@@ -2468,6 +2468,12 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Gérez les informations d’identification du registre, notamment la connexion et la déconnexion des registres de conteneurs.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Commandes de niveau système</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Commandes de gestion de niveau système.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marquer une image.</value>
   </data>

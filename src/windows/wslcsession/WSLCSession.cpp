@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
+#include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -108,6 +109,29 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     }
 
     return wslcInspect;
+}
+
+using wsl::windows::service::wslc::c_descriptors;
+using wsl::windows::service::wslc::c_mountains;
+
+// Generate a random container name in the format "descriptor_mountain".
+// When retry > 0, appends a random digit (0-9) to reduce collisions.
+std::string GenerateContainerName(int retry)
+{
+    std::mt19937 gen(std::random_device{}());
+
+    std::uniform_int_distribution<size_t> leftDist(0, c_descriptors.size() - 1);
+    std::uniform_int_distribution<size_t> rightDist(0, c_mountains.size() - 1);
+
+    auto name = std::format("{}_{}", c_descriptors[leftDist(gen)], c_mountains[rightDist(gen)]);
+
+    if (retry > 0)
+    {
+        std::uniform_int_distribution<int> digitDist(0, 9);
+        name += std::to_string(digitDist(gen));
+    }
+
+    return name;
 }
 
 } // namespace
@@ -235,7 +259,7 @@ try
         TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
     // Create the VM.
-    m_virtualMachine.emplace(Vm, Settings);
+    m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
@@ -1704,7 +1728,7 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
-    if (containerOptions->Name != nullptr)
+    if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
     {
         ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
@@ -1717,8 +1741,38 @@ try
     {
         std::scoped_lock lock(m_containersLock, m_networksLock);
 
+        // Generate a unique container name if the user didn't provide one.
+        std::string containerName;
+        if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
+        {
+            containerName = containerOptions->Name;
+        }
+        else
+        {
+            constexpr int c_maxNameRetries = 6;
+            for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
+            {
+                auto randomName = GenerateContainerName(attempt);
+                if (std::ranges::none_of(m_containers, [&](const auto& c) { return c->Name() == randomName; }))
+                {
+                    containerName = randomName;
+                    break;
+                }
+            }
+
+            // Fallback to a GUID name.
+            if (containerName.empty())
+            {
+                WSL_LOG("GenerateGuidContainerName");
+                GUID guid{};
+                THROW_IF_FAILED(CoCreateGuid(&guid));
+                containerName = wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
+            }
+        }
+
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
             *containerOptions,
+            containerName,
             *this,
             m_virtualMachine.value(),
             m_pluginNotifier.get(),
@@ -2106,7 +2160,12 @@ HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WS
 
 int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
 {
-    LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGTERM));
+    auto signalResult = Process.Get().Signal(WSLCSignalSIGTERM);
+    if (FAILED(signalResult))
+    {
+        LOG_HR_MSG(signalResult, "Failed to terminate process %i", Process.Get().GetPid());
+        return -1;
+    }
 
     try
     {
@@ -2465,22 +2524,24 @@ try
     }
     else
     {
-        // Stop dockerd first, then containerd (dockerd is a client of containerd).
-        // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-        if (m_dockerdProcess.has_value())
-        {
-            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-            WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-        }
-
-        if (m_containerdProcess.has_value())
-        {
-            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-            WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
-        }
-
         if (m_virtualMachine)
         {
+            m_virtualMachine->OnSessionTerminated();
+
+            // Stop dockerd first, then containerd (dockerd is a client of containerd).
+            // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
+            if (m_dockerdProcess.has_value())
+            {
+                auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+                WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
+            }
+
+            if (m_containerdProcess.has_value())
+            {
+                auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+                WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+            }
+
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
             try
             {

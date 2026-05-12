@@ -2461,6 +2461,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Manage registry credentials, including logging in and out of container registries.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tag an image.</value>
   </data>

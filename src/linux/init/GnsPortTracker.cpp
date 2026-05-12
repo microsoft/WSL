@@ -20,10 +20,17 @@ constexpr auto c_sock_diag_poll_timeout = std::chrono::milliseconds(10);
 constexpr auto c_bpf_poll_timeout = std::chrono::milliseconds(500);
 
 GnsPortTracker::GnsPortTracker(
-    std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher) :
-    m_hvSocketChannel(std::move(hvSocketChannel)), m_channel(std::move(netlinkChannel)), m_seccompDispatcher(seccompDispatcher)
+    std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+    NetlinkChannel&& netlinkChannel,
+    std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+    LX_MINI_INIT_NETWORKING_MODE networkingMode) :
+    m_hvSocketChannel(std::move(hvSocketChannel)),
+    m_channel(std::move(netlinkChannel)),
+    m_seccompDispatcher(seccompDispatcher),
+    m_networkingMode(networkingMode)
 {
     m_networkNamespace = std::filesystem::read_symlink("/proc/self/ns/net").string();
+    GNS_LOG_INFO("GnsPortTracker initialized with networking mode ({})", static_cast<int>(m_networkingMode));
 }
 
 void GnsPortTracker::RunPortRefresh()
@@ -175,9 +182,9 @@ void GnsPortTracker::Run()
     }
 }
 
-std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
+GnsPortTracker::ActivePorts GnsPortTracker::ListAllocatedPorts()
 {
-    std::set<PortAllocation> ports;
+    ActivePorts ports;
 
     inet_diag_req_v2 message{};
     message.sdiag_family = AF_INET;
@@ -188,8 +195,9 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
         for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
         {
             const auto* payload = e.Payload();
-            in6_addr address = {};
+            ports.PortProtocolPairs.emplace(ntohs(payload->id.idiag_sport), static_cast<int>(message.sdiag_protocol));
 
+            in6_addr address = {};
             if (payload->idiag_family == AF_INET6)
             {
                 static_assert(sizeof(address.s6_addr32) == 16);
@@ -201,7 +209,8 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
                 address.s6_addr32[0] = payload->id.idiag_src[0];
             }
 
-            ports.emplace(ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+            ports.FullAllocations.emplace(
+                ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
         }
     };
 
@@ -232,7 +241,7 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
     return ports;
 }
 
-void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp)
+void GnsPortTracker::OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp)
 {
     // Because there's no way to get notified when the bind() call actually completes, it' possible
     // that this method is called before the bind() completion and so the port allocation may not be visible yet.
@@ -244,7 +253,25 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
 
     for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
     {
-        if (Ports.find(it->first) == Ports.end())
+        bool portStillActive = false;
+        if (IsMirroredMode())
+        {
+            // In mirrored mode, match by port+protocol only. Sockets can use a source port even though an explicit
+            // bind() was not made for that port. As long as there is a socket using the source port, we should not
+            // deallocate it yet.
+            //
+            // For example, a listening socket on port X and a connection socket accepted from that listening socket
+            // will both use port X. Even if the listening socket is closed the connection socket may still be using
+            // the same port.
+            portStillActive = Ports.PortProtocolPairs.contains({it->first.Port, it->first.Protocol});
+        }
+        else
+        {
+            // In other modes, match by full allocation (port+family+protocol+address).
+            portStillActive = Ports.FullAllocations.contains(it->first);
+        }
+
+        if (!portStillActive)
         {
             if (!it->second.has_value() || it->second.value() < Timestamp)
             {
@@ -269,7 +296,7 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
             it->second.reset(); // The port is known to be allocated, remove the timeout
         }
 
-        it++;
+        ++it;
     }
 }
 

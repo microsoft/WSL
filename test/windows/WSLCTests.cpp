@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 #include "hcs.hpp"
+#include "ContainerNameGenerator.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -8148,7 +8149,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerNameGeneration)
     {
         {
-            // Create a container with a specific name
+            // Create a container with a specific name.
             auto container = WSLCContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
 
             // Validate that the container name is correct.
@@ -8159,8 +8160,38 @@ class WSLCTests
             // Create a container without name.
             auto container = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
 
-            // Validate that the service generates a name for the container.
-            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+            // Validate that the service generates a name in the format "descriptor_mountain[digit]".
+            auto name = container.Name();
+            VERIFY_ARE_NOT_EQUAL(name, "");
+
+            auto underscore = name.find('_');
+            VERIFY_ARE_NOT_EQUAL(underscore, std::string::npos);
+
+            auto descriptor = name.substr(0, underscore);
+            auto mountain = name.substr(underscore + 1);
+
+            // Strip trailing retry digit if present.
+            if (!mountain.empty() && std::isdigit(mountain.back()))
+            {
+                mountain.pop_back();
+            }
+
+            using wsl::windows::service::wslc::c_descriptors;
+            using wsl::windows::service::wslc::c_mountains;
+
+            VERIFY_IS_TRUE(std::ranges::find(c_descriptors, descriptor) != c_descriptors.end());
+            VERIFY_IS_TRUE(std::ranges::find(c_mountains, mountain) != c_mountains.end());
+        }
+
+        {
+            // Create multiple containers without names and verify they get unique names.
+            auto container1 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container2 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container3 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container2.Name());
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container3.Name());
+            VERIFY_ARE_NOT_EQUAL(container2.Name(), container3.Name());
         }
     }
 

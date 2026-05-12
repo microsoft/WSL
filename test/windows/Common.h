@@ -601,6 +601,10 @@ void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, con
 std::string ReadToString(SOCKET Handle);
 std::string ReadToString(HANDLE Handle);
 
+// Connects a pair of overlapped TCP sockets via an anonymous bind on the loopback interface.
+// Returns {client, server}.
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
+
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
@@ -671,3 +675,5 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size);

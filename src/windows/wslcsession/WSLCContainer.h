@@ -128,6 +128,7 @@ public:
 
     static std::unique_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
+        const std::string& Name,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
         IWSLCPluginNotifier* pluginNotifier,
