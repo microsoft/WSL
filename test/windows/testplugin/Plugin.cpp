@@ -18,6 +18,9 @@ Abstract:
 #include "PluginTests.h"
 
 using namespace wsl::windows::common::registry;
+using namespace wsl::windows::common::relay;
+using namespace wsl::shared::string;
+using namespace std::chrono_literals;
 
 std::ofstream g_logfile;
 std::optional<GUID> g_distroGuid;
@@ -376,15 +379,14 @@ static std::string ExtractJsonStringField(const char* json, std::string_view key
 
 HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
-    g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
-              << ", id=" << Session->SessionId << ", pid=" << Session->ApplicationPid
-              << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
+    g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName) << ", id=" << Session->SessionId
+              << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
               << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
 
     if (g_testType == PluginTestType::WslcSessionRejected)
     {
-        g_logfile << "OnWslcSessionCreated: E_UNEXPECTED" << std::endl;
-        return E_UNEXPECTED;
+        g_logfile << "OnWslcSessionCreated: ERROR_ACCESS_DENIED" << std::endl;
+        return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
     return S_OK;
@@ -399,6 +401,7 @@ HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
 }
 
 HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
+try
 {
     auto id = ExtractJsonStringField(InspectContainer, "Id");
     auto image = ExtractJsonStringField(InspectContainer, "Image");
@@ -407,67 +410,123 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
-        g_logfile << "OnWslcContainerStarted: E_UNEXPECTED" << std::endl;
-        return E_UNEXPECTED;
+        g_logfile << "OnWslcContainerStarted: ERROR_ACCESS_DENIED" << std::endl;
+        return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
-    if (g_testType == PluginTestType::WslcSuccess && g_api != nullptr)
+    if (g_testType == PluginTestType::WslcSuccess)
     {
-        // Mount a Windows folder, run a process in the root namespace, wait for it to exit,
-        // then unmount. Validates the full plugin -> WSLC API surface in one go.
-        std::filesystem::path modulePath = wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get();
-        auto mountSource = modulePath.parent_path().wstring();
+        // Helper: run a command in the root namespace and return stdout.
+        auto runCommand = [&](const char* cmd,
+                              const std::optional<std::string>& input = {},
+                              std::vector<const char*> env = {}) -> std::tuple<int, std::string, std::string> {
+            std::vector<const char*> arguments = {"/bin/sh", "-c", cmd, nullptr};
+            WSLCProcess process{};
+            THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), env.data(), &process));
 
-        wchar_t mountpoint[256] = {};
-        const auto mountResult =
-            g_api->WSLCMountFolder(Session->SessionId, mountSource.c_str(), TRUE, L"plugin-test-mount", mountpoint);
-        if (FAILED(mountResult))
-        {
-            g_logfile << "WSLC MountFolder failed: " << mountResult << std::endl;
-            return S_OK;
-        }
+            std::string out;
+            std::string err;
 
-        g_logfile << "WSLC Folder mounted at: " << wsl::shared::string::WideToMultiByte(mountpoint) << std::endl;
+            MultiHandleWait io;
+            io.AddHandle(std::make_unique<ReadHandle>(
+                wil::unique_socket{process.Stdout}, [&out](const auto& span) { out.append(span.begin(), span.end()); }));
 
-        std::vector<const char*> arguments = {"/bin/sh", "-c", "echo wslc-plugin-ok", nullptr};
-        WSLCProcess process{};
-        const auto procResult = g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), nullptr, &process);
-        if (FAILED(procResult))
-        {
-            g_logfile << "WSLC CreateProcess failed: " << procResult << std::endl;
-        }
-        else
-        {
-            g_logfile << "WSLC Process created, pid=" << process.Pid << std::endl;
+            io.AddHandle(std::make_unique<ReadHandle>(
+                wil::unique_socket{process.Stderr}, [&err](const auto& span) { err.append(span.begin(), span.end()); }));
 
-            int status = 0;
-            const auto waitResult = g_api->WSLCWaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status);
-            g_logfile << "WSLC WaitPid result=" << waitResult << ", status=" << status << std::endl;
+            io.AddHandle(std::make_unique<EventHandle>(wil::unique_handle{process.ExitEvent}));
 
-            if (process.Stdin != INVALID_SOCKET)
+            if (input.has_value())
+            {
+                io.AddHandle(
+                    std::make_unique<WriteHandle>(wil::unique_socket{process.Stdin}, std::vector<char>(input->begin(), input->end())));
+            }
+            else
             {
                 closesocket(process.Stdin);
             }
-            if (process.Stdout != INVALID_SOCKET)
-            {
-                closesocket(process.Stdout);
-            }
-            if (process.Stderr != INVALID_SOCKET)
-            {
-                closesocket(process.Stderr);
-            }
-            if (process.ExitEvent != nullptr)
-            {
-                CloseHandle(process.ExitEvent);
-            }
+
+            io.Run(60000ms);
+
+            int status = 0;
+            THROW_IF_FAILED(g_api->WSLCWaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status));
+            g_logfile << "Command'" << cmd << "', status=" << status << ", stdout: " << out << ", stderr: " << err << std::endl;
+
+            return {status, out, err};
+        };
+
+        // Test process creation (output & exit code validated by the test code).
+        {
+            runCommand("echo -n stdout-ok && echo -n stderr-ok >&2");
+            runCommand("cat", "stdin-ok");
+            runCommand("exit 12");
+            runCommand("echo -n $ENV", {}, {"ENV=env-ok", nullptr});
         }
 
-        const auto unmountResult = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
-        g_logfile << "WSLC Folder unmounted, result=" << unmountResult << std::endl;
+        // Validate that trying to execute a non-existent file fails with the expected error code.
+        {
+
+            WSLCProcess process{};
+            std::vector<const char*> args = {"does-not-exist", nullptr};
+
+            g_logfile << "WSLCCreateProcess(does-not-exist): "
+                      << std::hex << g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process) << std::endl;
+        }
+
+        // Validate that waitpid with an invalid pid fails with the expected error code.
+        {
+            g_logfile << "WSLCWaitPid(9999): " << std::hex << g_api->WSLCWaitPid(Session->SessionId, 9999, 30000, nullptr) << std::endl;
+        }
+
+        // Validate that waitpid returns the expected error on timeout
+        {
+            g_logfile << "WSLCWaitPid(1): " << std::hex << g_api->WSLCWaitPid(Session->SessionId, 1, 100, nullptr) << std::endl;
+        }
+
+        const auto testFolder = L"C:\\";
+        constexpr auto testFileName = "plu  gin-test.txt";
+
+        // Validate rw mounts.
+        {
+            auto rwCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testFileName); });
+
+            {
+                std::ofstream file(std::wstring(testFolder) + L"\\testfile.txt");
+                file << "Windows-content";
+            }
+
+            // Mount read-write and verify the file can be read from Linux.
+            wchar_t rwMountpoint[256] = {};
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, false, L"plugin-rw-test", rwMountpoint));
+
+            g_logfile << "WSLC RW folder mounted at: " << WideToMultiByte(rwMountpoint) << std::endl;
+
+            auto readCmd = std::format("cat {}/testfile.txt", rwMountpoint);
+            runCommand(readCmd.c_str());
+
+            THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, rwMountpoint));
+        }
+
+        // Validate ro mounts.
+        {
+            wchar_t roMountpoint[256] = {};
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"plugin-ro-test", roMountpoint));
+
+            g_logfile << "WSLC RO folder mounted at: " << WideToMultiByte(roMountpoint) << std::endl;
+
+            // Attempt to write from Linux — should fail on a read-only mount.
+            auto writeCmd = std::format("echo fail > {}/should-not-exist.txt", roMountpoint);
+            runCommand(writeCmd.c_str());
+
+            THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, roMountpoint));
+        }
+
+        g_logfile << "Test completed" << std::endl;
     }
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
 {

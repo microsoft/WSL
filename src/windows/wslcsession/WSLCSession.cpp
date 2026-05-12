@@ -1438,12 +1438,15 @@ try
     *Count = static_cast<ULONG>(deletedImages.size());
     *DeletedImages = output.release();
 
-    // Notify plugin manager of deleted images (best-effort).
-    for (size_t i = 0; i < deletedImages.size(); ++i)
+    // Notify plugin manager that the image was deleted (best-effort).
+    // Use the first Deleted entry which corresponds to the top-level image.
+    for (const auto& image : deletedImages)
     {
-        const auto& image = deletedImages[i];
-        const auto& name = image.Deleted.empty() ? image.Untagged : image.Deleted;
-        NotifyImageDeletedByName(name);
+        if (!image.Deleted.empty())
+        {
+            NotifyImageDeletedByName(image.Deleted);
+            break;
+        }
     }
 
     return S_OK;

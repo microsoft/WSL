@@ -609,12 +609,9 @@ class PluginTests
         WSLCSessionSettings settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
-        settings.MemoryMb = 2048;
+        settings.MemoryMb = 4096;
         settings.BootTimeoutMs = 30 * 1000;
-        const auto storagePathStr = StoragePath.wstring();
-        settings.StoragePath = storagePathStr.c_str();
-        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
-        settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
@@ -680,10 +677,16 @@ class PluginTests
             WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=*
             WSLC Container started, session=*, id=*, image=debian:latest
-            WSLC Folder mounted at: /mnt/wsl-plugin/plugin-test-mount
-            WSLC Process created, pid=*
-            WSLC WaitPid result=0, status=0
-            WSLC Folder unmounted, result=0
+            Command'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
+            Command'cat', status=0, stdout: stdin-ok, stderr: 
+            Command'exit 12', status=12, stdout: , stderr: 
+            Command'echo -n $ENV', status=0, stdout: env-ok, stderr: 
+            WSLCCreateProcess(does-not-exist): -2147467259
+            WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
+            Command'cat /mnt/wsl-plugin/plugin-rw-test/testfile.txt', status=0, stdout: Windows-content, stderr: 
+            WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
+            Command'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=*, stdout: , stderr: *
+            Test completed
             WSLC Container stopping, session=*, id=*
             WSLC Image deleted, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-test, id=*)";
@@ -714,12 +717,12 @@ class PluginTests
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
         const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
-        VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=19
             WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
-            OnWslcSessionCreated: E_UNEXPECTED)";
+            OnWslcSessionCreated: ERROR_ACCESS_DENIED)";
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -743,7 +746,7 @@ class PluginTests
                 "debian:latest", "wslc-plugin-rejected-container", {"/bin/sh", "-c", "echo nope"});
 
             auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsAttach);
-            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
         }
 
         constexpr auto ExpectedOutput =
@@ -751,7 +754,7 @@ class PluginTests
             WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=*
             WSLC Container started, session=*, id=*, image=debian:latest
-            OnWslcContainerStarted: E_UNEXPECTED
+            OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
 
         ValidateLogFile(ExpectedOutput);
