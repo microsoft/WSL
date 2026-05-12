@@ -67,7 +67,7 @@ class WSLCE2EImageImportTests
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify the imported image is listed
-        VerifyImageIsListed(ImportedImage.NameAndTag());
+        VerifyImageIsListed(ImportedImage);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_WithoutTag)
