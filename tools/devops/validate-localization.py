@@ -174,6 +174,88 @@ def fix_comments(comments: dict, path: str, strings: dict):
     click.secho(f'Updated file: {path}. {missed} comments need manual changes', fg='green' if missed == 0 else 'yellow', bold=True)
 
 
+ADML_NS = '{http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions}'
+ADML_FOLDER = 'intune'
+ADML_FILENAME = 'WSL.adml'
+
+def get_adml_strings(path: str) -> dict:
+    """Parse an .adml file and return {id: (value, [locked_tokens])}.
+
+    Locked tokens are extracted from XML comments of the form
+    `<!-- {Locked="..."}{Locked="..."} -->` placed immediately before a
+    `<string>` element. Non-Locked comments are ignored.
+    """
+    with open(path, 'rb') as fd:
+        content = fd.read()
+
+    root = xml.etree.ElementTree.fromstring(content)
+    string_table = root.find(f'.//{ADML_NS}stringTable')
+    if string_table is None:
+        return {}
+
+    strings = {sid: (text, []) for sid, text in
+               ((s.get('id'), s.text or '') for s in string_table.findall(f'{ADML_NS}string'))
+               if sid is not None}
+
+    text = content.decode('utf-8')
+    pattern = re.compile(r'<!--(.*?)-->\s*<string\s+id="([^"]+)"', re.DOTALL)
+    for m in pattern.finditer(text):
+        sid = m.group(2)
+        tokens = re.findall(r'\{Locked="([^"]*)"\}', m.group(1))
+        if tokens and sid in strings:
+            value, _ = strings[sid]
+            strings[sid] = (value, tokens)
+
+    return strings
+
+def validate_adml(adml_folder: str, baseline_language: str) -> bool:
+    """Validate ADML files. No-op when the baseline file isn't present."""
+    baseline_path = f'{adml_folder}/{baseline_language}/{ADML_FILENAME}'
+    if not os.path.isfile(baseline_path):
+        return True
+
+    print(f'Validating ADML baseline {baseline_path}')
+    baseline = get_adml_strings(baseline_path)
+    baseline_ids = set(baseline.keys())
+
+    result = True
+    for sid, (value, tokens) in baseline.items():
+        for tok in tokens:
+            if tok not in value:
+                print(f'error: locked token "{tok}" not found in baseline ADML string {sid}: {value}')
+                result = False
+
+    if not os.path.isdir(adml_folder):
+        return result
+
+    for entry in sorted(os.listdir(adml_folder)):
+        locale_path = f'{adml_folder}/{entry}/{ADML_FILENAME}'
+        if entry == baseline_language or not os.path.isfile(locale_path):
+            continue
+
+        print(f'Validating ADML {locale_path}')
+        translated = get_adml_strings(locale_path)
+        translated_ids = set(translated.keys())
+
+        missing = baseline_ids - translated_ids
+        extra = translated_ids - baseline_ids
+        if missing:
+            print(f'error: ADML {locale_path} is missing string ids: {sorted(missing)}')
+            result = False
+        if extra:
+            print(f'error: ADML {locale_path} has unexpected string ids: {sorted(extra)}')
+            result = False
+
+        for sid in baseline_ids & translated_ids:
+            _, tokens = baseline[sid]
+            tvalue, _ = translated[sid]
+            for tok in tokens:
+                if tok not in tvalue:
+                    print(f'error: locked token "{tok}" not found in {locale_path} string {sid}: {tvalue}')
+                    result = False
+
+    return result
+
 def run(resource_folder: str, baseline_language: str, fix: bool):
     baseline_file = f'{resource_folder}/{baseline_language}/Resources.resw'
 
@@ -185,6 +267,8 @@ def run(resource_folder: str, baseline_language: str, fix: bool):
         path = f'{resource_folder}/{language}/Resources.resw'
         print(f'Validating inserts in {path}')
         result &= validate_resource(baseline, path)
+
+    result &= validate_adml(ADML_FOLDER, baseline_language)
 
     if fix and comments:
         fix_comments(comments, baseline_file, strings)
