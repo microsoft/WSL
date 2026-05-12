@@ -440,7 +440,7 @@ std::vector<ContainerInformation> ContainerService::List(
         filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
-    WSLCListContainersOptions options;
+    WSLCListContainersOptions options{};
     options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
     options.Limit = limit;
     options.Filters = filterEntries.data();

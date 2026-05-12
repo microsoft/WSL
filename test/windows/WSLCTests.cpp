@@ -5470,7 +5470,7 @@ class WSLCTests
                 filters.push_back({.Key = k.c_str(), .Value = v.c_str()});
             }
 
-            WSLCListContainersOptions options;
+            WSLCListContainersOptions options{};
             options.Flags = flags;
             options.Filters = filters.data();
             options.FiltersCount = static_cast<ULONG>(filters.size());

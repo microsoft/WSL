@@ -1788,6 +1788,12 @@ try
 
     if (Options != nullptr)
     {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsAnyFlagSet(static_cast<WSLCListContainersFlags>(Options->Flags), ~WSLCListContainersFlagsValid),
+            "Invalid flags: 0x%x",
+            Options->Flags);
+
         all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
         limit = static_cast<int>(Options->Limit);
 

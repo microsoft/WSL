@@ -521,7 +521,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -a,--all     Show all regardless of state.\r\n"
-                << L"  --filter     " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
+                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
                 << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
                 << L"  -n,--last    " << Localization::WSLCCLI_LastArgDescription() << L"\r\n"
                 << L"  -l,--latest  " << Localization::WSLCCLI_LatestArgDescription() << L"\r\n"
