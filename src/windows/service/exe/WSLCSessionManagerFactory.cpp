@@ -24,10 +24,6 @@ CoCreatableClassWithFactory(WSLCSessionManager, WSLCSessionManagerFactory);
 
 static std::mutex g_mutex;
 static std::optional<WSLCSessionManagerImpl> g_sessionManagerImpl = std::make_optional<WSLCSessionManagerImpl>();
-static const bool g_sessionManagerInstanceRegistered = [] {
-    WSLCSessionManagerImpl::SetInstance(&g_sessionManagerImpl.value());
-    return true;
-}();
 static Microsoft::WRL::ComPtr<WSLCSessionManager> g_sessionManager;
 
 HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)

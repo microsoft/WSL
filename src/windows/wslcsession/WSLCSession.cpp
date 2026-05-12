@@ -213,7 +213,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm)
+HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_opt_ IWSLCPluginNotifier* PluginNotifier)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
@@ -223,7 +223,7 @@ try
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
-    m_pluginNotifier = Settings->PluginNotifier;
+    m_pluginNotifier = PluginNotifier;
 
     // Get user token for the current process
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
@@ -625,7 +625,7 @@ try
         json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
     }
 
-    LOG_IF_FAILED(m_pluginNotifier->NotifyImageCreated(json.c_str()));
+    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(json.c_str()));
 }
 CATCH_LOG()
 
@@ -640,7 +640,7 @@ try
     // The image is gone (or about to be) so use a minimal JSON keyed by ID.
     auto json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
 
-    LOG_IF_FAILED(m_pluginNotifier->NotifyImageDeleted(json.c_str()));
+    LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(json.c_str()));
 }
 CATCH_LOG()
 

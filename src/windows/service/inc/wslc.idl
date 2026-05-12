@@ -131,16 +131,16 @@ interface IWSLCPluginNotifier : IUnknown
 {
     // 'InspectJson' follows the wslc_schema::InspectContainer format.
     // Returning failure prevents the container creation.
-    HRESULT NotifyContainerStarted([in] LPCSTR InspectJson);
+    HRESULT OnContainerStarted([in] LPCSTR InspectJson);
 
     // Called when a container is about to stop. Errors are logged but ignored.
-    HRESULT NotifyContainerStopping([in] LPCSTR InspectJson);
+    HRESULT OnContainerStopping([in] LPCSTR InspectJson);
 
     // 'InspectJson' follows the wslc_schema::InspectImage format. Errors are logged but ignored.
-    HRESULT NotifyImageCreated([in] LPCSTR InspectJson);
+    HRESULT OnImageCreated([in] LPCSTR InspectJson);
 
     // Called when an image is deleted. Errors are logged but ignored.
-    HRESULT NotifyImageDeleted([in] LPCSTR InspectJson);
+    HRESULT OnImageDeleted([in] LPCSTR InspectJson);
 };
 
 typedef struct _WSLCImageInformation
@@ -718,9 +718,6 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
-    // Optional notifier used by the per-user process to forward plugin-related events
-    // (container started/stopped, image created/deleted) back to the SYSTEM service.
-    [unique] IWSLCPluginNotifier* PluginNotifier;
 } WSLCSessionInitSettings;
 
 [
@@ -775,10 +772,12 @@ interface IWSLCSession : IUnknown
     // Returns a handle to this COM server process (used to add to job object).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Initializes the session with a pre-created VM.
+    // Initializes the session with a pre-created VM and an optional plugin notifier
+    // for forwarding plugin-related events back to the SYSTEM service.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm);
+        [in] IWSLCVirtualMachine* Vm,
+        [in, unique] IWSLCPluginNotifier* PluginNotifier);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
@@ -832,6 +831,7 @@ interface IWSLCSessionFactory : IUnknown
     HRESULT CreateSession(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
+        [in, unique] IWSLCPluginNotifier* PluginNotifier,
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 

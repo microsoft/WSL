@@ -757,10 +757,10 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
             inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
         }
 
-        const auto rejectionResult = notifier->NotifyContainerStarted(inspectJson.c_str());
+        const auto rejectionResult = notifier->OnContainerStarted(inspectJson.c_str());
         if (FAILED(rejectionResult))
         {
-            LOG_HR_MSG(rejectionResult, "Plugin rejected container '%hs'; stopping it", m_id.c_str());
+            LOG_HR_MSG(rejectionResult, "Plugin rejected container '%hs' (0x%x); stopping it", m_id.c_str(), rejectionResult);
             try
             {
                 m_dockerClient.StopContainer(m_id, std::nullopt, std::nullopt);
@@ -931,7 +931,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
             inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
         }
 
-        LOG_IF_FAILED(notifier->NotifyContainerStopping(inspectJson.c_str()));
+        LOG_IF_FAILED(notifier->OnContainerStopping(inspectJson.c_str()));
     }
 
     ReleaseProcesses();
