@@ -19,4 +19,4 @@ constexpr uint32_t s_DefaultMemoryMB = 2000;
 // Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
 constexpr ULONG s_DefaultBootTimeout = 300000;
 // Default to 32 GB
-constexpr UINT64 s_DefaultStorageSize = 32ULL * 1000 * 1000 * 1000;
+constexpr UINT64 s_DefaultStorageSize = 32ULL * 1024 * 1024 * 1024;
