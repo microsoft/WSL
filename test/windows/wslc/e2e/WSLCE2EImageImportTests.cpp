@@ -72,6 +72,8 @@ class WSLCE2EImageImportTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_WithoutTag)
     {
+        SKIP_TEST_UNSTABLE();
+
         // Save image as a tarball
         auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});

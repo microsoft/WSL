@@ -71,6 +71,35 @@ std::string GetServerFromImage(const std::string& image)
     return server;
 }
 
+struct InputSource
+{
+    HANDLE Handle = nullptr;
+    wil::unique_hfile File;
+    ULONGLONG ContentLength = 0;
+};
+
+InputSource OpenImageInput(const std::wstring& input)
+{
+    InputSource result;
+    if (input == L"-")
+    {
+        result.Handle = GetStdHandle(STD_INPUT_HANDLE);
+    }
+    else
+    {
+        result.File.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!result.File);
+
+        LARGE_INTEGER fileSize{};
+        THROW_LAST_ERROR_IF(!GetFileSizeEx(result.File.get(), &fileSize));
+
+        result.Handle = result.File.get();
+        result.ContentLength = fileSize.QuadPart;
+    }
+
+    return result;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::services {
@@ -178,38 +207,15 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
-    wil::unique_hfile imageFile{CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-    THROW_LAST_ERROR_IF(!imageFile);
-
-    LARGE_INTEGER fileSize{};
-    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+    auto source = OpenImageInput(input);
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle), nullptr, source.ContentLength));
 }
 
 void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
-    HANDLE imageHandle = nullptr;
-    wil::unique_hfile imageFile;
-    ULONGLONG contentLength = 0;
-
-    if (input == L"-")
-    {
-        imageHandle = GetStdHandle(STD_INPUT_HANDLE);
-    }
-    else
-    {
-        imageFile.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF(!imageFile);
-
-        LARGE_INTEGER fileSize{};
-        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-
-        imageHandle = imageFile.get();
-        contentLength = fileSize.QuadPart;
-    }
-
-    THROW_IF_FAILED(session.Get()->ImportImage(ToCOMInputHandle(imageHandle), imageName.empty() ? nullptr : imageName.c_str(), nullptr, contentLength));
+    auto source = OpenImageInput(input);
+    THROW_IF_FAILED(session.Get()->ImportImage(
+        ToCOMInputHandle(source.Handle), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
