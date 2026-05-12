@@ -401,6 +401,7 @@ struct PortRelay
         wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
+    // Completes the overlapped AcceptEx initiated by ScheduleAccept, and sets accept context on the accepted socket.
     void CompleteAccept()
     {
         Pending = false;
@@ -419,6 +420,7 @@ struct PortRelay
             SOCKET_ERROR);
     }
 
+    // If the accept completes immediately, accept context will be set on the accepted socket.
     bool ScheduleAccept()
     {
         WI_VERIFY(!Pending);
