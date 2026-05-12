@@ -79,7 +79,7 @@ public:
     NON_COPYABLE(WSLCSessionManagerImpl);
     NON_MOVABLE(WSLCSessionManagerImpl);
 
-    WSLCSessionManagerImpl() = default;
+    WSLCSessionManagerImpl();
     ~WSLCSessionManagerImpl();
 
     void CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession);
@@ -88,26 +88,12 @@ public:
     void OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
 
-    // Resolved view of a session for plugin invocation - holds the COM session
-    // pointer plus the security info needed to build a WSLCSessionInformation.
-    struct ResolvedSession
-    {
-        wil::com_ptr<IWSLCSession> Session;
-        ULONG SessionId = 0;
-        DWORD CreatorPid = 0;
-        std::wstring DisplayName;
-        wil::unique_handle UserToken;
-        std::vector<BYTE> UserSid;
-    };
-
-    // Resolves a session by ID for plugin->API calls. Returns nullopt if no session matches
-    // (the session was released or never existed).
-    std::optional<ResolvedSession> FindSession(ULONG Id);
+    // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
+    wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
 
     // Returns the global instance used by SYSTEM-side singletons (e.g. PluginManager).
     // May be null during shutdown.
     static WSLCSessionManagerImpl* Instance() noexcept;
-    static void SetInstance(WSLCSessionManagerImpl* Instance) noexcept;
 
 private:
     // Resolves the default session name for a caller: appends the username

@@ -411,7 +411,7 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
         return E_UNEXPECTED;
     }
 
-    if (g_testType == PluginTestType::WslcSuccess && g_api != nullptr && g_api->Wslc != nullptr)
+    if (g_testType == PluginTestType::WslcSuccess && g_api != nullptr)
     {
         // Mount a Windows folder, run a process in the root namespace, wait for it to exit,
         // then unmount. Validates the full plugin -> WSLC API surface in one go.
@@ -420,7 +420,7 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
 
         wchar_t mountpoint[256] = {};
         const auto mountResult =
-            g_api->Wslc->MountFolder(Session->SessionId, mountSource.c_str(), TRUE, L"plugin-test-mount", mountpoint);
+            g_api->WSLCMountFolder(Session->SessionId, mountSource.c_str(), TRUE, L"plugin-test-mount", mountpoint);
         if (FAILED(mountResult))
         {
             g_logfile << "WSLC MountFolder failed: " << mountResult << std::endl;
@@ -431,7 +431,7 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
 
         std::vector<const char*> arguments = {"/bin/sh", "-c", "echo wslc-plugin-ok", nullptr};
         WSLCProcess process{};
-        const auto procResult = g_api->Wslc->CreateProcess(Session->SessionId, arguments[0], arguments.data(), nullptr, &process);
+        const auto procResult = g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), nullptr, &process);
         if (FAILED(procResult))
         {
             g_logfile << "WSLC CreateProcess failed: " << procResult << std::endl;
@@ -441,7 +441,7 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
             g_logfile << "WSLC Process created, pid=" << process.Pid << std::endl;
 
             int status = 0;
-            const auto waitResult = g_api->Wslc->WaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status);
+            const auto waitResult = g_api->WSLCWaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status);
             g_logfile << "WSLC WaitPid result=" << waitResult << ", status=" << status << std::endl;
 
             if (process.Stdin != INVALID_SOCKET)
@@ -462,7 +462,7 @@ HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR Ins
             }
         }
 
-        const auto unmountResult = g_api->Wslc->UnmountFolder(Session->SessionId, mountpoint);
+        const auto unmountResult = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
         g_logfile << "WSLC Folder unmounted, result=" << unmountResult << std::endl;
     }
 

@@ -114,13 +114,10 @@ struct WslcProcessKey
 std::mutex g_wslcProcessesMutex;
 std::map<WslcProcessKey, wil::com_ptr<IWSLCProcess>> g_wslcProcesses;
 
-std::optional<wsl::windows::service::wslc::WSLCSessionManagerImpl::ResolvedSession> ResolveWslcSession(WSLCSessionId Session)
+wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
 {
     auto* mgr = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance();
-    if (mgr == nullptr)
-    {
-        return std::nullopt;
-    }
+    THROW_HR_IF(RPC_E_DISCONNECTED, mgr == nullptr);
 
     return mgr->FindSession(static_cast<ULONG>(Session));
 }
@@ -134,14 +131,13 @@ try
 {
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
 
-    auto resolved = ResolveWslcSession(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+    auto session = ResolveWslcSession(Session);
 
     // Mount the folder under /mnt/wsl-plugin/<Name>. Convert Name to UTF-8 for the Linux path.
     const auto nameUtf8 = wsl::shared::string::WideToMultiByte(Name);
     const auto linuxPath = std::format("/mnt/wsl-plugin/{}", nameUtf8);
 
-    auto result = resolved->Session->MountWindowsFolder(WindowsPath, linuxPath.c_str(), ReadOnly);
+    auto result = session->MountWindowsFolder(WindowsPath, linuxPath.c_str(), ReadOnly);
 
     WSL_LOG(
         "WslcPluginMountFolderCall",
@@ -166,11 +162,10 @@ try
 {
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
-    auto resolved = ResolveWslcSession(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+    auto session = ResolveWslcSession(Session);
 
     const auto mountpointUtf8 = wsl::shared::string::WideToMultiByte(Mountpoint);
-    auto result = resolved->Session->UnmountWindowsFolder(mountpointUtf8.c_str());
+    auto result = session->UnmountWindowsFolder(mountpointUtf8.c_str());
 
     WSL_LOG(
         "WslcPluginUnmountFolderCall",
@@ -186,8 +181,7 @@ try
 {
     RETURN_HR_IF(E_POINTER, Executable == nullptr || Process == nullptr);
 
-    auto resolved = ResolveWslcSession(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+    auto session = ResolveWslcSession(Session);
 
     // Count NULL-terminated arrays.
     auto countArray = [](LPCSTR* arr) -> ULONG {
@@ -208,10 +202,11 @@ try
     options.CommandLine.Count = countArray(Arguments);
     options.Environment.Values = Env;
     options.Environment.Count = countArray(Env);
+    options.Flags = WSLCProcessFlagsStdin;
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = resolved->Session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
     if (FAILED(result))
     {
         WSL_LOG(
@@ -317,9 +312,8 @@ CATCH_RETURN();
 
 } // extern "C"
 
-static constexpr WSLCPluginAPIV1 WslcApiV1 = {&WSLCMountFolder, &WSLCUnmountFolder, &WSLCCreateProcess, &WSLCWaitPid};
-
-static constexpr WSLPluginAPIV1 ApiV1 = {Version, &MountFolder, &ExecuteBinary, &PluginError, &ExecuteBinaryInDistribution, &WslcApiV1};
+static constexpr WSLPluginAPIV1 ApiV1 = {
+    Version, &MountFolder, &ExecuteBinary, &PluginError, &ExecuteBinaryInDistribution, &WSLCMountFolder, &WSLCUnmountFolder, &WSLCCreateProcess, &WSLCWaitPid};
 
 void PluginManager::LoadPlugins()
 {

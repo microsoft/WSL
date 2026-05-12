@@ -83,13 +83,6 @@ public:
     // Used by the COM server host to signal process exit.
     void SetDestructionCallback(std::function<void()>&& callback);
 
-    // Returns the cross-process plugin notifier supplied by the SYSTEM service, or nullptr
-    // if no plugins are loaded. Used by container/image flows to forward plugin events.
-    IWSLCPluginNotifier* GetPluginNotifier() const noexcept
-    {
-        return m_pluginNotifier.get();
-    }
-
     // Helper used by image flows to notify the SYSTEM service plugin manager
     // that an image was created. Best-effort: any failures (including no plugin
     // installed) are swallowed so they cannot break the image flow.

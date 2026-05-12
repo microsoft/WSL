@@ -73,5 +73,4 @@ void wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances()
     }
 
     g_sessionManagerImpl.reset();
-    WSLCSessionManagerImpl::SetInstance(nullptr);
 }

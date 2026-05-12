@@ -72,6 +72,7 @@ public:
     WSLCContainerImpl(
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
+        IWSLCPluginNotifier* pluginNotifier,
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
@@ -129,6 +130,7 @@ public:
         const WSLCContainerOptions& Options,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
+        IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
@@ -139,6 +141,7 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
+        IWSLCPluginNotifier* pluginNotifier,
         WSLCVolumes& Volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
@@ -196,6 +199,7 @@ private:
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
+    IWSLCPluginNotifier* m_pluginNotifier;
     WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;

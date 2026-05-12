@@ -466,6 +466,7 @@ WSLCPortMapping ContainerPortMapping::Serialize() const
 WSLCContainerImpl::WSLCContainerImpl(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
@@ -482,6 +483,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags) :
     m_wslcSession(wslcSession),
+    m_pluginNotifier(pluginNotifier),
     m_virtualMachine(virtualMachine),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
@@ -741,7 +743,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     // Notify plugin manager (cross-process via the SYSTEM service) before finalizing state
     // so the container can be cleanly torn down on rejection by letting the scope_exit guards
     // unwind ports/volumes/init. Inspect inline because m_lock is already held exclusive.
-    auto* notifier = m_wslcSession.GetPluginNotifier();
+    auto* notifier = m_pluginNotifier;
     if (notifier != nullptr)
     {
         std::string inspectJson;
@@ -914,7 +916,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     unique_com_disconnect comWrapper;
 
     // Notify plugin manager (best-effort) that the container is stopping. Errors are ignored.
-    auto* notifier = m_wslcSession.GetPluginNotifier();
+    auto* notifier = m_pluginNotifier;
     if (notifier != nullptr && m_state == WslcContainerStateRunning)
     {
         std::string inspectJson;
@@ -1274,6 +1276,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
@@ -1603,6 +1606,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
+        pluginNotifier,
         std::move(result.Id),
         CleanContainerName(inspectData.Name),
         std::string(containerOptions.Image),
@@ -1627,6 +1631,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     WSLCVolumes& volumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
@@ -1691,6 +1696,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
+        pluginNotifier,
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),

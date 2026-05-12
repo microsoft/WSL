@@ -47,6 +47,8 @@ namespace settings = wsl::windows::wslc::settings;
 
 namespace {
 
+std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
+
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
 {
@@ -119,6 +121,11 @@ private:
 
 } // namespace
 
+WSLCSessionManagerImpl::WSLCSessionManagerImpl()
+{
+    g_managerInstance.store(this);
+}
+
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
     // Terminate all sessions on shutdown.
@@ -131,6 +138,8 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
         FireSessionStoppingLocked(entry);
         LOG_IF_FAILED(entry.Ref->Terminate());
     }
+
+    g_managerInstance.store(nullptr);
 }
 
 void WSLCSessionManagerImpl::FireSessionStoppingLocked(SessionEntry& entry) noexcept
@@ -575,12 +584,6 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
-namespace {
-// Global accessor used by PluginManager / WSLCPluginNotifier to resolve sessions.
-// Owned by WSLCSessionManagerFactory.
-std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
-} // namespace
-
 namespace wsl::windows::service::wslc {
 
 WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
@@ -588,14 +591,9 @@ WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
     return g_managerInstance.load();
 }
 
-void WSLCSessionManagerImpl::SetInstance(WSLCSessionManagerImpl* Instance) noexcept
+wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {
-    g_managerInstance.store(Instance);
-}
-
-std::optional<WSLCSessionManagerImpl::ResolvedSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
-{
-    std::optional<ResolvedSession> resolved;
+    wil::com_ptr<IWSLCSession> result;
 
     ForEachSession<HRESULT>([&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
         if (entry.SessionId != Id)
@@ -603,35 +601,12 @@ std::optional<WSLCSessionManagerImpl::ResolvedSession> WSLCSessionManagerImpl::F
             return std::nullopt;
         }
 
-        try
-        {
-            ResolvedSession r;
-            r.Session = session;
-            r.SessionId = entry.SessionId;
-            r.CreatorPid = entry.CreatorPid;
-            r.DisplayName = entry.DisplayName;
-            r.UserSid = entry.UserSid;
-
-            // Duplicate the user token so the resolved session has an independent handle.
-            wil::unique_handle dup;
-            if (entry.UserToken.is_valid())
-            {
-                THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
-                    entry.UserToken.get(), TOKEN_QUERY | TOKEN_DUPLICATE, nullptr, SecurityImpersonation, TokenImpersonation, &dup));
-            }
-            r.UserToken = std::move(dup);
-
-            resolved.emplace(std::move(r));
-            return S_OK; // stops iteration
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            return wil::ResultFromCaughtException();
-        }
+        result = session;
+        return S_OK; // stops iteration
     });
 
-    return resolved;
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !result, "WSLC session %lu not found", Id);
+    return result;
 }
 
 } // namespace wsl::windows::service::wslc

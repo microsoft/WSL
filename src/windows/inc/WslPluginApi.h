@@ -192,15 +192,6 @@ typedef HRESULT (*WSLPluginAPI_OnDistributionStopping)(const struct WSLSessionIn
 // Returning failure will NOT cause the operation to fail.
 typedef HRESULT (*WSLPluginAPI_OnDistributionRegistered)(const struct WSLSessionInformation* Session, const struct WslOfflineDistributionInformation* Distribution);
 
-// WSLC plugin -> API surface. Pointed to by WSLPluginAPIV1::Wslc.
-struct WSLCPluginAPIV1
-{
-    WSLCPluginAPI_MountFolder MountFolder;
-    WSLCPluginAPI_UnmountFolder UnmountFolder;
-    WSLCPluginAPI_CreateProcess CreateProcess;
-    WSLCPluginAPI_WaitPid WaitPid;
-};
-
 struct WSLPluginHooksV1
 {
     WSLPluginAPI_OnVMStarted OnVMStarted;
@@ -227,8 +218,11 @@ struct WSLPluginAPIV1
     WSLPluginAPI_PluginError PluginError;
     WSLPluginAPI_ExecuteBinaryInDistribution ExecuteBinaryInDistribution; // Introduced in 2.1.2
 
-    // WSLC plugin -> API surface. NULL if loaded against an older WSL.
-    const struct WSLCPluginAPIV1* Wslc;
+    // WSLC plugin -> API surface.
+    WSLCPluginAPI_MountFolder WSLCMountFolder;
+    WSLCPluginAPI_UnmountFolder WSLCUnmountFolder;
+    WSLCPluginAPI_CreateProcess WSLCCreateProcess;
+    WSLCPluginAPI_WaitPid WSLCWaitPid;
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);
