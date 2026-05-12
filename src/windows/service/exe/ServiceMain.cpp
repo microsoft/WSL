@@ -31,7 +31,6 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 wsl::windows::service::PluginManager g_pluginManager;
 
-
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
 

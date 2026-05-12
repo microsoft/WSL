@@ -30,7 +30,11 @@ void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& ca
 }
 
 HRESULT wslc::WSLCSessionFactory::CreateSession(
-    _In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_opt_ IWSLCPluginNotifier* PluginNotifier, _Out_ IWSLCSession** Session, _Out_ IWSLCSessionReference** ServiceRef)
+    _In_ const WSLCSessionInitSettings* Settings,
+    _In_ IWSLCVirtualMachine* Vm,
+    _In_opt_ IWSLCPluginNotifier* PluginNotifier,
+    _Out_ IWSLCSession** Session,
+    _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
     *Session = nullptr;

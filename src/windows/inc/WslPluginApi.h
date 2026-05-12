@@ -98,17 +98,17 @@ struct WSLCSessionInformation
     PSID UserSid;
 };
 
-// Represents a running WSLC process started by the plugin.
-// Stdin, Stdout and Stderr are connected to the process' stdio.
-// The caller must close the sockets and 'ExitEvent'.
-struct WSLCProcess
+// Opaque handle to a WSLC process created via WSLCPluginAPI_CreateProcess.
+// Must be released with WSLCPluginAPI_ProcessRelease when no longer needed.
+typedef void* WSLCProcessHandle;
+
+// Represents a standard file descriptor for WSLCPluginAPI_ProcessGetFd.
+typedef enum _WSLCProcessFd
 {
-    ULONG Pid;
-    SOCKET Stdin;
-    SOCKET Stdout;
-    SOCKET Stderr;
-    HANDLE ExitEvent; // Signaled when the process exits.
-};
+    WSLCProcessFdStdin = 0,
+    WSLCProcessFdStdout = 1,
+    WSLCProcessFdStderr = 2
+} WSLCProcessFd;
 
 // Create plan9 mount between Windows & Linux
 typedef HRESULT (*WSLPluginAPI_MountFolder)(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name);
@@ -154,11 +154,25 @@ typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCWSTR Mo
 
 // Create a process in the WSLC session's root namespace.
 // 'Arguments' and 'Env' are NULL-terminated arrays. 'Env' may be NULL.
+// 'Errno' is optional and receives the errno value if the process creation fails.
+// On success, 'Process' receives an opaque handle that must be released with WSLCPluginAPI_ProcessRelease.
 typedef HRESULT (*WSLCPluginAPI_CreateProcess)(
-    WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, struct WSLCProcess* Process);
+    WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno);
 
-// Wait for a process previously created via WSLCPluginAPI_CreateProcess to exit and get its exit code.
-typedef HRESULT (*WSLCPluginAPI_WaitPid)(WSLCSessionId Session, LONG Pid, ULONGLONG Timeout, int* Status);
+// Get a stdio handle from a WSLC process. The returned HANDLE is a socket.
+// The caller takes ownership and must close it with closesocket().
+typedef HRESULT (*WSLCPluginAPI_ProcessGetFd)(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle);
+
+// Get the exit event for a WSLC process. Signaled when the process exits.
+// The caller takes ownership and must close it with CloseHandle().
+typedef HRESULT (*WSLCPluginAPI_ProcessGetExitEvent)(WSLCProcessHandle Process, HANDLE* ExitEvent);
+
+// Get the exit code of a WSLC process. The process must have exited.
+typedef HRESULT (*WSLCPluginAPI_ProcessGetExitCode)(WSLCProcessHandle Process, int* ExitCode);
+
+// Release a WSLC process handle. All outstanding handles obtained via
+// WSLCPluginAPI_ProcessGetFd/GetExitEvent must be closed before calling this.
+typedef void (*WSLCPluginAPI_ProcessRelease)(WSLCProcessHandle Process);
 
 // Execute a program in a user distribution
 // On success, 'Socket' is connected to stdin & stdout (stderr goes to dmesg) // 'Arguments' is expected to be NULL terminated
@@ -222,7 +236,10 @@ struct WSLPluginAPIV1
     WSLCPluginAPI_MountFolder WSLCMountFolder;
     WSLCPluginAPI_UnmountFolder WSLCUnmountFolder;
     WSLCPluginAPI_CreateProcess WSLCCreateProcess;
-    WSLCPluginAPI_WaitPid WSLCWaitPid;
+    WSLCPluginAPI_ProcessGetFd WSLCProcessGetFd;
+    WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent;
+    WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;
+    WSLCPluginAPI_ProcessRelease WSLCProcessRelease;
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);

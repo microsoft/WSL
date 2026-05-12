@@ -102,17 +102,11 @@ CATCH_RETURN();
 
 namespace {
 
-// Tracks WSLC processes created by plugins via WSLCPluginAPI_CreateProcess so that
-// the corresponding WSLCPluginAPI_WaitPid call can resolve them by (session, pid).
-struct WslcProcessKey
+// Opaque wrapper around IWSLCProcess, handed out as WSLCProcessHandle to plugins.
+struct WslcProcessWrapper
 {
-    ::WSLCSessionId Session;
-    LONG Pid;
-    auto operator<=>(const WslcProcessKey&) const = default;
+    wil::com_ptr<IWSLCProcess> Process;
 };
-
-std::mutex g_wslcProcessesMutex;
-std::map<WslcProcessKey, wil::com_ptr<IWSLCProcess>> g_wslcProcesses;
 
 wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
 {
@@ -167,19 +161,22 @@ try
     const auto mountpointUtf8 = wsl::shared::string::WideToMultiByte(Mountpoint);
     auto result = session->UnmountWindowsFolder(mountpointUtf8.c_str());
 
-    WSL_LOG(
-        "WslcPluginUnmountFolderCall",
-        TraceLoggingValue(Mountpoint, "Mountpoint"),
-        TraceLoggingValue(result, "Result"));
+    WSL_LOG("WslcPluginUnmountFolderCall", TraceLoggingValue(Mountpoint, "Mountpoint"), TraceLoggingValue(result, "Result"));
 
     return result;
 }
 CATCH_RETURN();
 
-HRESULT WSLCCreateProcess(WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcess* Process)
+HRESULT WSLCCreateProcess(WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno)
 try
 {
     RETURN_HR_IF(E_POINTER, Executable == nullptr || Process == nullptr);
+
+    *Process = nullptr;
+    if (Errno != nullptr)
+    {
+        *Errno = 0;
+    }
 
     auto session = ResolveWslcSession(Session);
 
@@ -207,6 +204,12 @@ try
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
     auto result = session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+
+    if (Errno != nullptr)
+    {
+        *Errno = errnoValue;
+    }
+
     if (FAILED(result))
     {
         WSL_LOG(
@@ -217,103 +220,101 @@ try
         return result;
     }
 
-    int pid = 0;
-    THROW_IF_FAILED(process->GetPid(&pid));
+    auto wrapper = std::make_unique<WslcProcessWrapper>();
+    wrapper->Process = std::move(process);
+    *Process = wrapper.release();
 
-    // Retrieve std handles + exit event. Each must be SOCKET-typed by the plugin contract.
-    auto getSocket = [&](WSLCFD fd, SOCKET& out) -> HRESULT {
-        WSLCHandle handle{};
-        RETURN_IF_FAILED(process->GetStdHandle(fd, &handle));
-        if (handle.Type != WSLCHandleTypeSocket)
-        {
-            return E_UNEXPECTED;
-        }
-        out = reinterpret_cast<SOCKET>(handle.Handle.Socket);
-        return S_OK;
-    };
-
-    SOCKET stdinSock = INVALID_SOCKET;
-    SOCKET stdoutSock = INVALID_SOCKET;
-    SOCKET stderrSock = INVALID_SOCKET;
-    HANDLE exitEvent = nullptr;
-    THROW_IF_FAILED(getSocket(WSLCFDStdin, stdinSock));
-    THROW_IF_FAILED(getSocket(WSLCFDStdout, stdoutSock));
-    THROW_IF_FAILED(getSocket(WSLCFDStderr, stderrSock));
-    THROW_IF_FAILED(process->GetExitEvent(&exitEvent));
-
-    {
-        std::lock_guard lock(g_wslcProcessesMutex);
-        g_wslcProcesses[{Session, pid}] = process;
-    }
-
-    Process->Pid = static_cast<ULONG>(pid);
-    Process->Stdin = stdinSock;
-    Process->Stdout = stdoutSock;
-    Process->Stderr = stderrSock;
-    Process->ExitEvent = exitEvent;
-
-    WSL_LOG(
-        "WslcPluginCreateProcessCall",
-        TraceLoggingValue(Executable, "Executable"),
-        TraceLoggingValue(pid, "Pid"),
-        TraceLoggingValue(S_OK, "Result"));
+    WSL_LOG("WslcPluginCreateProcessCall", TraceLoggingValue(Executable, "Executable"), TraceLoggingValue(S_OK, "Result"));
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCWaitPid(WSLCSessionId Session, LONG Pid, ULONGLONG Timeout, int* Status)
+HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle)
 try
 {
-    RETURN_HR_IF(E_POINTER, Status == nullptr);
+    RETURN_HR_IF(E_POINTER, Process == nullptr || Handle == nullptr);
 
-    wil::com_ptr<IWSLCProcess> process;
+    *Handle = nullptr;
+
+    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
+
+    WSLCFD wslcFd{};
+    switch (Fd)
     {
-        std::lock_guard lock(g_wslcProcessesMutex);
-        auto it = g_wslcProcesses.find({Session, Pid});
-        if (it == g_wslcProcesses.end())
-        {
-            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-        }
-        process = it->second;
+    case WSLCProcessFdStdin:
+        wslcFd = WSLCFDStdin;
+        break;
+    case WSLCProcessFdStdout:
+        wslcFd = WSLCFDStdout;
+        break;
+    case WSLCProcessFdStderr:
+        wslcFd = WSLCFDStderr;
+        break;
+    default:
+        return E_INVALIDARG;
     }
 
-    wil::unique_handle exitEvent;
-    THROW_IF_FAILED(process->GetExitEvent(exitEvent.put()));
+    WSLCHandle handle{};
+    RETURN_IF_FAILED(wrapper->Process->GetStdHandle(wslcFd, &handle));
 
-    const DWORD timeoutMs = (Timeout == 0 || Timeout > MAXDWORD) ? INFINITE : static_cast<DWORD>(Timeout);
-    const auto waitResult = WaitForSingleObject(exitEvent.get(), timeoutMs);
-    if (waitResult == WAIT_TIMEOUT)
-    {
-        WSL_LOG("WslcPluginWaitPidCall", TraceLoggingValue(Pid, "Pid"), TraceLoggingValue(HRESULT_FROM_WIN32(WAIT_TIMEOUT), "Result"));
-        return HRESULT_FROM_WIN32(WAIT_TIMEOUT);
-    }
-    THROW_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
+    *Handle = handle.Handle.Socket;
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCProcessGetExitEvent(WSLCProcessHandle Process, HANDLE* ExitEvent)
+try
+{
+    RETURN_HR_IF(E_POINTER, Process == nullptr || ExitEvent == nullptr);
+
+    *ExitEvent = nullptr;
+
+    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
+    return wrapper->Process->GetExitEvent(ExitEvent);
+}
+CATCH_RETURN();
+
+HRESULT WSLCProcessGetExitCode(WSLCProcessHandle Process, int* ExitCode)
+try
+{
+    RETURN_HR_IF(E_POINTER, Process == nullptr || ExitCode == nullptr);
+
+    *ExitCode = -1;
+    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
 
     WSLCProcessState state{};
-    int code = 0;
-    THROW_IF_FAILED(process->GetState(&state, &code));
-    *Status = code;
+    RETURN_IF_FAILED(wrapper->Process->GetState(&state, ExitCode));
 
-    {
-        std::lock_guard lock(g_wslcProcessesMutex);
-        g_wslcProcesses.erase({Session, Pid});
-    }
-
-    WSL_LOG(
-        "WslcPluginWaitPidCall",
-        TraceLoggingValue(Pid, "Pid"),
-        TraceLoggingValue(code, "Status"),
-        TraceLoggingValue(S_OK, "Result"));
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), state != WslcProcessStateExited && state != WslcProcessStateSignalled);
 
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLCProcessRelease(WSLCProcessHandle Process)
+{
+    if (Process != nullptr)
+    {
+        delete static_cast<WslcProcessWrapper*>(Process);
+    }
+}
 
 } // extern "C"
 
 static constexpr WSLPluginAPIV1 ApiV1 = {
-    Version, &MountFolder, &ExecuteBinary, &PluginError, &ExecuteBinaryInDistribution, &WSLCMountFolder, &WSLCUnmountFolder, &WSLCCreateProcess, &WSLCWaitPid};
+    Version,
+    &MountFolder,
+    &ExecuteBinary,
+    &PluginError,
+    &ExecuteBinaryInDistribution,
+    &WSLCMountFolder,
+    &WSLCUnmountFolder,
+    &WSLCCreateProcess,
+    &WSLCProcessGetFd,
+    &WSLCProcessGetExitEvent,
+    &WSLCProcessGetExitCode,
+    &WSLCProcessRelease};
 
 void PluginManager::LoadPlugins()
 {

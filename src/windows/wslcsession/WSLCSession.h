@@ -191,10 +191,7 @@ private:
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    void ImportImageImpl(
-        DockerHTTPClient::HTTPRequestContext& Request,
-        const WSLCHandle ImageHandle,
-        std::vector<std::string>* loadedImages = nullptr);
+    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, std::vector<std::string>* loadedImages = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 

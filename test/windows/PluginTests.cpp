@@ -669,10 +669,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
         }
 
-        // The expected output uses '*' wildcards for variable values. The container init
-        // exits via SIGTERM-ish signaling so the order of "Container stopping" relative to
-        // session shutdown is deterministic - it fires when Stop()/Delete() runs above.
-        constexpr auto ExpectedOutput =
+        const auto ExpectedOutput = std::format(
             LR"(Plugin loaded. TestMode=18
             WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=*
@@ -681,17 +678,24 @@ class PluginTests
             Command'cat', status=0, stdout: stdin-ok, stderr: 
             Command'exit 12', status=12, stdout: , stderr: 
             Command'echo -n $ENV', status=0, stdout: env-ok, stderr: 
-            WSLCCreateProcess(does-not-exist): -2147467259
+            WSLCCreateProcess(does-not-exist): {:x}, errno=2
+            WSLCProcessGetFd(999): {}
+            WSLCProcessGetExitCode(<running>): {}
             WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
             Command'cat /mnt/wsl-plugin/plugin-rw-test/testfile.txt', status=0, stdout: Windows-content, stderr: 
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
-            Command'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=*, stdout: , stderr: *
+            Command'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
+            WSLCMountFolder(nonexistent): {}
             Test completed
             WSLC Container stopping, session=*, id=*
             WSLC Image deleted, session=*, id=*
-            WSLC Session stopping, name=plugin-wslc-test, id=*)";
+            WSLC Session stopping, name=plugin-wslc-test, id=*)",
+            static_cast<uint32_t>(E_FAIL),
+            E_INVALIDARG,
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
 
-        ValidateLogFile(ExpectedOutput);
+        ValidateLogFile(ExpectedOutput.c_str());
     }
 
     WSL2_TEST_METHOD(WslcSessionRejected)

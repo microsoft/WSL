@@ -416,40 +416,49 @@ try
 
     if (g_testType == PluginTestType::WslcSuccess)
     {
-        // Helper: run a command in the root namespace and return stdout.
+        // Helper: run a command in the root namespace and return (status, stdout, stderr).
         auto runCommand = [&](const char* cmd,
                               const std::optional<std::string>& input = {},
                               std::vector<const char*> env = {}) -> std::tuple<int, std::string, std::string> {
             std::vector<const char*> arguments = {"/bin/sh", "-c", cmd, nullptr};
-            WSLCProcess process{};
-            THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), env.data(), &process));
+            WSLCProcessHandle process = nullptr;
+            THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), env.data(), &process, nullptr));
+            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCProcessRelease(process); });
+
+            wil::unique_handle stdinHandle;
+            wil::unique_handle stdoutHandle;
+            wil::unique_handle stderrHandle;
+            wil::unique_handle exitEvent;
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdin, &stdinHandle));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &stdoutHandle));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrHandle));
+            THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exitEvent));
 
             std::string out;
             std::string err;
 
             MultiHandleWait io;
             io.AddHandle(std::make_unique<ReadHandle>(
-                wil::unique_socket{process.Stdout}, [&out](const auto& span) { out.append(span.begin(), span.end()); }));
+                std::move(stdoutHandle), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<ReadHandle>(
-                wil::unique_socket{process.Stderr}, [&err](const auto& span) { err.append(span.begin(), span.end()); }));
+                std::move(stderrHandle), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
 
-            io.AddHandle(std::make_unique<EventHandle>(wil::unique_handle{process.ExitEvent}));
+            io.AddHandle(std::make_unique<EventHandle>(std::move(exitEvent)));
 
             if (input.has_value())
             {
-                io.AddHandle(
-                    std::make_unique<WriteHandle>(wil::unique_socket{process.Stdin}, std::vector<char>(input->begin(), input->end())));
+                io.AddHandle(std::make_unique<WriteHandle>(std::move(stdinHandle), std::vector<char>(input->begin(), input->end())));
             }
             else
             {
-                closesocket(process.Stdin);
+                stdinHandle.reset();
             }
 
             io.Run(60000ms);
 
             int status = 0;
-            THROW_IF_FAILED(g_api->WSLCWaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status));
+            THROW_IF_FAILED(g_api->WSLCProcessGetExitCode(process, &status));
             g_logfile << "Command'" << cmd << "', status=" << status << ", stdout: " << out << ", stderr: " << err << std::endl;
 
             return {status, out, err};
@@ -465,22 +474,27 @@ try
 
         // Validate that trying to execute a non-existent file fails with the expected error code.
         {
-
-            WSLCProcess process{};
+            WSLCProcessHandle process = nullptr;
+            int errnoValue = 0;
             std::vector<const char*> args = {"does-not-exist", nullptr};
 
-            g_logfile << "WSLCCreateProcess(does-not-exist): "
-                      << std::hex << g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process) << std::endl;
+            auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, &errnoValue);
+            g_logfile << "WSLCCreateProcess(does-not-exist): " << std::hex << hr << ", errno=" << std::dec << errnoValue << std::endl;
         }
 
-        // Validate that waitpid with an invalid pid fails with the expected error code.
+        // Validate various error paths
         {
-            g_logfile << "WSLCWaitPid(9999): " << std::hex << g_api->WSLCWaitPid(Session->SessionId, 9999, 30000, nullptr) << std::endl;
-        }
+            std::vector<const char*> args = {"/bin/sh", "-c", "sleep 9999", nullptr};
+            WSLCProcessHandle process = nullptr;
+            THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr));
+            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCProcessRelease(process); });
 
-        // Validate that waitpid returns the expected error on timeout
-        {
-            g_logfile << "WSLCWaitPid(1): " << std::hex << g_api->WSLCWaitPid(Session->SessionId, 1, 100, nullptr) << std::endl;
+            // Validate that getting an fd that doesn't exist fails with the expected error code.
+            HANDLE dummy = nullptr;
+            g_logfile << "WSLCProcessGetFd(999): " << g_api->WSLCProcessGetFd(process, static_cast<WSLCProcessFd>(999), &dummy) << std::endl;
+            int exitCode = -1;
+
+            g_logfile << "WSLCProcessGetExitCode(<running>): " << g_api->WSLCProcessGetExitCode(process, &exitCode) << std::endl;
         }
 
         const auto testFolder = L"C:\\";
@@ -519,6 +533,13 @@ try
             runCommand(writeCmd.c_str());
 
             THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, roMountpoint));
+        }
+
+        // Validate that trying to mount a folder that doesn't exist fails with the expected error code.
+        {
+            wchar_t mountpoint[256] = {};
+            g_logfile << "WSLCMountFolder(nonexistent): "
+                      << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", TRUE, L"plugin-ro-test", mountpoint) << std::endl;
         }
 
         g_logfile << "Test completed" << std::endl;
