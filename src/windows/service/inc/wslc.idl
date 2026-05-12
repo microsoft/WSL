@@ -409,7 +409,7 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsOpenVmmTtrpc = 64,
 } WSLCFeatureFlags;
 
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug)")
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsOpenVmm | WslcFeatureFlagsOpenVmmTtrpc)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
@@ -456,11 +456,11 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
-    // Connects to a vsock port in the VM. Returns a socket handle suitable
-    // for use with SocketChannel.
-    // For HCS VMs, this uses hvsocket (overlapped I/O supported).
+    // Connects to a vsock port in the VM. Returns a socket handle that
+    // supports overlapped I/O (suitable for use with SocketChannel).
+    // For HCS VMs, this uses hvsocket.
     // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge
-    // (AF_UNIX; SocketChannel auto-detects and uses SyncSocketTransport).
+    // with a TCP loopback relay to provide overlapped I/O support.
     HRESULT ConnectToVsockPort([in] ULONG Port, [out, system_handle(sh_socket)] HANDLE* Socket);
 
     // Accepts a crash dump connection from the VM. Blocks until a crash dump

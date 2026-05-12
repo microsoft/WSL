@@ -27,7 +27,6 @@ Abstract:
 
 #include <winrt/Windows.Foundation.h>
 #include "DockerHTTPClient.h"
-#include "SocketTransport.h"
 
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
@@ -559,120 +558,6 @@ wil::unique_socket DockerHTTPClient::MonitorEvents()
     return std::move(socket);
 }
 
-// Creates a TCP loopback socket pair by relaying data between an AF_UNIX socket
-// and a TCP socket. Returns the TCP client socket which supports overlapped I/O.
-// The relay threads run until both sides close.
-static wil::unique_socket RelayToOverlappedSocket(_In_ wil::unique_socket&& unixSocket)
-{
-    // Create a TCP loopback listener on an ephemeral port.
-    wil::unique_socket listenSock(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-    THROW_LAST_ERROR_IF(listenSock.get() == INVALID_SOCKET);
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0; // Ephemeral port
-    THROW_LAST_ERROR_IF(bind(listenSock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
-    THROW_LAST_ERROR_IF(listen(listenSock.get(), 1) == SOCKET_ERROR);
-
-    // Get the assigned port.
-    int addrLen = sizeof(addr);
-    THROW_LAST_ERROR_IF(getsockname(listenSock.get(), reinterpret_cast<sockaddr*>(&addr), &addrLen) == SOCKET_ERROR);
-
-    // Connect a TCP client to the listener.
-    wil::unique_socket clientSock(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-    THROW_LAST_ERROR_IF(clientSock.get() == INVALID_SOCKET);
-    THROW_LAST_ERROR_IF(connect(clientSock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
-
-    // Accept the server side.
-    wil::unique_socket serverSock(accept(listenSock.get(), nullptr, nullptr));
-    THROW_LAST_ERROR_IF(serverSock.get() == INVALID_SOCKET);
-    listenSock.reset(); // No longer needed.
-
-    // Use a shared_ptr for the unix socket so both relay threads can reference it
-    // and the socket is closed when the last thread finishes.
-    auto sharedUnix = std::make_shared<wil::unique_socket>(std::move(unixSocket));
-    auto sharedServer = std::make_shared<wil::unique_socket>(std::move(serverSock));
-
-    // Relay: unix -> TCP server (using synchronous recv/send, no overlapped I/O).
-    std::thread([unix = sharedUnix, server = sharedServer]() {
-        try
-        {
-            constexpr size_t bufSize = 64 * 1024;
-            std::vector<char> buf(bufSize);
-            for (;;)
-            {
-                int n = recv(unix->get(), buf.data(), static_cast<int>(buf.size()), 0);
-                if (n <= 0)
-                {
-                    shutdown(server->get(), SD_SEND);
-                    break;
-                }
-
-                int sent = 0;
-                while (sent < n)
-                {
-                    int s = send(server->get(), buf.data() + sent, n - sent, 0);
-                    if (s <= 0)
-                    {
-                        break;
-                    }
-                    sent += s;
-                }
-
-                if (sent < n)
-                {
-                    break;
-                }
-            }
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-        }
-    }).detach();
-
-    // Relay: TCP server -> unix (using synchronous recv/send, no overlapped I/O).
-    std::thread([unix = sharedUnix, server = sharedServer]() {
-        try
-        {
-            constexpr size_t bufSize = 64 * 1024;
-            std::vector<char> buf(bufSize);
-            for (;;)
-            {
-                int n = recv(server->get(), buf.data(), static_cast<int>(buf.size()), 0);
-                if (n <= 0)
-                {
-                    shutdown(unix->get(), SD_SEND);
-                    break;
-                }
-
-                int sent = 0;
-                while (sent < n)
-                {
-                    int s = send(unix->get(), buf.data() + sent, n - sent, 0);
-                    if (s <= 0)
-                    {
-                        break;
-                    }
-                    sent += s;
-                }
-
-                if (sent < n)
-                {
-                    break;
-                }
-            }
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-        }
-    }).detach();
-
-    return clientSock;
-}
-
 wil::unique_socket DockerHTTPClient::ConnectSocket()
 {
     auto lock = m_lock.lock_exclusive();
@@ -684,11 +569,11 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     THROW_HR_IF_MSG(E_FAIL, response.Pid <= 0, "fork() returned %i", response.Pid);
 
-    // Connect the new hvsocket via the VM interface.
+    // Connect the new socket via the VM interface.
     wil::unique_socket connSocket;
     THROW_IF_FAILED(m_vm->ConnectToVsockPort(response.Port, reinterpret_cast<HANDLE*>(&connSocket)));
     wsl::shared::SocketChannel newChannel{
-        std::move(connSocket), "DockerClient", m_exitingEvent, true};
+        std::move(connSocket), "DockerClient", {m_exitingEvent}};
     lock.reset();
 
     // Connect that socket to the docker unix socket.
@@ -698,21 +583,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     auto result = newChannel.Transaction<WSLC_UNIX_CONNECT>(writer.Span());
     THROW_HR_IF_MSG(E_FAIL, result.Result < 0, "Failed to connect to unix socket: '/var/run/docker.sock', %i", result.Result);
 
-    auto releasedSocket = newChannel.Release();
-
-    // If this is an AF_UNIX socket, it doesn't support overlapped I/O (WSARecv/ReadFile
-    // with OVERLAPPED). The HTTP client and relay infrastructure require overlapped I/O,
-    // so relay through a TCP loopback socket pair.
-    WSAPROTOCOL_INFOW protocolInfo{};
-    int infoLen = sizeof(protocolInfo);
-    if (getsockopt(releasedSocket.get(), SOL_SOCKET, SO_PROTOCOL_INFOW,
-            reinterpret_cast<char*>(&protocolInfo), &infoLen) == 0 &&
-        protocolInfo.iAddressFamily == AF_UNIX)
-    {
-        return RelayToOverlappedSocket(std::move(releasedSocket));
-    }
-
-    return releasedSocket;
+    return newChannel.Release();
 }
 
 std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendRequestAndReadResponse(verb Method, const URL& Url, const std::string& Body)

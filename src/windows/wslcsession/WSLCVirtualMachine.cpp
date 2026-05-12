@@ -274,7 +274,7 @@ void WSLCVirtualMachine::Initialize()
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
 
-    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get(), true};
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
     // Create a thread to watch for exited processes.
     auto [__, ___, childChannel] = Fork(WSLC_FORK::Thread);
@@ -586,7 +586,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->ConnectToVsockPort(port, reinterpret_cast<HANDLE*>(&socket)));
 
-    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get(), true});
+    return std::make_tuple(
+        pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), std::vector<HANDLE>(Channel.GetExitEvents())});
 }
 
 WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
@@ -1252,7 +1253,8 @@ void WSLCVirtualMachine::CollectCrashDumps()
             constexpr DWORD timeout = 30 * 1000;
             THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_vmTerminatingEvent.get(), true};
+            auto channel = wsl::shared::SocketChannel{
+                std::move(socket), "crash_dump", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;

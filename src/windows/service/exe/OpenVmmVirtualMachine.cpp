@@ -558,6 +558,30 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_waitVmThread.join();
     }
 
+    // Join relay threads (they exit when the exit event is signaled
+    // or when the sockets they relay between close).
+    if (m_initRelayThread.joinable())
+    {
+        m_initRelayThread.join();
+    }
+
+    if (m_crashDumpRelayThread.joinable())
+    {
+        m_crashDumpRelayThread.join();
+    }
+
+    {
+        std::lock_guard lock(m_relayLock);
+        for (auto& t : m_relayThreads)
+        {
+            if (t.joinable())
+            {
+                t.join();
+            }
+        }
+        m_relayThreads.clear();
+    }
+
     // Clean up the init listener socket if still open.
     if (m_initListenSocket != INVALID_SOCKET)
     {
@@ -602,6 +626,136 @@ try
 }
 CATCH_RETURN()
 
+// Bidirectional relay between a Unix domain socket and a TCP socket using select().
+// Runs until either socket closes or exitEvent is signaled.
+// Takes ownership of both sockets and closes them on exit.
+static void RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent)
+{
+    auto cleanup = wil::scope_exit([&] {
+        closesocket(unixSock);
+        closesocket(tcpSock);
+    });
+
+    char buffer[65536];
+
+    while (true)
+    {
+        // Check if we should exit.
+        if (WaitForSingleObject(exitEvent, 0) == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
+        fd_set readSet;
+        FD_ZERO(&readSet);
+        FD_SET(unixSock, &readSet);
+        FD_SET(tcpSock, &readSet);
+
+        timeval timeout{};
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100000; // 100ms poll
+
+        int ready = select(0, &readSet, nullptr, nullptr, &timeout);
+        if (ready == SOCKET_ERROR)
+        {
+            break;
+        }
+
+        if (ready == 0)
+        {
+            continue; // Timeout, loop and check exitEvent
+        }
+
+        // Unix -> TCP
+        if (FD_ISSET(unixSock, &readSet))
+        {
+            int bytes = recv(unixSock, buffer, sizeof(buffer), 0);
+            if (bytes <= 0)
+            {
+                break;
+            }
+
+            int sent = 0;
+            while (sent < bytes)
+            {
+                int n = send(tcpSock, buffer + sent, bytes - sent, 0);
+                if (n <= 0)
+                {
+                    return;
+                }
+                sent += n;
+            }
+        }
+
+        // TCP -> Unix
+        if (FD_ISSET(tcpSock, &readSet))
+        {
+            int bytes = recv(tcpSock, buffer, sizeof(buffer), 0);
+            if (bytes <= 0)
+            {
+                break;
+            }
+
+            int sent = 0;
+            while (sent < bytes)
+            {
+                int n = send(unixSock, buffer + sent, bytes - sent, 0);
+                if (n <= 0)
+                {
+                    return;
+                }
+                sent += n;
+            }
+        }
+    }
+}
+
+// Creates a TCP loopback socket pair and starts a relay thread between an
+// AF_UNIX socket and the TCP server socket. Returns the TCP client socket
+// (which supports overlapped I/O) and the relay thread. The relay thread
+// takes ownership of both the Unix socket and the TCP server socket.
+static std::pair<wil::unique_socket, std::thread> CreateRelayedSocket(
+    _In_ SOCKET unixSock, _In_ HANDLE exitEvent)
+{
+    // Create a TCP loopback listener on an ephemeral port.
+    SOCKET tcpListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    THROW_LAST_ERROR_IF(tcpListener == INVALID_SOCKET);
+    auto closeListener = wil::scope_exit([&] { closesocket(tcpListener); });
+
+    sockaddr_in loopback{};
+    loopback.sin_family = AF_INET;
+    loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    loopback.sin_port = 0; // Let OS pick a port
+    THROW_LAST_ERROR_IF(bind(tcpListener, reinterpret_cast<sockaddr*>(&loopback), sizeof(loopback)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF(listen(tcpListener, 1) == SOCKET_ERROR);
+
+    // Get the port that was assigned.
+    sockaddr_in boundAddr{};
+    int addrLen = sizeof(boundAddr);
+    THROW_LAST_ERROR_IF(getsockname(tcpListener, reinterpret_cast<sockaddr*>(&boundAddr), &addrLen) == SOCKET_ERROR);
+
+    // Connect a TCP client to the listener.
+    SOCKET tcpClient = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    THROW_LAST_ERROR_IF(tcpClient == INVALID_SOCKET);
+    auto closeClient = wil::scope_exit([&] { closesocket(tcpClient); });
+
+    THROW_LAST_ERROR_IF(connect(tcpClient, reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
+
+    // Accept the server-side connection.
+    SOCKET tcpServer = accept(tcpListener, nullptr, nullptr);
+    THROW_LAST_ERROR_IF(tcpServer == INVALID_SOCKET);
+
+    closeListener.release();
+    closesocket(tcpListener);
+
+    // Start a relay thread that takes ownership of unixSock and tcpServer.
+    auto relayThread = std::thread(RelaySocketData, unixSock, tcpServer, exitEvent);
+
+    // Return the TCP client socket — this supports overlapped I/O.
+    closeClient.release();
+    return {wil::unique_socket(tcpClient), std::move(relayThread)};
+}
+
 HRESULT OpenVmmVirtualMachine::AcceptConnection(_Out_ HANDLE* Socket)
 try
 {
@@ -625,9 +779,11 @@ try
     m_initListenSocket = INVALID_SOCKET;
     DeleteFileW(m_initListenPath.c_str());
 
-    // Return the AF_UNIX socket directly. SocketChannel will auto-detect
-    // the socket type and use SyncSocketTransport for non-overlapped I/O.
-    *Socket = reinterpret_cast<HANDLE>(unixSock);
+    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
+    // which SocketChannel requires. Bridge via a TCP loopback relay.
+    auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
+    m_initRelayThread = std::move(relayThread);
+    *Socket = reinterpret_cast<HANDLE>(tcpSocket.release());
     return S_OK;
 }
 CATCH_RETURN()
@@ -845,10 +1001,15 @@ try
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(response, "Response"));
 
-    // Return the AF_UNIX socket directly. SocketChannel will auto-detect
-    // the socket type and use SyncSocketTransport for non-overlapped I/O.
+    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
+    // which SocketChannel requires. Bridge via a TCP loopback relay.
     closeUnix.release();
-    *Socket = reinterpret_cast<HANDLE>(unixSock);
+    auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
+    {
+        std::lock_guard lock(m_relayLock);
+        m_relayThreads.emplace_back(std::move(relayThread));
+    }
+    *Socket = reinterpret_cast<HANDLE>(tcpSocket.release());
     return S_OK;
 }
 CATCH_RETURN()
@@ -872,7 +1033,11 @@ try
     SOCKET unixSock = accept(m_crashDumpListenSocket, nullptr, nullptr);
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
 
-    *Socket = reinterpret_cast<HANDLE>(unixSock);
+    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
+    // which SocketChannel requires. Bridge via a TCP loopback relay.
+    auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
+    m_crashDumpRelayThread = std::move(relayThread);
+    *Socket = reinterpret_cast<HANDLE>(tcpSocket.release());
     return S_OK;
 }
 CATCH_RETURN()
