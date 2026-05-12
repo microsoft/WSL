@@ -445,8 +445,8 @@ int RunPortTracker(int Argc, char** Argv)
 
     if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy)
     {
-        LOG_WARNING("Invalid networking mode ({}), falling back to None", NetworkingMode);
-        NetworkingMode = LxMiniInitNetworkingModeNone;
+        std::cerr << "Invalid networking mode (" << NetworkingMode << ")\n";
+        return 1;
     }
 
     const bool synchronousMode = BpfFd != -1 && NetlinkSocketFd != -1;
