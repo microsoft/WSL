@@ -627,43 +627,23 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
     }
 }
 
-void WSLCSession::NotifyImageCreatedByName(const std::string& ImageNameOrId) noexcept
+void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
-    if (!m_pluginNotifier || !m_dockerClient.has_value())
+    if (!m_dockerClient.has_value())
     {
         return;
     }
 
-    std::string json;
-    try
-    {
-        auto dockerInspect = m_dockerClient->InspectImage(ImageNameOrId.c_str());
-        auto wslcInspect = ConvertInspectImage(dockerInspect);
-        json = wsl::shared::ToJson(wslcInspect);
-    }
-    catch (...)
-    {
-        // Best-effort: fall back to a minimal payload if inspect fails.
-        LOG_CAUGHT_EXCEPTION();
-        json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
-    }
-
-    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(json.c_str()));
+    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
 }
 CATCH_LOG()
 
-void WSLCSession::NotifyImageDeletedByName(const std::string& ImageNameOrId) noexcept
+void WSLCSession::OnImageDeleted(const std::string& ImageNameOrId) noexcept
 try
 {
-    if (!m_pluginNotifier)
-    {
-        return;
-    }
-
-    // The image is gone (or about to be) so use a minimal JSON keyed by ID.
+    // The image is already deleted so we can't inspect it. Build a minimal JSON.
     auto json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
-
     LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(json.c_str()));
 }
 CATCH_LOG()
@@ -695,7 +675,7 @@ try
     auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
-    NotifyImageCreatedByName(Image);
+    OnImageCreated(Image);
 
     return S_OK;
 }
@@ -1035,7 +1015,7 @@ try
 
     for (const auto& imageName : loadedImages)
     {
-        NotifyImageCreatedByName(imageName);
+        OnImageCreated(imageName);
     }
 
     return S_OK;
@@ -1064,7 +1044,7 @@ try
 
     ImportImageImpl(*requestContext, ImageHandle);
 
-    NotifyImageCreatedByName(ImageName);
+    OnImageCreated(ImageName);
     return S_OK;
 }
 CATCH_RETURN();
@@ -1468,7 +1448,7 @@ try
     {
         if (!image.Deleted.empty())
         {
-            NotifyImageDeletedByName(image.Deleted);
+            OnImageDeleted(image.Deleted);
             break;
         }
     }
@@ -1548,10 +1528,18 @@ try
     auto lock = m_lock.lock_shared();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectImageLockHeld(ImageNameOrId).c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
+{
     docker_schema::InspectImage dockerInspect;
     try
     {
-        dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+        dockerInspect = m_dockerClient->InspectImage(NameOrId);
     }
     catch (const DockerHTTPException& e)
     {
@@ -1570,12 +1558,8 @@ try
     auto wslcInspect = ConvertInspectImage(dockerInspect);
 
     // Serialize to JSON
-    std::string wslcJson = wsl::shared::ToJson(wslcInspect);
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslcJson.c_str()).release();
-
-    return S_OK;
+    return wsl::shared::ToJson(wslcInspect);
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::Authenticate(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken)
 try

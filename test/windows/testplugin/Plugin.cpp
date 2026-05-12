@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WslPluginApi.h"
+#include "wslc_schema.h"
 
 #include "PluginTests.h"
 
@@ -341,42 +342,6 @@ HRESULT OnDistributionUnregistered(const WSLSessionInformation* Session, const W
     return S_OK;
 }
 
-// Extracts the value of a "key":"value" string field from a flat JSON document.
-// Returns an empty string if the field is not present. Used by WSLC handlers to
-// keep logs deterministic without pulling in a full JSON parser.
-static std::string ExtractJsonStringField(const char* json, std::string_view key)
-{
-    if (json == nullptr)
-    {
-        return {};
-    }
-
-    std::string needle = "\"";
-    needle.append(key);
-    needle.append("\":\"");
-
-    const char* start = strstr(json, needle.c_str());
-    if (start == nullptr)
-    {
-        return {};
-    }
-    start += needle.size();
-
-    std::string out;
-    while (*start != '\0' && *start != '"')
-    {
-        if (*start == '\\' && start[1] != '\0')
-        {
-            out.push_back(start[1]);
-            start += 2;
-            continue;
-        }
-        out.push_back(*start);
-        ++start;
-    }
-    return out;
-}
-
 HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
     g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName) << ", id=" << Session->SessionId
@@ -400,13 +365,13 @@ HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
     return S_OK;
 }
 
-HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
+HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 try
 {
-    auto id = ExtractJsonStringField(InspectContainer, "Id");
-    auto image = ExtractJsonStringField(InspectContainer, "Image");
+    auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
 
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << id << ", image=" << image << std::endl;
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+              << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
@@ -423,7 +388,7 @@ try
             std::vector<const char*> arguments = {"/bin/sh", "-c", cmd, nullptr};
             WSLCProcessHandle process = nullptr;
             THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), env.data(), &process, nullptr));
-            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCProcessRelease(process); });
+            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
             wil::unique_handle stdinHandle;
             wil::unique_handle stdoutHandle;
@@ -487,7 +452,7 @@ try
             std::vector<const char*> args = {"/bin/sh", "-c", "sleep 9999", nullptr};
             WSLCProcessHandle process = nullptr;
             THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr));
-            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCProcessRelease(process); });
+            auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
             // Validate that getting an fd that doesn't exist fails with the expected error code.
             HANDLE dummy = nullptr;
@@ -510,10 +475,10 @@ try
             }
 
             // Mount read-write and verify the file can be read from Linux.
-            wchar_t rwMountpoint[256] = {};
+            char rwMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
             THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, false, L"plugin-rw-test", rwMountpoint));
 
-            g_logfile << "WSLC RW folder mounted at: " << WideToMultiByte(rwMountpoint) << std::endl;
+            g_logfile << "WSLC RW folder mounted at: " << rwMountpoint << std::endl;
 
             auto readCmd = std::format("cat {}/testfile.txt", rwMountpoint);
             runCommand(readCmd.c_str());
@@ -523,10 +488,10 @@ try
 
         // Validate ro mounts.
         {
-            wchar_t roMountpoint[256] = {};
+            char roMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
             THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"plugin-ro-test", roMountpoint));
 
-            g_logfile << "WSLC RO folder mounted at: " << WideToMultiByte(roMountpoint) << std::endl;
+            g_logfile << "WSLC RO folder mounted at: " << roMountpoint << std::endl;
 
             // Attempt to write from Linux — should fail on a read-only mount.
             auto writeCmd = std::format("echo fail > {}/should-not-exist.txt", roMountpoint);
@@ -537,7 +502,7 @@ try
 
         // Validate that trying to mount a folder that doesn't exist fails with the expected error code.
         {
-            wchar_t mountpoint[256] = {};
+            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
             g_logfile << "WSLCMountFolder(nonexistent): "
                       << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", TRUE, L"plugin-ro-test", mountpoint) << std::endl;
         }
@@ -549,24 +514,27 @@ try
 }
 CATCH_RETURN();
 
-HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
+HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
-    auto id = ExtractJsonStringField(InspectContainer, "Id");
-    g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << id << std::endl;
+    auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
+    g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+              << ", state=" << container.State.Status << std::endl;
     return S_OK;
 }
 
-HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectImage)
+HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
-    auto id = ExtractJsonStringField(InspectImage, "Id");
-    g_logfile << "WSLC Image created, session=" << Session->SessionId << ", id=" << id << std::endl;
+    auto image = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(InspectJson);
+    auto name = (image.RepoTags.has_value() && !image.RepoTags->empty()) ? image.RepoTags->front() : "<none>";
+    g_logfile << "WSLC Image created, session=" << Session->SessionId << ", id=" << image.Id << ", name=" << name << std::endl;
     return S_OK;
 }
 
-HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectImage)
+HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
-    auto id = ExtractJsonStringField(InspectImage, "Id");
-    g_logfile << "WSLC Image deleted, session=" << Session->SessionId << ", id=" << id << std::endl;
+    auto image = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(InspectJson);
+    auto name = (image.RepoTags.has_value() && !image.RepoTags->empty()) ? image.RepoTags->front() : "<none>";
+    g_logfile << "WSLC Image deleted, session=" << Session->SessionId << ", id=" << image.Id << ", name=" << name << std::endl;
     return S_OK;
 }
 

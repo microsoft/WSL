@@ -69,7 +69,7 @@ struct SessionEntry
     bool StoppingNotified = false;
 
     // Snapshot of UserToken/UserSid for plugin invocations. Populated at creation.
-    wil::unique_handle UserToken;
+    wil::shared_handle UserToken;
     std::vector<BYTE> UserSid;
 };
 
@@ -128,7 +128,7 @@ private:
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
                 // Session is gone: notify plugins (if not already), then drop persistent reference if any.
-                FireSessionStoppingLocked(entry);
+                NotifySessionStoppingLockHeld(entry);
 
                 auto remove =
                     std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == entry.SessionId; });
@@ -173,7 +173,7 @@ private:
 
     // Fires PluginManager::OnWslcSessionStopping for the given entry exactly once.
     // Caller must hold m_wslcSessionsLock. Errors are swallowed (stopping notifications are best-effort).
-    void FireSessionStoppingLocked(SessionEntry& entry) noexcept;
+    void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;

@@ -740,36 +740,17 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    // Notify plugin manager (cross-process via the SYSTEM service) before finalizing state
-    // so the container can be cleanly torn down on rejection by letting the scope_exit guards
-    // unwind ports/volumes/init. Inspect inline because m_lock is already held exclusive.
-    auto* notifier = m_pluginNotifier;
-    if (notifier != nullptr)
+    auto inspectJson = InspectLockHeld();
+    const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
+    if (FAILED(pluginResult))
     {
-        std::string inspectJson;
+        LOG_HR_MSG(pluginResult, "Plugin rejected container '%hs' (0x%x); stopping it", m_id.c_str(), pluginResult);
         try
         {
-            auto dockerInspect = m_dockerClient.InspectContainer(m_id);
-            auto wslcInspect = BuildInspectContainer(dockerInspect);
-            inspectJson = wsl::shared::ToJson(wslcInspect);
+            m_dockerClient.StopContainer(m_id.c_str(), {}, {});
         }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
-        }
-
-        const auto rejectionResult = notifier->OnContainerStarted(inspectJson.c_str());
-        if (FAILED(rejectionResult))
-        {
-            LOG_HR_MSG(rejectionResult, "Plugin rejected container '%hs' (0x%x); stopping it", m_id.c_str(), rejectionResult);
-            try
-            {
-                m_dockerClient.StopContainer(m_id, std::nullopt, std::nullopt);
-            }
-            CATCH_LOG();
-            THROW_HR(rejectionResult);
-        }
+        CATCH_LOG();
+        THROW_HR(pluginResult);
     }
 
     portCleanup.release();
@@ -916,24 +897,13 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     unique_com_disconnect comWrapper;
 
     // Notify plugin manager (best-effort) that the container is stopping. Errors are ignored.
-    auto* notifier = m_pluginNotifier;
-    if (notifier != nullptr && m_state == WslcContainerStateRunning)
+    if (m_state == WslcContainerStateRunning)
     {
-        std::string inspectJson;
         try
         {
-            // Inspect without re-acquiring m_lock (already held exclusive by caller).
-            auto dockerInspect = m_dockerClient.InspectContainer(m_id);
-            auto wslcInspect = BuildInspectContainer(dockerInspect);
-            inspectJson = wsl::shared::ToJson(wslcInspect);
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(InspectLockHeld().c_str()));
         }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
-        }
-
-        LOG_IF_FAILED(notifier->OnContainerStopping(inspectJson.c_str()));
+        CATCH_LOG();
     }
 
     ReleaseProcesses();
@@ -1741,17 +1711,21 @@ void WSLCContainerImpl::Inspect(LPSTR* Output) const
 
     try
     {
-        // Get Docker inspect data
-        auto dockerInspect = m_dockerClient.InspectContainer(m_id);
-
-        // Convert to WSLC schema
-        auto wslcInspect = BuildInspectContainer(dockerInspect);
-
-        // Serialize WSLC schema to JSON
-        std::string wslcJson = wsl::shared::ToJson(wslcInspect);
-        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslcJson.c_str()).release();
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectLockHeld().c_str()).release();
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
+}
+
+std::string WSLCContainerImpl::InspectLockHeld() const
+{
+    // Get Docker inspect data
+    auto dockerInspect = m_dockerClient.InspectContainer(m_id);
+
+    // Convert to WSLC schema
+    auto wslcInspect = BuildInspectContainer(dockerInspect);
+
+    // Serialize WSLC schema to JSON
+    return wsl::shared::ToJson(wslcInspect);
 }
 
 void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const

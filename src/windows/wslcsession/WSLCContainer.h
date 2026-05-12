@@ -172,6 +172,8 @@ private:
     void MapPorts();
     void UnmapPorts();
 
+    __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
+
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;

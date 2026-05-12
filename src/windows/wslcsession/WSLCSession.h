@@ -83,15 +83,6 @@ public:
     // Used by the COM server host to signal process exit.
     void SetDestructionCallback(std::function<void()>&& callback);
 
-    // Helper used by image flows to notify the SYSTEM service plugin manager
-    // that an image was created. Best-effort: any failures (including no plugin
-    // installed) are swallowed so they cannot break the image flow.
-    void NotifyImageCreatedByName(const std::string& ImageNameOrId) noexcept;
-
-    // Notify the SYSTEM service plugin manager that an image is about to be deleted.
-    // Must be called before DeleteImage so the plugin can still inspect the image.
-    void NotifyImageDeletedByName(const std::string& ImageNameOrId) noexcept;
-
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
     IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_opt_ IWSLCPluginNotifier* PluginNotifier) override;
@@ -181,7 +172,16 @@ private:
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
+    _Requires_shared_lock_held_(m_lock)
+    std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageDeleted(const std::string& ImageNameOrId) noexcept;
+
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();

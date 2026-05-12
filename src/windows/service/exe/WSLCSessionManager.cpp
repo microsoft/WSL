@@ -135,14 +135,14 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
     std::lock_guard lock(m_wslcSessionsLock);
     for (auto& entry : m_sessions)
     {
-        FireSessionStoppingLocked(entry);
+        NotifySessionStoppingLockHeld(entry);
         LOG_IF_FAILED(entry.Ref->Terminate());
     }
 
     g_managerInstance.store(nullptr);
 }
 
-void WSLCSessionManagerImpl::FireSessionStoppingLocked(SessionEntry& entry) noexcept
+void WSLCSessionManagerImpl::NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept
 try
 {
     if (entry.StoppingNotified)
@@ -156,7 +156,7 @@ try
     info.DisplayName = entry.DisplayName.c_str();
     info.ApplicationPid = entry.CreatorPid;
     info.UserToken = entry.UserToken.get();
-    info.UserSid = entry.UserSid.empty() ? nullptr : entry.UserSid.data();
+    info.UserSid = entry.UserSid.data();
     g_pluginManager.OnWslcSessionStopping(&info);
 }
 CATCH_LOG()
@@ -244,9 +244,11 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
         // Capture a duplicated user token + raw SID so PluginManager can build
         // WSLCSessionInformation later (e.g. on shutdown) without re-impersonating.
-        wil::unique_handle storedUserToken;
+        // The token is shared between the SessionEntry and the WSLCPluginNotifier.
+        wil::unique_handle dupToken;
         THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
-            userToken.get(), TOKEN_QUERY | TOKEN_DUPLICATE, nullptr, SecurityImpersonation, TokenImpersonation, &storedUserToken));
+            userToken.get(), TOKEN_QUERY | TOKEN_DUPLICATE, nullptr, SecurityImpersonation, TokenImpersonation, &dupToken));
+        wil::shared_handle sharedToken{dupToken.release()};
 
         const DWORD sidLen = GetLengthSid(tokenInfo.TokenInfo->User.Sid);
         std::vector<BYTE> storedSid(sidLen);
@@ -254,12 +256,8 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
         // Build the plugin notifier service-side. Lifetime tracked via the SessionEntry.
         Microsoft::WRL::ComPtr<IWSLCPluginNotifier> notifier;
-        wil::unique_handle notifierToken;
-        THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
-            userToken.get(), TOKEN_QUERY | TOKEN_DUPLICATE, nullptr, SecurityImpersonation, TokenImpersonation, &notifierToken));
-
         notifier = wil::MakeOrThrow<WSLCPluginNotifier>(
-            g_pluginManager, sessionId, creatorPid, resolvedDisplayName, std::move(notifierToken), std::vector<BYTE>(storedSid));
+            g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
         // Create the VM in the SYSTEM service (privileged).
         auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
@@ -277,7 +275,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, std::move(storedUserToken), std::move(storedSid)});
+            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);

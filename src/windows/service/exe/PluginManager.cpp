@@ -120,7 +120,7 @@ wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
 
 extern "C" {
 
-HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPWSTR Mountpoint)
+HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPSTR Mountpoint)
 try
 {
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
@@ -128,13 +128,15 @@ try
     auto session = ResolveWslcSession(Session);
 
     // Mount the folder under /mnt/wsl-plugin/<Name>. Convert Name to UTF-8 for the Linux path.
-    const auto nameUtf8 = wsl::shared::string::WideToMultiByte(Name);
-    const auto linuxPath = std::format("/mnt/wsl-plugin/{}", nameUtf8);
+    const auto linuxPath = std::format("/mnt/wsl-plugin/{}", Name);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, linuxPath.length() >= WSLC_MOUNTPOINT_LENGTH, "Mountpoint too long: %hs", linuxPath.c_str());
 
     auto result = session->MountWindowsFolder(WindowsPath, linuxPath.c_str(), ReadOnly);
 
     WSL_LOG(
         "WslcPluginMountFolderCall",
+        TraceLoggingValue(Session, "SessionId"),
         TraceLoggingValue(WindowsPath, "WindowsPath"),
         TraceLoggingValue(linuxPath.c_str(), "LinuxPath"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
@@ -143,25 +145,27 @@ try
 
     if (SUCCEEDED(result))
     {
-        const auto wideLinuxPath = wsl::shared::string::MultiByteToWide(linuxPath);
-        wcsncpy_s(Mountpoint, 256, wideLinuxPath.c_str(), _TRUNCATE);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(Mountpoint, WSLC_MOUNTPOINT_LENGTH, linuxPath.c_str()) != 0);
     }
 
     return result;
 }
 CATCH_RETURN();
 
-HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCWSTR Mountpoint)
+HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint)
 try
 {
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
 
-    const auto mountpointUtf8 = wsl::shared::string::WideToMultiByte(Mountpoint);
-    auto result = session->UnmountWindowsFolder(mountpointUtf8.c_str());
+    auto result = session->UnmountWindowsFolder(Mountpoint);
 
-    WSL_LOG("WslcPluginUnmountFolderCall", TraceLoggingValue(Mountpoint, "Mountpoint"), TraceLoggingValue(result, "Result"));
+    WSL_LOG(
+        "WslcPluginUnmountFolderCall",
+        TraceLoggingValue(Session, "SessionId"),
+        TraceLoggingValue(Mountpoint, "Mountpoint"),
+        TraceLoggingValue(result, "Result"));
 
     return result;
 }
@@ -214,6 +218,7 @@ try
     {
         WSL_LOG(
             "WslcPluginCreateProcessCall",
+            TraceLoggingValue(Session, "SessionId"),
             TraceLoggingValue(Executable, "Executable"),
             TraceLoggingValue(result, "Result"),
             TraceLoggingValue(errnoValue, "Errno"));
@@ -224,7 +229,12 @@ try
     wrapper->Process = std::move(process);
     *Process = wrapper.release();
 
-    WSL_LOG("WslcPluginCreateProcessCall", TraceLoggingValue(Executable, "Executable"), TraceLoggingValue(S_OK, "Result"));
+    WSL_LOG(
+        "WslcPluginCreateProcessCall",
+        TraceLoggingValue(Session, "SessionId"),
+        TraceLoggingValue(Executable, "Executable"),
+        TraceLoggingValue(*Process, "Process"),
+        TraceLoggingValue(S_OK, "Result"));
 
     return S_OK;
 }
@@ -252,11 +262,20 @@ try
         wslcFd = WSLCFDStderr;
         break;
     default:
+        WSL_LOG("WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
         return E_INVALIDARG;
     }
 
     WSLCHandle handle{};
-    RETURN_IF_FAILED(wrapper->Process->GetStdHandle(wslcFd, &handle));
+    auto result = wrapper->Process->GetStdHandle(wslcFd, &handle);
+
+    WSL_LOG(
+        "WslcPluginProcessGetFd",
+        TraceLoggingValue(static_cast<int>(Fd), "Fd"),
+        TraceLoggingValue(handle.Handle.Socket, "Handle"),
+        TraceLoggingValue(result, "Result"));
+
+    RETURN_IF_FAILED(result);
 
     *Handle = handle.Handle.Socket;
     return S_OK;
@@ -271,7 +290,14 @@ try
     *ExitEvent = nullptr;
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-    return wrapper->Process->GetExitEvent(ExitEvent);
+    auto result = wrapper->Process->GetExitEvent(ExitEvent);
+
+    WSL_LOG(
+        "WslcPluginProcessGetExitEvent",
+        TraceLoggingValue(*ExitEvent, "ExitEvent"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
 }
 CATCH_RETURN();
 
@@ -284,18 +310,28 @@ try
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
 
     WSLCProcessState state{};
-    RETURN_IF_FAILED(wrapper->Process->GetState(&state, ExitCode));
+    auto result = wrapper->Process->GetState(&state, ExitCode);
 
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), state != WslcProcessStateExited && state != WslcProcessStateSignalled);
+    if (SUCCEEDED(result) && state != WslcProcessStateExited && state != WslcProcessStateSignalled)
+    {
+        result = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
+    }
 
-    return S_OK;
+    WSL_LOG(
+        "WslcPluginProcessGetExitCode",
+        TraceLoggingValue(*ExitCode, "ExitCode"),
+        TraceLoggingValue(static_cast<int>(state), "State"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
 }
 CATCH_RETURN();
 
-void WSLCProcessRelease(WSLCProcessHandle Process)
+void WSLCReleaseProcess(WSLCProcessHandle Process)
 {
     if (Process != nullptr)
     {
+        WSL_LOG("WslcPluginReleaseProcess", TraceLoggingValue(Process, "Process"));
         delete static_cast<WslcProcessWrapper*>(Process);
     }
 }
@@ -314,7 +350,7 @@ static constexpr WSLPluginAPIV1 ApiV1 = {
     &WSLCProcessGetFd,
     &WSLCProcessGetExitEvent,
     &WSLCProcessGetExitCode,
-    &WSLCProcessRelease};
+    &WSLCReleaseProcess};
 
 void PluginManager::LoadPlugins()
 {

@@ -26,6 +26,9 @@ extern "C" {
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
 #define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
+// Maximum size for mount points returned by WSLCPluginAPI_MountFolder. This includes the null terminator.
+#define WSLC_MOUNTPOINT_LENGTH 256
+
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
         (Api->Version.Major == (_Major) && Api->Version.Minor == (_Minor) && Api->Version.Revision < (_Revision))) \
@@ -99,7 +102,7 @@ struct WSLCSessionInformation
 };
 
 // Opaque handle to a WSLC process created via WSLCPluginAPI_CreateProcess.
-// Must be released with WSLCPluginAPI_ProcessRelease when no longer needed.
+// Must be released with WSLCPluginAPI_ReleaseProcess when no longer needed.
 typedef void* WSLCProcessHandle;
 
 // Represents a standard file descriptor for WSLCPluginAPI_ProcessGetFd.
@@ -139,23 +142,23 @@ typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInform
 typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation* Session, LPCSTR InspectImage);
 
 // Called when an image is deleted. Errors are ignored.
-typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR InspectImage);
+typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR ImageId);
 
 //
 // WSLC plugin -> API calls (called by the plugin into WSL)
 //
 
 // Mount a Windows folder into the WSLC session VM. The mount path is returned via 'Mountpoint'.
-// 'Mountpoint' must point to a buffer of at least 256 wchar_t.
-typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPWSTR Mountpoint);
+// 'Mountpoint' must point to a buffer of at least WSLC_MOUNTPOINT_LENGTH chars, including the null terminator.
+typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPSTR Mountpoint);
 
 // Unmount a folder previously mounted via WSLCPluginAPI_MountFolder.
-typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCWSTR Mountpoint);
+typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mountpoint);
 
 // Create a process in the WSLC session's root namespace.
 // 'Arguments' and 'Env' are NULL-terminated arrays. 'Env' may be NULL.
 // 'Errno' is optional and receives the errno value if the process creation fails.
-// On success, 'Process' receives an opaque handle that must be released with WSLCPluginAPI_ProcessRelease.
+// On success, 'Process' receives an opaque handle that must be released with WSLCPluginAPI_ReleaseProcess.
 typedef HRESULT (*WSLCPluginAPI_CreateProcess)(
     WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno);
 
@@ -172,7 +175,7 @@ typedef HRESULT (*WSLCPluginAPI_ProcessGetExitCode)(WSLCProcessHandle Process, i
 
 // Release a WSLC process handle. All outstanding handles obtained via
 // WSLCPluginAPI_ProcessGetFd/GetExitEvent must be closed before calling this.
-typedef void (*WSLCPluginAPI_ProcessRelease)(WSLCProcessHandle Process);
+typedef void (*WSLCPluginAPI_ReleaseProcess)(WSLCProcessHandle Process);
 
 // Execute a program in a user distribution
 // On success, 'Socket' is connected to stdin & stdout (stderr goes to dmesg) // 'Arguments' is expected to be NULL terminated
@@ -239,7 +242,7 @@ struct WSLPluginAPIV1
     WSLCPluginAPI_ProcessGetFd WSLCProcessGetFd;
     WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent;
     WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;
-    WSLCPluginAPI_ProcessRelease WSLCProcessRelease;
+    WSLCPluginAPI_ReleaseProcess WSLCReleaseProcess;
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);
