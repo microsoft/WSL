@@ -15,6 +15,7 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
+#include "Defaults.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
 #include "Localization.h"
@@ -26,12 +27,6 @@ using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
 
 namespace {
-constexpr uint32_t s_DefaultCPUCount = 2;
-constexpr uint32_t s_DefaultMemoryMB = 2000;
-// Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
-constexpr ULONG s_DefaultBootTimeout = 300000;
-// Default to 1 GB
-constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
 #define WSLC_FLAG_VALUE_ASSERT(_wlsc_name_, _wslc_name_) \
     static_assert(_wlsc_name_ == _wslc_name_, "Flag values differ: " #_wlsc_name_ " != " #_wslc_name_);
@@ -314,6 +309,25 @@ std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
 {
     wil::com_ptr<IWSLCSessionManager> result;
     HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
+    if (SUCCEEDED(hr))
+    {
+        const WSLCVersion clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        BOOL isSupported = FALSE;
+        THROW_IF_FAILED(result->IsClientVersionSupported(&clientVersion, &isSupported));
+
+        if (!isSupported)
+        {
+            LOG_HR_MSG(
+                WSLC_E_SDK_UPDATE_NEEDED,
+                "WSLC SDK update required. Current SDK version: %lu.%lu.%lu",
+                WSL_PACKAGE_VERSION_MAJOR,
+                WSL_PACKAGE_VERSION_MINOR,
+                WSL_PACKAGE_VERSION_REVISION);
+
+            return {result, WSLC_E_SDK_UPDATE_NEEDED};
+        }
+    }
+
     return {result, hr};
 }
 
@@ -341,20 +355,6 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
     return result;
 }
 
-bool NeedsWslRuntimeInstalled()
-{
-    auto hr = CreateSessionManagerRaw().second;
-
-    if (SUCCEEDED(hr))
-    {
-        return false;
-    }
-    else if (hr == REGDB_E_CLASSNOTREG)
-    {
-        return true;
-    }
-    THROW_HR(hr);
-}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -442,6 +442,7 @@ try
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+    WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
     {
@@ -1472,7 +1473,20 @@ try
     WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
 
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
-    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
+
+    auto hr = CreateSessionManagerRaw().second;
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+    }
+    else if (hr == WSLC_E_SDK_UPDATE_NEEDED)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+    }
+    else if (FAILED(hr))
+    {
+        THROW_HR(hr);
+    }
 
     *missingComponents = componentCheck;
 
@@ -1506,12 +1520,14 @@ try
 {
     HRESULT result = S_OK;
     bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    bool needsRuntime = NeedsWslRuntimeInstalled();
+    auto runtimeResult = CreateSessionManagerRaw().second;
 
-    if (!needsVirtualMachine && !needsRuntime)
+    if (!needsVirtualMachine && SUCCEEDED(runtimeResult))
     {
         return result;
     }
+
+    THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
 
     // Installing these components requires elevation.
     auto token = wil::open_current_access_token();
@@ -1544,7 +1560,7 @@ try
         }
     }
 
-    if (needsRuntime)
+    if (!SUCCEEDED(runtimeResult))
     {
         std::function<void(uint32_t)> callback;
         if (progressCallback)

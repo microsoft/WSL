@@ -2461,6 +2461,12 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Zarządzaj poświadczeniami rejestru, w tym logowaniem i wylogowywaniem z rejestrów kontenerów.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Polecenia na poziomie systemu</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Polecenia zarządzania na poziomie systemu.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Oznacz obraz.</value>
   </data>
@@ -2630,11 +2636,21 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Usuń kontener po jego zatrzymaniu</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Sygnał do zatrzymania kontenera</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Rozmiar /dev/shm (np. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Identyfikator sesji</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Ścieżka magazynu sesji</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Sygnał do wysłania</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Bieżące lub istniejące odwołanie do obrazu w formacie nazwa_obrazu[:tag]</value>
@@ -2668,7 +2684,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Katalog roboczy wewnątrz kontenera</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Zapisz identyfikator kontenera w podanej ścieżce.</value>
+    <value>Zapisz identyfikator kontenera w podanej ścieżce</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Adres IP serwera nazw DNS w pliku resolv.conf</value>
@@ -2737,11 +2753,19 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Nieprawidłowa wartość argumentu {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Nieprawidłowa wartość {}: {} jest poza prawidłowym zakresem ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Nieprawidłowa wartość argumentu {}: »{}«. Oczekiwano rozmiaru pamięci (np. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>Plik CID „{}” już istnieje</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

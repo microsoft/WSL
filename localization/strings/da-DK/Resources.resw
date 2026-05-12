@@ -2461,6 +2461,12 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Administrer legitimationsoplysninger til registreringsdatabaser, herunder log på og log ud af objektbeholderregistreringsdatabaser.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marker et billede.</value>
   </data>
@@ -2630,11 +2636,21 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Fjern objektbeholderen, når den stopper</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal om at stoppe objektbeholderen</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Størrelse på /dev/shm (f.eks. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Sessions-id</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sti til sessionslager</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal, der skal sendes</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuel eller eksisterende billedreference i formatet image-name[:tag]</value>
@@ -2668,7 +2684,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Arbejdsmappe inde i objektbeholderen</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Skriv objektbeholder-id'et til den angivne sti.</value>
+    <value>Skriv container-id'et til den angivne sti</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adressen på DNS-navneserveren i resolv.conf</value>
@@ -2737,11 +2753,19 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Ugyldig {} argumentværdi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ugyldig {} værdi: {} er uden for det gyldige område ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Ugyldig {}-argumentværdi: '{}'. Forventede en hukommelsesstørrelse (f.eks. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID-filen "{}" findes allerede</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

@@ -2461,6 +2461,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Manage registry credentials, including logging in and out of container registries.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tag an image.</value>
   </data>
@@ -2630,11 +2636,21 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Remove the container after it stops</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Session ID</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Session storage path</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
@@ -2668,7 +2684,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Working directory inside the container</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Write the container ID to the provided path.</value>
+    <value>Write the container ID to the provided path</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP address of the DNS nameserver in resolv.conf</value>
@@ -2742,6 +2758,14 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Invalid {} value: {} is out of valid range ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

@@ -429,7 +429,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
-    m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    m_miniInitChannel =
+        wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", {m_terminatingEvent.get()}};
 
     // Accept the connection from the Linux guest for notifications.
     m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
@@ -512,7 +513,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
-    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling;
+    // Virtio proxy forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
+    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::VirtioProxy;
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
@@ -571,9 +573,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             {
                 wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
-                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket, m_vmConfig.EnableDnsTunneling);
+                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
+                // NAT may have fallen back to virtio proxy after the early-config message; drop the unused DNS hvsocket.
+                dnsTunnelingSocket.reset();
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, std::move(dnsTunnelingSocket));
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1056,7 +1060,7 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
             THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_terminatingEvent.get()};
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", {m_terminatingEvent.get()}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;
@@ -1904,7 +1908,9 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 
 bool WslCoreVm::IsDnsTunnelingSupported() const
 {
-    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
+    WI_ASSERT(
+        m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
+        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
@@ -1955,7 +1961,7 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     transaction.Send<LX_MINI_INIT_MOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the mount result from mini_init
     auto [mountResult, step] = GetMountResult(channel);
@@ -2085,7 +2091,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
         channel = {
             AcceptConnection(m_vmConfig.KernelBootTimeout),
             "WaitForPmem",
-            m_terminatingEvent.get(),
+            {m_terminatingEvent.get()},
         };
     }
 
@@ -2394,7 +2400,7 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
 
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "ResizeDistribution", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "ResizeDistribution", {m_terminatingEvent.get()}};
     auto outputChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
 
     wsl::windows::common::relay::ScopedRelay outputRelay(std::move(outputChannel), OutputHandle);
@@ -2473,7 +2479,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     transaction.Send(message);
 
     // Accept a connection from mini_init.
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the unmount result from mini_init
     return GetMountResult(channel);
@@ -2489,7 +2495,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedD
     transaction.Send<LX_MINI_INIT_UNMOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init.
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the unmount result from mini_init.
     return GetMountResult(channel);
@@ -2546,7 +2552,7 @@ try
             break;
         }
 
-        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", m_terminatingEvent.get()};
+        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", {m_terminatingEvent.get()}};
         std::thread([this, channel = std::move(channel)]() mutable {
             try
             {
@@ -2853,7 +2859,7 @@ void WslCoreVm::ValidateNetworkingMode()
         EMIT_USER_WARNING(Localization::MessageLocalhostForwardingNotSupportedMirroredMode());
     }
 
-    // If DNS tunneling was requested, ensure it is supported by Windows.
+    // The DnsResolver support check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
         // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.
