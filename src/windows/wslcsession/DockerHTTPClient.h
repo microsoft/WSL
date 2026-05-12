@@ -129,7 +129,15 @@ public:
         std::vector<std::string> absentLabels;
     };
 
-    std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
+    struct ListContainersFilters
+    {
+        // Generic Docker filter map. Each key maps to one or more values; the
+        // daemon applies its native semantics (OR within a key for most
+        // filters, AND for label/network).
+        std::map<std::string, std::vector<std::string>> entries;
+    };
+
+    std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false, int limit = -1, const ListContainersFilters& filters = {});
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds);

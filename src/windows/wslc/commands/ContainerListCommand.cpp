@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "ContainerCommand.h"
+#include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
@@ -29,7 +30,10 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All),
+        Argument::Create(ArgType::Filter),
         Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::Last),
+        Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
         Argument::Create(ArgType::Session),
@@ -44,18 +48,6 @@ std::wstring ContainerListCommand::ShortDescription() const
 std::wstring ContainerListCommand::LongDescription() const
 {
     return Localization::WSLCCLI_ContainerListLongDesc();
-}
-
-void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
 }
 
 // clang-format off

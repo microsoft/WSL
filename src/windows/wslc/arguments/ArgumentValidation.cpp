@@ -57,6 +57,14 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
+    case ArgType::Last:
+        validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::Last>(), m_name);
+        break;
+
+    case ArgType::Filter:
+        validation::ValidateFilter(execArgs.GetAll<ArgType::Filter>());
+        break;
+
     case ArgType::Gpus:
         validation::ValidateGpus(execArgs.GetAll<ArgType::Gpus>(), m_name);
         break;
@@ -112,6 +120,19 @@ void ValidateVolumeMount(const std::vector<std::wstring>& values)
     for (const auto& value : values)
     {
         std::ignore = models::VolumeMount::Parse(value);
+    }
+}
+
+// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
+// the runtime validates the key and value for specific objects.
+void ValidateFilter(const std::vector<std::wstring>& values)
+{
+    for (const auto& value : values)
+    {
+        if (value.find(L'=') == std::wstring::npos)
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
+        }
     }
 }
 

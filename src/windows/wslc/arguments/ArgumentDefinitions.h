@@ -53,6 +53,7 @@ _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       L
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EnvFileArgDescription()) \
 _(File,           "file",                L"f",              Kind::Value,       Localization::WSLCCLI_FileArgDescription()) \
+_(Filter,         "filter",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,         "follow",              L"f",              Kind::Flag,        Localization::WSLCCLI_FollowArgDescription()) \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
@@ -65,6 +66,8 @@ _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
+_(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
+_(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \

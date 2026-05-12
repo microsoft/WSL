@@ -20,7 +20,6 @@ Abstract:
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
-#include <unordered_map>
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
@@ -420,12 +419,28 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
     THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
 }
 
-std::vector<ContainerInformation> ContainerService::List(Session& session)
+std::vector<ContainerInformation> ContainerService::List(
+    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    std::vector<ContainerInformation> result;
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    WSLCListContainersOptions options;
+    options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
+    options.Limit = limit;
+    options.Filters = filterEntries.data();
+    options.FiltersCount = static_cast<ULONG>(filterEntries.size());
+
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
     wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+    THROW_IF_FAILED(
+        session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+    std::vector<ContainerInformation> result;
 
     for (const auto& current : containers)
     {

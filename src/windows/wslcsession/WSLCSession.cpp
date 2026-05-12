@@ -1713,28 +1713,88 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListContainers(WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
+HRESULT WSLCSession::ListContainers(
+    const WSLCListContainersOptions* Options, WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
 try
 {
     COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Containers);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Ports);
+    RETURN_HR_IF_NULL(E_POINTER, PortsCount);
 
     *Count = 0;
     *Containers = nullptr;
     *Ports = nullptr;
     *PortsCount = 0;
 
+    bool all = false;
+    int limit = -1;
+    DockerHTTPClient::ListContainersFilters filters;
+
+    if (Options != nullptr)
+    {
+        all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
+        limit = static_cast<int>(Options->Limit);
+
+        if (Options->FiltersCount > 0)
+        {
+            RETURN_HR_IF(E_POINTER, Options->Filters == nullptr);
+
+            for (ULONG i = 0; i < Options->FiltersCount; ++i)
+            {
+                THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
+                THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Value == nullptr, "Filter value cannot be null (index %lu)", i);
+
+                filters.entries[Options->Filters[i].Key].emplace_back(Options->Filters[i].Value);
+            }
+        }
+    }
+
     auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    std::vector<docker_schema::ContainerInfo> dockerContainers;
+    try
+    {
+        dockerContainers = m_dockerClient->ListContainers(all, limit, filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+
+    std::unordered_set<std::string> matchedIds;
+    matchedIds.reserve(dockerContainers.size());
+    for (const auto& c : dockerContainers)
+    {
+        matchedIds.insert(c.Id);
+    }
+
     std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslcContainerStateDeleted; });
 
-    auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(m_containers.size());
+    // Pre-count matches so we can size the output array exactly.
+    size_t matchedCount = 0;
+    for (const auto& e : m_containers)
+    {
+        if (matchedIds.contains(e->ID()))
+        {
+            ++matchedCount;
+        }
+    }
+
+    auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(matchedCount);
     std::vector<WSLCContainerPortMapping> allPorts;
 
     size_t index = 0;
     for (const auto& e : m_containers)
     {
+        if (!matchedIds.contains(e->ID()))
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
@@ -1758,7 +1818,7 @@ try
         index++;
     }
 
-    *Count = static_cast<ULONG>(m_containers.size());
+    *Count = static_cast<ULONG>(matchedCount);
     *Containers = output.release();
 
     if (!allPorts.empty())
