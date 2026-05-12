@@ -1004,9 +1004,16 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    // Collect loaded image names from the docker response stream so we can
+    // notify plugins after the load completes.
+    std::vector<std::string> loadedImages;
+    ImportImageImpl(*requestContext, ImageHandle, &loadedImages);
 
-    // Note: image name is unknown for LoadImage; rely on docker events to trigger plugin notifications instead.
+    for (const auto& imageName : loadedImages)
+    {
+        NotifyImageCreatedByName(imageName);
+    }
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -1038,7 +1045,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, std::vector<std::string>* loadedImages)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1090,7 +1097,22 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
         else if (parsed.stream.has_value())
         {
-            // TODO: report progress to caller.
+            // Docker's /images/load emits "Loaded image: <name>\n" for each image.
+            constexpr std::string_view prefix = "Loaded image: ";
+            if (loadedImages != nullptr && parsed.stream->starts_with(prefix))
+            {
+                auto name = parsed.stream->substr(prefix.size());
+                while (!name.empty() && (name.back() == '\n' || name.back() == '\r'))
+                {
+                    name.pop_back();
+                }
+
+                if (!name.empty())
+                {
+                    loadedImages->push_back(std::move(name));
+                }
+            }
+
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
         }
         else
