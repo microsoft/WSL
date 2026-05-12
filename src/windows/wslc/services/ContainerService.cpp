@@ -20,6 +20,7 @@ Abstract:
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
+#include <filesystem>
 #include <unordered_map>
 #include <wslc.h>
 
