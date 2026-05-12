@@ -456,10 +456,11 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
-    // Connects to a vsock port in the VM. Returns a socket handle that
-    // supports overlapped I/O (suitable for use with SocketChannel).
-    // For HCS VMs, this uses hvsocket. For OpenVMM VMs, this uses the
-    // hybrid_vsock Unix domain socket bridge with a TCP loopback relay.
+    // Connects to a vsock port in the VM. Returns a socket handle suitable
+    // for use with SocketChannel.
+    // For HCS VMs, this uses hvsocket (overlapped I/O supported).
+    // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge
+    // (AF_UNIX; SocketChannel auto-detects and uses SyncSocketTransport).
     HRESULT ConnectToVsockPort([in] ULONG Port, [out, system_handle(sh_socket)] HANDLE* Socket);
 
     // Accepts a crash dump connection from the VM. Blocks until a crash dump
