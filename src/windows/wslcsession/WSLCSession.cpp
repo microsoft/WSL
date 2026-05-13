@@ -237,7 +237,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_opt_ IWSLCPluginNotifier* PluginNotifier)
+HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);

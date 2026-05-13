@@ -124,6 +124,7 @@ HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnl
 try
 {
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
+    RETURN_HR_IF_MSG(E_INVALIDARG, StrStrW(Name, L"..") != nullptr, "Name cannot contain '..': %ls", WindowsPath);
 
     auto session = ResolveWslcSession(Session);
 

@@ -363,7 +363,8 @@ try
                               std::vector<const char*> env = {}) -> std::tuple<int, std::string, std::string> {
             std::vector<const char*> arguments = {"/bin/sh", "-c", cmd, nullptr};
             WSLCProcessHandle process = nullptr;
-            THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments.data(), env.data(), &process, nullptr));
+            THROW_IF_FAILED(g_api->WSLCCreateProcess(
+                Session->SessionId, arguments[0], arguments.data(), env.empty() ? nullptr : env.data(), &process, nullptr));
             auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
             wil::unique_handle stdinHandle;
@@ -439,14 +440,14 @@ try
         }
 
         const auto testFolder = L"C:\\";
-        constexpr auto testFileName = "plu  gin-test.txt";
+        constexpr auto testFileName = L"plugin-test.txt";
 
         // Validate rw mounts.
         {
             auto rwCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testFileName); });
 
             {
-                std::ofstream file(std::wstring(testFolder) + L"\\testfile.txt");
+                std::ofstream file(std::wstring(testFolder) + testFileName);
                 file << "Windows-content";
             }
 
@@ -456,7 +457,7 @@ try
 
             g_logfile << "WSLC RW folder mounted at: " << rwMountpoint << std::endl;
 
-            auto readCmd = std::format("cat {}/testfile.txt", rwMountpoint);
+            auto readCmd = std::format("cat {}/{}", rwMountpoint, testFileName);
             runCommand(readCmd.c_str());
 
             THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, rwMountpoint));
@@ -481,6 +482,13 @@ try
             char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
             g_logfile << "WSLCMountFolder(nonexistent): "
                       << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", TRUE, L"plugin-ro-test", mountpoint) << std::endl;
+        }
+
+        // Validate that trying to escape the /mnt folder fails.
+        {
+            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
+            g_logfile << "WSLCMountFolder(../escape): "
+                      << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"../escape", mountpoint) << std::endl;
         }
 
         g_logfile << "Test completed" << std::endl;

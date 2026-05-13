@@ -825,7 +825,7 @@ interface IWSLCSessionFactory : IUnknown
     HRESULT CreateSession(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
-        [in, unique] IWSLCPluginNotifier* PluginNotifier,
+        [in] IWSLCPluginNotifier* PluginNotifier,
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 

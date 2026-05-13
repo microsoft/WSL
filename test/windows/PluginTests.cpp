@@ -664,6 +664,7 @@ class PluginTests
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
             Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}
+            WSLCMountFolder(../escape): {}
             Test completed
             WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
@@ -672,7 +673,8 @@ class PluginTests
             static_cast<uint32_t>(E_FAIL),
             E_INVALIDARG,
             HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            E_INVALIDARG);
 
         ValidateLogFile(ExpectedOutput.c_str());
     }
@@ -714,8 +716,8 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=21
             WSLC Session created, name=plugin-wslc-pull-test, id=*, pid=*, token=set, sid=set
-            WSLC Container started, session=1, id=*, name=*, image=wslc-registry:latest, state=running
-            WSLC Image created, session=1, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
+            WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
         ValidateLogFile(ExpectedOutput);

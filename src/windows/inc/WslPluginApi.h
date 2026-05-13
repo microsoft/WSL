@@ -138,7 +138,7 @@ typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInform
 
 // Called when an image is created (either pulled, or imported). Errors are ignored.
 // 'InspectImage' is a JSON document that follows the wslc_schema::InspectImage format.
-// N.B. This callback is currently only invoked when images are pulled. Images created via load, import or build are not reported.
+// N.B. This callback is currently only invoked when images are pulled or imported. Images created via load or build are not reported.
 typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation* Session, LPCSTR InspectImage);
 
 // Called when an image is deleted. 'ImageId' is the deleted image identifier. Errors are ignored.
