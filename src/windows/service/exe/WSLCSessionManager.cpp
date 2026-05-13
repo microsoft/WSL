@@ -33,11 +33,13 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
+#include "ExecutionContext.h"
 #include "wslutil.h"
 #include "filesystem.hpp"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
+using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
@@ -266,8 +268,6 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
         AddSessionProcessToJobObject(factory.get());
 
-        // Create the session via the factory, passing the plugin notifier as a top-level
-        // COM parameter for correct cross-process proxy marshaling.
         auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
@@ -558,27 +558,39 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+try
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WslcSession);
 }
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLCSessionManagerImpl::ListSessions, Sessions, SessionsCount);
 }
 
 HRESULT WSLCSessionManager::OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLCSessionManagerImpl::OpenSession, Id, Session);
 }
 
 HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
@@ -600,7 +612,7 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
         }
 
         result = session;
-        return S_OK; // stops iteration
+        return S_OK;
     });
 
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !result, "WSLC session %lu not found", Id);

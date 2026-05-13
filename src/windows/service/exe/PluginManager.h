@@ -51,7 +51,7 @@ public:
     HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
     void OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const;
     void OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
-    void OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
+    void OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const;
 
     void ThrowIfFatalPluginError() const;
 

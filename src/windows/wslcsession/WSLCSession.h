@@ -180,7 +180,7 @@ private:
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
     _Requires_shared_lock_held_(m_lock)
-    void OnImageDeleted(const std::string& ImageNameOrId) noexcept;
+    void OnImageDeleted(const std::string& ImageId) noexcept;
 
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
@@ -191,7 +191,7 @@ private:
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, std::vector<std::string>* loadedImages = nullptr);
+    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 

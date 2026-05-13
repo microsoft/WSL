@@ -102,10 +102,9 @@ struct WSLCSessionInformation
 };
 
 // Opaque handle to a WSLC process created via WSLCPluginAPI_CreateProcess.
-// Must be released with WSLCPluginAPI_ReleaseProcess when no longer needed.
+// Must be released with WSLCPluginAPI_ReleaseProcess.
 typedef void* WSLCProcessHandle;
 
-// Represents a standard file descriptor for WSLCPluginAPI_ProcessGetFd.
 typedef enum _WSLCProcessFd
 {
     WSLCProcessFdStdin = 0,
@@ -121,7 +120,7 @@ typedef HRESULT (*WSLPluginAPI_MountFolder)(WSLSessionId Session, LPCWSTR Window
 typedef HRESULT (*WSLPluginAPI_ExecuteBinary)(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket);
 
 //
-// WSLC plugin hooks (called by WSL into the plugin)
+// WSLC plugin hooks.
 //
 
 // Called when a WSLC session is created. Returning an error prevents the session creation.
@@ -139,13 +138,14 @@ typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInform
 
 // Called when an image is created (either pulled, or imported). Errors are ignored.
 // 'InspectImage' is a JSON document that follows the wslc_schema::InspectImage format.
+// N.B. This callback is currently only invoked when images are pulled. Images created via load, import or build are not reported.
 typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation* Session, LPCSTR InspectImage);
 
-// Called when an image is deleted. Errors are ignored.
+// Called when an image is deleted. 'ImageId' is the deleted image identifier. Errors are ignored.
 typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR ImageId);
 
 //
-// WSLC plugin -> API calls (called by the plugin into WSL)
+// WSLC plugin API calls.
 //
 
 // Mount a Windows folder into the WSLC session VM. The mount path is returned via 'Mountpoint'.
@@ -162,8 +162,7 @@ typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mou
 typedef HRESULT (*WSLCPluginAPI_CreateProcess)(
     WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno);
 
-// Get a stdio handle from a WSLC process. The returned HANDLE is a socket.
-// The caller takes ownership and must close it with closesocket().
+// Get a stdio handle from a WSLC process The caller takes ownership and must close it with CloseHandle().
 typedef HRESULT (*WSLCPluginAPI_ProcessGetFd)(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle);
 
 // Get the exit event for a WSLC process. Signaled when the process exits.
@@ -235,14 +234,14 @@ struct WSLPluginAPIV1
     WSLPluginAPI_PluginError PluginError;
     WSLPluginAPI_ExecuteBinaryInDistribution ExecuteBinaryInDistribution; // Introduced in 2.1.2
 
-    // WSLC plugin -> API surface.
-    WSLCPluginAPI_MountFolder WSLCMountFolder;
-    WSLCPluginAPI_UnmountFolder WSLCUnmountFolder;
-    WSLCPluginAPI_CreateProcess WSLCCreateProcess;
-    WSLCPluginAPI_ProcessGetFd WSLCProcessGetFd;
-    WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent;
-    WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;
-    WSLCPluginAPI_ReleaseProcess WSLCReleaseProcess;
+    // WSLC API calls.
+    WSLCPluginAPI_MountFolder WSLCMountFolder;                 // Introduced in 2.9.0
+    WSLCPluginAPI_UnmountFolder WSLCUnmountFolder;             // Introduced in 2.9.0
+    WSLCPluginAPI_CreateProcess WSLCCreateProcess;             // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetFd WSLCProcessGetFd;               // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent; // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;   // Introduced in 2.9.0
+    WSLCPluginAPI_ReleaseProcess WSLCReleaseProcess;           // Introduced in 2.9.0
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);

@@ -61,14 +61,11 @@ struct SessionEntry
     std::wstring DisplayName;
     CallingProcessTokenInfo Owner;
 
-    // Plugin notifier handed to the per-user process. Kept alive here so its proxy in
-    // the per-user process remains usable. May be null if there are no loaded plugins.
     Microsoft::WRL::ComPtr<IWSLCPluginNotifier> PluginNotifier;
 
     // Whether OnSessionStopping has been fired already; ensures it is fired exactly once.
     bool StoppingNotified = false;
 
-    // Snapshot of UserToken/UserSid for plugin invocations. Populated at creation.
     wil::shared_handle UserToken;
     std::vector<BYTE> UserSid;
 };
@@ -171,8 +168,6 @@ private:
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
-    // Fires PluginManager::OnWslcSessionStopping for the given entry exactly once.
-    // Caller must hold m_wslcSessionsLock. Errors are swallowed (stopping notifications are best-effort).
     void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};

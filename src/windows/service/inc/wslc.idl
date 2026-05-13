@@ -117,11 +117,6 @@ interface IProgressCallback : IUnknown
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
-//
-// IWSLCPluginNotifier - Callback from the per-user WSLC session into the SYSTEM service
-// for plugin-related events that originate inside the per-user process.
-// SYSTEM service implements this and dispatches to PluginManager.
-//
 [
     uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
     pointer_default(unique),
@@ -772,12 +767,11 @@ interface IWSLCSession : IUnknown
     // Returns a handle to this COM server process (used to add to job object).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Initializes the session with a pre-created VM and an optional plugin notifier
-    // for forwarding plugin-related events back to the SYSTEM service.
+    // Initializes the session with a pre-created VM?
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
-        [in, unique] IWSLCPluginNotifier* PluginNotifier);
+        [in] IWSLCPluginNotifier* PluginNotifier);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);

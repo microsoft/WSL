@@ -1314,55 +1314,6 @@ class WSLCTests
         }
     }
 
-    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current())
-    {
-        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-
-        if (comError.has_value())
-        {
-            if (!Expected.has_value())
-            {
-                LogError("Unexpected COM error: '%ls'. Source: %hs", comError->Message.get(), std::format("{}", Source).c_str());
-                VERIFY_FAIL();
-            }
-
-            VERIFY_ARE_EQUAL(Expected.value(), comError->Message.get());
-        }
-        else
-        {
-            if (Expected.has_value())
-            {
-                LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
-                VERIFY_FAIL();
-            }
-        }
-    }
-
-    void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
-    {
-        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-
-        if (comError.has_value())
-        {
-            if (!comError->Message)
-            {
-                LogError("Expected COM error containing: '%ls', but COM error message was null", ExpectedSubstring.c_str());
-                VERIFY_FAIL();
-            }
-
-            if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
-            {
-                LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
-                VERIFY_FAIL();
-            }
-        }
-        else
-        {
-            LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
-            VERIFY_FAIL();
-        }
-    }
-
     class CapturingProgressCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
     {

@@ -744,13 +744,24 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
-        LOG_HR_MSG(pluginResult, "Plugin rejected container '%hs' (0x%x); stopping it", m_id.c_str(), pluginResult);
+        // Forward the COM error message, if available.
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+        LOG_HR_MSG(pluginResult, "Plugin rejected start of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
         try
         {
             m_dockerClient.StopContainer(m_id.c_str(), {}, {});
         }
         CATCH_LOG();
-        THROW_HR(pluginResult);
+
+        if (comError.has_value() && comError->Message)
+        {
+            THROW_HR_WITH_USER_ERROR(pluginResult, comError->Message.get());
+        }
+        else
+        {
+            THROW_HR(pluginResult);
+        }
     }
 
     portCleanup.release();

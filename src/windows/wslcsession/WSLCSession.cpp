@@ -1011,15 +1011,7 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    // Collect loaded image names from the docker response stream so we can
-    // notify plugins after the load completes.
-    std::vector<std::string> loadedImages;
-    ImportImageImpl(*requestContext, ImageHandle, &loadedImages);
-
-    for (const auto& imageName : loadedImages)
-    {
-        OnImageCreated(imageName);
-    }
+    ImportImageImpl(*requestContext, ImageHandle);
 
     return S_OK;
 }
@@ -1052,7 +1044,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, std::vector<std::string>* loadedImages)
+void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1104,22 +1096,6 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
         else if (parsed.stream.has_value())
         {
-            // Docker's /images/load emits "Loaded image: <name>\n" for each image.
-            constexpr std::string_view prefix = "Loaded image: ";
-            if (loadedImages != nullptr && parsed.stream->starts_with(prefix))
-            {
-                auto name = parsed.stream->substr(prefix.size());
-                while (!name.empty() && (name.back() == '\n' || name.back() == '\r'))
-                {
-                    name.pop_back();
-                }
-
-                if (!name.empty())
-                {
-                    loadedImages->push_back(std::move(name));
-                }
-            }
-
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
         }
         else
@@ -1445,27 +1421,13 @@ try
     *Count = static_cast<ULONG>(deletedImages.size());
     *DeletedImages = output.release();
 
-    // Notify plugin manager that the image was deleted (best-effort).
-    // Prefer the first Deleted entry (actual layer removal); fall back to the first
-    // Untagged entry (tag removal only, e.g. when containers still reference the image).
-    std::string deletedId;
+    // Notify plugin manager of all deleted image IDs.
     for (const auto& image : deletedImages)
     {
         if (!image.Deleted.empty())
         {
-            deletedId = image.Deleted;
-            break;
+            OnImageDeleted(image.Deleted);
         }
-
-        if (deletedId.empty() && !image.Untagged.empty())
-        {
-            deletedId = image.Untagged;
-        }
-    }
-
-    if (!deletedId.empty())
-    {
-        OnImageDeleted(deletedId);
     }
 
     return S_OK;

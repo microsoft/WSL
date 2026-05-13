@@ -580,16 +580,15 @@ void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
     {
         if (e.hooks.OnSessionCreated != nullptr)
         {
+            auto result = e.hooks.OnSessionCreated(Session);
             WSL_LOG(
                 "PluginOnWslcSessionCreatedCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
                 TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(Session->DisplayName, "DisplayName"));
+                TraceLoggingValue(Session->DisplayName, "DisplayName"),
+                TraceLoggingValue(result, "Result"));
 
-            const auto result = e.hooks.OnSessionCreated(Session);
-            // Reuse ThrowIfPluginError for the user-error / fatal-error semantics.
-            // SessionId on the WSL plugin error path expects WSLSessionId; reuse 0 since this is a WSLC session.
-            ThrowIfPluginError(result, 0, e.name.c_str());
+            ThrowIfPluginError(result, Session->SessionId, e.name.c_str());
         }
     }
 }
@@ -602,12 +601,13 @@ void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
     {
         if (e.hooks.OnSessionStopping != nullptr)
         {
+            const auto result = e.hooks.OnSessionStopping(Session);
             WSL_LOG(
                 "PluginOnWslcSessionStoppingCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"));
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
 
-            const auto result = e.hooks.OnSessionStopping(Session);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -622,17 +622,18 @@ try
     {
         if (e.hooks.ContainerStarted != nullptr)
         {
+            // Failure here aborts the container creation. Surface the first error.
+            const auto result = e.hooks.ContainerStarted(Session, InspectJson);
             WSL_LOG(
                 "PluginOnWslcContainerStartedCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"));
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
 
-            // Failure here aborts the container creation. Surface the first error.
-            const auto result = e.hooks.ContainerStarted(Session, InspectJson);
             if (FAILED(result))
             {
                 LOG_HR_MSG(result, "Plugin '%ls' rejected container creation", e.name.c_str());
-                return result;
+                THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageFatalPluginError(e.name));
             }
         }
     }
@@ -648,13 +649,15 @@ void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Sessio
     {
         if (e.hooks.ContainerStopping != nullptr)
         {
+
+            const auto result = e.hooks.ContainerStopping(Session, ContainerId);
             WSL_LOG(
                 "PluginOnWslcContainerStoppingCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
                 TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(ContainerId, "ContainerId"));
+                TraceLoggingValue(ContainerId, "ContainerId"),
+                TraceLoggingValue(result, "Result"));
 
-            const auto result = e.hooks.ContainerStopping(Session, ContainerId);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -668,18 +671,19 @@ void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LP
     {
         if (e.hooks.ImageCreated != nullptr)
         {
+            const auto result = e.hooks.ImageCreated(Session, InspectJson);
             WSL_LOG(
                 "PluginOnWslcImageCreatedCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"));
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
 
-            const auto result = e.hooks.ImageCreated(Session, InspectJson);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
 }
 
-void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const
 {
     ExecutionContext context(Context::Plugin);
 
@@ -687,12 +691,13 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
     {
         if (e.hooks.ImageDeleted != nullptr)
         {
+            const auto result = e.hooks.ImageDeleted(Session, ImageId);
             WSL_LOG(
                 "PluginOnWslcImageDeletedCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"));
-
-            const auto result = e.hooks.ImageDeleted(Session, InspectJson);
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(ImageId, "ImageId"),
+                TraceLoggingValue(result, "Result"));
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
