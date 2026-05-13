@@ -1477,6 +1477,7 @@ class UnitTests
     {
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --resize 1500GB --allow-unsafe");
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --allow-unsafe");
+        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
     // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.

@@ -925,6 +925,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     // Fail if the distribution is running.
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
+    _EnsureNotLocked(DistroGuid);
 
     // Lookup the distribution configuration
     const auto lxssKey = s_OpenLxssUserKey();
@@ -1771,6 +1772,8 @@ try
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
+    _EnsureNotLocked(DistroGuid);
+
     // Don't attempt if running
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
@@ -1802,6 +1805,7 @@ try
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+    _EnsureNotLocked(DistroGuid);
 
     const auto& vhdPath = configuration.VhdFilePath;
     if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
