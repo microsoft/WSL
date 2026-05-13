@@ -394,7 +394,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         targetSession = std::format(L"{}-{}", baseName, username);
     }
 
-    auto listResult = RunWslc(L"session list");
+    auto listResult = RunWslc(L"system session list");
     listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();
@@ -403,7 +403,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         // Check if the line ends with the target session name
         if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
         {
-            auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
+            auto result = RunWslc(std::format(L"system session terminate \"{}\"", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }

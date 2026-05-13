@@ -160,6 +160,8 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config);
 
 wil::unique_fd UnmarshalConsoleFromServer(int MessageFd, LXBUS_IPC_CONSOLE_ID ConsoleId);
 
+int WslInitWatcher(int Argc, char** Argv);
+
 int WslEntryPoint(int Argc, char* Argv[])
 {
     //
@@ -221,6 +223,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSL_USER_GENERATOR) == 0)
         {
             ExitCode = GenerateUserSystemdUnits(Argc, Argv);
+        }
+        else if (strcmp(BaseName, LX_INIT_WSL_INIT_WATCHER) == 0)
+        {
+            ExitCode = WslInitWatcher(Argc, Argv);
         }
         else
         {
@@ -2397,6 +2403,16 @@ Return Value:
         }
 
         //
+        // Fork a watcher process that monitors WSL init and tears down
+        // the PID namespace if it exits unexpectedly.
+        //
+
+        UtilCreateChildProcess(LX_INIT_WSL_INIT_WATCHER, [&]() {
+            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, static_cast<char*>(nullptr));
+            LOG_ERROR("execl({}) failed {}", LX_INIT_WSL_INIT_WATCHER, errno);
+        });
+
+        //
         // Keep track of the new pid for WSL init.
         //
 
@@ -3488,4 +3504,37 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
             LOG_ERROR("{} failed to start within {}ms", INIT_PATH, Config.BootInitTimeout);
         }
     }
+}
+
+int WslInitWatcher(int Argc, char** Argv)
+{
+    // Ignore log initialization failure. Not critical.
+    InitializeLogging(false);
+
+    UtilSetThreadName(LX_INIT_WSL_INIT_WATCHER);
+
+    const pid_t wslInitPid = getppid();
+    const int pidfd = syscall(SYS_pidfd_open, wslInitPid, 0);
+    if (pidfd < 0)
+    {
+        LOG_ERROR("pidfd_open failed {}", errno);
+        _exit(1);
+    }
+
+    pollfd pfd{pidfd, POLLIN, 0};
+    int rc;
+    while ((rc = poll(&pfd, 1, -1)) < 0 && errno == EINTR)
+    {
+    }
+    if (rc <= 0 || (pfd.revents & POLLIN) == 0)
+    {
+        LOG_ERROR("poll failed {} {}", rc, errno);
+        _exit(1);
+    }
+
+    LOG_ERROR("wsl init has exited, shutting down the distro");
+
+    // Teardown the current PID namespace. Not shutting down the VM.
+    reboot(RB_POWER_OFF);
+    _exit(1);
 }

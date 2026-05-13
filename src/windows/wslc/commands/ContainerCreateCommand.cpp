@@ -31,7 +31,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
-        // Argument::Create(ArgType::CIDFile),
+        Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::DNS, false, NO_LIMIT),
         // Argument::Create(ArgType::DNSDomain),
         Argument::Create(ArgType::DNSOption, false, NO_LIMIT),
