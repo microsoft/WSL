@@ -55,6 +55,8 @@ class WSLCE2EContainerStatsTests
         // With no running containers, stats should produce no output rows (header only or empty).
         auto result = RunWslc(L"container stats");
         result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(
+            static_cast<size_t>(1), result.GetStdoutLines().size(), L"Expected only the header row when there are no containers");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_RunningContainer_HasExpectedColumns)
