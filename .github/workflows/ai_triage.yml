@@ -14,7 +14,7 @@ on:
       issue:
         description: 'Issue number to (re-)triage'
         required: true
-        type: string
+        type: number
       force:
         description: 'Bypass the input-sha skip check'
         required: false

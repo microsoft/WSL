@@ -323,12 +323,19 @@ def render_prompt(template: str, issue: Issue, candidates: list[Candidate]) -> s
         for c in candidates
     ]
     body = truncate(issue.body, MAX_BODY_CHARS)
-    return (
-        template.replace("{{ISSUE_NUMBER}}", str(issue.number))
-        .replace("{{ISSUE_TITLE}}", issue.title)
-        .replace("{{ISSUE_BODY}}", body)
-        .replace("{{CANDIDATES_JSON}}", json.dumps(candidates_payload, indent=2))
-    )
+    substitutions = {
+        "{{ISSUE_NUMBER}}": str(issue.number),
+        "{{ISSUE_TITLE}}": issue.title,
+        "{{ISSUE_BODY}}": body,
+        "{{CANDIDATES_JSON}}": json.dumps(candidates_payload, indent=2),
+    }
+    # Single-pass substitution. Sequential .replace() would let a later
+    # replacement (e.g. {{CANDIDATES_JSON}}) rewrite content already
+    # interpolated from an earlier untrusted field (issue title/body), giving
+    # the issue author a way to alter the prompt. re.sub with a placeholder->
+    # value map only touches placeholders present in the original template.
+    pattern = re.compile("|".join(re.escape(k) for k in substitutions))
+    return pattern.sub(lambda m: substitutions[m.group(0)], template)
 
 
 def sha(*parts: str) -> str:
@@ -369,9 +376,6 @@ class TriageResult:
     missing_fields: list[str]
     duplicate_candidate_numbers: list[int]
     maintainer_summary: str
-
-
-_JSON_OBJECT_RE = re.compile(r"\{.*?\}", re.DOTALL)
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
@@ -555,21 +559,30 @@ def render_comment(
     return "\n".join(lines)
 
 
-def find_existing_marker_comment(issue_number: int) -> dict[str, Any] | None:
-    """Return the most recent comment posted by us, or None.
+_COMMENT_PAGE_LIMIT = 10  # cap pagination at 1000 comments; well above any real issue
 
-    Sorts newest-first to avoid missing the marker on issues with > 100
-    comments (the page size cap of the comments API).
+
+def find_existing_marker_comment(issue_number: int) -> dict[str, Any] | None:
+    """Return our most recent marker comment, or None.
+
+    Walks pages newest-first (sort=created&direction=desc) and stops at the
+    first marker hit. If no marker appears in the first 100 comments and the
+    issue has more than 100, we keep paginating until either we find one, the
+    page comes back short (last page), or we hit the safety cap.
     """
-    comments = gh_api(
-        f"repos/{REPO}/issues/{issue_number}/comments?per_page=100&sort=created&direction=desc"
-    )
-    if not isinstance(comments, list):
-        return None
-    for comment in comments:
-        body = comment.get("body") if isinstance(comment, dict) else None
-        if isinstance(body, str) and MARKER_PREFIX in body:
-            return comment
+    for page in range(1, _COMMENT_PAGE_LIMIT + 1):
+        comments = gh_api(
+            f"repos/{REPO}/issues/{issue_number}/comments"
+            f"?per_page=100&sort=created&direction=desc&page={page}"
+        )
+        if not isinstance(comments, list) or not comments:
+            return None
+        for comment in comments:
+            body = comment.get("body") if isinstance(comment, dict) else None
+            if isinstance(body, str) and MARKER_PREFIX in body:
+                return comment
+        if len(comments) < 100:
+            return None
     return None
 
 

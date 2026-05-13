@@ -20,7 +20,7 @@ pipeline driven by [`triage/config.yml`](../config.yml).
 |---|---|
 | `triage/ai/ai_triage.py` | The Python script. Reads the issue, fetches duplicate candidates, calls `gh models run`, validates the output, upserts the comment. |
 | `triage/ai/prompt.md` | The system+user prompt. The script substitutes `{{ISSUE_NUMBER}}`, `{{ISSUE_TITLE}}`, `{{ISSUE_BODY}}`, `{{CANDIDATES_JSON}}`. |
-| `.github/workflows/ai_triage.yml` | The Actions workflow. Triggered on `issues.opened` and `workflow_dispatch`. |
+| `.github/workflows/ai_triage.yml` | The Actions workflow. Initial rollout is **manual `workflow_dispatch` only**; the `issues.opened` trigger is committed but commented out and can be enabled once the comment quality has been validated on real issues. |
 
 ## How to run locally
 

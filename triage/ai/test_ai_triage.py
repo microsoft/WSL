@@ -533,3 +533,123 @@ class TestAllowlistConsistency:
         assert sample.startswith(a.MARKER_PREFIX)
         # And parse_marker must recognize what render_marker produces.
         assert a.parse_marker(sample) == ("0" * 16, "1" * 16)
+
+
+# ---------------------------------------------------------------------------
+# render_prompt: substitution must be single-pass / injection-resistant
+# ---------------------------------------------------------------------------
+
+
+class TestRenderPrompt:
+    def _issue(self, *, title="title", body="body", number=1):
+        return a.Issue(
+            number=number,
+            title=title,
+            body=body,
+            state="open",
+            locked=False,
+            author_login="user",
+            author_type="User",
+            author_association="NONE",
+        )
+
+    def _render(self, *, title="title", body="body"):
+        template = (
+            "NUM={{ISSUE_NUMBER}}\n"
+            "TITLE={{ISSUE_TITLE}}\n"
+            "BODY={{ISSUE_BODY}}\n"
+            "CANDS={{CANDIDATES_JSON}}\n"
+        )
+        return a.render_prompt(template, self._issue(title=title, body=body), [])
+
+    def test_basic_substitution(self):
+        out = self._render(title="hello", body="world")
+        assert "TITLE=hello" in out
+        assert "BODY=world" in out
+        assert "CANDS=[]" in out
+
+    def test_issue_body_cannot_inject_candidates_placeholder(self):
+        # If render_prompt did sequential .replace() calls, an attacker could
+        # put "{{CANDIDATES_JSON}}" inside the issue body and have their own
+        # text get rewritten to whatever value we substitute for that
+        # placeholder later. Single-pass substitution must prevent this.
+        out = self._render(body="evil {{CANDIDATES_JSON}} payload")
+        assert "BODY=evil {{CANDIDATES_JSON}} payload" in out
+        # And the genuine placeholder still gets the real (empty) candidates.
+        assert "CANDS=[]" in out
+
+    def test_issue_title_cannot_inject_body_placeholder(self):
+        out = self._render(title="t {{ISSUE_BODY}}", body="real-body")
+        assert "TITLE=t {{ISSUE_BODY}}" in out
+        assert "BODY=real-body" in out
+
+    def test_unknown_placeholder_left_intact(self):
+        # render_prompt should only touch the four placeholders it knows about.
+        template = "{{UNKNOWN}} {{ISSUE_TITLE}}"
+        out = a.render_prompt(template, self._issue(title="X"), [])
+        assert out == "{{UNKNOWN}} X"
+
+
+# ---------------------------------------------------------------------------
+# find_existing_marker_comment: pagination
+# ---------------------------------------------------------------------------
+
+
+class TestFindExistingMarkerComment:
+    def _stub_pages(self, monkeypatch, pages):
+        """Replace gh_api with a stub that returns the next page from `pages`."""
+        calls = []
+
+        def fake(path, **kwargs):
+            calls.append(path)
+            index = len(calls) - 1
+            return pages[index] if index < len(pages) else []
+
+        monkeypatch.setattr(a, "gh_api", fake)
+        return calls
+
+    def _marker_comment(self, cid):
+        return {"id": cid, "body": f"{a.MARKER_PREFIX} input-sha=abc prompt-sha=def -->\nbody"}
+
+    def _other_comment(self, cid, text="hi"):
+        return {"id": cid, "body": text}
+
+    def test_finds_marker_on_first_page(self, monkeypatch):
+        page1 = [self._other_comment(1), self._marker_comment(2), self._other_comment(3)]
+        calls = self._stub_pages(monkeypatch, [page1])
+        result = a.find_existing_marker_comment(123)
+        assert result is not None and result["id"] == 2
+        assert len(calls) == 1
+        assert "page=1" in calls[0]
+
+    def test_paginates_until_marker_found(self, monkeypatch):
+        # Page 1 is full and has no marker; marker is on page 2.
+        page1 = [self._other_comment(i) for i in range(100)]
+        page2 = [self._marker_comment(200)]
+        calls = self._stub_pages(monkeypatch, [page1, page2])
+        result = a.find_existing_marker_comment(123)
+        assert result is not None and result["id"] == 200
+        assert len(calls) == 2
+        assert "page=2" in calls[1]
+
+    def test_stops_at_short_page(self, monkeypatch):
+        # Page 1 has < 100 entries and no marker => no marker exists; no page 2.
+        page1 = [self._other_comment(i) for i in range(5)]
+        calls = self._stub_pages(monkeypatch, [page1])
+        assert a.find_existing_marker_comment(123) is None
+        assert len(calls) == 1
+
+    def test_stops_at_empty_page(self, monkeypatch):
+        # Defensive: if a page comes back empty mid-walk, stop.
+        page1 = [self._other_comment(i) for i in range(100)]
+        calls = self._stub_pages(monkeypatch, [page1, []])
+        assert a.find_existing_marker_comment(123) is None
+        assert len(calls) == 2
+
+    def test_returns_none_if_marker_never_found(self, monkeypatch):
+        # 100 full pages, no marker. Capped at _COMMENT_PAGE_LIMIT.
+        full = [self._other_comment(i) for i in range(100)]
+        pages = [full] * (a._COMMENT_PAGE_LIMIT + 5)
+        calls = self._stub_pages(monkeypatch, pages)
+        assert a.find_existing_marker_comment(123) is None
+        assert len(calls) == a._COMMENT_PAGE_LIMIT
