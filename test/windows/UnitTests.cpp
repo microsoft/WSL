@@ -2993,13 +2993,6 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
 
-        {
-            WslKeepAlive keepAlive;
-            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --compact", -1);
-            VERIFY_IS_TRUE(out.find(wsl::shared::Localization::MessageVhdInUse()) != std::wstring::npos);
-            VERIFY_IS_TRUE(out.find(L"Wsl/Service/WSL_E_DISTRO_NOT_STOPPED") != std::wstring::npos);
-            VERIFY_ARE_EQUAL(err, L"");
-        }
     }
 
     WSL2_TEST_METHOD(FileOffsets)

@@ -1868,15 +1868,10 @@ try
         RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
         vhdPath = configuration.VhdFilePath;
-        if (m_runningInstances.contains(*DistroGuid) || (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str())))
-        {
-            THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
-        }
-
-        _CompactionBegin(configuration.DistroId);
+        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
     }
 
-    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _CompactionComplete(configuration.DistroId); });
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
 
     const auto result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
     if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
@@ -2485,22 +2480,6 @@ void LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistri
 
 _Requires_lock_not_held_(m_instanceLock)
 void LxssUserSessionImpl::_ConversionComplete(_In_ GUID DistroGuid)
-{
-    std::lock_guard lock(m_instanceLock);
-    std::erase_if(m_lockedDistributions, [&](const auto& pair) { return (IsEqualGUID(pair.first, DistroGuid)); });
-
-    _VmCheckIdle();
-}
-
-_Requires_lock_held_(m_instanceLock)
-void LxssUserSessionImpl::_CompactionBegin(_In_ GUID DistroGuid)
-{
-    _EnsureNotLocked(&DistroGuid);
-    m_lockedDistributions.emplace_back(DistroGuid, LxssDistributionStateCompacting);
-}
-
-_Requires_lock_not_held_(m_instanceLock)
-void LxssUserSessionImpl::_CompactionComplete(_In_ GUID DistroGuid)
 {
     std::lock_guard lock(m_instanceLock);
     std::erase_if(m_lockedDistributions, [&](const auto& pair) { return (IsEqualGUID(pair.first, DistroGuid)); });
