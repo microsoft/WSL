@@ -16,6 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
+#include <relay.hpp>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -73,29 +74,36 @@ std::string GetServerFromImage(const std::string& image)
 
 struct InputSource
 {
-    HANDLE Handle = nullptr;
-    wil::unique_hfile File;
+    InputSource(wsl::windows::common::relay::HandleWrapper&& handle, ULONGLONG contentLength) :
+        Handle(std::move(handle)), ContentLength(contentLength)
+    {
+    }
+
+    wsl::windows::common::relay::HandleWrapper Handle;
     ULONGLONG ContentLength = 0;
 };
 
-InputSource OpenImageInput(const std::wstring& input)
+wsl::windows::common::relay::HandleWrapper OpenInputHandle(const std::wstring& input)
 {
-    InputSource result;
     if (input == L"-")
     {
-        result.Handle = GetStdHandle(STD_INPUT_HANDLE);
-    }
-    else
-    {
-        result.File.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF(!result.File);
-        result.Handle = result.File.get();
+        return wsl::windows::common::relay::HandleWrapper(GetStdHandle(STD_INPUT_HANDLE));
     }
 
+    wil::unique_hfile file(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    THROW_LAST_ERROR_IF(!file);
+
+    return wsl::windows::common::relay::HandleWrapper(std::move(file));
+}
+
+InputSource OpenImageInput(const std::wstring& input)
+{
+    auto handle = OpenInputHandle(input);
+
     LARGE_INTEGER fileSize{};
-    THROW_LAST_ERROR_IF(!GetFileSizeEx(result.Handle, &fileSize));
-    result.ContentLength = fileSize.QuadPart;
-    return result;
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcImportPipeNotSupported(), !GetFileSizeEx(handle.Get(), &fileSize));
+
+    return InputSource{std::move(handle), static_cast<ULONGLONG>(fileSize.QuadPart)};
 }
 
 } // namespace
@@ -206,14 +214,14 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
     auto source = OpenImageInput(input);
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle), nullptr, source.ContentLength));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength));
 }
 
 void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
     auto source = OpenImageInput(input);
     THROW_IF_FAILED(session.Get()->ImportImage(
-        ToCOMInputHandle(source.Handle), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength));
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
