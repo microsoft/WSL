@@ -5874,10 +5874,9 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Duplicate network: 'bridge'");
     }
 
-    WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameReportsNotFoundTest)
+    WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameTest)
     {
-        // Malformed names are not validated separately — they fail the network lookup,
-        // matching the primary network's attach-by-name semantics.
+        // Most malformed names fall through to the network lookup.
 
         // Invalid character.
         {
@@ -5897,8 +5896,8 @@ class WSLCTests
             launcher.AddAdditionalNetwork("");
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
-            ValidateCOMErrorMessage(L"Network not found: ''");
+            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+            ValidateCOMErrorMessage(L"Network name cannot be empty.");
         }
 
         // Name exceeds WSLC_MAX_NETWORK_NAME_LENGTH (255).
