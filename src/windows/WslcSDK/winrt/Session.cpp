@@ -58,8 +58,6 @@ void Session::Start()
     // This object needs to stay alive for as long as the callbacks may be invoked even if all other references to it are dropped.
     // We increase its ref count here, and decrease it once the session terminates.
     AddRef();
-
-    return *this;
 }
 
 void Session::EnsureStarted() const

@@ -130,8 +130,6 @@ void Process::Start()
         THROW_MSG_IF_FAILED(hr, errorMessage);
     }
     m_settings = nullptr;
-
-    return *this;
 }
 
 Process::~Process()
