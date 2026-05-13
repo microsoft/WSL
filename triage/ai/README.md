@@ -99,9 +99,19 @@ instructions inside the issue body.
 
 ## Failure mode
 
-Silent. Any model error, JSON-parse failure, schema violation, rate-limit, or
-post failure causes the script to log to stderr and exit 0 with no comment.
-The workflow run shows the failure for maintainers; users see nothing.
+Two tiers:
+
+* **Silent (exit 0, workflow green):** model errors, JSON-parse failures,
+  schema violations, rate limits, transient `gh` API errors on read paths,
+  staleness aborts. The script logs to stderr; users see nothing.
+* **Loud (exit 1, workflow red):** comment-upsert failures (permission 403,
+  5xx), and any unexpected exception escaping the inline handlers. These
+  indicate a real maintainer-actionable problem (misconfigured permissions,
+  programming bug) and surface as a failed workflow run.
+
+The split is intentional: model flakes and bot-vs-issue races shouldn't page
+anyone, but a permission misconfig that prevents the agent from ever posting
+should fail visibly.
 
 ## Cost / abuse posture
 

@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable
 
-REPO = "microsoft/WSL"
+REPO = os.environ.get("AI_TRIAGE_REPO", "microsoft/WSL")
 PROMPT_VERSION = "v1"
 MARKER_PREFIX = "<!-- ai-triage:v1"
 
@@ -472,6 +472,7 @@ def validate_and_clamp(
     )
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 _RAW_URL_RE = re.compile(r"https?://\S+")
 _MENTION_RE = re.compile(r"(?<![\w])@(?=[A-Za-z0-9_-])")
@@ -479,10 +480,16 @@ _BACKTICK_RE = re.compile(r"`+")
 
 
 def sanitize_summary(text: str) -> str:
-    """Strip markdown links/URLs/mentions/backticks from model-authored prose."""
+    """Strip markdown links/URLs/mentions/backticks/HTML from model-authored prose.
+
+    Defense-in-depth: even though render_comment() also html-escapes the result,
+    we strip raw HTML tags here so the function lives up to its name and is safe
+    in isolation if it's ever used outside the rendering path.
+    """
     if not text:
         return ""
-    cleaned = _MARKDOWN_LINK_RE.sub(r"\1", text)
+    cleaned = _HTML_TAG_RE.sub("", text)
+    cleaned = _MARKDOWN_LINK_RE.sub(r"\1", cleaned)
     cleaned = _RAW_URL_RE.sub("[link removed]", cleaned)
     # Defang @mentions by inserting a zero-width space after the @.
     cleaned = _MENTION_RE.sub("@\u200b", cleaned)
@@ -637,9 +644,18 @@ def main(argv: list[str]) -> int:
         return _main_inner(argv)
     except SystemExit:
         raise
-    except Exception as exc:  # silent abort; do not leak tracebacks to Actions logs
-        print(f"abort: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)
-        return 0
+    except Exception as exc:
+        # Anything reaching here escaped the inline GhError handlers in
+        # _main_inner and is therefore unexpected (programming bug, permission
+        # misconfig such as the comment-upsert 403, etc.). Surface it loudly
+        # so the workflow run fails and maintainers see it. Expected silent
+        # failures (model errors, JSON parse errors, transient gh API errors
+        # on read paths) are caught and converted to exit-0 inline.
+        import traceback
+
+        print(f"ERROR: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return 1
 
 
 def _main_inner(argv: list[str]) -> int:
@@ -714,11 +730,11 @@ def _main_inner(argv: list[str]) -> int:
         print(comment_body)
         return 0
 
-    try:
-        upsert_comment(args.issue, comment_body, existing)
-    except GhError as exc:
-        print(f"abort: comment upsert failed: {exc}", file=sys.stderr)
-        return 0
+    # Intentionally NOT wrapped: an upsert failure (e.g. permission 403, 5xx)
+    # means we built a valid comment but couldn't post it. That is a maintainer-
+    # actionable misconfiguration, not transient model noise, so we let it
+    # propagate to main() and fail the workflow run loudly.
+    upsert_comment(args.issue, comment_body, existing)
 
     print(f"posted ai-triage comment on issue #{args.issue}", file=sys.stderr)
     return 0

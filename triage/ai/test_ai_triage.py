@@ -67,6 +67,22 @@ class TestSanitizeSummary:
     def test_strips_surrounding_whitespace(self):
         assert a.sanitize_summary("  hello  ") == "hello"
 
+    def test_strips_html_tags(self):
+        # Defense-in-depth: render_comment also html-escapes, but the function
+        # is named "sanitize" and must produce safe output in isolation.
+        assert a.sanitize_summary("<script>alert(1)</script>hello") == "alert(1)hello"
+
+    def test_strips_html_tag_attributes(self):
+        result = a.sanitize_summary('click <a href="https://evil">here</a>')
+        assert "<" not in result
+        assert ">" not in result
+        assert "href" not in result
+        assert "here" in result
+
+    def test_strips_html_comment(self):
+        # HTML comments would otherwise let the model inject a fake marker.
+        assert "<!--" not in a.sanitize_summary("hi <!-- ai-triage:v1 fake --> bye")
+
 
 # ---------------------------------------------------------------------------
 # extract_json_object

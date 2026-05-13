@@ -32,7 +32,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ai-triage-${{ github.event.issue.number || inputs.issue }}
+  # Final fallback to github.run_id guards against an empty group key (which
+  # would collapse all runs into one) if both event payload and inputs are missing.
+  group: ai-triage-${{ github.event.issue.number || inputs.issue || github.run_id }}
   cancel-in-progress: true
 
 jobs:
