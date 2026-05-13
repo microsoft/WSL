@@ -61,7 +61,12 @@ namespace {
                 // label=<key> or label=<key>=<value>
                 const auto eq = value.find('=');
 
-                if (eq == std::string::npos)
+                if (eq == 0)
+                {
+                    // Reject empty label keys (e.g. "label==value"). They are not valid in Docker.
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidFilter("label=" + value));
+                }
+                else if (eq == std::string::npos)
                 {
                     labels.emplace_back(value, std::nullopt);
                 }
@@ -283,6 +288,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::st
         auto it = m_volumes.find(name);
         if (it == m_volumes.end())
         {
+            WSL_LOG("PrunedUnknownVolume", TraceLoggingValue(name.c_str(), "name"));
             continue;
         }
 
