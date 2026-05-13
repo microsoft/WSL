@@ -501,17 +501,23 @@ struct BuildKitVertex
     std::string digest;
     std::string name;
     std::string started;
+    std::string completed;
     std::string error;
+    bool cached{};
+    std::vector<std::string> inputs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, completed, error, cached, inputs);
 };
 
 struct BuildKitStatus
 {
     std::string id;
     std::string vertex;
+    int64_t current{};
+    int64_t total{};
+    std::string completed;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex, current, total, completed);
 };
 
 struct BuildKitLog
