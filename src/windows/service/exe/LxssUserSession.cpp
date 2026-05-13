@@ -1853,17 +1853,26 @@ HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
 try
 {
     auto runAsUser = wil::CoImpersonateClient();
-    std::lock_guard lock(m_instanceLock);
-    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    const auto configuration = s_GetDistributionConfiguration(registration);
-    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+    std::filesystem::path vhdPath;
+    LXSS_DISTRO_CONFIGURATION configuration;
 
-    const auto& vhdPath = configuration.VhdFilePath;
-    if (m_runningInstances.contains(*DistroGuid) || (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str())))
     {
-        THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
+        std::lock_guard lock(m_instanceLock);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        configuration = s_GetDistributionConfiguration(registration);
+        RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+        vhdPath = configuration.VhdFilePath;
+        if (m_runningInstances.contains(*DistroGuid) || (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str())))
+        {
+            THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
+        }
+
+        _CompactionBegin(configuration.DistroId);
     }
+
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _CompactionComplete(configuration.DistroId); });
 
     const auto result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
     if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
@@ -2477,6 +2486,20 @@ void LxssUserSessionImpl::_ConversionComplete(_In_ GUID DistroGuid)
     std::erase_if(m_lockedDistributions, [&](const auto& pair) { return (IsEqualGUID(pair.first, DistroGuid)); });
 
     _VmCheckIdle();
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_CompactionBegin(_In_ GUID DistroGuid)
+{
+    _EnsureNotLocked(&DistroGuid);
+    m_compactingDistributions.push_back(DistroGuid);
+}
+
+_Requires_lock_not_held_(m_instanceLock)
+void LxssUserSessionImpl::_CompactionComplete(_In_ GUID DistroGuid)
+{
+    std::lock_guard lock(m_instanceLock);
+    std::erase_if(m_compactingDistributions, [&](const auto& entry) { return (IsEqualGUID(entry, DistroGuid)); });
 }
 
 _Requires_exclusive_lock_held_(m_instanceLock)
@@ -3147,13 +3170,17 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_EnsureNotLocked(_In_ LPCGUID DistroGuid, const std::source_location& location)
 {
-    const auto found = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
+    const auto locked = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
         return IsEqualGUID(entry.first, *DistroGuid);
+    });
+
+    const auto compacting = std::find_if(m_compactingDistributions.begin(), m_compactingDistributions.end(), [&DistroGuid](const auto& entry) {
+        return IsEqualGUID(entry, *DistroGuid);
     });
 
     THROW_HR_IF_MSG(
         E_ILLEGAL_STATE_CHANGE,
-        (found != m_lockedDistributions.end()),
+        (locked != m_lockedDistributions.end()) || (compacting != m_compactingDistributions.end()),
         "%hs, %hs:%u",
         location.function_name(),
         location.file_name(),
