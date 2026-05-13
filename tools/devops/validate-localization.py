@@ -6,6 +6,11 @@ import re
 import xml.etree.ElementTree
 from xml.sax.saxutils import escape
 
+# Ensure stdout can handle non-ASCII characters (e.g. translated ADML strings)
+# without failing on Windows where the default encoding may be cp1252.
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 def validate_line_endings(path: str, content: bytes):
     line = 0
     for i in range(0, len(content)):
