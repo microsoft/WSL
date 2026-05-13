@@ -84,6 +84,17 @@ const Argument* ParseArgumentsStateMachine::NextPositional()
     return &*m_positionalSearchItr;
 }
 
+bool ParseArgumentsStateMachine::HasNextPositional() const
+{
+    auto itr = m_positionalSearchItr;
+    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
+    {
+        ++itr;
+    }
+
+    return itr != m_positionalArgs.end();
+}
+
 // Parse arguments as such:
 //  1. If argument starts with a single -, the alias is considered (can be 1-2 characters).
 //      a. If the named argument alias (a or ab) needs a VALUE, it can be provided in these ways:
@@ -127,7 +138,14 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     // The currentArg is non-empty, and starts with a -.
     if (currArg.length() == 1)
     {
-        // If it is only one character, then it is an error since it is neither an alias nor a named argument.
+        if (HasNextPositional())
+        {
+            // The '-' character may be a valid positional argument value (ex: stdin), so treat this
+            // as a positional argument if there are any positionals left to fill.
+            return ProcessPositionalArgument(currArg);
+        }
+
+        // No positional argument remaining means this is an invalid argument.
         return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
     }
 
@@ -141,10 +159,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     return ProcessNamedArgument(currArg);
 }
 
-// Assumes non-empty and does not begin with '-'.
+// Assumes non-empty.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalArgument(const std::wstring_view& currArg)
 {
-    WI_ASSERT(!currArg.empty() && currArg[0] != WSLC_CLI_ARG_ID_CHAR);
+    WI_ASSERT(!currArg.empty());
 
     const Argument* nextPositional = NextPositional();
     if (!nextPositional)

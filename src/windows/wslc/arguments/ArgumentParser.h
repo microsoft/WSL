@@ -89,6 +89,9 @@ struct ParseArgumentsStateMachine
     // Gets the next positional argument, or nullptr if there is not one.
     const Argument* NextPositional();
 
+    // Returns true if there is a next positional argument available, without advancing the iterator.
+    bool HasNextPositional() const;
+
     const std::vector<Argument>& Arguments() const
     {
         return m_arguments;
