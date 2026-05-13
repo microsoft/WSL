@@ -20,6 +20,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "hcs.hpp"
 #include "ContainerNameGenerator.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -31,6 +32,7 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -181,28 +183,6 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->OpenContainer(name.c_str(), &rawContainer));
 
         return RunningWSLCContainer(std::move(rawContainer), {});
-    }
-
-    std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, USHORT port = 5000)
-    {
-        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-        if (!username.empty())
-        {
-            env.push_back(std::format("USERNAME={}", username));
-            env.push_back(std::format("PASSWORD={}", password));
-        }
-
-        WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddPort(port, port, AF_INET);
-
-        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-
-        auto registryAddress = std::format("127.0.0.1:{}", port);
-        auto registryUrl = std::format(L"http://{}", registryAddress);
-        ExpectHttpResponse(registryUrl.c_str(), 200, true);
-
-        return {std::move(container), std::move(registryAddress)};
     }
 
     std::string PushImageToRegistry(const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
@@ -563,7 +543,7 @@ class WSLCTests
     {
         {
             // Start a local registry without auth and push hello-world:latest to it.
-            auto [registryContainer, registryAddress] = StartLocalRegistry();
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*m_defaultSession);
 
             auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", ""));
             ExpectImagePresent(*m_defaultSession, image.c_str(), false);
@@ -606,7 +586,7 @@ class WSLCTests
     WSLC_TEST_METHOD(PullImageAdvanced)
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
-        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*m_defaultSession);
         auto auth = BuildRegistryAuthHeader("", "");
 
         auto validatePull = [&](const std::string& sourceImage) {
@@ -716,7 +696,7 @@ class WSLCTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*m_defaultSession, c_username, c_password);
 
         wil::unique_cotaskmem_ansistring token;
         VERIFY_ARE_EQUAL(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, "wrong-password", &token), E_FAIL);

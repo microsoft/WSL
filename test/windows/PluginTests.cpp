@@ -19,8 +19,10 @@ Abstract:
 #include "wslc.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 
 using namespace wsl::windows::common::registry;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDistroPath;
 extern std::wstring g_testDataPath;
@@ -604,14 +606,21 @@ class PluginTests
         return sessionManager;
     }
 
-    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, std::filesystem::path const& StoragePath)
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(
+        LPCWSTR Name,
+        std::filesystem::path const& StoragePath,
+        WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone)
     {
+        const auto storagePathStr = StoragePath.wstring();
+
         WSLCSessionSettings settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
         settings.MemoryMb = 4096;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WSLCNetworkingModeNone;
+        settings.NetworkingMode = NetworkingMode;
+        settings.StoragePath = storagePathStr.c_str();
+        settings.MaximumStorageSizeMb = 1024 * 20;
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
@@ -627,7 +636,12 @@ class PluginTests
 
     static void LoadDebianImage(IWSLCSession* session)
     {
-        const auto imagePath = GetTestImagePath("debian:latest");
+        LoadTestImage(session, "debian:latest");
+    }
+
+    static void LoadTestImage(IWSLCSession* session, std::string_view imageName)
+    {
+        const auto imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
             CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!imageFile);
@@ -694,26 +708,6 @@ class PluginTests
         ValidateLogFile(ExpectedOutput.c_str());
     }
 
-    static wil::com_ptr<IWSLCSession> CreateWslcSessionWithNetworking(LPCWSTR Name, std::filesystem::path const& StoragePath)
-    {
-        WSLCSessionSettings settings{};
-        settings.DisplayName = Name;
-        settings.CpuCount = 4;
-        settings.MemoryMb = 4096;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
-        const auto storagePathStr = StoragePath.wstring();
-        settings.StoragePath = storagePathStr.c_str();
-        settings.MaximumStorageSizeMb = 1024 * 20;
-
-        auto manager = OpenWslcSessionManager();
-        wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-
-        return session;
-    }
-
     WSL2_TEST_METHOD(WslcPullImageNotification)
     {
         ConfigurePlugin(PluginTestType::WslcSuccess);
@@ -725,36 +719,20 @@ class PluginTests
         });
 
         {
-            auto session = CreateWslcSessionWithNetworking(L"plugin-wslc-pull-test", storagePath);
+            auto session = CreateWslcSession(L"plugin-wslc-pull-test", storagePath, WSLCNetworkingModeVirtioProxy);
 
             // Load the registry and debian images.
             LoadDebianImage(session.get());
-
-            const auto registryImagePath = GetTestImagePath("wslc-registry:latest");
-            wil::unique_hfile registryFile{CreateFileW(
-                registryImagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            THROW_LAST_ERROR_IF(!registryFile);
-
-            LARGE_INTEGER registryFileSize{};
-            THROW_LAST_ERROR_IF(!GetFileSizeEx(registryFile.get(), &registryFileSize));
-            VERIFY_SUCCEEDED(session->LoadImage(
-                wsl::windows::common::wslutil::ToCOMInputHandle(registryFile.get()), nullptr, registryFileSize.QuadPart));
+            LoadTestImage(session.get(), "wslc-registry:latest");
 
             // Start a local registry container.
-            constexpr USHORT registryPort = 5000;
-            wsl::windows::common::WSLCContainerLauncher registryLauncher("wslc-registry:latest", {}, {}, {"REGISTRY_HTTP_ADDR=0.0.0.0:5000"});
-            registryLauncher.SetEntrypoint({"/entrypoint.sh"});
-            registryLauncher.AddPort(registryPort, registryPort, AF_INET);
-
-            auto registryContainer = registryLauncher.Launch(*session, WSLCContainerStartFlagsNone);
-            auto registryAddress = std::format("127.0.0.1:{}", registryPort);
-            ExpectHttpResponse(std::format(L"http://{}", registryAddress).c_str(), 200, true);
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
 
             // Tag debian:latest for the local registry and push it.
             auto registryImage = std::format("{}/debian:latest", registryAddress);
+            auto registryRepo = std::format("{}/debian", registryAddress);
             WSLCTagImageOptions tagOptions{};
             tagOptions.Image = "debian:latest";
-            auto registryRepo = std::format("{}/debian", registryAddress);
             tagOptions.Repo = registryRepo.c_str();
             tagOptions.Tag = "latest";
             VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
