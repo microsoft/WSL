@@ -1528,6 +1528,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
             L"loadDefaultKernelModules=" + std::wstring(Default.loadDefaultKernelModules.value() ? L"true" : L"false") + L"\n";
     }
 
+    if (Default.systemDistro.has_value())
+    {
+        newConfig += L"systemDistro=" + EscapePath(Default.systemDistro.value()) + L"\n";
+    }
+
     switch (Default.networkingMode.value_or(wsl::core::NetworkingMode::Nat))
     {
     case wsl::core::NetworkingMode::Nat:
