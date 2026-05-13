@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Linux용 Windows 하위 시스템</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Linux용 Windows 하위 시스템</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Linux용 Windows 하위 시스템 허용</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">이 정책을 사용하지 않도록 설정하면 컴퓨터의 모든 사용자가 Linux용 Windows 하위 시스템에서 실행 중인 Linux 배포에 액세스할 수 없습니다.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">Linux용 Windows 하위 시스템의 인박스 버전을 허용</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">사용하지 않도록 설정할 경우, 이 정책은 Linux용 Windows 하위 시스템의 받은 편지함 버전(선택적 구성 요소)을 사용하지 않도록 설정합니다. 사용하지 않도록 설정할 경우, WSL의 Store 버전만 사용할 수 있습니다.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">WSL1 허용</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">사용하지 않도록 설정할 경우, 이 정책은 WSL1을 사용하지 않도록 설정합니다. 이 경우 WSL2 배포만 사용할 수 있습니다.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">사용자 지정 커널 구성 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.kernel)를 통한 사용자 지정 커널 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">사용자 지정 시스템 배포 구성 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.systemDistro)를 통한 사용자 지정 시스템 배포 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">커널 명령줄 구성 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.kernelCommandLine)를 통한 커널 명령줄 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="AllowDebugShell">디버그 셸 허용</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">사용하지 않도록 설정할 경우, 이 정책은 디버그 셸(wsl.exe --debug-shell)을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">중첩된 가상화 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.nestedVirtualization)를 통한 중첩 가상화 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">커널 디버깅 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.kernelDebugPort)를 통한 커널 디버깅 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">사용자 지정 네트워킹 구성 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.networkingmode)를 통한 사용자 지정 네트워킹 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="FirewallUserSettingConfigurable">사용자 설정 방화벽 구성 허용</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.firewall)를 통한 방화벽 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="AllowDiskMount">패스스루 디스크 탑재 허용</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">사용하지 않도록 설정할 경우, 이 정책은 WSL2에서 패스스루 디스크 탑재(wsl.exe --mount)를 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+
+        <string id="DefaultNetworkingMode">기본 네트워킹 모드 구성</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">이 정책은 WSL2에 사용할 기본 네트워킹 모드를 지정합니다.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">없음</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">미러됨</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL 컨테이너</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">WSL 컨테이너 허용</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">이 정책은 이 컴퓨터에서 WSL 컨테이너를 사용할 수 있는지 여부를 제어합니다. 사용하도록 설정하거나 구성하지 않으면 사용자와 Windows 애플리케이션이 WSL을 통해 Linux 컨테이너를 실행할 수 있습니다. 사용 안 함으로 설정하면 WSL 컨테이너가 모든 사용자에 대해 차단되고 Windows 앱에서 Linux 컨테이너를 실행할 수 없습니다. 경고: '사용 안 함'으로 설정하면 Linux 컨테이너에 종속된 Windows 앱이 중단될 수 있습니다.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">WSL 컨테이너 레지스트리 허용 목록</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">사용하도록 설정할 경우, WSL 컨테이너는 여기 나열된 레지스트리에서만 이미지를 가져올 수 있습니다. 이는 WSL 컨테이너 CLI와 WSL 컨테이너 API를 사용하는 모든 애플리케이션에 영향을 줍니다.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">기본 네트워킹 모드</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">허용된 레지스트리</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

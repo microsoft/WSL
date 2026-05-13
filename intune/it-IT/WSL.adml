@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Sottosistema Windows per Linux</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Sottosistema Windows per Linux</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Consenti il sottosistema Windows per Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">Se impostato su disabilitato, questo criterio disabilita l'accesso alle distribuzioni Linux in esecuzione nel sottosistema Windows per Linux per tutti gli utenti del computer.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">Consenti la versione inbox del sottosistema Windows per Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">Se impostato su Disabilitato, questo criterio disabilita la versione inbox (componente facoltativo) del sottosistema Windows per Linux. Se questo criterio è disabilitato, è possibile usare solo la versione Store di WSL.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">Consenti WSL1</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">Se impostato su Disabilitato, questo criterio disabilita WSL1. Se questa opzione è disabilitata, è possibile usare solo distribuzioni WSL2.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Consenti la configurazione del kernel personalizzata</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione personalizzata del kernel tramite .wslconfig (wsl2.kernel). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Consenti la configurazione della distribuzione di sistema personalizzata</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione della distribuzione di sistema personalizzata tramite .wslconfig (wsl2.systemDistro). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Consenti la configurazione della riga di comando del kernel</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione della riga di comando del kernel tramite .wslconfig (wsl2.kernelCommandLine). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="AllowDebugShell">Consenti la shell di debug</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">Se impostato su Disabilitato, questo criterio disabilita la shell di debug (wsl.exe --debug-shell). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Consenti la virtualizzazione annidata</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione della virtualizzazione annidata tramite .wslconfig (wsl2.nestedVirtualization). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Consenti il debug del kernel</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione di debug del kernel tramite .wslconfig (wsl2.kernelDebugPort). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Consenti la configurazione di rete personalizzata</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione della rete personalizzata tramite .wslconfig (wsl2.networkingmode). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Consenti all'utente di impostare la configurazione del firewall</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">Se impostato su Disabilitato, questo criterio disabilita la configurazione del firewall tramite .wslconfig (wsl2.firewall). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="AllowDiskMount">Consenti il montaggio pass-through dei dischi</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">Se impostato su Disabilitato, questo criterio disabilita il montaggio pass-through dei dischi in WSL2 (wsl.exe --mount). Questo criterio è valido solo per Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Configura la modalità di rete predefinita</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Questo criterio specifica la modalità di rete predefinita da usare per WSL2.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Nessuna</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Con mirroring</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">Contenitore di WSL</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">Consenti contenitore di WSL</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Questo criterio controlla se è possibile usare il contenitore WSL in questo computer. Se abilitato o non configurato, gli utenti e le applicazioni Windows possono eseguire contenitori Linux tramite WSL. Se questa opzione è disabilitata, il contenitore WSL è bloccato per tutti gli utenti e le app di Windows non possono eseguire contenitori Linux. Avviso: se si imposta questa opzione su 'Disabilitato', è possibile che le app di Windows che dipendono da contenitori Linux vengano interrotte.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">Elenco elementi consentiti per i registri del contenitore WSL</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">Quando è abilitato, il contenitore WSL può eseguire il pull delle immagini solo dai registri elencati qui. Questo influisce sia sulla CLI del contenitore WSL sia su tutte le applicazioni che usano l'API del contenitore WSL.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Modalità di rete predefinita</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Registri consentiti</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

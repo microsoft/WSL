@@ -394,215 +394,215 @@ Käyttö:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Tekijänoikeus (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
+Lisätietoja tämän tuotteen tietosuojasta löytyy osoitteesta https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Käyttö: wsl.exe [Argumentti] [Asetukset...] [Komentorivi]
 
-Arguments for running Linux binaries:
+Linux-binaaritiedostojen suoritusargumentit:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Jos komentoriville ei anneta tekstiä, wsl.exe käynnistää oletusliittymän.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Suorita määritetty komento käyttämättä oletusarvoista Linux-liittymää.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Suorita määritetty komento annetulla liittymätyypillä.
 
     --
-        Pass the remaining command line as-is.
+        Välitä jäljellä oleva komentorivi sellaisenaan.
 
-Options:
+Asetukset:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Asettaa määritetyn hakemiston nykyiseksi työhakemistoksi.
+        Jos ~ on käytössä, käytetään Linux-käyttäjän kotipolkua. Jos polku alkaa
+        merkillä /, se tulkitaan absoluuttiseksi Linux-poluksi.
+        Muussa tapauksessa arvon on oltava absoluuttinen Windows-polku.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Suorita määritetty jakelu.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Suorita määritetty jakelutunnus.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Suorita määritettynä käyttäjänä.
 
     --system
-        Launches a shell for the system distribution.
+        Käynnistää liittymän järjestelmän jakelua varten.
 
-Arguments for managing Windows Subsystem for Linux:
+Argumentit Windows-alijärjestelmän Linuxille hallintaan:
 
     --help
-        Display usage information.
+        Näytä käyttötiedot.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Avaa WSL2-virheenkorjausliittymä diagnostiikkatarkoitusta varten.
 
-    --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+    --install [Jakelu] [Asetukset...]
+        Asenna jakelu Windows-alijärjestelmään Linuxille.
+        Jos haluat luettelon kelvollisista jakeluista, käytä argumenttia 'wsl.exe --list --online'.
 
-        Options:
+        Asetukset:
             --enable-wsl1
-                Enable WSL1 support.
+                Ota WSL1-tuki käyttöön.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Luo kooltaan kiinteä levy jakelun tallentamista varten.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Asenna jakelu paikallisesta tiedostosta.
 
             --legacy
-                Use the legacy distribution manifest.
+                Käytä vanhoja jakelun kokoonpanotietoja.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Määritä jakelun asennuspolku.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Määritä jakelun nimi.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Asenna ainoastaan pakolliset valinnaiset komponentit, älä jakelua.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Älä käynnistä jakelua asennuksen jälkeen.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Määrittää uutta jakelua varten käytettävän version.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Määrittää jakelun tallennuslevyn koon.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Lataa jakelu Internetistä Microsoft Storen sijaan.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Muuttaa tietyn jakelun asetuksia.
 
-        Options:
+        Asetukset:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Siirrä jakelu uuteen sijaintiin.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Määritä jakelun VHD harvaksi, jolloin levytilaa voidaan vapauttaa automaattisesti.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Määritä jakelun oletuskäyttäjä.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Muuta jakelun levyn koko määritettyyn kokoon.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Liittää ja ottaa käyttöön fyysisen tai virtuaalilevyn kaikissa WSL2-jakeluissa.
 
-        Options:
+        Asetuksia:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Määrittää, että &lt;Disk&gt; viittaa virtuaalikiintolevyyn.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Liitä levy WSL2:een, mutta älä ota sitä käyttöön.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Ota levy käyttöön käyttäen mukautettua nimeä käyttöönottopisteelle.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Tiedostojärjestelmä levyn käyttöönoton yhteydessä. Jos sitä ei ole määritetty, käytetään oletusarvoa ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Käyttöönoton lisäasetukset.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Käyttöön otettavan osion indeksi. Jos sitä ei ole määritetty, käytetään oletusarvoisesti koko levyä.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Muuttaa uusien jakeluiden oletusasennusversiota.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Lopettaa kaikki käynnissä olevat jakelut ja WSL 2:n
+        kevyen käytön näennäiskoneen.
 
-        Options:
+        Asetuksia:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Lopeta WSL 2 -virtuaalikone, vaikka toiminto olisi käynnissä. Voi aiheuttaa tietojen menettämisen.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Näytä Windows-alijärjestelmän Linuxille tila.
 
-    --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+    --unmount [Levy]
+        Poistaa levyn käytöstä ja irrottaa sen kaikista WSL2-jakeluista.
+        Poistaa käytöstä kaikki levyt ja irrottaa ne, jos sitä kutsutaan ilman argumenttia.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Poistaa Windows-alijärjestelmä Linuxille -paketin tästä tietokoneesta.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Päivitä Windows-alijärjestelmä Linuxille -paketti.
 
-        Options:
+        Asetuksia:
             --pre-release
-                Download a pre-release version if available.
+                Lataa ennakkoversio, jos se on saatavilla.
 
     --version, -v
-        Display version information.
+        Näytä versiotiedot.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Asetukset]
+        Vie jakelun tar-tiedostoon.
+        Tiedostonimi voi olla - STDOUT-siirrännälle.
 
-        Options:
+        Asetuksia:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Määrittää vientimuodon. Tuetut arvot: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Asetukset]
+        Tuo määritetyn tar-tiedoston uutena jakeluna.
+        Tiedostonimi voi olla - STDIN-siirrännälle.
 
-        Options:
+        Asetuksia:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Määrittää uudelle jakelulle käytettävän version.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Määrittää, että annettu tiedosto on .vhd- tai .vhdx-tiedosto, ei tar-tiedosto.
+                Tämä toiminto tekee VHD-tiedostosta kopion määritetyssä asennussijainnissa.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Tuo määritetyn VHD-tiedoston uutena jakeluna.
+        Tämä virtuaalikiintolevy on alustettava ext4-tiedostojärjestelmän tyypillä.
 
-    --list, -l [Options]
-        Lists distributions.
+    --list, -l [Asetukset]
+        Näyttää luettelon jakeluista.
 
-        Options:
+        Asetuksia:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Näytä luettelo kaikista jakeluista, mukaan lukien jakelut, joita
+                asennetaan tai joiden asennusta poistetaan parhaillaan.
 
             --running
-                List only distributions that are currently running.
+                Näytä vain parhaillaan käynnissä olevien jakeluiden luettelo.
 
             --quiet, -q
-                Only show distribution names.
+                Näytä vain jakeluiden nimet.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Näytä yksityiskohtaiset tiedot kaikista jakeluista.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Määrittää jakelun oletukseksi.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Muuttaa määritetyn jakelun versiota.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Lopettaa määritetyn jakelun.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Poistaa jakelun rekisteröinnin ja päätiedostojärjestelmän.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -987,6 +987,16 @@ Palataan nat-verkkopalveluun.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>Tietokonekäytäntö on poistanut WSL1:n käytöstä.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>The container image registry '{}' is blocked by the computer policy.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Päivitä WSL2-versioksi suorittamalla wsl.exe --set-version {} 2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1052,7 +1062,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse VHD is supported on WSL2 only.</value>
+    <value>Harvaa VHD tuetaan vain WSL2:ssa.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
@@ -1154,8 +1164,8 @@ Virhekoodi: {}</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Sparse VHD support is currently disabled due to potential data corruption.
-To force a distribution to use a sparse VHD, please run:
+    <value>Harva VHD tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
+Jos haluat pakottaa jakelun käyttämään harvaa VHD, suorita seuraavasti:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
@@ -1305,7 +1315,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
     <value>Totuusarvo, joka ottaa käyttöön tulostekonsolin ikkunan, joka näyttää diagnostiikkaviestien sisällön WSL 2 -distroesiintymän käynnistyksen yhteydessä.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Default VHD Size</value>
+    <value>VHD oletuskoko</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
@@ -1880,7 +1890,7 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Enable sparse VHD by default</value>
+    <value>Ota käyttöön harva VHD oletusarvon mukaan</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
@@ -1888,7 +1898,7 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Enable sparse VHD by default.</value>
+    <value>Ota käyttöön harva VHD oletusarvoisesti.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
@@ -2252,6 +2262,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Pakollinen asetus puuttuu: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Unknown option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
