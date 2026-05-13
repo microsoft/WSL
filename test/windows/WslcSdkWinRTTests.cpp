@@ -226,7 +226,8 @@ class WslcSdkWinRtTests
         settings.TimeoutMS(30 * 1000);
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
-        m_defaultSession = WSLCSDK::Session::Create(settings).Start();
+        m_defaultSession = WSLCSDK::Session(settings);
+        m_defaultSession.Start();
 
         // Pull images required by the tests (no-op if already present).
         for (const auto* imageName : {"debian:latest", "python:3.12-alpine", "hello-world:latest", "wslc-registry:latest"})
@@ -276,24 +277,25 @@ class WslcSdkWinRtTests
 
         // Positive: Creation must succeed with valid settings.
         {
-            auto session = WSLCSDK::Session::Create(settings);
+            auto session = WSLCSDK::Session(settings);
             VERIFY_IS_NOT_NULL(session);
         }
 
         // Negative: Must throw if used used before Start()
         {
-            auto session = WSLCSDK::Session::Create(settings);
+            auto session = WSLCSDK::Session(settings);
             VERIFY_THROWS_HR(std::ignore = session.Images(), E_ILLEGAL_METHOD_CALL);
         }
 
         // Positive: Starting the session must succeed.
         {
-            VERIFY_NO_THROW(WSLCSDK::Session::Create(settings).Start());
+            auto session = WSLCSDK::Session(settings);
+            VERIFY_NO_THROW(session.Start());
         }
 
         // Negative: Null settings must fail.
         {
-            VERIFY_THROWS_HR(WSLCSDK::Session::Create(nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER));
+            VERIFY_THROWS_HR(WSLCSDK::Session(nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER));
         }
     }
 
@@ -307,7 +309,7 @@ class WslcSdkWinRtTests
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh", extraStorage.wstring());
         settings.TimeoutMS(30 * 1000);
 
-        auto session = WSLCSDK::Session::Create(settings);
+        auto session = WSLCSDK::Session(settings);
         session.Terminated([&](WSLCSDK::Session, WSLCSDK::SessionTerminationReason reason) { promise.set_value(reason); });
 
         session.Start();
@@ -1291,7 +1293,8 @@ class WslcSdkWinRtTests
         settings.TimeoutMS(30 * 1000u);
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
-        auto session = WSLCSDK::Session::Create(settings).Start();
+        auto session = WSLCSDK::Session(settings);
+        session.Start();
 
         // Load debian.
         const auto debianTar = GetTestImagePath("debian:latest");
@@ -1561,7 +1564,8 @@ class WslcSdkWinRtTests
         settings.FeatureFlags(WSLCSDK::SessionFeatureFlags::EnableGpu);
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
-        auto gpuSession = WSLCSDK::Session::Create(settings).Start();
+        auto gpuSession = WSLCSDK::Session(settings);
+        gpuSession.Start();
 
         const auto debianTar = GetTestImagePath("debian:latest");
         gpuSession.LoadImageAsync(debianTar.wstring()).get();
