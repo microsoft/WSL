@@ -915,8 +915,6 @@ int Manage(_In_ std::wstring_view commandLine)
         THROW_HR(WSL_E_INVALID_USAGE);
     }
 
-    THROW_HR_IF(WSL_E_INVALID_USAGE, allowUnsafe && !sparse.has_value());
-
     if (sparse)
     {
         SetSparse(distroGuid, sparse.value(), allowUnsafe);
