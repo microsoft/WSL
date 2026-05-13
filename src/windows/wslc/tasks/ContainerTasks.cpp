@@ -455,7 +455,8 @@ void ShowContainerStats(CLIExecutionContext& context)
     auto containers = context.Args.GetAll<ArgType::ContainerId>();
 
     // If any are specified we use those, otherwise we show all containers.
-    if (containers.empty())
+    const bool userSpecifiedContainers = !containers.empty();
+    if (!userSpecifiedContainers)
     {
         GetContainers(context);
         const auto& allContainers = context.Data.Get<Data::Containers>();
@@ -482,6 +483,13 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
         catch (const wil::ResultException& ex)
         {
+            if (!userSpecifiedContainers && ex.GetErrorCode() == RPC_E_DISCONNECTED)
+            {
+                // If the user did not explicitly specify the container, then this is expected
+                // in the case of a container being deleted between enumeration and stats query.
+                continue;
+            }
+
             LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
             throw;
         }
