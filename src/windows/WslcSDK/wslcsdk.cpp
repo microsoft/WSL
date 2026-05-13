@@ -309,6 +309,25 @@ std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
 {
     wil::com_ptr<IWSLCSessionManager> result;
     HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
+    if (SUCCEEDED(hr))
+    {
+        const WSLCVersion clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        BOOL isSupported = FALSE;
+        THROW_IF_FAILED(result->IsClientVersionSupported(&clientVersion, &isSupported));
+
+        if (!isSupported)
+        {
+            LOG_HR_MSG(
+                WSLC_E_SDK_UPDATE_NEEDED,
+                "WSLC SDK update required. Current SDK version: %lu.%lu.%lu",
+                WSL_PACKAGE_VERSION_MAJOR,
+                WSL_PACKAGE_VERSION_MINOR,
+                WSL_PACKAGE_VERSION_REVISION);
+
+            return {result, WSLC_E_SDK_UPDATE_NEEDED};
+        }
+    }
+
     return {result, hr};
 }
 
@@ -336,20 +355,6 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
     return result;
 }
 
-bool NeedsWslRuntimeInstalled()
-{
-    auto hr = CreateSessionManagerRaw().second;
-
-    if (SUCCEEDED(hr))
-    {
-        return false;
-    }
-    else if (hr == REGDB_E_CLASSNOTREG)
-    {
-        return true;
-    }
-    THROW_HR(hr);
-}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -488,16 +493,42 @@ try
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
     RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
-    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
+
+    // Reject unknown flag bits so future additions can't be silently ignored.
+    constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER;
+    RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
+
+    // Hold uid/gid strings at function scope so the c_str() pointers stored
+    // in driverOpts stay valid through CreateVolume.
+    const auto sizeStr = std::to_string(options->sizeBytes);
+    std::string uidStr;
+    std::string gidStr;
+
+    std::vector<WSLCDriverOption> driverOpts;
+    driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
+
+    if (options->type == WSLC_VHD_TYPE_FIXED)
+    {
+        driverOpts.push_back({"Fixed", "true"});
+    }
+    else
+    {
+        RETURN_HR_IF(E_INVALIDARG, options->type != WSLC_VHD_TYPE_DYNAMIC);
+    }
+
+    if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
+    {
+        uidStr = std::to_string(options->uid);
+        gidStr = std::to_string(options->gid);
+        driverOpts.push_back({"Uid", uidStr.c_str()});
+        driverOpts.push_back({"Gid", gidStr.c_str()});
+    }
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     volumeOptions.Driver = "vhd";
-
-    auto sizeStr = std::to_string(options->sizeBytes);
-    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
-    volumeOptions.DriverOpts = driverOpts;
-    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+    volumeOptions.DriverOpts = driverOpts.data();
+    volumeOptions.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
 
     WSLCVolumeInformation volumeInfo{};
     return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
@@ -526,6 +557,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+
+        // Owner is only honored on named volumes; reject here so callers can't
+        // mistakenly believe it applied to the session rootfs VHD.
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;
     }
@@ -1468,7 +1503,20 @@ try
     WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
 
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
-    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
+
+    auto hr = CreateSessionManagerRaw().second;
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+    }
+    else if (hr == WSLC_E_SDK_UPDATE_NEEDED)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+    }
+    else if (FAILED(hr))
+    {
+        THROW_HR(hr);
+    }
 
     *missingComponents = componentCheck;
 
@@ -1502,12 +1550,14 @@ try
 {
     HRESULT result = S_OK;
     bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    bool needsRuntime = NeedsWslRuntimeInstalled();
+    auto runtimeResult = CreateSessionManagerRaw().second;
 
-    if (!needsVirtualMachine && !needsRuntime)
+    if (!needsVirtualMachine && SUCCEEDED(runtimeResult))
     {
         return result;
     }
+
+    THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
 
     // Installing these components requires elevation.
     auto token = wil::open_current_access_token();
@@ -1540,7 +1590,7 @@ try
         }
     }
 
-    if (needsRuntime)
+    if (!SUCCEEDED(runtimeResult))
     {
         std::function<void(uint32_t)> callback;
         if (progressCallback)

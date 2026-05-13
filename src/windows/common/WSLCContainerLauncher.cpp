@@ -250,6 +250,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& Co
     m_tmpfsMounts.push_back(tmpfs);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
+{
+    m_additionalNetworks.push_back(Name);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(IWSLCSession& Session, WSLCContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
@@ -283,7 +288,6 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
-    options.ContainerNetwork.ContainerNetworkName = m_containerNetworkName.empty() ? nullptr : m_containerNetworkName.c_str();
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
@@ -354,6 +358,22 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
+
+    std::vector<WSLCNetworkAttachment> networkAttachments;
+    if (m_containerNetworkType == WSLCContainerNetworkTypeCustom)
+    {
+        networkAttachments.push_back({m_containerNetworkName.c_str(), nullptr});
+    }
+    for (const auto& e : m_additionalNetworks)
+    {
+        networkAttachments.push_back({e.c_str(), nullptr});
+    }
+
+    if (!networkAttachments.empty())
+    {
+        options.ContainerNetwork.Networks = networkAttachments.data();
+        options.ContainerNetwork.NetworksCount = static_cast<ULONG>(networkAttachments.size());
+    }
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

@@ -241,10 +241,17 @@ typedef enum _WSLCContainerNetworkType
     WSLCContainerNetworkTypeCustom = 3
 } WSLCContainerNetworkType;
 
+typedef struct _WSLCNetworkAttachment
+{
+    [unique] LPCSTR NetworkName;
+    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
+} WSLCNetworkAttachment;
+
 typedef struct _WSLCContainerNetwork
 {
     WSLCContainerNetworkType ContainerNetworkType;
-    LPCSTR ContainerNetworkName;
+    [unique, size_is(NetworksCount)] const WSLCNetworkAttachment* Networks;
+    ULONG NetworksCount;
 } WSLCContainerNetwork;
 
 typedef enum _WSLCContainerFlags
@@ -527,6 +534,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
+    HRESULT Stats([out] LPSTR* Output);
 }
 
 typedef enum _WSLCDeletedImageType
@@ -835,6 +843,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
 interface IWSLCSessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLCVersion* Version);
+    HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
 
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
@@ -855,3 +864,4 @@ cpp_quote("#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY
 cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8) /* 0x80040608 */")
 cpp_quote("#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9) /* 0x80040609 */")
 cpp_quote("#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10) /* 0x8004060A */")
+cpp_quote("#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11) /* 0x8004060B */")

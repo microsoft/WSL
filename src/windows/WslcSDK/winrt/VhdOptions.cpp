@@ -45,4 +45,8 @@ void VhdOptions::Type(winrt::Microsoft::WSL::Containers::VhdType const& value)
 {
     throw hresult_not_implemented();
 }
+void VhdOptions::SetOwner(uint32_t uid, uint32_t gid)
+{
+    throw hresult_not_implemented();
+}
 } // namespace winrt::Microsoft::WSL::Containers::implementation

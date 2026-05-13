@@ -27,6 +27,8 @@ struct VhdOptions : VhdOptionsT<VhdOptions>
     void SizeInBytes(uint64_t value);
     winrt::Microsoft::WSL::Containers::VhdType Type();
     void Type(winrt::Microsoft::WSL::Containers::VhdType const& value);
+
+    void SetOwner(uint32_t uid, uint32_t gid);
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {

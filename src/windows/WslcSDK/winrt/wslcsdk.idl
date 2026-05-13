@@ -273,6 +273,11 @@ namespace Microsoft.WSL.Containers
         String Name;
         UInt64 SizeInBytes;
         VhdType Type;
+
+        // Sets owner uid/gid on the volume root inode at mkfs time. Only
+        // supported on named volumes; setting this on a SessionSettings
+        // VhdRequirements fails at property-set time with E_INVALIDARG.
+        void SetOwner(UInt32 uid, UInt32 gid);
     };
 
     enum ImageProgressStatus
