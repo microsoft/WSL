@@ -1,0 +1,65 @@
+name: AI issue triage (dry-run)
+
+# Companion to the rule-based wti triage (see new_issue.yml). Runs in parallel
+# on newly-opened issues, asks an LLM to classify component / type, detect
+# missing template fields, and surface possible duplicates, then posts a single
+# collapsible maintainer-facing comment.
+#
+# v1 is dry-run: no labels are applied, no issue state is changed.
+# See triage/ai/README.md for full design and graduation plan.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: 'Issue number to (re-)triage'
+        required: true
+        type: string
+      force:
+        description: 'Bypass the input-sha skip check'
+        required: false
+        type: boolean
+        default: false
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  # `models: read` is the documented permission for GitHub Models inference
+  # from Actions. See https://github.com/actions/ai-inference#usage and
+  # https://docs.github.com/en/github-models.
+  models: read
+  contents: read
+
+concurrency:
+  group: ai-triage-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: true
+
+jobs:
+  ai-triage:
+    name: Run ai_triage.py
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install gh-models extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh extension install github/gh-models
+
+      - name: Run AI triage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONIOENCODING: utf-8
+          AI_TRIAGE_MODEL: openai/gpt-4o-mini
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue }}
+          FORCE_FLAG: ${{ inputs.force == true && '--force' || '' }}
+        run: |
+          python triage/ai/ai_triage.py --issue "$ISSUE_NUMBER" $FORCE_FLAG

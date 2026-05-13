@@ -1,0 +1,36 @@
+name: AI triage tests
+
+# Unit tests for the AI triage script (triage/ai/ai_triage.py). Pure-function
+# only — no network, no model calls — so this is safe to run on PRs from forks.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'triage/ai/**'
+      - '.github/workflows/ai_triage*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: pip install --quiet pytest
+
+      - name: Run unit tests
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m pytest triage/ai -v
