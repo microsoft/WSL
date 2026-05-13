@@ -194,7 +194,7 @@ public:
 
     wil::unique_socket MonitorEvents();
 
-    struct DockerHttpResponseHandle : public common::relay::ReadHandle
+    struct DockerHttpResponseHandle : public common::io::ReadHandle
     {
         NON_COPYABLE(DockerHttpResponseHandle);
         NON_MOVABLE(DockerHttpResponseHandle);
@@ -218,7 +218,7 @@ public:
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
         size_t LineFeeds = 0;
         std::optional<size_t> RemainingContentLength;
-        std::optional<common::relay::HTTPChunkBasedReadHandle> ResponseParser;
+        std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };
 
 private:

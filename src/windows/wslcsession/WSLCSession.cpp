@@ -22,7 +22,7 @@ Abstract:
 #include "wslpolicies.h"
 
 using namespace wsl::windows::common;
-using relay::MultiHandleWait;
+using io::MultiHandleWait;
 using wsl::shared::Localization;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
@@ -312,7 +312,7 @@ try
 
     // Monitor for unexpected VM exit.
     m_ioRelay.AddHandle(
-        std::make_unique<windows::common::relay::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
+        std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
     // Recover any existing resources from storage.
     RecoverExistingNetworks();
@@ -492,13 +492,13 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
         process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
         process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
     return process;
 }
@@ -762,8 +762,8 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
@@ -920,11 +920,11 @@ try
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
     io.AddHandle(
-        std::make_unique<relay::ReadHandle>(
+        std::make_unique<io::ReadHandle>(
             buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }),
-        relay::MultiHandleWait::CancelOnCompleted);
+        io::MultiHandleWait::CancelOnCompleted);
 
-    io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
+    io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
     // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
     bool cancelled = false;
@@ -935,7 +935,7 @@ try
         THROW_LAST_ERROR_IF_NULL(killTimer);
 
         io.AddHandle(
-            std::make_unique<relay::EventHandle>(
+            std::make_unique<io::EventHandle>(
                 CancelEvent,
                 [&]() {
                     cancelled = true;
@@ -943,12 +943,12 @@ try
                     LARGE_INTEGER dueTime{.QuadPart = -10LL * 10 * 1000 * 1000}; // 10 seconds
                     THROW_IF_WIN32_BOOL_FALSE(SetWaitableTimer(killTimer.get(), &dueTime, 0, nullptr, nullptr, FALSE));
                 }),
-            relay::MultiHandleWait::NeedNotComplete);
+            io::MultiHandleWait::NeedNotComplete);
 
         io.AddHandle(
-            std::make_unique<relay::EventHandle>(
+            std::make_unique<io::EventHandle>(
                 killTimer.get(), [&]() { LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL)); }),
-            relay::MultiHandleWait::NeedNotComplete);
+            io::MultiHandleWait::NeedNotComplete);
     }
 
     try
@@ -1111,9 +1111,9 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
-        common::relay::HandleWrapper{Request.stream.native_handle()}));
+    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+        common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+        common::io::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -1170,14 +1170,14 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
         };
 
         io.AddHandle(
-            std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
+            std::make_unique<io::ReadHandle>(common::io::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
             MultiHandleWait::CancelOnCompleted);
     }
     else
     {
         io.AddHandle(
-            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
+            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             MultiHandleWait::CancelOnCompleted);
     }
 
@@ -2627,20 +2627,20 @@ HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {
-    relay::MultiHandleWait io;
+    io::MultiHandleWait io;
 
     // Cancel with E_ABORT if the session is terminating.
-    io.AddHandle(std::make_unique<relay::EventHandle>(
+    io.AddHandle(std::make_unique<io::EventHandle>(
         m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
 
     // Cancel with E_ABORT if the client process exits.
-    io.AddHandle(std::make_unique<relay::EventHandle>(
+    io.AddHandle(std::make_unique<io::EventHandle>(
         wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
 
     if (CancelHandle != nullptr)
     {
         io.AddHandle(
-            std::make_unique<relay::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+            std::make_unique<io::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
     }
 
     return io;

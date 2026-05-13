@@ -6685,9 +6685,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             bool callbackInvoked = false;
             std::vector<gsl::byte> message;
 
-            wsl::windows::common::relay::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadSocketMessageHandle>(
-                wsl::windows::common::relay::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
                     callbackInvoked = true;
                     message.assign(received.begin(), received.end());
                 }));

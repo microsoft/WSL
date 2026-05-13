@@ -145,7 +145,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
 
-    common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
+    common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);

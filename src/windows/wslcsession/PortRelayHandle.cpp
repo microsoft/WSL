@@ -34,7 +34,7 @@ PortRelayAcceptHandle::PortRelayAcceptHandle(
 
 PortRelayAcceptHandle::~PortRelayAcceptHandle()
 {
-    if (State == relay::IOHandleStatus::Pending)
+    if (State == io::IOHandleStatus::Pending)
     {
         LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(reinterpret_cast<HANDLE>(ListenSocket.get()), &Overlapped));
 
@@ -50,7 +50,7 @@ PortRelayAcceptHandle::~PortRelayAcceptHandle()
 
 void PortRelayAcceptHandle::Schedule()
 {
-    WI_ASSERT(State == relay::IOHandleStatus::Standby);
+    WI_ASSERT(State == io::IOHandleStatus::Standby);
 
     // Create a new socket for accepting
     AcceptedSocket.reset(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
@@ -61,22 +61,22 @@ void PortRelayAcceptHandle::Schedule()
     if (AcceptEx(ListenSocket.get(), AcceptedSocket.get(), AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
     {
         // Accept completed immediately
-        State = relay::IOHandleStatus::Completed;
+        State = io::IOHandleStatus::Completed;
     }
     else
     {
         auto error = WSAGetLastError();
         THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_IO_PENDING, "Handle: 0x%p", reinterpret_cast<void*>(ListenSocket.get()));
 
-        State = relay::IOHandleStatus::Pending;
+        State = io::IOHandleStatus::Pending;
     }
 }
 
 void PortRelayAcceptHandle::Collect()
 {
-    WI_ASSERT(State == relay::IOHandleStatus::Pending || State == relay::IOHandleStatus::Completed);
+    WI_ASSERT(State == io::IOHandleStatus::Pending || State == io::IOHandleStatus::Completed);
 
-    if (State == relay::IOHandleStatus::Pending)
+    if (State == io::IOHandleStatus::Pending)
     {
         DWORD bytesReceived{};
         DWORD flagsReturned{};
@@ -87,7 +87,7 @@ void PortRelayAcceptHandle::Collect()
     LaunchRelay(std::move(AcceptedSocket));
 
     // Go back to standby to accept the next connection
-    State = relay::IOHandleStatus::Standby;
+    State = io::IOHandleStatus::Standby;
 }
 
 HANDLE PortRelayAcceptHandle::GetHandle() const
