@@ -46,12 +46,12 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass Session
     {
-        static Session Create(SessionSettings settings);
+        Session(SessionSettings settings);
 
-        Session Start();
+        void Start();
         void Terminate();
 
-        Container CreateContainer(ContainerSettings containerSettings);
+        Container Createontainer(ContainerSettings containerSettings);
 
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
         // TODO: Explore additional overloads for other types of input streams
@@ -216,7 +216,7 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass Process
     {
-        Process Start();
+        void Start();
 
         void Signal(Signal signal);
         Windows.Storage.Streams.IInputStream GetOutputStream(ProcessOutputHandle outputHandle);
