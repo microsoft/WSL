@@ -2649,8 +2649,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Filter output based on conditions provided</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument '{}' for '-f, --filter' flag: bad format of filter (expected name=value)</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="-f, --filter"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter"}{Locked="-f"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Follow log output</value>
