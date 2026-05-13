@@ -6654,5 +6654,261 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             -1);
     }
 
+    TEST_METHOD(ReadSocketMessageHandle)
+    {
+        // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
+        // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
+        // that HRESULT instead, and the OnMessage callback must not be invoked.
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK) {
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            std::vector<gsl::byte> message;
+
+            wsl::windows::common::relay::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadSocketMessageHandle>(
+                wsl::windows::common::relay::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                    callbackInvoked = true;
+                    message.assign(received.begin(), received.end());
+                }));
+
+            const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
+            VERIFY_ARE_EQUAL(hr, expectedHr);
+            VERIFY_ARE_EQUAL(callbackInvoked, SUCCEEDED(expectedHr));
+            return message;
+        };
+
+        // Scenario 1: A complete header-only message is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 7;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 2: A complete message with a payload body is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 128;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 42;
+            header->TransactionStep = 2;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+            WriteSocket(client.get(), payload.data(), payload.size());
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 3: Sender closes without writing any bytes. The reader should observe a clean
+        // end-of-stream and signal completion with an empty span (no exception).
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 4: Sender closes after sending fewer bytes than a full header.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            std::array<gsl::byte, sizeof(MESSAGE_HEADER) - 1> partialHeader{};
+            std::memset(partialHeader.data(), 0xCC, partialHeader.size());
+            WriteSocket(client.get(), partialHeader.data(), partialHeader.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 5: Sender provides a complete header but closes after sending only part of the body.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t fullBodySize = 64;
+            constexpr size_t partialBodySize = 16;
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = gsl::narrow_cast<unsigned int>(sizeof(header) + fullBodySize);
+            header.TransactionId = 11;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            std::array<gsl::byte, partialBodySize> partialBody{};
+            std::memset(partialBody.data(), 0x55, partialBody.size());
+            WriteSocket(client.get(), partialBody.data(), partialBody.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+    }
+
+    TEST_METHOD(SocketChannel)
+    {
+        // Read exactly `size` bytes from a raw socket into the destination buffer.
+        auto recvAll = [](SOCKET socket, void* destination, size_t size) {
+            auto* cursor = static_cast<char*>(destination);
+            size_t total = 0;
+            while (total < size)
+            {
+                const auto received = recv(socket, cursor + total, gsl::narrow_cast<int>(size - total), 0);
+                VERIFY_IS_TRUE(received > 0);
+                total += static_cast<size_t>(received);
+            }
+        };
+
+        // Scenario 1: SendMessage produces the expected wire format on the peer socket.
+        // The header should carry the auto-stamped TransactionId (1 for the first non-transaction
+        // message) and a NONE transaction step, and the payload bytes should match exactly.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(client), "client"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = static_cast<int32_t>(0xCAFEBABE);
+            channel.SendMessage(message);
+
+            std::array<gsl::byte, sizeof(message)> received{};
+            recvAll(server.get(), received.data(), received.size());
+
+            const auto* header = reinterpret_cast<const MESSAGE_HEADER*>(received.data());
+            VERIFY_ARE_EQUAL(header->MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(header->MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(header->TransactionId, 1u);
+            VERIFY_ARE_EQUAL(header->TransactionStep, static_cast<unsigned int>(TRANSACTION_STEP::NONE));
+
+            const auto* payload = reinterpret_cast<const RESULT_MESSAGE<int32_t>*>(received.data());
+            VERIFY_ARE_EQUAL(payload->Result, static_cast<int32_t>(0xCAFEBABE));
+        }
+
+        // Scenario 2: Two channels can round-trip a typed message end-to-end.
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = 1234;
+            sender.SendMessage(message);
+
+            auto& received = receiver.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
+            VERIFY_ARE_EQUAL(received.Header.MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(received.Header.MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(received.Header.TransactionId, 1u);
+            VERIFY_ARE_EQUAL(received.Result, 1234);
+        }
+
+        // Scenario 3: An exit event signaled while ReceiveMessage is waiting causes the call to
+        // throw E_ABORT. Pre-signaling avoids racing a worker thread with the call.
+        {
+            auto [client, server] = MakeSocketPair();
+            wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+            exitEvent.SetEvent();
+            wsl::shared::SocketChannel channel{std::move(server), "server", std::vector<HANDLE>{exitEvent.get()}};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_ABORT);
+        }
+
+        // Scenario 4: ReceiveMessageOrClosed on a peer that closed the socket without sending
+        // any data returns {nullptr, empty span} and does not throw.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+            client.reset();
+
+            auto [message, span] = channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
+            VERIFY_IS_NULL(message);
+            VERIFY_ARE_EQUAL(span.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 5: A message arriving with a TransactionId other than the next expected
+        // sequence number (the first message must have id 1) is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 99;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 6: A transaction-tagged message arriving on a channel waiting for a
+        // non-transaction message is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 1;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::REQUEST);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 7: A header-only message arriving when a larger message type is expected
+        // is rejected with E_UNEXPECTED because the received span is too small for the type.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            MESSAGE_HEADER header{};
+            header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 1;
+            header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 8: ReceiveMessage with a finite timeout on an idle socket throws
+        // HRESULT_FROM_WIN32(ERROR_TIMEOUT) once the timeout elapses.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+        }
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

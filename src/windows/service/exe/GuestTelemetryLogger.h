@@ -17,7 +17,7 @@ Abstract:
 #include "RingBuffer.h"
 #include "relay.hpp"
 
-class GuestTelemetryLogger : public std::enable_shared_from_this<GuestTelemetryLogger>
+class GuestTelemetryLogger
 {
 public:
     GuestTelemetryLogger() = delete;

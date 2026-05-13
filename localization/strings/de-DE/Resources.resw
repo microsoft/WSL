@@ -2467,6 +2467,12 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Registrierungsanmeldedaten verwalten, einschließlich der Anmeldung bei und Abmeldung von Containerregistrierungen.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Befehle auf Systemebene</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Verwaltungsbefehle auf Systemebene.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Ein Bild taggen.</value>
   </data>

@@ -2467,6 +2467,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>管理登錄認證，包括登入和登出容器登錄。</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>系統層級命令</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>系統層級管理命令。</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>為影像加上標籤。</value>
   </data>

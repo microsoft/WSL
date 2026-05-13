@@ -2467,6 +2467,12 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Gestire le credenziali del registro, incluso l'accesso e la disconnessione dai registri contenitori.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Contrassegna un’immagine.</value>
   </data>

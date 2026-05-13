@@ -248,12 +248,13 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
     return *this;
 }
 
-WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings) :
+WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLCFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
-    m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4")
+    m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
+    m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
 }
@@ -272,13 +273,14 @@ void WSLCVirtualMachine::Initialize()
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
 
-    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
     // Create a thread to watch for exited processes.
     auto [__, ___, childChannel] = Fork(WSLC_FORK::Thread);
+    childChannel.SetExitEvents({m_vmTerminatingEvent.get()});
 
     WSLC_WATCH_PROCESSES watchMessage{};
-    auto watchTransaction = childChannel.StartTransaction();
+    auto watchTransaction = childChannel.StartTransaction(m_initChannelTimeout);
     watchTransaction.Send(watchMessage);
 
     THROW_HR_IF(E_FAIL, watchTransaction.Receive<RESULT_MESSAGE<uint32_t>>().Result != 0);
@@ -493,7 +495,7 @@ void WSLCVirtualMachine::Unmount(_In_ const char* Path)
     wsl::shared::MessageWriter<WSLC_UNMOUNT> message;
     message.WriteString(Path);
 
-    const auto& response = subChannel.Transaction<WSLC_UNMOUNT>(message.Span());
+    const auto& response = subChannel.Transaction<WSLC_UNMOUNT>(message.Span(), nullptr, m_initChannelTimeout);
 
     // TODO: Return errno to caller
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), response.Result == EINVAL);
@@ -511,7 +513,7 @@ void WSLCVirtualMachine::DetachDisk(_In_ ULONG Lun)
     // Detach it from the guest
     WSLC_DETACH message;
     message.Lun = Lun;
-    const auto& response = m_initChannel.Transaction(message);
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
 
     // TODO: Return errno to caller
     THROW_HR_IF(E_FAIL, response.Result != 0);
@@ -539,7 +541,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
         message.ForkType = Type;
         message.TtyColumns = static_cast<uint16_t>(TtyColumns);
         message.TtyRows = static_cast<uint16_t>(TtyRows);
-        const auto& response = Channel.Transaction(message);
+        const auto& response = Channel.Transaction(message, nullptr, m_initChannelTimeout);
         port = response.Port;
         pid = response.Pid;
         ptyMaster = response.PtyMasterFd;
@@ -547,9 +549,10 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_bootTimeoutMs);
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_initChannelTimeout);
 
-    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
+    return std::make_tuple(
+        pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), std::vector<HANDLE>(Channel.GetExitEvents())});
 }
 
 WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
@@ -557,12 +560,12 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
     WSLC_ACCEPT message{};
     message.Fd = Fd;
 
-    auto transaction = Channel.StartTransaction();
+    auto transaction = Channel.StartTransaction(m_initChannelTimeout);
     transaction.Send(message);
     const auto& response = transaction.Receive<WSLC_ACCEPT::TResponse>();
 
     ConnectedSocket socket;
-    socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+    socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result, m_vmTerminatingEvent.get(), m_initChannelTimeout);
 
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)
@@ -583,7 +586,7 @@ std::string WSLCVirtualMachine::GetVhdDevicePath(ULONG Lun)
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = WSLC_GET_DISK::Type;
     message.ScsiLun = Lun;
-    const auto& response = m_initChannel.Transaction(message);
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to get disk path, init returned: %lu", response.Result);
 
     return response.Buffer;
@@ -686,7 +689,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         relayMessage.Socket = tty->Fd;
         relayMessage.TtyControl = ttyControlhandle.Fd; // N.B. Fd is set to -1 if unset.
         {
-            auto relayTransaction = childChannel.StartTransaction();
+            auto relayTransaction = childChannel.StartTransaction(m_initChannelTimeout);
             relayTransaction.Send(relayMessage);
         }
 
@@ -700,7 +703,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         registerProcess(grandChildPid);
 
         {
-            auto execTransaction = grandChildChannel.StartTransaction();
+            auto execTransaction = grandChildChannel.StartTransaction(m_initChannelTimeout);
             execTransaction.Send<WSLC_EXEC>(Message.Span());
             auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
             result = execResponse != nullptr ? execResponse->Result : 0;
@@ -717,7 +720,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     {
         registerProcess(pid);
 
-        auto execTransaction = childChannel.StartTransaction();
+        auto execTransaction = childChannel.StartTransaction(m_initChannelTimeout);
         execTransaction.Send<WSLC_EXEC>(Message.Span());
         auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
         auto result = execResponse != nullptr ? execResponse->Result : 0;
@@ -806,7 +809,7 @@ void WSLCVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
     WSLC_SIGNAL message;
     message.Pid = Pid;
     message.Signal = Signal;
-    const auto& response = m_initChannel.Transaction(message);
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
 
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }
@@ -1123,6 +1126,17 @@ void WSLCVirtualMachine::OnProcessReleased(int Pid)
     });
 }
 
+void WSLCVirtualMachine::OnSessionTerminated()
+{
+    std::lock_guard lock{m_lock};
+
+    // Don't cancel init transactions on the session termination event, since that event is set.
+    m_initChannel.SetExitEvents({m_vmTerminatingEvent.get()});
+
+    // Set a lower timeout for init transactions since we're terminating.
+    m_initChannelTimeout = 15 * 1000;
+}
+
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
@@ -1202,7 +1216,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             constexpr DWORD timeout = 30 * 1000;
             THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get()};
+            auto channel = wsl::shared::SocketChannel{
+                std::move(socket.value()), "crash_dump", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;

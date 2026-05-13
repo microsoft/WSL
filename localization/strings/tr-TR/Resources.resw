@@ -2461,6 +2461,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Kapsayıcı kayıt defterlerinde oturum açma ve oturumu kapatma da dahil olmak üzere kayıt defteri kimlik bilgilerini yönetin.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Bir resmi etiketleyin.</value>
   </data>

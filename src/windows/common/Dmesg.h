@@ -17,7 +17,7 @@ Abstract:
 #include "relay.hpp"
 #include "RingBuffer.h"
 
-class DmesgCollector : public std::enable_shared_from_this<DmesgCollector>
+class DmesgCollector
 {
 public:
     DmesgCollector() = delete;

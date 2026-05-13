@@ -231,6 +231,68 @@ private:
     std::function<void()> OnClose;
 };
 
+// A buffer that may either own its underlying storage (constructed from a size, allocating an
+// internal std::vector<char>) or borrow it from a caller-provided gsl::span<gsl::byte>.
+class BufferWrapper
+{
+public:
+    DEFAULT_MOVABLE(BufferWrapper);
+    NON_COPYABLE(BufferWrapper);
+
+    explicit BufferWrapper(size_t size) : m_owned(std::in_place, size)
+    {
+    }
+
+    explicit BufferWrapper(gsl::span<gsl::byte> span) : m_unowned(span)
+    {
+    }
+
+    bool Owned() const noexcept
+    {
+        return m_owned.has_value();
+    }
+
+    void Resize(size_t size)
+    {
+        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Resize called on a non-owned buffer");
+        m_owned->resize(size);
+    }
+
+    void Append(gsl::span<char> Span)
+    {
+        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Append called on a non-owned buffer");
+
+        m_owned->insert(m_owned->end(), Span.begin(), Span.end());
+    }
+
+    void Consume(size_t bytes) noexcept
+    {
+        WI_ASSERT(bytes <= Size());
+        if (Owned())
+        {
+            m_owned->erase(m_owned->begin(), m_owned->begin() + bytes);
+        }
+        else
+        {
+            m_unowned = m_unowned.subspan(bytes);
+        }
+    }
+
+    gsl::span<gsl::byte> Span() noexcept
+    {
+        return Owned() ? gsl::make_span(reinterpret_cast<gsl::byte*>(m_owned->data()), m_owned->size()) : m_unowned;
+    }
+
+    size_t Size() const noexcept
+    {
+        return Owned() ? m_owned->size() : m_unowned.size();
+    }
+
+private:
+    std::optional<std::vector<char>> m_owned;
+    gsl::span<gsl::byte> m_unowned;
+};
+
 class OverlappedIOHandle
 {
 public:
@@ -282,7 +344,7 @@ private:
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
+    BufferWrapper Buffer{LX_RELAY_BUFFER_SIZE};
     LARGE_INTEGER Offset{};
 };
 
@@ -343,6 +405,33 @@ private:
     bool ExpectHeader = true;
 };
 
+class ReadSocketMessageHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(ReadSocketMessageHandle);
+    NON_MOVABLE(ReadSocketMessageHandle);
+
+    ReadSocketMessageHandle(HandleWrapper&& Socket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
+    ~ReadSocketMessageHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    void ScheduleRecv();
+    void ProcessRecvResult(DWORD BytesRead);
+
+    HandleWrapper Socket;
+    std::vector<gsl::byte>& Buffer;
+    std::function<void(const gsl::span<gsl::byte>& Message)> OnMessage;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    bool ReadingHeader = true;
+    size_t BytesRemaining = sizeof(MESSAGE_HEADER);
+    size_t CurrentOffset = 0;
+};
+
 class WriteHandle : public OverlappedIOHandle
 {
 public:
@@ -350,6 +439,7 @@ public:
     NON_MOVABLE(WriteHandle);
 
     WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
+    WriteHandle(HandleWrapper&& Handle, gsl::span<gsl::byte> Span);
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
@@ -360,7 +450,7 @@ private:
     HandleWrapper Handle;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::vector<char> Buffer;
+    BufferWrapper Buffer;
     LARGE_INTEGER Offset{};
 };
 
