@@ -765,6 +765,10 @@ int ListDistributionsHelper(_In_ ListOptions options)
                 state = L"Exporting";
                 break;
 
+            case LxssDistributionStateCompacting:
+                state = L"Compacting";
+                break;
+
             default:
                 break;
             }
@@ -790,7 +794,8 @@ int ListDistributionsHelper(_In_ ListOptions options)
             std::erase_if(distros, [&](const auto& entry) {
                 return (
                     (entry.State == LxssDistributionStateInstalling) || (entry.State == LxssDistributionStateUninstalling) ||
-                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting));
+                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting) ||
+                    (entry.State == LxssDistributionStateCompacting));
             });
         }
 

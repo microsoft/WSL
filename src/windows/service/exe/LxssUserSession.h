@@ -562,13 +562,13 @@ private:
     void _ConversionComplete(_In_ GUID DistroGuid);
 
     /// <summary>
-    /// Adds a distro to the list of compacting distros.
+    /// Adds a distro to the locked distribution list while compacting.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
     void _CompactionBegin(_In_ GUID DistroGuid);
 
     /// <summary>
-    /// Removes a distro from the list of compacting distros.
+    /// Removes a compacting distro from the locked distribution list.
     /// </summary>
     _Requires_lock_not_held_(m_instanceLock)
     void _CompactionComplete(_In_ GUID DistroGuid);
@@ -835,11 +835,6 @@ private:
     /// Contains a list of distribution are toggling VM mode.
     /// </summary>
     _Guarded_by_(m_instanceLock) std::list<std::pair<GUID, LxssDistributionState>> m_lockedDistributions;
-
-    /// <summary>
-    /// Contains a list of distributions being compacted.
-    /// </summary>
-    _Guarded_by_(m_instanceLock) std::list<GUID> m_compactingDistributions;
 
     /// <summary>
     /// The running utility vm for WSL2 distributions.
