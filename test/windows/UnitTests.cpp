@@ -393,6 +393,26 @@ class UnitTests
         }
     }
 
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+
+        // Kill the WSL init process
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
@@ -6152,31 +6172,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    static LxssDistributionState GetDistroState()
+    {
+        wsl::windows::common::SvcComm service;
+
+        for (const auto& e : service.EnumerateDistributions())
+        {
+            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            {
+                return e.State;
+            }
+        }
+
+        return LxssDistributionStateInvalid;
+    }
+
     TEST_METHOD(DistroTimeout)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
-
-        auto getDistroState = [&]() {
-            wsl::windows::common::SvcComm service;
-
-            for (const auto& e : service.EnumerateDistributions())
-            {
-                if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
-                {
-                    return e.State;
-                }
-            }
-
-            return LxssDistributionStateInvalid;
-        };
 
         // Validate that distributions don't time out when timeout is -1
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
+            VERIFY_ARE_EQUAL(GetDistroState(), LxssDistributionStateRunning);
         }
 
         // Validate that distributions time out when timeout value is > 0
@@ -6190,7 +6211,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             unsigned long iterations = 0;
             while (std::chrono::steady_clock::now() < deadline)
             {
-                if (getDistroState() == LxssDistributionStateInstalled)
+                if (GetDistroState() == LxssDistributionStateInstalled)
                 {
                     LogInfo("Distribution stopped after %lu iterations", iterations);
                     return;
@@ -6200,7 +6221,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 iterations++;
             }
 
-            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, getDistroState());
+            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, GetDistroState());
             VERIFY_FAIL();
         }
     }
