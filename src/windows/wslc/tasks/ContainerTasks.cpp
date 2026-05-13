@@ -54,6 +54,8 @@ std::string FormatBytes(uint64_t bytes)
     }
     else
     {
+        // Bytes are always whole numbers, so decimal places are intentionally omitted here.
+        // This matches the behaviour of `docker stats`.
         return std::format("{} B", bytes);
     }
 }

@@ -17,7 +17,6 @@ Abstract:
 #include <array>
 #include <cwchar>
 #include <functional>
-#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -96,6 +95,10 @@ struct TableOutput
     using OutputFn = std::function<void(const std::wstring&)>;
 
     static constexpr size_t DefaultColumnPadding = 3; // Docker-like spacing between columns
+
+    // For redirected console the receiver controls the width. This should be a large value but mpt
+    // too large. A few thousand should be reasonable and prevents potential arithmetic issues later.
+    static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
 
     // Constructor with default behavior (no column limits)
     TableOutput(header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
@@ -280,7 +283,7 @@ private:
 
         // stdout is not a real console (e.g. redirected/piped). Return a large value
         // so column shrinking is not applied — the receiver controls its own display width.
-        return std::numeric_limits<size_t>::max();
+        return DefaultRedirectedConsoleWidth;
     }
 
     void OutputHeaderOnly()
