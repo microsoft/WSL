@@ -483,11 +483,16 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
         catch (const wil::ResultException& ex)
         {
-            if (!userSpecifiedContainers && ex.GetErrorCode() == RPC_E_DISCONNECTED)
+            if (!userSpecifiedContainers)
             {
-                // If the user did not explicitly specify the container, then this is expected
-                // in the case of a container being deleted between enumeration and stats query.
-                continue;
+                // If the user did not explicitly specify a container then there may be expected
+                // race conditions between listing containers and querying stats.
+                switch (ex.GetErrorCode())
+                {
+                case RPC_E_DISCONNECTED:
+                case WSLC_E_CONTAINER_NOT_FOUND:
+                    continue;
+                }
             }
 
             LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
