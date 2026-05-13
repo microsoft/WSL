@@ -593,9 +593,8 @@ class WslcSdkWinRtTests
         {
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.NetworkingMode(WSLCSDK::ContainerNetworkingMode::None);
-            containerSettings.PortMappings(
-                winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
-                    {WSLCSDK::ContainerPortMapping(12342, 8000, WSLCSDK::PortProtocol::TCP)}));
+            containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
+                {WSLCSDK::ContainerPortMapping(12342, 8000, WSLCSDK::PortProtocol::TCP)}));
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
             VERIFY_THROWS_HR(container.Start(WSLCSDK::ContainerStartFlags::None), E_INVALIDARG);
@@ -611,9 +610,8 @@ class WslcSdkWinRtTests
             auto containerSettings = WSLCSDK::ContainerSettings(L"python:3.12-alpine");
             containerSettings.InitProcess(procSettings);
             containerSettings.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
-            containerSettings.PortMappings(
-                winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
-                    {WSLCSDK::ContainerPortMapping(12341, 8000, WSLCSDK::PortProtocol::TCP)}));
+            containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
+                {WSLCSDK::ContainerPortMapping(12341, 8000, WSLCSDK::PortProtocol::TCP)}));
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
@@ -655,8 +653,8 @@ class WslcSdkWinRtTests
         VERIFY_THROWS_HR(
             {
                 auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-                containerSettings.Volumes(
-                    winrt::single_threaded_vector<WSLCSDK::ContainerVolume>({WSLCSDK::ContainerVolume(L"relative", L"/mnt/path", false)}));
+                containerSettings.Volumes(winrt::single_threaded_vector<WSLCSDK::ContainerVolume>(
+                    {WSLCSDK::ContainerVolume(L"relative", L"/mnt/path", false)}));
                 auto container = m_defaultSession.CreateContainer(containerSettings);
                 container.Start(WSLCSDK::ContainerStartFlags::None);
             },
@@ -666,9 +664,8 @@ class WslcSdkWinRtTests
         VERIFY_THROWS_HR(
             {
                 auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-                containerSettings.Volumes(
-                    winrt::single_threaded_vector<WSLCSDK::ContainerVolume>(
-                        {WSLCSDK::ContainerVolume(currentDirectory, L"./mnt/path", false)}));
+                containerSettings.Volumes(winrt::single_threaded_vector<WSLCSDK::ContainerVolume>(
+                    {WSLCSDK::ContainerVolume(currentDirectory, L"./mnt/path", false)}));
                 auto container = m_defaultSession.CreateContainer(containerSettings);
                 container.Start(WSLCSDK::ContainerStartFlags::None);
             },
@@ -677,8 +674,8 @@ class WslcSdkWinRtTests
         // Positive: absolute paths must succeed.
         {
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.Volumes(
-                winrt::single_threaded_vector<WSLCSDK::ContainerVolume>({WSLCSDK::ContainerVolume(currentDirectory, L"/mnt/path", false)}));
+            containerSettings.Volumes(winrt::single_threaded_vector<WSLCSDK::ContainerVolume>(
+                {WSLCSDK::ContainerVolume(currentDirectory, L"/mnt/path", false)}));
             auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Delete(WSLCSDK::DeleteContainerFlags::None);
         }
@@ -716,11 +713,10 @@ class WslcSdkWinRtTests
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
-        containerSettings.Volumes(
-            winrt::single_threaded_vector<WSLCSDK::ContainerVolume>({
-                WSLCSDK::ContainerVolume(hostRwDir.wstring(), L"/mnt/rw", false),
-                WSLCSDK::ContainerVolume(hostRoDir.wstring(), L"/mnt/ro", true),
-            }));
+        containerSettings.Volumes(winrt::single_threaded_vector<WSLCSDK::ContainerVolume>({
+            WSLCSDK::ContainerVolume(hostRwDir.wstring(), L"/mnt/rw", false),
+            WSLCSDK::ContainerVolume(hostRoDir.wstring(), L"/mnt/ro", true),
+        }));
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
@@ -1153,9 +1149,8 @@ class WslcSdkWinRtTests
             std::promise<int32_t> exitPromise;
 
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
-                winrt::single_threaded_vector<winrt::hstring>(
-                    {L"/bin/sh", L"-c", winrt::hstring(std::format(L"echo HELLO && exit {}", exitCodeArg))}));
+            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+                {L"/bin/sh", L"-c", winrt::hstring(std::format(L"echo HELLO && exit {}", exitCodeArg))}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
@@ -1252,9 +1247,8 @@ class WslcSdkWinRtTests
         stdoutData.reserve(c_expectedBytes + 4096);
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(
-            winrt::single_threaded_vector<winrt::hstring>(
-                {L"/bin/sh", L"-c", L"dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64 -w 0"}));
+        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+            {L"/bin/sh", L"-c", L"dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64 -w 0"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1313,14 +1307,13 @@ class WslcSdkWinRtTests
         // Positive: write a marker via a container that mounts the named volume.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
-                winrt::single_threaded_vector<winrt::hstring>(
-                    {L"/bin/sh", L"-c", L"echo wslc-winrt-vhd-test > /data/marker.txt"}));
+            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+                {L"/bin/sh", L"-c", L"echo wslc-winrt-vhd-test > /data/marker.txt"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
-            containerSettings.NamedVolumes(
-                winrt::single_threaded_vector<WSLCSDK::ContainerNamedVolume>({WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", false)}));
+            containerSettings.NamedVolumes(winrt::single_threaded_vector<WSLCSDK::ContainerNamedVolume>(
+                {WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", false)}));
 
             auto container = session.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
@@ -1334,14 +1327,13 @@ class WslcSdkWinRtTests
         // Positive: read back the marker in a second container (read-only mount).
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
-                winrt::single_threaded_vector<winrt::hstring>(
-                    {L"/bin/sh", L"-c", L"test \"$(cat /data/marker.txt)\" = wslc-winrt-vhd-test"}));
+            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+                {L"/bin/sh", L"-c", L"test \"$(cat /data/marker.txt)\" = wslc-winrt-vhd-test"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
-            containerSettings.NamedVolumes(
-                winrt::single_threaded_vector<WSLCSDK::ContainerNamedVolume>({WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", true)}));
+            containerSettings.NamedVolumes(winrt::single_threaded_vector<WSLCSDK::ContainerNamedVolume>(
+                {WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", true)}));
 
             auto container = session.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
