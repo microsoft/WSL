@@ -66,11 +66,7 @@ enum class ShutdownBehavior
 /// </summary>
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce7e") LxssUserSession
-    : public Microsoft::WRL::RuntimeClass<
-          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
-          ILxssUserSession,
-          IWslSupport,
-          IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ILxssUserSession, IWslSupport, IFastRundown>
 {
 public:
     LxssUserSession(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session);
