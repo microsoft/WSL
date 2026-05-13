@@ -297,7 +297,8 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesF
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneImageResult>(verb::post, url);
 }
 
-std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all, int limit, std::map<std::string, std::vector<std::string>> filters)
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);

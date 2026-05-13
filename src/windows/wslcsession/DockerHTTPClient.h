@@ -123,7 +123,7 @@ public:
 
     // Container management.
     std::vector<common::docker_schema::ContainerInfo> ListContainers(
-        bool all = false, int limit = -1, std::map<std::string, std::vector<std::string>> filters = {});
+        bool all = false, int limit = -1, const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds);

@@ -13,7 +13,6 @@ Abstract:
 --*/
 
 #include "ContainerCommand.h"
-#include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
