@@ -26,6 +26,7 @@ set(SOURCES
     DockerEventTracker.cpp
     DockerHTTPClient.cpp
     IORelay.cpp
+    OptionParser.cpp
     ServiceProcessLauncher.cpp
     )
 
@@ -33,6 +34,7 @@ set(HEADERS
     DockerEventTracker.h
     DockerHTTPClient.h
     IORelay.h
+    OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h

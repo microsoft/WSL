@@ -22,7 +22,7 @@ using namespace wsl::shared::string;
 
 class WSLCE2EImageTagTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageTagTests)
+    WSLC_TEST_CLASS(WSLCE2EImageTagTests)
 
     TEST_METHOD_SETUP(MethodSetup)
     {

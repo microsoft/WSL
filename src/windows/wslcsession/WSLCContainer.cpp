@@ -474,10 +474,10 @@ void ProcessAdditionalNetworks(
 
     for (ULONG i = startIndex; i < network.NetworksCount; i++)
     {
-        // NetworkName may arrive as null when the caller passed "" (MIDL marshals empty LPCSTR as null).
-        // Both null and empty fall through to the network lookup, returning WSLC_E_NETWORK_NOT_FOUND.
         const char* rawName = network.Networks[i].NetworkName;
-        const std::string networkName = rawName != nullptr ? rawName : "";
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !rawName || strlen(rawName) == 0);
+
+        const std::string networkName = rawName;
 
         auto [_, inserted] = endpointsConfig.insert({networkName, EmptyObject{}});
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !inserted);
@@ -1084,7 +1084,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
-    // Passed this point, no member variables can be accessed.
+    // Past this point, no member variables can be accessed.
     lock.reset();
 
     io.Run({});
@@ -1336,6 +1336,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
 
 std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
+    const std::string& containerName,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
@@ -1650,8 +1651,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
-    auto result =
-        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
+    auto result = DockerClient.CreateContainer(request, containerName);
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
@@ -1875,6 +1875,19 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
     }
 }
 
+void WSLCContainerImpl::Stats(LPSTR* Output) const
+{
+    auto lock = m_lock.lock_shared();
+
+    try
+    {
+        auto stats = m_dockerClient.ContainerStats(m_id);
+        std::string json = wsl::shared::ToJson(stats);
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to get stats for container '%hs'", m_id.c_str());
+}
+
 std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags)
 {
     // Create one pipe for each STD handle.
@@ -1925,7 +1938,7 @@ void WSLCContainerImpl::MapPorts()
         if (!e.VmMapping.VmPort)
         {
             // Reuse existing vm port allocation when possible.
-            // This is required because the same container can be bind the port number for different families or protocols.
+            // This is required because the same container can bind the port number for different families or protocols.
             auto existing = allocatedPorts.find(e.ContainerPort);
             if (existing != allocatedPorts.end())
             {
@@ -2163,6 +2176,18 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 
     return CallImpl(&WSLCContainerImpl::Inspect, Output);
 }
+
+HRESULT WSLCContainer::Stats(LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF(E_POINTER, Output == nullptr);
+
+    *Output = nullptr;
+    return CallImpl(&WSLCContainerImpl::Stats, Output);
+}
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Delete(WSLCDeleteFlags Flags)
 try

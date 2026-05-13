@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 #include "hcs.hpp"
+#include "ContainerNameGenerator.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -898,69 +899,94 @@ class WSLCTests
 
         LogInfo("Test: Before/Since filters");
         {
-            // Get all images to find their IDs
+            // Get all images to find their IDs and creation times
             wil::unique_cotaskmem_array_ptr<WSLCImageInformation> allImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
 
             std::string debianId, pythonId;
+            LONGLONG debianCreated = 0, pythonCreated = 0;
             for (const auto& image : allImages)
             {
                 std::string imageName = image.Image;
                 if (imageName == "debian:latest")
                 {
                     debianId = image.Hash;
+                    debianCreated = image.Created;
                 }
                 else if (imageName == "python:3.12-alpine")
                 {
                     pythonId = image.Hash;
+                    pythonCreated = image.Created;
                 }
             }
 
             VERIFY_IS_FALSE(debianId.empty());
             VERIFY_IS_FALSE(pythonId.empty());
 
-            // Test 'since' filter - images created after debian
+            // Both Created timestamps must be populated and distinct so that the since/before
+            // boundaries are unambiguous. Equal timestamps would make Docker's filter behavior
+            // ambiguous and could reintroduce flakiness.
+            VERIFY_IS_GREATER_THAN(debianCreated, 0LL);
+            VERIFY_IS_GREATER_THAN(pythonCreated, 0LL);
+            VERIFY_ARE_NOT_EQUAL(debianCreated, pythonCreated);
+
+            // Determine which image is older/newer based on actual creation timestamps.
+            // Image creation times come from the registry and can change independently.
+            const bool debianIsOlder = debianCreated < pythonCreated;
+            const auto& olderId = debianIsOlder ? debianId : pythonId;
+            const auto& newerId = debianIsOlder ? pythonId : debianId;
+            const auto* olderName = debianIsOlder ? "debian:latest" : "python:3.12-alpine";
+            const auto* newerName = debianIsOlder ? "python:3.12-alpine" : "debian:latest";
+
+            LogInfo(
+                "Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)",
+                olderName,
+                debianIsOlder ? debianCreated : pythonCreated,
+                newerName,
+                debianIsOlder ? pythonCreated : debianCreated);
+
+            // Test 'since' filter - images created after the older image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Since = debianId.c_str();
+                options.Since = olderId.c_str();
 
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundPython = false;
+                bool foundNewer = false;
                 for (const auto& image : images)
                 {
                     LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
-                    if (std::string{image.Image} == "python:3.12-alpine")
+                    if (std::string{image.Image} == newerName)
                     {
-                        foundPython = true;
+                        foundNewer = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundPython);
+                VERIFY_IS_TRUE(foundNewer);
             }
 
-            // Test 'before' filter - images created before python
+            // Test 'before' filter - images created before the newer image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Before = pythonId.c_str();
+                options.Before = newerId.c_str();
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundDebian = false;
+                bool foundOlder = false;
                 for (const auto& image : images)
                 {
-                    if (std::string{image.Image} == "debian:latest")
+                    if (std::string{image.Image} == olderName)
                     {
-                        foundDebian = true;
+                        foundOlder = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundDebian);
+                VERIFY_IS_TRUE(foundOlder);
             }
         }
 
@@ -3171,7 +3197,7 @@ class WSLCTests
             else
             {
                 return std::format(
-                    "/win-path*9p*{},relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
+                    "/win-path*9p*{},relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
             }
         };
 
@@ -3368,7 +3394,7 @@ class WSLCTests
             ExpectMount(
                 session.get(),
                 "/usr/lib/wsl/drivers",
-                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             ExpectMount(
                 session.get(),
@@ -4092,26 +4118,142 @@ class WSLCTests
 
         // Invalid SizeBytes values.
         WSLCDriverOption emptySize[] = {{"SizeBytes", ""}};
-        validateInvalidOptionsFailure(emptySize, ARRAYSIZE(emptySize), E_INVALIDARG, L"Invalid size: ");
+        validateInvalidOptionsFailure(emptySize, ARRAYSIZE(emptySize), E_INVALIDARG, L"Invalid value for option 'SizeBytes': ''");
 
         WSLCDriverOption zeroSize[] = {{"SizeBytes", "0"}};
-        validateInvalidOptionsFailure(zeroSize, ARRAYSIZE(zeroSize), E_INVALIDARG, L"Invalid size: 0");
+        validateInvalidOptionsFailure(zeroSize, ARRAYSIZE(zeroSize), E_INVALIDARG, L"Invalid value for option 'SizeBytes': '0'");
 
         WSLCDriverOption invalidSizeAbc[] = {{"SizeBytes", "abc"}};
-        validateInvalidOptionsFailure(invalidSizeAbc, ARRAYSIZE(invalidSizeAbc), E_INVALIDARG, L"Invalid size: abc");
+        validateInvalidOptionsFailure(
+            invalidSizeAbc, ARRAYSIZE(invalidSizeAbc), E_INVALIDARG, L"Invalid value for option 'SizeBytes': 'abc'");
 
         WSLCDriverOption invalidSizeMixed[] = {{"SizeBytes", "123abc"}};
-        validateInvalidOptionsFailure(invalidSizeMixed, ARRAYSIZE(invalidSizeMixed), E_INVALIDARG, L"Invalid size: 123abc");
+        validateInvalidOptionsFailure(
+            invalidSizeMixed, ARRAYSIZE(invalidSizeMixed), E_INVALIDARG, L"Invalid value for option 'SizeBytes': '123abc'");
 
         WSLCDriverOption invalidSizeSign[] = {{"SizeBytes", "+-1"}};
-        validateInvalidOptionsFailure(invalidSizeSign, ARRAYSIZE(invalidSizeSign), E_INVALIDARG, L"Invalid size: +-1");
+        validateInvalidOptionsFailure(
+            invalidSizeSign, ARRAYSIZE(invalidSizeSign), E_INVALIDARG, L"Invalid value for option 'SizeBytes': '+-1'");
 
         WSLCDriverOption invalidSizeOverflow[] = {{"SizeBytes", "18446744073709551616"}};
         validateInvalidOptionsFailure(
-            invalidSizeOverflow, ARRAYSIZE(invalidSizeOverflow), E_INVALIDARG, L"Invalid size: 18446744073709551616");
+            invalidSizeOverflow,
+            ARRAYSIZE(invalidSizeOverflow),
+            E_INVALIDARG,
+            L"Invalid value for option 'SizeBytes': '18446744073709551616'");
 
         WSLCDriverOption invalidSizeNeg[] = {{"SizeBytes", "-1"}};
-        validateInvalidOptionsFailure(invalidSizeNeg, ARRAYSIZE(invalidSizeNeg), E_INVALIDARG, L"Invalid size: -1");
+        validateInvalidOptionsFailure(
+            invalidSizeNeg, ARRAYSIZE(invalidSizeNeg), E_INVALIDARG, L"Invalid value for option 'SizeBytes': '-1'");
+
+        // Invalid Fixed values.
+        WSLCDriverOption invalidFixed[] = {{"SizeBytes", "1073741824"}, {"Fixed", "yes"}};
+        validateInvalidOptionsFailure(
+            invalidFixed, ARRAYSIZE(invalidFixed), E_INVALIDARG, L"Invalid value for option 'Fixed': 'yes'");
+
+        WSLCDriverOption emptyFixed[] = {{"SizeBytes", "1073741824"}, {"Fixed", ""}};
+        validateInvalidOptionsFailure(emptyFixed, ARRAYSIZE(emptyFixed), E_INVALIDARG, L"Invalid value for option 'Fixed': ''");
+
+        // Invalid Uid values. Tests pair Uid with a valid Gid because Parse
+        // requires both to be present together.
+        WSLCDriverOption negUid[] = {{"SizeBytes", "1073741824"}, {"Uid", "-1"}, {"Gid", "0"}};
+        validateInvalidOptionsFailure(negUid, ARRAYSIZE(negUid), E_INVALIDARG, L"Invalid value for option 'Uid': '-1'");
+
+        WSLCDriverOption abcUid[] = {{"SizeBytes", "1073741824"}, {"Uid", "abc"}, {"Gid", "0"}};
+        validateInvalidOptionsFailure(abcUid, ARRAYSIZE(abcUid), E_INVALIDARG, L"Invalid value for option 'Uid': 'abc'");
+
+        WSLCDriverOption hugeUid[] = {{"SizeBytes", "1073741824"}, {"Uid", "4294967296"}, {"Gid", "0"}}; // 2^32, exceeds uint32_t max
+        validateInvalidOptionsFailure(hugeUid, ARRAYSIZE(hugeUid), E_INVALIDARG, L"Invalid value for option 'Uid': '4294967296'");
+
+        // Invalid Gid values.
+        WSLCDriverOption negGid[] = {{"SizeBytes", "1073741824"}, {"Uid", "0"}, {"Gid", "-1"}};
+        validateInvalidOptionsFailure(negGid, ARRAYSIZE(negGid), E_INVALIDARG, L"Invalid value for option 'Gid': '-1'");
+
+        // Uid without Gid (or vice versa) is rejected.
+        WSLCDriverOption uidOnly[] = {{"SizeBytes", "1073741824"}, {"Uid", "1000"}};
+        validateInvalidOptionsFailure(uidOnly, ARRAYSIZE(uidOnly), E_INVALIDARG, L"Missing required option: 'Gid'");
+
+        WSLCDriverOption gidOnly[] = {{"SizeBytes", "1073741824"}, {"Gid", "1000"}};
+        validateInvalidOptionsFailure(gidOnly, ARRAYSIZE(gidOnly), E_INVALIDARG, L"Missing required option: 'Uid'");
+
+        // Unknown options are rejected (catches typos and unsupported keys).
+        WSLCDriverOption unknownOpt[] = {{"SizeBytes", "1073741824"}, {"Bogus", "value"}};
+        validateInvalidOptionsFailure(unknownOpt, ARRAYSIZE(unknownOpt), E_INVALIDARG, L"Unknown option: 'Bogus'");
+    }
+
+    WSLC_TEST_METHOD(NamedVolumesVhdOwnership)
+    {
+        // Verify Uid/Gid are baked into the root inode at mkfs time so a
+        // non-root container user can write to the volume.
+        const std::string volumeName = "wslc-test-vhd-ownership";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        // nobody/nogroup are typically uid=65534 / gid=65534 on Debian.
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}, {"Uid", "65534"}, {"Gid", "65534"}};
+
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Driver = "vhd";
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+
+        // A container running as 'nobody' should be able to write to the volume.
+        {
+            WSLCContainerLauncher writer(
+                "debian:latest", "vhd-ownership-writer", {"/bin/sh", "-c", "echo non-root >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+            writer.SetUser("nobody:nogroup");
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+        }
+
+        // Verify the file is owned by the same uid/gid as the volume root.
+        {
+            WSLCContainerLauncher checker(
+                "debian:latest", "vhd-ownership-checker", {"/bin/sh", "-c", "stat -c '%u %g' /data && cat /data/marker.txt"});
+            checker.AddNamedVolume(volumeName, "/data", true);
+
+            auto checkerContainer = checker.Launch(*m_defaultSession);
+            auto checkerProcess = checkerContainer.GetInitProcess();
+            ValidateProcessOutput(checkerProcess, {{1, "65534 65534\nnon-root\n"}});
+        }
+    }
+
+    WSLC_TEST_METHOD(NamedVolumesVhdFixed)
+    {
+        // Fixed=true produces a .vhdx whose on-disk size is at least SizeBytes.
+        const std::string volumeName = "wslc-test-vhd-fixed";
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+        constexpr ULONGLONG c_sizeBytes = 64 * _1MB;
+
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        const auto sizeBytesStr = std::to_string(c_sizeBytes);
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeBytesStr.c_str()}, {"Fixed", "true"}};
+
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Driver = "vhd";
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+        const auto fileSize = std::filesystem::file_size(volumeVhdPath);
+
+        // A dynamic VHD for a 64MB volume is typically a few MB; a fixed VHD
+        // pre-allocates the full payload (>= SizeBytes).
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(fileSize, c_sizeBytes);
     }
 
     WSLC_TEST_METHOD(ListAndInspectNamedVolumesTest)
@@ -4439,7 +4581,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(std::string("172.31.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
@@ -4539,7 +4681,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_FALSE(inspect.Id.empty());
@@ -4567,7 +4709,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
@@ -5874,10 +6016,9 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Duplicate network: 'bridge'");
     }
 
-    WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameReportsNotFoundTest)
+    WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameTest)
     {
-        // Malformed names are not validated separately — they fail the network lookup,
-        // matching the primary network's attach-by-name semantics.
+        // Most malformed names fall through to the network lookup.
 
         // Invalid character.
         {
@@ -5897,8 +6038,8 @@ class WSLCTests
             launcher.AddAdditionalNetwork("");
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
-            ValidateCOMErrorMessage(L"Network not found: ''");
+            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+            ValidateCOMErrorMessage(L"Network name cannot be empty.");
         }
 
         // Name exceeds WSLC_MAX_NETWORK_NAME_LENGTH (255).
@@ -8212,6 +8353,124 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerStats_RunningContainer)
+    {
+        // Start a long-lived detached container on a bridged network so network stats are populated.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats", &container));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+        VERIFY_IS_FALSE(std::string(output.get()).empty());
+
+        const auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+
+        // cpu_stats
+        // The VM has been running so system_cpu_usage is non-zero.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.system_cpu_usage, 0ull);
+
+        // The container process itself has consumed some CPU.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.cpu_usage.total_usage, 0ull);
+
+        // Kernel + user time together must not exceed total CPU time.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(
+            stats.cpu_stats.cpu_usage.usage_in_kernelmode + stats.cpu_stats.cpu_usage.usage_in_usermode, stats.cpu_stats.cpu_usage.total_usage);
+
+        // The session was created with 4 CPUs.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.online_cpus, 0u);
+
+        // precpu_stats
+        // precpu_stats is a prior snapshot; its total must not exceed the current total.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.cpu_usage.total_usage, stats.cpu_stats.cpu_usage.total_usage);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.system_cpu_usage, stats.cpu_stats.system_cpu_usage);
+
+        // memory_stats
+        // Limit is the VM memory ceiling — must be non-zero.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.limit, 0ull);
+
+        // The sleep process occupies at least some memory.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.usage, 0ull);
+
+        // Usage must never exceed the reported limit.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.memory_stats.usage, stats.memory_stats.limit);
+
+        // pids_stats
+        // At minimum the sleep process itself must be counted.
+        VERIFY_IS_GREATER_THAN(stats.pids_stats.current, 0ull);
+
+        // networks
+        // A bridged container always has at least one network interface.
+        VERIFY_IS_TRUE(stats.networks.has_value());
+        VERIFY_IS_FALSE(stats.networks->empty());
+
+        // Every interface entry must have consistent packet/byte counts
+        // (bytes >= 0 is trivially true for unsigned, but packets imply bytes >= 0 too).
+        for (const auto& [iface, net] : *stats.networks)
+        {
+            VERIFY_IS_FALSE(iface.empty());
+
+            // If packets were received/sent, the byte count must also be non-zero.
+            if (net.rx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.rx_bytes, 0ull);
+            }
+            if (net.tx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.tx_bytes, 0ull);
+            }
+        }
+
+        // blkio_stats
+        // io_service_bytes_recursive may be absent for a container with no disk I/O,
+        // but if present every entry must have a non-empty operation name.
+        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+        {
+            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+            {
+                VERIFY_IS_FALSE(entry.op.empty());
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_NullOutputPointer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-null", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-null", &container));
+
+        // Passing nullptr for Output must fail.
+        VERIFY_FAILED(container->Stats(nullptr));
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_CreatedContainer_ReturnsZeroedStats)
+    {
+        // A created-but-not-started container returns zeroed stats from Docker rather than an error.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-created", {}, {}, WSLCContainerNetworkTypeBridged);
+        auto [result, runningContainer] = launcher.CreateNoThrow(*m_defaultSession);
+        VERIFY_SUCCEEDED(result);
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-created", &container));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce)); });
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        // A non-running container has no active processes.
+        auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+        VERIFY_ARE_EQUAL(0ull, stats.pids_stats.current);
+    }
+
     WSLC_TEST_METHOD(InvalidNames)
     {
         auto expectInvalidArg = [&](const std::string& name) {
@@ -8420,7 +8679,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerNameGeneration)
     {
         {
-            // Create a container with a specific name
+            // Create a container with a specific name.
             auto container = WSLCContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
 
             // Validate that the container name is correct.
@@ -8431,8 +8690,38 @@ class WSLCTests
             // Create a container without name.
             auto container = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
 
-            // Validate that the service generates a name for the container.
-            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+            // Validate that the service generates a name in the format "descriptor_mountain[digit]".
+            auto name = container.Name();
+            VERIFY_ARE_NOT_EQUAL(name, "");
+
+            auto underscore = name.find('_');
+            VERIFY_ARE_NOT_EQUAL(underscore, std::string::npos);
+
+            auto descriptor = name.substr(0, underscore);
+            auto mountain = name.substr(underscore + 1);
+
+            // Strip trailing retry digit if present.
+            if (!mountain.empty() && std::isdigit(mountain.back()))
+            {
+                mountain.pop_back();
+            }
+
+            using wsl::windows::service::wslc::c_descriptors;
+            using wsl::windows::service::wslc::c_mountains;
+
+            VERIFY_IS_TRUE(std::ranges::find(c_descriptors, descriptor) != c_descriptors.end());
+            VERIFY_IS_TRUE(std::ranges::find(c_mountains, mountain) != c_mountains.end());
+        }
+
+        {
+            // Create multiple containers without names and verify they get unique names.
+            auto container1 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container2 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container3 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container2.Name());
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container3.Name());
+            VERIFY_ARE_NOT_EQUAL(container2.Name(), container3.Name());
         }
     }
 

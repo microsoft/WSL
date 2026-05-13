@@ -28,4 +28,29 @@
     <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcInvalidPlatform)' != ''">
         <Error Text="wslcsdk.dll could not be copied because the $(_wslcInvalidPlatformProperty) '$(_wslcInvalidPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
     </Target>
+
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+
+    <!-- ================================================================== -->
+    <!-- C# specific: CPS Up-to-Date Check for container source files       -->
+    <!-- ================================================================== -->
+
+    <!-- Register the saved tar and source files for CPS up-to-date check.
+         The tar is the sole build output (build is atomic with save — see
+         _WslcBuildAndSaveSingleImage in common.targets). -->
+    <Target Name="_WslcRegisterUpToDateCheckInputs"
+            BeforeTargets="CollectUpToDateCheckBuiltDesignTime"
+            Condition="'$(UsingMicrosoftNETSdk)' == 'true' AND '@(WslcImage)' != ''">
+        <ItemGroup>
+            <UpToDateCheckBuilt Include="%(WslcImage.TarLocation)"
+                                Condition="'%(WslcImage.TarLocation)' != ''" />
+            <UpToDateCheckBuilt Include="$(OutDir)%(WslcImage.Identity).tar"
+                                Condition="'%(WslcImage.TarLocation)' == ''" />
+            <UpToDateCheckInput Include="%(WslcImage.Dockerfile)" Condition="'%(WslcImage.Dockerfile)' != ''" />
+            <_WslcUpToDateDirs Include="@(WslcImage->'%(Sources)')" Condition="'%(WslcImage.Sources)' != ''" />
+            <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" Condition="'%(_WslcUpToDateDirs.Identity)' != ''" />
+            <UpToDateCheckInput Include="%(WslcImage.Context)\**\*" Condition="'%(WslcImage.Sources)' == '' AND '%(WslcImage.Context)' != ''" />
+        </ItemGroup>
+    </Target>
+
 </Project>

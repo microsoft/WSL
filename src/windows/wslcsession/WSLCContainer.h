@@ -102,6 +102,7 @@ public:
     void Exec(_In_ const WSLCProcessOptions* Options, LPCSTR DetachKeys, _Out_ IWSLCProcess** Process);
     void Inspect(LPSTR* Output) const;
     void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
+    void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
 
     void CopyTo(IWSLCContainer** Container) const;
@@ -126,6 +127,7 @@ public:
 
     static std::unique_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
+        const std::string& Name,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
@@ -228,6 +230,7 @@ public:
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
+    IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
