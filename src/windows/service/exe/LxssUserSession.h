@@ -562,18 +562,6 @@ private:
     void _ConversionComplete(_In_ GUID DistroGuid);
 
     /// <summary>
-    /// Adds a distro to the locked distribution list while compacting.
-    /// </summary>
-    _Requires_lock_held_(m_instanceLock)
-    void _CompactionBegin(_In_ GUID DistroGuid);
-
-    /// <summary>
-    /// Removes a compacting distro from the locked distribution list.
-    /// </summary>
-    _Requires_lock_not_held_(m_instanceLock)
-    void _CompactionComplete(_In_ GUID DistroGuid);
-
-    /// <summary>
     /// Creates a distribution registration for legacy installs.
     /// </summary>
     _Requires_exclusive_lock_held_(m_instanceLock)
