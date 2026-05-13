@@ -987,6 +987,16 @@ Falling back to NAT networking.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 is disabled by the computer policy.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>The container image registry '{}' is blocked by the computer policy.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Please run 'wsl.exe --set-version {} 2' to upgrade to WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2093,6 +2103,10 @@ Usage:
     <value>Container '{}' is not running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress is not yet supported.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Container '{}' is running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2103,6 +2117,9 @@ Usage:
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Container network name is required for custom network type.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Network name cannot be empty.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Unrecognized command: '{}'</value>
@@ -2258,6 +2275,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Missing required option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcInvalidVolumeOption" xml:space = "preserve" >
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcUnknownVolumeOption" xml:space = "preserve" >
+    <value>Unknown option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >
     <value>Unsupported volume type: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2284,6 +2309,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcNetworkAlreadyExists" xml:space = "preserve" >
     <value>Network '{}' already exists.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Duplicate network: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >

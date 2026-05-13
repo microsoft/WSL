@@ -19,6 +19,7 @@ Abstract:
 #include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
+#include "wslpolicies.h"
 
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
@@ -35,6 +36,25 @@ constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 namespace {
+
+// Group policy: WSLContainerRegistryAllowlist restricts which container-image
+// registries can be pulled from or pushed to. The check is enforced here at the
+// service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
+// any other COM client). The repo argument must be the parsed repo from
+// wslutil::ParseImage so callers don't pay the regex cost twice.
+void EnforceRegistryAllowlist(const std::string& Repo)
+{
+    const auto policiesKey = wsl::windows::policies::OpenPoliciesKey();
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(Repo);
+    const auto serverWide = wsl::shared::string::MultiByteToWide(server);
+
+    if (wsl::windows::policies::IsRegistryAllowed(policiesKey.get(), serverWide))
+    {
+        return;
+    }
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
+}
 
 std::string IndentLines(const std::string& input, const std::string& prefix)
 {
@@ -633,10 +653,11 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    EnforceRegistryAllowlist(repo);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
 
     if (!tagOrDigest.has_value())
     {
@@ -672,6 +693,15 @@ try
         WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
         "Invalid flags: 0x%x",
         Options->Flags);
+
+    // Image builds shell out to `docker build` inside the VM, which fetches FROM
+    // base images directly through the in-VM docker daemon and bypasses the
+    // per-pull registry policy gate. When an allowlist is configured, refuse the
+    // build outright since we cannot reliably attribute its registry traffic.
+    if (wsl::windows::policies::HasRegistryAllowlist(wsl::windows::policies::OpenPoliciesKey().get()))
+    {
+        THROW_HR_WITH_USER_ERROR(WSL_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
+    }
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
@@ -1442,10 +1472,12 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
 
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    EnforceRegistryAllowlist(repo);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 

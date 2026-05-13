@@ -242,10 +242,17 @@ typedef enum _WSLCContainerNetworkType
     WSLCContainerNetworkTypeCustom = 3
 } WSLCContainerNetworkType;
 
+typedef struct _WSLCNetworkAttachment
+{
+    [unique] LPCSTR NetworkName;
+    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
+} WSLCNetworkAttachment;
+
 typedef struct _WSLCContainerNetwork
 {
     WSLCContainerNetworkType ContainerNetworkType;
-    LPCSTR ContainerNetworkName;
+    [unique, size_is(NetworksCount)] const WSLCNetworkAttachment* Networks;
+    ULONG NetworksCount;
 } WSLCContainerNetwork;
 
 typedef enum _WSLCContainerFlags

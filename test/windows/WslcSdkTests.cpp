@@ -1992,13 +1992,95 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
-        // Negative: fixed VHD type is not yet supported.
+        // Negative: invalid VHD type must fail.
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
             vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = static_cast<WslcVhdType>(42);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: fixed-allocation VHD; on-disk file size must be >= SizeBytes.
+        {
+            constexpr auto c_fixedVolumeName = "wslc-sdk-vhd-fixed";
+            constexpr auto c_fixedSizeBytes = 64ull * _1MB;
+            WslcVhdRequirements vhd{};
+            vhd.name = c_fixedVolumeName;
+            vhd.sizeBytes = c_fixedSizeBytes;
             vhd.type = WSLC_VHD_TYPE_FIXED;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, nullptr)); });
+
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_fixedVolumeName) + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
+        }
+
+        // Positive: owner flags are honored — uid/gid baked into the volume root
+        // inode at mkfs time. Verify by stat-ing the mount inside a container.
+        {
+            constexpr auto c_ownedVolumeName = "wslc-sdk-vhd-owned";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_ownedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_OWNER;
+            vhd.uid = 65534; // nobody
+            vhd.gid = 65534; // nogroup
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_ownedVolumeName, nullptr)); });
+
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/usr/bin/stat", "-c", "%u %g", "/data"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_ownedVolumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = FALSE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "65534 65534\n");
+        }
+
+        // Negative: unknown flag bits are rejected.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = static_cast<WslcVhdRequirementsFlags>(0x80000000);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: flags=NONE silently ignores uid/gid (volume defaults to root:root).
+        {
+            constexpr auto c_unflaggedVolumeName = "wslc-sdk-vhd-unflagged";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_unflaggedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_NONE;
+            vhd.uid = 1000;
+            vhd.gid = 1000;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            wil::unique_cotaskmem_string deleteErr;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_unflaggedVolumeName, &deleteErr));
         }
     }
 

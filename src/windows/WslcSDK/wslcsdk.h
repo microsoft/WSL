@@ -40,7 +40,7 @@ EXTERN_C_START
 #define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)         /* 0x8004060B */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 80
+#define WSLC_SESSION_OPTIONS_SIZE 88
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -80,8 +80,18 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1
+    WSLC_VHD_TYPE_FIXED = 1    // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
 } WslcVhdType;
+
+typedef enum WslcVhdRequirementsFlags
+{
+    WSLC_VHD_REQ_FLAG_NONE = 0x00000000,
+    // When set, WslcVhdRequirements::uid and gid are honored. When clear,
+    // those fields are ignored and the volume is left owned by root:root.
+    WSLC_VHD_REQ_FLAG_OWNER = 0x00000001,
+} WslcVhdRequirementsFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcVhdRequirementsFlags);
 
 typedef struct WslcVhdRequirements
 {
@@ -89,6 +99,11 @@ typedef struct WslcVhdRequirements
     _In_z_ PCSTR name;
     _In_ uint64_t sizeBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
+    // The remaining fields are only honored by WslcCreateSessionVhdVolume.
+    // WslcSetSessionSettingsVhd rejects non-NONE flags with E_INVALIDARG.
+    _In_ WslcVhdRequirementsFlags flags;
+    _In_ uint32_t uid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
+    _In_ uint32_t gid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFeatureFlags

@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <fstream>
 #include "Common.h"
 #include "registry.hpp"
 #include "wslpolicies.h"
@@ -52,6 +53,36 @@ class PolicyTest
     static auto SetPolicy(LPCWSTR Name, DWORD Value)
     {
         return RegistryKeyChange(HKEY_LOCAL_MACHINE, c_registryKey, Name, Value);
+    }
+
+    // Writes the supplied entries under the WSLContainerRegistryAllowlist sub-key as REG_SZ
+    // values named "AllowedRegistry1", "AllowedRegistry2", ... (matching what the GP editor
+    // writes for the ADMX `<list valuePrefix="AllowedRegistry"/>` policy) and deletes the
+    // sub-key when the returned scope exits.
+    static auto SetRegistryAllowlist(std::initializer_list<std::wstring_view> entries)
+    {
+        const auto policies = OpenKey(HKEY_LOCAL_MACHINE, c_registryKey, KEY_ALL_ACCESS);
+
+        // Drop any pre-existing sub-key so stale `AllowedRegistryN` values from a previous
+        // (possibly interrupted) test run can't leak into this one.
+        DeleteKey(policies.get(), c_wslContainerRegistryAllowlist);
+
+        const auto subKey = CreateKey(policies.get(), c_wslContainerRegistryAllowlist);
+        DWORD index = 1;
+        for (const auto& entry : entries)
+        {
+            const auto name = std::format(L"AllowedRegistry{}", index++);
+            const std::wstring data{entry};
+            WriteString(subKey.get(), nullptr, name.c_str(), data.c_str());
+        }
+        return wil::scope_exit([] {
+            try
+            {
+                const auto policies = OpenKey(HKEY_LOCAL_MACHINE, c_registryKey, KEY_ALL_ACCESS);
+                DeleteKey(policies.get(), c_wslContainerRegistryAllowlist);
+            }
+            CATCH_LOG()
+        });
     }
 
     static void ValidateWarnings(const std::wstring& expectedWarnings, bool pattern = false)
@@ -387,6 +418,162 @@ class PolicyTest
             WslShutdown();
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'virtioproxy'"), 0u);
+        }
+    }
+
+    // Build the absolute path to the installed wslc.exe.
+    static std::wstring GetWslcExePath()
+    {
+        auto msiPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        THROW_HR_IF_MSG(E_UNEXPECTED, !msiPath.has_value(), "MSI install location not found in registry; is WSL installed?");
+        return (std::filesystem::path(*msiPath) / L"wslc.exe").wstring();
+    }
+
+    // Verifies AllowWSLContainer=0 gates the WSLCSessionManager COM factory itself, so that
+    // every method (including GetVersion) is unreachable when the policy disables containers.
+    WSLC_TEST_METHOD(WSLContainerDisabled)
+    {
+        auto revert = SetPolicy(c_allowWSLContainer, 0);
+
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager));
+        VERIFY_ARE_EQUAL(WSL_E_CONTAINER_DISABLED, hr);
+        VERIFY_IS_NULL(sessionManager.get());
+    }
+
+    // Verifies AllowWSLContainer=0 gates wslc.exe at startup with a friendly message.
+    WSLC_TEST_METHOD(WSLContainerDisabledCli)
+    {
+        auto revert = SetPolicy(c_allowWSLContainer, 0);
+
+        std::wstring cmd = L"\"" + GetWslcExePath() + L"\" container ls";
+        auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
+
+        VERIFY_ARE_EQUAL(1, exitCode);
+        if (stderrText.find(L"WSL container is disabled by the computer policy") == std::wstring::npos)
+        {
+            LogError("Expected stderr to contain disabled message, got: '%ls'", stderrText.c_str());
+            VERIFY_FAIL();
+        }
+    }
+
+    // Verifies the WSLContainerRegistryAllowlist denies image pulls from registries not in the
+    // allowlist.
+    WSLC_TEST_METHOD(RegistryAllowlistDenies)
+    {
+        // Allowlist contains ONLY mcr.microsoft.com -- pulling docker.io must be denied.
+        auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+
+        std::wstring cmd = L"\"" + GetWslcExePath() + L"\" image pull alpine:latest";
+        auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
+
+        VERIFY_ARE_NOT_EQUAL(0, exitCode);
+        const std::wstring combined = stdoutText + stderrText;
+        if (combined.find(L"docker.io") == std::wstring::npos || combined.find(L"blocked by the computer policy") == std::wstring::npos)
+        {
+            LogError(
+                "Expected blocked-by-policy for docker.io when allowlist is mcr.microsoft.com, got stdout: '%ls' stderr: '%ls'",
+                stdoutText.c_str(),
+                stderrText.c_str());
+            VERIFY_FAIL();
+        }
+    }
+
+    // Verifies that `wslc image build` is rejected outright when an allowlist is configured,
+    // since the in-VM docker daemon would fetch FROM base images directly and bypass the
+    // per-pull registry gate.
+    WSLC_TEST_METHOD(RegistryAllowlistRejectsImageBuild)
+    {
+        auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+
+        // Set up a minimal build context with a one-line Dockerfile in TEMP.
+        const auto contextDir = std::filesystem::temp_directory_path() / L"wsl-policy-build-test";
+        std::error_code ec;
+        std::filesystem::remove_all(contextDir, ec);
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit([&] { std::filesystem::remove_all(contextDir, ec); });
+
+        {
+            std::ofstream df(contextDir / L"Dockerfile");
+            VERIFY_IS_TRUE(df.is_open());
+            df << "FROM scratch\n";
+        }
+
+        std::wstring cmd = L"\"" + GetWslcExePath() + L"\" image build \"" + contextDir.wstring() + L"\"";
+        auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
+
+        VERIFY_ARE_NOT_EQUAL(0, exitCode);
+        const std::wstring combined = stdoutText + stderrText;
+        if (combined.find(L"Building container images is blocked") == std::wstring::npos ||
+            combined.find(L"computer policy") == std::wstring::npos)
+        {
+            LogError(
+                "Expected image-build to be blocked by policy, got stdout: '%ls' stderr: '%ls'", stdoutText.c_str(), stderrText.c_str());
+            VERIFY_FAIL();
+        }
+    }
+
+    // Pure-function tests for the registry-allowlist policy evaluator. These don't talk to the
+    // service, but do read/write the WSL policies registry key (created by TestClassSetup).
+    TEST_METHOD(IsRegistryAllowed_Logic)
+    {
+        // No policy key configured -> always allowed.
+        VERIFY_IS_TRUE(IsRegistryAllowed(nullptr, L"docker.io"));
+
+        const auto policiesKey = OpenPoliciesKey();
+        VERIFY_IS_TRUE(!!policiesKey);
+
+        // No allowlist sub-key configured -> allowed.
+        VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"docker.io"));
+
+        // Allowlist with multiple entries; matching is case-insensitive.
+        {
+            auto revert = SetRegistryAllowlist({L"mcr.microsoft.com", L"Docker.IO"});
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"mcr.microsoft.com"));
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"docker.io"));
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"DOCKER.IO"));
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"MCR.Microsoft.COM"));
+            VERIFY_IS_FALSE(IsRegistryAllowed(policiesKey.get(), L"ghcr.io"));
+        }
+
+        // Sub-key present with no entries -> no effective restriction, every server allowed.
+        {
+            auto revert = SetRegistryAllowlist({});
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"docker.io"));
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"mcr.microsoft.com"));
+        }
+
+        // Sub-key present but only contains empty entries -> treated as no restriction, not
+        // as a deny-all (defensive against stray GP editor list items).
+        {
+            auto revert = SetRegistryAllowlist({L"", L""});
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"docker.io"));
+            VERIFY_IS_TRUE(IsRegistryAllowed(policiesKey.get(), L"mcr.microsoft.com"));
+        }
+    }
+
+    // Pure-function tests for HasRegistryAllowlist (used by `wslc image build` to decide whether
+    // to refuse outright when the operation cannot be attributed to a single registry).
+    TEST_METHOD(HasRegistryAllowlist_Logic)
+    {
+        VERIFY_IS_FALSE(HasRegistryAllowlist(nullptr));
+
+        const auto policiesKey = OpenPoliciesKey();
+        VERIFY_IS_TRUE(!!policiesKey);
+
+        // No sub-key -> not configured.
+        VERIFY_IS_FALSE(HasRegistryAllowlist(policiesKey.get()));
+
+        // Sub-key present with no entries -> not effectively configured.
+        {
+            auto revert = SetRegistryAllowlist({});
+            VERIFY_IS_FALSE(HasRegistryAllowlist(policiesKey.get()));
+        }
+
+        // Sub-key present with entries -> configured.
+        {
+            auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+            VERIFY_IS_TRUE(HasRegistryAllowlist(policiesKey.get()));
         }
     }
 };
