@@ -539,11 +539,11 @@ void ShowContainerStats(CLIExecutionContext& context)
         {
             for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
             {
-                if (entry.op == "read" || entry.op == "Read")
+                if (_stricmp(entry.op.c_str(), "read") == 0)
                 {
                     blkReadBytes += entry.value;
                 }
-                else if (entry.op == "write" || entry.op == "Write")
+                else if (_stricmp(entry.op.c_str(), "write") == 0)
                 {
                     blkWriteBytes += entry.value;
                 }
