@@ -58,6 +58,7 @@ static HANDLE g_OriginalStderr;
 static BOOL g_RelogEverything = TRUE;
 static bool g_LogDmesgAfterEachTest = false;
 static PTP_TIMER g_WatchdogTimer;
+
 static BOOL g_VmMode;
 static std::wstring g_originalConfig;
 static std::wstring g_originalDefaultDistro;
@@ -1977,6 +1978,17 @@ Return Value:
 
     THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
 
+    // Assign a job object to the current process to ensure that we don't leak processes on failure.
+    // N.B. When the job object is closed, all processes associated with the job will be terminated.
+    // Because of that, we're purposefully leaking this job object so we don't kill the test process on cleanup.
+    auto job = CreateJobObjectW(nullptr, nullptr);
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(job, GetCurrentProcess()));
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -2603,6 +2615,32 @@ std::string ReadToString(SOCKET Handle)
     return output;
 }
 
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair()
+{
+    wil::unique_socket listenSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!listenSocket);
+
+    sockaddr_in bindAddr{};
+    bindAddr.sin_family = AF_INET;
+    bindAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bindAddr.sin_port = 0;
+    THROW_LAST_ERROR_IF(bind(listenSocket.get(), reinterpret_cast<sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF(listen(listenSocket.get(), 1) == SOCKET_ERROR);
+
+    sockaddr_in boundAddr{};
+    int boundAddrLen = sizeof(boundAddr);
+    THROW_LAST_ERROR_IF(getsockname(listenSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), &boundAddrLen) == SOCKET_ERROR);
+
+    wil::unique_socket clientSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!clientSocket);
+    THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
+
+    wil::unique_socket serverSocket{accept(listenSocket.get(), nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!serverSocket);
+
+    return {std::move(clientSocket), std::move(serverSocket)};
+}
+
 std::string ReadToString(HANDLE Handle)
 {
     std::string output;
@@ -2935,4 +2973,16 @@ void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_
 
     THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
         const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+}
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size)
+{
+    while (size > 0)
+    {
+        auto result = send(Socket, static_cast<const char*>(data), gsl::narrow_cast<int>(size), 0);
+        VERIFY_IS_TRUE(result > 0);
+
+        size -= result;
+        data = static_cast<const char*>(data) + result;
+    }
 }

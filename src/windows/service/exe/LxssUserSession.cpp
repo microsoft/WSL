@@ -2208,7 +2208,7 @@ try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"Telemetry");
 
-    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", m_vmTerminating.get());
+    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", {m_vmTerminating.get()});
 
     // Check if drvfs notifications are enabled for the user.
     bool drvFsNotifications{};
