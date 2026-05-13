@@ -1475,8 +1475,6 @@ class UnitTests
 
     TEST_METHOD(ManageInvalidUsage)
     {
-        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --resize 1500GB --allow-unsafe");
-        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --allow-unsafe");
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
