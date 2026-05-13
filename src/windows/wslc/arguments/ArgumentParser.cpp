@@ -67,31 +67,24 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     }
 }
 
+void ParseArgumentsStateMachine::AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const
+{
+    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
+    {
+        ++itr;
+    }
+}
+
 const Argument* ParseArgumentsStateMachine::NextPositional()
 {
-    // Find the next appropriate positional arg if the current itr isn't one or has hit its limit.
-    while (m_positionalSearchItr != m_positionalArgs.end() &&
-           (m_executionArgs.Count(m_positionalSearchItr->Type()) == m_positionalSearchItr->Limit()))
-    {
-        ++m_positionalSearchItr;
-    }
-
-    if (m_positionalSearchItr == m_positionalArgs.end())
-    {
-        return nullptr;
-    }
-
-    return &*m_positionalSearchItr;
+    AdvanceToNextPositional(m_positionalSearchItr);
+    return m_positionalSearchItr != m_positionalArgs.end() ? &*m_positionalSearchItr : nullptr;
 }
 
 bool ParseArgumentsStateMachine::HasNextPositional() const
 {
     auto itr = m_positionalSearchItr;
-    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
-    {
-        ++itr;
-    }
-
+    AdvanceToNextPositional(itr);
     return itr != m_positionalArgs.end();
 }
 

@@ -105,6 +105,9 @@ private:
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
 
+    // Advances the given iterator past any positionals that have reached their limit.
+    void AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const;
+
     Invocation& m_invocation;
     ArgMap& m_executionArgs;
     std::vector<Argument> m_arguments;
