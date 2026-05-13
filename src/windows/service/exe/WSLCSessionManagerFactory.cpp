@@ -16,6 +16,7 @@ Abstract:
 
 #include "WSLCSessionManagerFactory.h"
 #include "WSLCSessionManager.h"
+#include "wslpolicies.h"
 
 using wsl::windows::service::wslc::WSLCSessionManagerFactory;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
@@ -37,6 +38,14 @@ HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
     try
     {
+        wsl::windows::common::COMServiceExecutionContext context;
+
+        namespace policies = wsl::windows::policies;
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSL_E_CONTAINER_DISABLED,
+            wsl::shared::Localization::MessageWSLContainerDisabled(),
+            !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainer));
+
         std::lock_guard lock{g_mutex};
 
         THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessionManagerImpl.has_value());

@@ -991,6 +991,16 @@ Falling back to NAT networking.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 is disabled by the computer policy.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>The container image registry '{}' is blocked by the computer policy.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Please run 'wsl.exe --set-version {} 2' to upgrade to WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2256,6 +2266,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
     <value>Missing required option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcInvalidVolumeOption" xml:space = "preserve" >
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcUnknownVolumeOption" xml:space = "preserve" >
+    <value>Unknown option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >

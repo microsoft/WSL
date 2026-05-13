@@ -493,16 +493,42 @@ try
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
     RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
-    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
+
+    // Reject unknown flag bits so future additions can't be silently ignored.
+    constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER;
+    RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
+
+    // Hold uid/gid strings at function scope so the c_str() pointers stored
+    // in driverOpts stay valid through CreateVolume.
+    const auto sizeStr = std::to_string(options->sizeBytes);
+    std::string uidStr;
+    std::string gidStr;
+
+    std::vector<WSLCDriverOption> driverOpts;
+    driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
+
+    if (options->type == WSLC_VHD_TYPE_FIXED)
+    {
+        driverOpts.push_back({"Fixed", "true"});
+    }
+    else
+    {
+        RETURN_HR_IF(E_INVALIDARG, options->type != WSLC_VHD_TYPE_DYNAMIC);
+    }
+
+    if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
+    {
+        uidStr = std::to_string(options->uid);
+        gidStr = std::to_string(options->gid);
+        driverOpts.push_back({"Uid", uidStr.c_str()});
+        driverOpts.push_back({"Gid", gidStr.c_str()});
+    }
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     volumeOptions.Driver = "vhd";
-
-    auto sizeStr = std::to_string(options->sizeBytes);
-    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
-    volumeOptions.DriverOpts = driverOpts;
-    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+    volumeOptions.DriverOpts = driverOpts.data();
+    volumeOptions.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
 
     WSLCVolumeInformation volumeInfo{};
     return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
@@ -531,6 +557,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+
+        // Owner is only honored on named volumes; reject here so callers can't
+        // mistakenly believe it applied to the session rootfs VHD.
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;
     }

@@ -31,6 +31,8 @@ inline constexpr auto c_allowDiskMount = L"AllowDiskMount";
 inline constexpr auto c_allowCustomNetworkingModeUserSetting = L"AllowNetworkingModeUserSetting";
 inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSetting";
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
+inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
+inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
 
 inline wil::unique_hkey CreatePoliciesKey(DWORD desiredAccess)
 {
@@ -100,6 +102,139 @@ inline wil::unique_hkey OpenPoliciesKey()
 
     LOG_IF_WIN32_ERROR(result);
     return key;
+}
+
+// Opens the WSLContainerRegistryAllowlist sub-key under the supplied policies key for
+// read-only enumeration. Returns an empty handle when the policy is not configured (sub-key
+// absent) or the parent key is null.
+inline wil::unique_hkey OpenRegistryAllowlistKey(HKEY policiesKey)
+{
+    if (policiesKey == nullptr)
+    {
+        return {};
+    }
+
+    wil::unique_hkey subKey;
+    const auto result = RegOpenKeyExW(policiesKey, c_wslContainerRegistryAllowlist, 0, KEY_READ, &subKey);
+    if (result == ERROR_PATH_NOT_FOUND || result == ERROR_FILE_NOT_FOUND)
+    {
+        return {};
+    }
+
+    LOG_IF_WIN32_ERROR(result);
+    return subKey;
+}
+
+// Returns the REG_SZ data of every value under the WSLContainerRegistryAllowlist sub-key
+// (one entry per configured registry hostname). The ADMX uses
+// `<list valuePrefix="AllowedRegistry"/>`, which the GP editor materialises by writing one
+// REG_SZ value per entry: each value is named `AllowedRegistry1`, `AllowedRegistry2`, ... and
+// the value's data is the actual hostname; the value names are therefore ignored here. Schema
+// reference: https://learn.microsoft.com/en-us/previous-versions/windows/desktop/Policy/element-list
+//
+// Returns an empty list when the sub-key has no values or on any enumeration failure; either
+// case means no effective restriction is in place.
+inline std::vector<std::wstring> EnumerateRegistryAllowlist(HKEY subKey)
+try
+{
+    std::vector<std::wstring> entries;
+    if (subKey == nullptr)
+    {
+        return entries;
+    }
+
+    DWORD maxValueNameChars = 0;
+    DWORD maxValueDataBytes = 0;
+    THROW_IF_WIN32_ERROR(RegQueryInfoKeyW(
+        subKey, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &maxValueNameChars, &maxValueDataBytes, nullptr, nullptr));
+
+    std::wstring nameBuffer(static_cast<size_t>(maxValueNameChars) + 1, L'\0');
+    std::wstring dataBuffer(maxValueDataBytes / sizeof(wchar_t) + 1, L'\0');
+    for (DWORD index = 0;; ++index)
+    {
+        DWORD nameSize = static_cast<DWORD>(nameBuffer.size());
+        DWORD dataSize = static_cast<DWORD>(dataBuffer.size() * sizeof(wchar_t));
+        DWORD type = 0;
+        const auto status =
+            RegEnumValueW(subKey, index, nameBuffer.data(), &nameSize, nullptr, &type, reinterpret_cast<BYTE*>(dataBuffer.data()), &dataSize);
+        if (status == ERROR_NO_MORE_ITEMS)
+        {
+            break;
+        }
+
+        THROW_IF_WIN32_ERROR(status);
+        if (type != REG_SZ && type != REG_EXPAND_SZ)
+        {
+            continue;
+        }
+
+        const size_t chars = dataSize / sizeof(wchar_t);
+        std::wstring_view entry{dataBuffer.data(), chars};
+        if (!entry.empty() && entry.back() == L'\0')
+        {
+            entry.remove_suffix(1);
+        }
+
+        // Skip empty entries so a stray blank list item in the GP editor doesn't make the
+        // allowlist non-empty (which would otherwise deny every registry).
+        if (entry.empty())
+        {
+            continue;
+        }
+
+        entries.emplace_back(entry);
+    }
+
+    return entries;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return {};
+}
+
+// Evaluates the WSLContainerRegistryAllowlist policy for `server`. The policy only restricts
+// traffic when the sub-key exists and contains at least one entry. With the sub-key absent or
+// empty, every server is allowed; otherwise the server is allowed only when it case-insensitively
+// matches one of the allowlist entries.
+inline bool IsRegistryAllowed(HKEY policiesKey, std::wstring_view server)
+{
+    auto subKey = OpenRegistryAllowlistKey(policiesKey);
+    if (!subKey)
+    {
+        return true;
+    }
+
+    const auto entries = EnumerateRegistryAllowlist(subKey.get());
+    if (entries.empty())
+    {
+        return true;
+    }
+
+    if (server.empty())
+    {
+        return true;
+    }
+
+    const std::wstring target{server};
+    for (const auto& entry : entries)
+    {
+        if (_wcsicmp(entry.c_str(), target.c_str()) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Returns true when the WSLContainerRegistryAllowlist policy is in effect (sub-key present
+// with at least one entry). Used by callers (e.g., `wslc image build`) that cannot attribute
+// traffic to a specific registry and must therefore refuse the operation whenever any
+// allowlist restriction is active.
+inline bool HasRegistryAllowlist(HKEY policiesKey)
+{
+    auto subKey = OpenRegistryAllowlistKey(policiesKey);
+    return subKey && !EnumerateRegistryAllowlist(subKey.get()).empty();
 }
 
 } // namespace wsl::windows::policies

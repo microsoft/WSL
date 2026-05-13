@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Подсистема Windows для Linux</value>
   </data>
@@ -137,24 +153,27 @@
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Этот том уже подключен в WSL2.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Диск с таким именем уже подключен; отключите диск или выберите новое имя и повторите попытку.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Указанное имя подключения содержит недопустимый символ "/". Повторите попытку без недопустимого символа.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Диск успешно подключен как "/mnt/wsl/{}".
 Примечание. Расположение будет разным, если вы изменили параметр automount.root в /etc/wsl.conf.
 Чтобы отключить и отключить диск, выполните команду "wsl.exe {} {}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Диск был подключен, но подключить его не удалось: {}.
 Для получения дополнительных сведений выполните команду "dmesg" в WSL2.
 Чтобы отключить диск, выполните команду "wsl.exe {} {}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Ниже указан список допустимых дистрибутивов, которые можно установить.
@@ -177,6 +196,7 @@
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Для подключения диска требуется доступ администратора.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Не удалось экспортировать дистрибутив.</value>
@@ -310,7 +330,7 @@
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD уже подключен с помощью команды wsl.exe --mount, отключите диск перед запуском.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>Текущая конфигурация компьютера не поддерживает WSL1.
@@ -381,215 +401,215 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>(c) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
-Сведения о конфиденциальности этого продукта см. на странице https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-Использование: wsl.exe [аргумент] [параметры...] [командная_строка]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-Аргументы для запуска двоичных файлов Linux:
+Arguments for running Linux binaries:
 
-    Если командная строка не указана, wsl.exe запускает оболочку по умолчанию.
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        Выполнить указанную команду без использования оболочки Linux по умолчанию.
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        Выполнить указанную команду с указанным типом оболочки.
+        Execute the specified command with the provided shell type.
 
     --
-        Передать оставшуюся командную строку без изменений.
+        Pass the remaining command line as-is.
 
-Параметры:
+Options:
     --cd &lt;Directory&gt;
-        Задает указанный каталог в качестве текущего рабочего каталога.
-        Если указан символ "~", будет использоваться домашний путь пользователя Linux. Если путь начинается
-        с символа "/", он будет интерпретироваться как абсолютный путь Linux.
-        В противном случае значение должно быть абсолютным путем Windows.
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        Запуск указанного дистрибутива.
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        Запуск дистрибутива с указанным ИД.
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        Запуск от имени указанного пользователя.
+        Run as the specified user.
 
     --system
-        Запускает оболочку для дистрибутива системы.
+        Launches a shell for the system distribution.
 
-Аргументы для управления подсистемой Windows для Linux:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        Вывод сведений об использовании.
+        Display usage information.
 
     --debug-shell
-        Открыть оболочку отладки WSL2 для целей диагностики.
+        Open a WSL2 debug shell for diagnostics purposes.
 
-    --install [дистрибутив] [параметры...]
-        Установить дистрибутив подсистемы Windows для Linux.
-        Для получения списка допустимых дистрибутивов используйте 'wsl.exe --list --online'.
+    --install [Distro] [Options...]
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-        Параметры:
+        Options:
             --enable-wsl1
-                Включить поддержку WSL1.
+                Enable WSL1 support.
 
             --fixed-vhd
-                Создать диск фиксированного размера для хранения дистрибутива.
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                Установить дистрибутив из локального файла.
+                Install a distribution from a local file.
 
             --legacy
-                Использовать устаревший манифест дистрибутива.
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                Задать путь установки для дистрибутива.
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                Задать имя дистрибутива.
+                Set the name of the distribution.
 
             --no-distribution
-                Устанавливать только необходимые дополнительные компоненты, но не дистрибутив.
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                Не запускать дистрибутив после установки.
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                Указывает версию, используемую для нового дистрибутива.
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                Указывает размер диска для хранения дистрибутива.
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                Скачать дистрибутив из Интернета вместо Microsoft Store.
+                Download the distribution from the internet instead of the Microsoft Store.
 
-    --manage [дистрибутив] [параметры...]
-        Изменяет определенные параметры дистрибутива.
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Changes distro specific options.
 
-        Параметры:
+        Options:
             --move &lt;Location&gt;
-                Переместить дистрибутив в новое местоположение.
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-                Задать для VHD дистрибутива значение "разреженный", чтобы обеспечить автоматическое освобождение дискового пространства.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                Задать пользователя по умолчанию для дистрибутива.
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                Изменить размер диска дистрибутива до указанного размера.
+                Resize the disk of the distribution to the specified size.
 
     --mount &lt;Disk&gt;
-        Присоединяет и подключает физический или виртуальный диск во всех дистрибутивах WSL 2.
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        Параметры:
+        Options:
             --vhd
-                Указывает, что &lt;Disk&gt; относится к виртуальному жесткому диску.
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                Присоединить диск к WSL2, но не подключать его.
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                Подключить диск, используя собственное имя для точки подключения.
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                Файловая система, используемая при подключении диска. Если не указано, по умолчанию используется ext4.
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                Дополнительные параметры подключения.
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                Индекс подключаемого раздела. Если не указано, по умолчанию используется весь диск.
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        Изменяет версию установки по умолчанию для новых дистрибутивов.
+        Changes the default install version for new distributions.
 
     --shutdown
-        Немедленно завершает все выполняющиеся дистрибутивы и
-        упрощенную виртуальную машину служебной программы WSL 2.
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        Параметры:
+        Options:
             --force
-                Прервать работу виртуальной машины WSL 2, даже если операция выполняется. Может привести к потере данных.
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
 
     --status
-        Показывает состояние подсистемы Windows для Linux.
+        Show the status of Windows Subsystem for Linux.
 
-    --unmount [диск]
-        Отключает и отсоединяет диск от всех дистрибутивов WSL2.
-        При вызове без аргумента отключает и отсоединяет все диски.
+    --unmount [Disk]
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        Удаляет с этого компьютера пакет подсистемы Windows для Linux.
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        Обновление пакета подсистемы Windows для Linux.
+        Update the Windows Subsystem for Linux package.
 
-        Параметры:
+        Options:
             --pre-release
-                Скачивание предварительной версии, если она доступна.
+                Download a pre-release version if available.
 
     --version, -v
-        Вывод сведений о версии.
+        Display version information.
 
-Аргументы для управления дистрибутивами в подсистеме Windows для Linux:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [параметры]
-        Экспорт дистрибутива в TAR-файл.
-        Имя файла может быть "-" для stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        Параметры:
+        Options:
             --format &lt;Format&gt;
-                Указывает формат экспорта. Поддерживаемые значения: tar, tar.gz, tar.xz, vhd.
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [параметры]
-        Импортирует указанный TAR-файл в качестве нового дистрибутива.
-        Имя файла может быть "-" для stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        Параметры:
-            --version &lt;версия&gt;
-                Указывает версию, используемую для нового дистрибутива.
+        Options:
+            --version &lt;Version&gt;
+                Specifies the version to use for the new distribution.
 
             --vhd
-                Указывает, что предоставленный файл является файлом VHD или VHDX, а не TAR-файлом.
-                Эта операция создает копию VHD-файла в указанном расположении установки.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Импортирует указанный VHD-файл в качестве нового дистрибутива.
-        Этот виртуальный жесткий диск должен быть отформатирован с типом файловой системы ext4.
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
-    --list, -l [параметры]
-        Перечисление дистрибутивов.
+    --list, -l [Options]
+        Lists distributions.
 
-        Параметры:
+        Options:
             --all
-                Перечислить все дистрибутивы, включая дистрибутивы,
-                которые устанавливаются или удаляются в настоящий момент.
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                Перечислить только дистрибутивы, которые сейчас запущены.
+                List only distributions that are currently running.
 
             --quiet, -q
-                Показывать только имена дистрибутивов.
+                Only show distribution names.
 
             --verbose, -v
-                Вывод подробных сведений обо всех дистрибутивах.
+                Show detailed information about all distributions.
 
             --online, -o
-                Вывод списка дистрибутивов, доступных для установки с помощью команды 'wsl.exe --install'.
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Задает дистрибутив по умолчанию.
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Изменяет версию указанного дистрибутива.
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        Прерывает работу указанного дистрибутива.
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        Отменяет регистрацию дистрибутива и удаляет корневую файловую систему.</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -609,7 +629,7 @@
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>Версия WSL: {}
@@ -632,8 +652,8 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Виртуальный жесткий диск пользовательских модулей ядра в {} не найден: "{}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The custom kernel modules VHD in {} was not found: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>Настраиваемое системное распределение, указанное в {}, не найдено или имеет неправильный формат.</value>
@@ -694,7 +714,7 @@
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount на ARM64 требует Windows версии 27653 или более поздней.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Последняя версия подсистема Windows для Linux уже установлена.</value>
@@ -829,6 +849,7 @@
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Использование устаревшей регистрации распространения. Вместо этого рассмотрите возможность использования дистрибутива на основе tar.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Устаревшие регистрации дистрибутивов не поддерживают аргумент --version .</value>
@@ -860,7 +881,7 @@
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Не удалось создать диск переключения в "{}": {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Не удалось создать диск "{}": {}</value>
@@ -879,6 +900,7 @@
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>БЕЗОПАСНЫЙ РЕЖИМ ВКЛЮЧЕН — многие функции будут отключены</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Режим зеркальной сети не поддерживается: {}.
@@ -901,24 +923,30 @@
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>Туннелирование DNS не поддерживается</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Параметр wsl2.localhostForwarding не действует при использовании зеркального сетевого режима</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>В узле обнаружено изменение HTTP-прокси. Перезапустите WSL, чтобы применить изменение.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера localhost обнаружена, но не отражена в WSL. WSL в режиме NAT не поддерживает прокси-серверы localhost.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера IPv6 обнаружена, но не отражена в WSL. WSL в режиме NAT не поддерживает IPv6.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера localhost IPv6 обнаружена, но не отражена в WSL. WSL не поддерживает прокси-серверы localhost IPv6.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>При попытке разрешить параметры прокси-сервера произошла непредвиденная ошибка. Параметры прокси-сервера не были зеркально отражены в WSL.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Произошла ошибка при доступе к реестру. Путь: "{}". Ошибка: {}</value>
@@ -961,7 +989,7 @@
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>Команда wsl.exe --mount отключена политикой компьютера.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>Подсистема WSL1 отключена политикой компьютера.</value>
@@ -1024,7 +1052,7 @@
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Не удалось завершить операцию, так как VHD сейчас используется. Чтобы принудительно остановить использование WSL, выполните команду wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} не является допустимым логическим значением, &lt;true|false&gt;</value>
@@ -1032,6 +1060,7 @@
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>Разреженный VHD поддерживается только в WSL2.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Запуск WSL в виде локальной системы не поддерживается.</value>
@@ -1081,7 +1110,7 @@
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Похоже, это VHD-файл. Используйте --vhd для импорта VHD вместо tar.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Не удалось установить {} с Microsoft Store: {}
@@ -1129,23 +1158,26 @@
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Из-за текущей проблемы совместимости с клиентом глобального безопасного доступа туннелирование DNS отключено.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Поддержка разреженного VHD в настоящее время отключена из-за возможного повреждения данных.
 Чтобы принудительно использовать разреженный VHD в дистрибутиве, выполните команду:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Не удалось подключить {}. Дополнительные сведения см. в dmesg.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>Обработка /etc/fstab с помощью mount -a завершилась неудачей.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Произошла ошибка при подключении диска дистрибутива, он был подключен только для чтения в качестве резервного варианта.
 Инструкции по восстановлению см. на странице https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Не удалось перевести "{}"</value>
@@ -1184,28 +1216,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Автоматический прокси включен</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Позволяет WSL использовать сведения HTTP-прокси Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Автоматический прокси включен.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Позволяет WSL использовать сведения HTTP-прокси Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>Используйте лучший анализ DNS</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Применимо, тольк, если для параметра wsl2.dnsTunneling установлено значение ИСТИНА. Если установлено значение ИСТИНА, Windows извлечет вопрос из запроса DNS и попытается его решить, игнорируя неизвестные записи.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Используйте лучший анализ DNS.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, тольк, если для параметра wsl2.dnsTunneling установлено значение ИСТИНА. Если установлено значение ИСТИНА, Windows извлечет вопрос из запроса DNS и попытается его решить, игнорируя неизвестные записи.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Настраиваемое ядро</value>
@@ -1227,6 +1266,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>Абсолютный путь Windows к VHD модулей настраиваемого ядра Linux.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Обзор модулей ядра</value>
@@ -1236,6 +1276,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Абсолютный путь Windows к VHD модулей настраиваемого ядра Linux.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Пользовательский системный дистрибутив</value>
@@ -1244,8 +1285,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Обзор дистрибутивов</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Укажите путь к виртуальному жесткому диску, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <value>Specify a path to a VHD which will load as a custom system distro, primarily used to power GUI apps in WSL. [Learn more about system distros here].</value>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1256,6 +1297,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, который в основном используется для работы приложений с графическим интерфейсом в WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Включить консоль отладки</value>
@@ -1270,19 +1312,23 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Логическое значение для включения окна вывода консоли, в котором отображается содержимое диагностических сообщений при запуске экземпляра дистрибутива WSL 2.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Размер виртуального жесткого диска по умолчанию</value>
+    <value>Default VHD Size</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Максимальный размер по умолчанию для расширяемого виртуального жесткого диска WSL (VHD) только для вновь создаваемых дистрибутивов.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Восстановить размер</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Размер виртуального жесткого диска по умолчанию</value>
+    <value>Default VHD Size</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Максимальный размер по умолчанию, указанный в мегабайтах, для расширяемого виртуального жесткого диска WSL (VHD) только для вновь создаваемых дистрибутивов.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Разработчик</value>
@@ -1302,28 +1348,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS-прокси включен</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Применимо, только если для параметра wsl2.networkingMode установлено значение NAT. Логическое значение, сообщающее WSL о необходимости настройки DNS-сервера в Linux для NAT на узле. Установка значения ЛОЖЬ приведет к зеркалированию DNS-серверов из Windows в Linux.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-прокси включен.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, только если для параметра wsl2.networkingMode установлено значение NAT. Логическое значение, сообщающее WSL о необходимости настройки DNS-сервера в Linux для NAT на узле. Установка значения ЛОЖЬ приведет к зеркалированию DNS-серверов из Windows в Linux.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>Нисходящая маршрутизация событий DNS включена</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>Изменяет способ передачи DNS-запросов из WSL в Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Нисходящая маршрутизация событий DNS включена.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Изменяет способ передачи DNS-запросов из WSL в Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Файловая система</value>
@@ -1399,19 +1452,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Начальное время ожидания автоматического прокси-сервера</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Применимо, только если для wsl2.autoProxy установлено значение ИСТИНА. Определяет, как долго (в миллисекундах) WSL будет ждать получения информации о HTTP-прокси при запуске контейнера WSL. Если параметры прокси-сервера разрешены по истечении этого времени, экземпляр WSL необходимо перезапустить, чтобы использовать полученные параметры прокси-сервера.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Сброс времени ожидания</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Начальное время ожидания автоматического прокси-сервера</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, только если для wsl2.autoProxy установлено значение ИСТИНА. Определяет, как долго (в миллисекундах) WSL будет ждать получения информации о HTTP-прокси при запуске контейнера WSL. Если параметры прокси-сервера разрешены по истечении этого времени, экземпляр WSL необходимо перезапустить, чтобы использовать полученные параметры прокси-сервера.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Командная строка ядра</value>
@@ -1587,6 +1643,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
 • Команды Docker можно запускать в WSL или Windows с помощью одной и той же управляющей программы и образов Docker.
 • Удобно обмениваться файлами и папками между Windows и Linux с помощью автоматического подключения дисков Windows в WSL.
 • Можно использовать любимые инструменты и редакторы Windows для работы с кодом и файлами Linux, и наоборот, благодаря взаимодействию через WSL.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Интеграция Docker Desktop</value>
@@ -1754,15 +1811,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Включить безопасный режим</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Запускайте WSL в "безопасном режиме", который отключает многие функции и предназначен для восстановления дистрибутивов, находящихся в плохом состоянии.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Включить безопасный режим.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Запускайте WSL в "безопасном режиме", который отключает многие функции и предназначен для восстановления дистрибутивов, находящихся в плохом состоянии.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>О службе</value>
@@ -1826,46 +1887,59 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Включить разреженный виртуальный жесткий диск по умолчанию</value>
+    <value>Enable sparse VHD by default</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Все вновь созданные виртуальные жесткие диски будут автоматически настроены на разрежение при включении.</value>
+    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Включить разреженный виртуальный жесткий диск по умолчанию.</value>
+    <value>Enable sparse VHD by default.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Все вновь созданные виртуальные жесткие диски будут автоматически настроены на разрежение при включении.</value>
+    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Поменять расположение файла</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>Абсолютный путь Windows к обмену виртуальным жестким диском.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Просмотр файлов подкачки</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Поменять расположение файла</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Абсолютный путь Windows к обмену виртуальным жестким диском.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Размер буфера</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Объем места для обмена добавляемого в виртуальную машину WSL 2, 0 для файла переключения. Хранилище буфера — это дисковое ОЗУ, используемое при превышении ограничения на объем памяти на устройстве.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Восстановить размер</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Размер буфера</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Какой объем пространства подкачки (указан в мегабайтах) добавить к виртуальной машине WSL 2. 0 для отсутствия файла подкачки. Хранилище буфера — это дисковое ОЗУ, используемое при превышении ограничения на объем памяти на устройстве.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>Включить VirtIO</value>
@@ -1878,6 +1952,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Позволяет монтировать файловую систему 9P с узла с помощью транспорта virtio.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>Время ожидания простоя виртуальной машины</value>
