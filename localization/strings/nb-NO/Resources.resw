@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Windows-undersystem for Linux</value>
   </data>
@@ -137,24 +153,27 @@ Hvis du vil tvinge WSL2 til å stoppe og koble fra disken, kjører du wsl.exe {}
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Volumet er allerede montert i WSL2.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>En disk med dette navnet er allerede montert. demonter disken, eller velg et nytt navn, og prøv på nytt.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Det angitte monteringsnavnet inneholder et ugyldig /-tegn. Prøv på nytt uten det ugyldige tegnet.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Disken er koblet til som «/mnt/wsl/{}».
 Obs! Plasseringen vil være en annen hvis du har endret innstillingen automount.root i /etc/wsl.conf.
 Kjør wsl.exe {} {} for å koble fra disken.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Disken ble koblet til, men kan ikke monteres: {}.
 Hvis du vil ha mer informasjon, kan du kjøre dmesg i WSL2.
 Kjør wsl.exe {} {} for å koble fra disken.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Nedenfor vises en liste over gyldige distribusjoner som kan installeres.
@@ -177,6 +196,7 @@ Installer ved hjelp av wsl.exe {} &lt;Distro&gt;.
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Administratortilgang kreves for å montere en disk.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Eksport av distribusjonen mislyktes.</value>
@@ -303,7 +323,7 @@ Hvis du vil ha mer informasjon, kan du gå til https://aka.ms/enablevirtualizati
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD-disken er allerede montert via wsl.exe --mount, Demonter disken før du starter.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1 støttes ikke med gjeldende maskinkonfigurasjon.
@@ -602,7 +622,7 @@ Argumenter for behandling av distribusjoner i Windows-undersystem for Linux:
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL-versjon: {}
@@ -626,7 +646,7 @@ Build-tid: {}</value>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
     <value>VHD-en for tilpassede kjernemoduler i {} ble ikke funnet: «{}».</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>Den egendefinerte systemdistribusjonen som er angitt i {} ble ikke funnet, eller har feil format.</value>
@@ -687,7 +707,7 @@ Argumenter:
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount på ARM64 krever Windows versjon 27653 eller nyere.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Den nyeste versjonen av Windows-undersystem for Linux er allerede installert.</value>
@@ -822,6 +842,7 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Bruker eldre distribusjonsregistrering. Vurder å bruke en tar-basert distribusjon i stedet.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Eldre distribusjonsregistreringer støtter ikke --version argumentet.</value>
@@ -853,7 +874,7 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Kan ikke opprette swapdisken i {}: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Kan ikke opprette disk «{}»: {}</value>
@@ -872,6 +893,7 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>SIKKERMODUS AKTIVERT – mange funksjoner vil bli deaktivert</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Avspeilet nettverksmodus støttes ikke: {}.
@@ -894,24 +916,30 @@ Faller tilbake til NAT-nettverk.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>DNS-tunnelering støttes ikke</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Innstillingen wsl2.localhostForwarding har ingen effekt ved bruk av avspeilet nettverksmodus</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>Det ble oppdaget en http-proxy-endring på verten. Start WSL på nytt for å bruke endringen.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>En localhost-proxykonfigurasjon ble oppdaget, men ikke avspeilet i Windows Subsystem for Linux. Windows Subsystem for Linux i NAT-modus støtter ikke localhost-proxyer.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>En IPv6-proxykonfigurasjon ble oppdaget, men ikke avspeilet i WSL. WSL i NAT-modus støtter ikke IPv6.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>En IPv6-proxy-konfigurasjon for localhost ble oppdaget, men er ikke avspeilet i WSL. WSL støtter ikke IPv6-proxyer for localhost.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>Det oppstod en uventet feil under forsøk på å løse proxy-innstillinger. Proxy-innstillinger ble ikke speilet til WSL.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Det oppstod en feil under tilgang til registeret. Bane: {}. Feil: {}</value>
@@ -954,7 +982,7 @@ Faller tilbake til NAT-nettverk.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount er deaktivert av datamaskinpolicyen.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 er deaktivert av datamaskinpolicyen.</value>
@@ -1017,7 +1045,7 @@ Faller tilbake til NAT-nettverk.</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Operasjonen kan ikke fullføres fordi VHD-en er i bruk. Slik tvinger du WSL til å stoppe: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} er ikke en gyldig boolsk verdi, &lt;sann|usann&gt;</value>
@@ -1025,6 +1053,7 @@ Faller tilbake til NAT-nettverk.</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>Sparse VHD støttes bare på WSL2.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Kjøring av WSL som lokalt system støttes ikke.</value>
@@ -1074,7 +1103,7 @@ Faller tilbake til NAT-nettverk.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Dette ser ut som en VHD-fil. Bruk --vhd til å importere en VHD i stedet for en tar.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Kan ikke installere {} fra Microsoft Store: {}
@@ -1122,23 +1151,26 @@ Feilkode: {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>DNS-tunnelering er deaktivert på grunn av et nåværende kompatibilitetsproblem med Global sikker tilgang-klienten.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparsom VHD-støtte er deaktivert på grunn av potensiell dataskade.
 Hvis du vil tvinge en distribusjon til å bruke en sparsom VHD, kan du kjøre:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Kan ikke montere {}. Se dmesg hvis du vil ha mer informasjon.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>Behandling av /etc/fstab med mount -a mislyktes.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Det oppstod en feil under montering av distribusjonsdisken. Den ble montert som skrivebeskyttet.
 Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Kan ikke oversette {}</value>
@@ -1177,28 +1209,35 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Automatisk proxy aktivert</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Gjør det mulig for WSL å bruke HTTP-proxyinformasjon for Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Automatisk proxy aktivert.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gjør det mulig for WSL å bruke HTTP-proxyinformasjon for Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>Bruk beste forsøk på DNS-analyse</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Gjelder bare når wsl2.dnsTunneling er satt til sann. Når satt til sann, trekker Windows ut spørsmålet fra DNS-forespørselen og prøver å løse det, og de ukjente postene ignoreres.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Bruk DNS-analyse med beste innsats.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gjelder bare når wsl2.dnsTunneling er satt til sann. Når satt til sann, trekker Windows ut spørsmålet fra DNS-forespørselen og prøver å løse det, og de ukjente postene ignoreres.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Egendefinert kjerne</value>
@@ -1220,6 +1259,7 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>En absolutt Windows-bane til modul-VHD for en egendefinert Linux-kjerne.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Bla gjennom kjernemoduler</value>
@@ -1229,6 +1269,7 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>En absolutt Windows-bane til modul-VHD for en egendefinert Linux-kjerne.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Egendefinert systemdeaktivering</value>
@@ -1238,7 +1279,7 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Angi en bane til en VHD som lastes inn som en egendefinert systemdeaktivering, først og fremst brukt til å drive GUI-apper i WSL. [Mer informasjon om systemdespsjoner her].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1249,6 +1290,7 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Angi en bane til en VHD som lastes inn som en egendefinert systemdistro, hovedsakelig brukt til å drive GUI-apper i WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Aktiver feilsøkingskonsoll</value>
@@ -1264,18 +1306,22 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>Standard VHD-størrelse</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Standard maksimal størrelse for den utvidbare virtuelle WSL-harddisken (VHD) bare for nyopprettede distribusjoner.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Tilbakestill størrelse</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Standard VHD-størrelse</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Standard maksimal størrelse, angitt i megabyte, bare for den utvidbare virtuelle WSL-harddisken (VHD) for nylig opprettede distribusjoner.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Utvikler</value>
@@ -1295,28 +1341,35 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS-proxy aktivert</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Gjelder bare når wsl2.networkingMode er satt til NAT. Boolsk for å informere WSL om å konfigurere DNS-serveren i Linux til NAT på verten. Hvis du setter til Usann, speiler dette DNS-servere fra Windows til Linux.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-proxy aktivert.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gjelder bare når wsl2.networkingMode er satt til NAT. Boolean for å informere WSL om å konfigurere DNS-serveren i Linux til NAT på verten. Hvis du setter til Usann, speiler dette DNS-servere fra Windows til Linux.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS-tunnelering aktivert</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>Endrer hvordan DNS-forespørsler er proxy fra WSL til Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-tunnelering aktivert.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Endrer hvordan DNS-forespørsler er proxy fra WSL til Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Filsystem</value>
@@ -1392,19 +1445,22 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Første tidsavbrudd for automatisk proxy</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Gjelder bare når wsl2.autoProxy er satt til sann. Konfigurerer hvor lenge (i millisekunder) WSL skal vente på henting av HTTP-proxyinformasjon når du starter en WSL-beholder. Hvis proxy-innstillingene løses etter dette tidspunktet, må WSL-forekomsten startes på nytt for å bruke de hentede proxy-innstillingene.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Tilbakestill tidsavbrudd</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Første tidsavbrudd for automatisk proxy</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gjelder bare når wsl2.autoProxy er satt til sann. Konfigurerer hvor lenge WSL i millisekunder venter på å hente HTTP-proxyinformasjon når en WSL-beholder startes. Hvis proxy-innstillingene løses etter dette tidspunktet, må WSL-forekomsten startes på nytt for å bruke de hentede proxy-innstillingene.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Kjernekommandolinje</value>
@@ -1580,6 +1636,7 @@ Noen av fordelene med å bruke Docker Desktop med WSL er:
 • Du kan kjøpe Docker-kommandoer i WSL eller i Windows med samme Docker-daemon og -bilder.
 • Du kan dele filer og mapper mellom Windows og Linux sømløst med automatisk montering av Windows-stasjoner i WSL.
 • Du kan bruke dine foretrukne Windows-verktøy og -redigeringsprogrammer til å jobbe på Linux-kode og -filer og omvendt, takket være interoperabiliteten til WSL.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Desktop-integrasjon</value>
@@ -1747,15 +1804,19 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Aktiver Sikker modus</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Kjør WSL i Sikkermodus som deaktiverer mange funksjoner og er ment å brukes til å gjenopprette distribusjoner som er i ugyldige tilstander.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Aktiver sikkermodus.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Kjør WSL i Sikkermodus som deaktiverer mange funksjoner og er ment å brukes til å gjenopprette distribusjoner som er i ugyldige tilstander.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Om</value>
@@ -1820,45 +1881,58 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>Aktiver sparsommelig VHD som standard</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
     <value>En nyopprettet VHD settes til spredt automatisk når den er aktivert.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Aktiver sparse VHD som standard.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>En nyopprettet VHD settes til spredt automatisk når den er aktivert.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Bytt filplassering</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>En absolutt Windows-bane til den virtuelle harddisken for bytting.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Bla gjennom vekslefiler</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Bytt filplassering</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>En absolutt Windows-bane til den virtuelle harddisken for bytting.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Bytt størrelse</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Hvor mye bytteplass som skal legges til WSL 2 VM, 0 for ingen byttingsfil. Bytt lagring er diskbasert RAM som brukes når minnebehovet overskrider grensen på maskinvareenhet.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Tilbakestill størrelse</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Bytt størrelse</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Hvor mye veksleplass, angitt i megabyte, som skal legges til VM-en for WSL 2. 0 for ingen vekslefil. Vekslelagring er diskbasert RAM som brukes når minnebehovet overskrider grensen på maskinvareenheten.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>Aktiver VirtIO</value>
@@ -1871,6 +1945,7 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Aktiverer montering av 9P-filsystemet fra verten ved hjelp av virtio-transport.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>Tidsavbrudd for inaktiv virtuell maskin</value>
@@ -2462,10 +2537,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Administrer registerlegitimasjon, inkludert pålogging til og fra beholderregistre.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Systemnivåkommandoer</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Administrasjonskommandoer på systemnivå.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Merk et bilde.</value>

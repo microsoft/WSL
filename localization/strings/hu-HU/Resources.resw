@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Linuxos Windows-alrendszer</value>
   </data>
@@ -137,24 +153,27 @@ A WSL2 leállításának és leválasztásának kényszerítéséhez futtassa a 
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>A kötet már csatlakoztatva van a WSL2-ben.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Már van ilyen nevű lemez csatlakoztatva; válassza le a lemezt, vagy válasszon egy új nevet, és próbálkozzon újra.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>A megadott csatlakoztatásnév érvénytelen "/" karaktert tartalmaz. Próbálkozzon újra az érvénytelen karakter nélkül.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>A lemez sikeresen csatlakoztatva a következőként: /mnt/wsl/{}.
 Megjegyzés: A hely eltérő lesz, ha módosította az automount.root beállítást az /etc/wsl.conf fájlban.
 A lemez csatlakoztatásának bontásához és leválasztásához futtassa a 'wsl.exe {} {}' parancsot.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>A lemez csatlakoztatva van, de nem sikerült csatlakoztatni: {}.
 További részletekért futtassa a "dmesg" parancsot a WSL2-ben.
 A lemez leválasztásához futtassa a wsl.exe {} {} parancsot.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Az alábbi lista az érvényes, telepíthető disztribúciókat tartalmazza.
@@ -177,6 +196,7 @@ Telepítés a wsl.exe {} &lt;Distro&gt; használatával.
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>A lemez csatlakoztatásához rendszergazdai hozzáférés szükséges.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>A disztribúció exportálása nem sikerült.</value>
@@ -302,8 +322,8 @@ További információért látogasson el ide: https://aka.ms/enablevirtualizatio
     <value>Túl sok virtuális merevlemez vagy fizikai lemez van csatlakoztatva.</value>
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
-    <value>A virtuális merevlemez már csatlakoztatva van a következővel: wsl.exe --mount, Kérjük, az indítás előtt válassza le a lemezt.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>VHD already mounted via wsl.exe --mount, please unmount the disk before launching.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>A jelenlegi gépkonfiguráció nem támogatja a WSL1-et.
@@ -602,7 +622,7 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL-verzió: {}
@@ -625,8 +645,8 @@ Létrehozás időpontja: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>A(z) {} helyen lévő egyéni kernelmodulok virtuális merevlemeze nem található: „{}”.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The custom kernel modules VHD in {} was not found: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>A(z) {} helyen megadott egyéni rendszerterjesztés nem található vagy nem megfelelő formátumú.</value>
@@ -687,7 +707,7 @@ Argumentumok:
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>az ARM64-wsl.exe --mount a Windows 27653-es vagy újabb verzióját igényli.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Az Linuxos Windows-alrendszer legújabb verziója már telepítve van.</value>
@@ -822,6 +842,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Örökölt disztribúciós regisztráció használata. Fontolja meg inkább tar-alapú disztribúció használatát.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Az örökölt terjesztési regisztrációk nem támogatják a --version argumentumot.</value>
@@ -853,7 +874,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Nem sikerült létrehozni a felcserélési lemezt itt: {}: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Nem sikerült létrehozni a(z) {} lemezt: {}</value>
@@ -872,6 +893,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>CSÖKKENTETT MÓD ENGEDÉLYEZVE – számos funkció le lesz tiltva</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>A tükrözött hálózati mód nem támogatott: {}.
@@ -894,24 +916,30 @@ Visszaállás NAT-hálózatkezelésre.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>A DNS-alagút nem támogatott</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>A wsl2.localhostForwarding beállításnak nincs hatása tükrözött hálózati mód használatakor</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>A rendszer HTTP-proxymódosítást észlelt a gazdagépen. A módosítás alkalmazásához indítsa újra a WSL-t.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>A rendszer localhost-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A NAT módban futó WSL nem támogatja a localhost proxykat.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>A rendszer egy IPv6-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A WSL NAT-módban nem támogatja az IPv6 proxyt.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>A rendszer localhost IPv6-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A WSL nem támogatja a localhost IPv6-proxykat.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>Váratlan hiba történt a proxybeállítások feloldása közben. A proxybeállítások nem lettek tükrözve a WSL-be.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Hiba történt a beállításjegyzék elérésekor. Elérési út: {}. Hiba: {}</value>
@@ -954,7 +982,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount műveletet a számítógép-házirend letiltotta.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>A WSL1-et a számítógép-házirend letiltotta.</value>
@@ -1016,8 +1044,8 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>Dokumentumok megtekintése</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>A művelet nem hajtható végre, mert a virtuális merevlemez jelenleg használatban van. A WSL használatának kényszerítése: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>A(z) {} nem érvényes logikai érték, &lt;true|false&gt;</value>
@@ -1025,6 +1053,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>A ritka VHD csak WSL2 esetén támogatott.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>A WSL helyi rendszerként való futtatása nem támogatott.</value>
@@ -1074,7 +1103,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Ez egy VHD-fájlnak tűnik. VHD importálásához használja a --vhd formátumot tar helyett.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Nem sikerült telepíteni a(z) {} alkalmazást a Microsoft Store: {}
@@ -1122,23 +1151,26 @@ Hibakód: {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>A Globális biztonságos hozzáférés ügyféllel kapcsolatos jelenlegi kompatibilitási probléma miatt a DNS-alagútképzés le van tiltva.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>A ritka VHD-támogatás jelenleg le van tiltva az adatok esetleges sérülése miatt.
 Ha egy disztribúciót ritka VHD használatára szeretne kényszeríteni, futtassa a következőt:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>A(z) {} csatlakoztatása nem sikerült. További részletekért tekintse meg a dmesg fájlt.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>A /etc/fstab feldolgozása a mount -a parancs használatával nem sikerült.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Hiba történt a terjesztési lemez csatlakoztatása közben. A lemez tartalékként írásvédettként lett csatlakoztatva.
 Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Nem sikerült lefordítani a következőt: {}</value>
@@ -1177,28 +1209,35 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Automatikus proxy engedélyezve</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Lehetővé teszi a WSL-nek a Windows HTTP-proxyadatainak használatát.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Automatikus proxy engedélyezve.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Lehetővé teszi a WSL-nek a Windows HTTP-proxyadatainak használatát.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>A lehető legjobb DNS-elemzést használja</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.dnsTunneling értéke true. Ha igaz értékre van állítva, a Windows kinyeri a kérdést a DNS-kérelemből, és megkísérli a megoldását, figyelmen kívül hagyva az ismeretlen rekordokat.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>A lehető legjobb DNS-elemzést használja.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.dnsTunneling értéke true. Ha igaz értékre van állítva, a Windows kinyeri a kérdést a DNS-kérelemből, és megkísérli a megoldását, figyelmen kívül hagyva az ismeretlen rekordokat.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Egyéni kernel</value>
@@ -1219,7 +1258,8 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
     <value>Egyedi kernelmodulok</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
-    <value>Egyéni Linux-kernel modulok virtuális merevlemezének abszolút Windows-elérési útja.</value>
+    <value>An absolute Windows path to a custom Linux kernel modules VHD.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Kernelmodulok böngészése</value>
@@ -1228,7 +1268,8 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
     <value>Egyedi kernelmodulok</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Egyéni Linux-kernel modulok virtuális merevlemezének abszolút Windows-elérési útja.</value>
+    <value>An absolute Windows path to a custom Linux kernel modules VHD.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Egyéni rendszer disztribúciója</value>
@@ -1238,7 +1279,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak. [További információ a rendszer disztribúcióiról itt].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1249,6 +1290,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Hibakeresési konzol engedélyezése</value>
@@ -1264,18 +1306,22 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>Alapértelmezett VHD-méret</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>A bővíthető WSL virtuális merevlemez (VHD) alapértelmezett maximális mérete csak az újonnan létrehozott disztribúciókhoz.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Méret visszaállítása</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Alapértelmezett VHD-méret</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>A bővíthető WSL virtuális merevlemez (VHD) alapértelmezett megabájtban mért maximális mérete csak az újonnan létrehozott disztribúciókhoz.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Fejlesztő</value>
@@ -1295,28 +1341,35 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS proxy engedélyezve</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.networkingMode NAT értékre van beállítva. Logikai érték, amely tájékoztatja a WSL-t, hogy konfigurálja a DNS-kiszolgálót Linux rendszeren a gazdagép NAT-jára. A false értékre állítás a DNS-kiszolgálókat Windowsról Linuxra tükrözi.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS proxy engedélyezve.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.networkingMode NAT értékre van beállítva. Logikai érték, amely tájékoztatja a WSL-t, hogy konfigurálja a DNS-kiszolgálót Linux rendszeren a gazdagép NAT-jára. A false értékre állítás a DNS-kiszolgálókat Windowsról Linuxra tükrözi.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS-alagútkezelés engedélyezve</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>A DNS-kérések WSL-ről Windowsra történő proxyzása szerint változik.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-alagútkezelés engedélyezve.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>A DNS-kérések WSL-ről Windowsra történő proxyzása szerint változik.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Fájlrendszer</value>
@@ -1392,19 +1445,22 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Kezdeti automatikus proxy időtúllépése</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.autoProxy igaz értékre van állítva. Konfigurálja, hogy a WSL mennyi ideig (ezredmásodpercben) várja meg a HTTP-proxyadatok lekérését a WSL-tároló indításakor. Ha ezt követően feloldja a proxybeállításokat, a WSL-példányt újra kell indítani a lekért proxybeállítások használatához.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Kezdeti automatikus proxy időtúllépése</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Csak akkor alkalmazható, ha a wsl2.autoProxy igaz értékre van állítva. Konfigurálja, hogy a WSL mennyi ideig (ezredmásodpercben) várja meg a HTTP-proxyadatok lekérését a WSL-tároló indításakor. Ha ezt követően feloldja a proxybeállításokat, a WSL-példányt újra kell indítani a lekért proxybeállítások használatához.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Kernel parancssora</value>
@@ -1580,6 +1636,7 @@ A Docker Desktop WSL-lel való használatának néhány előnye:
 • Docker-parancsokat futtathat WSL-ben vagy Windowsban, ugyanazzal a Docker-démonnal és lemezképekkel.
 • A windowsos meghajtók WSL-beli automatikus csatlakoztatásával zökkenőmentesen oszthat meg fájlokat és mappákat Windows és Linux között.
 • A WSL együttműködési képességének köszönhetően a kívánt Windows-eszközökkel és -szerkesztőkkel dolgozhat Linux-kódon és -fájlokon, vagy fordítva.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Desktop-integráció</value>
@@ -1747,15 +1804,19 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Csökkentett mód engedélyezése</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Futtatja a WSL-t csökkentett módban, amely számos funkciót letilt, és a rossz állapotú disztribúciók helyreállítására szolgál.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Csökkentett mód engedélyezése.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Futtatja a WSL-t csökkentett módban, amely számos funkciót letilt, és a rossz állapotú disztribúciók helyreállítására szolgál.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Névjegy</value>
@@ -1820,45 +1881,58 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>Ritka VHD engedélyezése alapértelmezés szerint</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Az újonnan létrehozott virtuális merevlemezek automatikus ritkításra lesznek beállítva, ha engedélyezve vannak.</value>
+    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Ritka VHD engedélyezése alapértelmezés szerint.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Az újonnan létrehozott virtuális merevlemezek automatikus ritkításra lesznek beállítva, ha engedélyezve vannak.</value>
+    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Fájl helyének felcserélése</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>A virtuális merevlemez felcserélésére szolgáló abszolút Windows-elérési út.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Tallózás a felcserélési fájlok között</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Fájl helyének felcserélése</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>A virtuális merevlemez felcserélésére szolgáló abszolút Windows-elérési út.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Felcserélési méret</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Mennyi lapozóterületet kell hozzáadni a WSL 2 virtuális géphez, 0-t a felcserélés nélküli fájlhoz. A felcserélési tároló lemezalapú RAM, amit akkor használ a rendszer ha a memóriaigény meghaladja a hardvereszközökre vonatkozó korlátot.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Méret visszaállítása</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Felcserélési méret</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>A WSL 2 virtuális géphez hozzáadandó lapozótár megabájtban megadva. 0 a felcserélés nélküli fájlhoz. A felcserélési tároló lemezalapú RAM, amit akkor használ a rendszer ha a memóriaigény meghaladja a hardvereszközökre vonatkozó korlátot.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>VirtIO engedélyezése</value>
@@ -1871,6 +1945,7 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Engedélyezi a 9P-fájlrendszer csatlakoztatását a gazdagépről a virtio átvitellel.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>Virtuális gép üresjárati időkorlátja</value>
@@ -2462,10 +2537,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>A beállításjegyzék hitelesítő adatainak kezelése, beleértve a tárolóregisztrációs adatbázisokba való bejelentkezést és a tárolóregisztrációs adatbázisokból való kijelentkezéseket.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Rendszerszintű parancsok</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Rendszerszintű felügyeleti parancsok.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Kép címkézése.</value>

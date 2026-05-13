@@ -245,6 +245,8 @@ Abstract:
 
 #define LX_INIT_WSL_USER_GENERATOR "wsl-user-generator"
 
+#define LX_INIT_WSL_INIT_WATCHER "init-watcher"
+
 //
 // WSL2-specific environment variables.
 //

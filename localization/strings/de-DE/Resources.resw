@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Windows-Subsystem für Linux</value>
   </data>
@@ -137,24 +153,27 @@ Führen Sie "wsl.exe {}" aus, um das Beenden und Trennen des Datenträgers durch
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Das Volume ist bereits innerhalb von WSL2 bereitgestellt.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Ein Datenträger mit diesem Namen ist bereits bereitgestellt. Heben Sie die Bereitstellung des Datenträgers auf, oder wählen Sie einen neuen Namen aus, und versuchen Sie es nochmal.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Der angegebene Bereitstellungsname enthält ein ungültiges "/"-Zeichen. Wiederholen Sie den Vorgang ohne das ungültige Zeichen.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Der Datenträger wurde erfolgreich als "/mnt/wsl/{}" bereitgestellt.
 Hinweis: Der Speicherort ist anders, wenn Sie die Einstellung "automount.root" in "/etc/wsl.conf" geändert haben.
 Um die Bereitstellung des Datenträgers aufzuheben und zu trennen, führen Sie "wsl.exe {} {}" aus.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Der Datenträger wurde angefügt, konnte aber nicht eingebunden werden: {}.
 Führen Sie "dmesg" in WSL2 aus, um weitere Informationen zu erhalten.
 Führen Sie "wsl.exe {} {}" aus, um den Datenträger zu trennen.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Im Folgenden finden Sie eine Liste gültiger Distributionen, die installiert werden können.
@@ -177,6 +196,7 @@ Mit "wsl.exe {} &lt;Distro&gt;" installieren.
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Zum Bereitstellen eines Datenträgers ist Administratorzugriff erforderlich.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Fehler beim Exportieren der Distribution.</value>
@@ -309,7 +329,7 @@ Weitere Informationen finden Sie unter https://aka.ms/enablevirtualization</valu
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>Die VHD wurde bereits über wsl.exe --mount, bereitgestellt. Heben Sie die Bereitstellung des Datenträgers vor dem Start auf.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1 wird mit Ihrer aktuellen Computer-Konfiguration nicht unterstützt.
@@ -608,7 +628,7 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL-Version: {}
@@ -632,7 +652,7 @@ Buildzeit: {}</value>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
     <value>Die benutzerdefinierte Kernelmodule-VHD in {} wurde nicht gefunden: „{}“.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>Die in {} angegebene benutzerdefinierte Systemdistribution wurde nicht gefunden oder weist nicht das richtige Format auf.</value>
@@ -693,7 +713,7 @@ Argumente:
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount auf ARM64 erfordert Windows 27653 oder höher.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Die neueste Version von Windows-Subsystem für Linux ist bereits installiert.</value>
@@ -827,7 +847,8 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>Es wird die Legacy-Verteilungsregistrierung verwendet. Erwägen Sie, stattdessen eine TAR-basierte Distribution zu verwenden.</value>
+    <value>Using legacy distribution registration. Consider using a tar based distribution instead.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Ältere Distributionsregistrierungen unterstützen das Argument --version nicht.</value>
@@ -859,7 +880,7 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Fehler beim Erstellen des Austauschdatenträgers in "{}": {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Fehler beim Erstellen des Datenträgers „{}“: {}</value>
@@ -878,6 +899,7 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>ABGESICHERTER MODUS AKTIVIERT – viele Features werden deaktiviert</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Der gespiegelte Netzwerkmodus wird nicht unterstützt: {}.
@@ -900,24 +922,30 @@ Fallback auf NAT-Netzwerk.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>DNS-Tunneln wird nicht unterstützt</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Die Einstellung "wsl2.localhostForwarding" hat keine Auswirkungen, wenn der gespiegelte Netzwerkmodus verwendet wird.</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>Auf dem Host wurde eine Http-Proxy-Änderung erkannt. Bitte starten Sie WSL neu, um die Änderung anzuwenden.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>Eine Localhost-Proxykonfiguration wurde erkannt, aber nicht in WSL gespiegelt. WSL im NAT-Modus unterstützt keine Localhost-Proxys.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>Eine IPv6-Proxykonfiguration wurde erkannt, aber nicht in WSL gespiegelt. WSL im NAT-Modus unterstützt IPv6 nicht.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>Eine Localhost-IPv6-Proxykonfiguration wurde erkannt, aber nicht in WSL gespiegelt. WSL unterstützt keine Localhost-IPv6-Proxys.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>Ein unerwarteter Fehler ist beim Auflösen der Proxyeinstellungen aufgetreten. Die Proxyeinstellungen wurden nicht in WSL gespiegelt.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Fehler beim Zugriff auf die Registrierung. Pfad: '{}'. Fehler: {}</value>
@@ -960,7 +988,7 @@ Fallback auf NAT-Netzwerk.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount ist durch die Computerrichtlinie deaktiviert.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 ist durch die Computerrichtlinie deaktiviert.</value>
@@ -1023,7 +1051,7 @@ Fallback auf NAT-Netzwerk.</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHD zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} ist kein gültiger boolescher Wert, &lt;true|false&gt;</value>
@@ -1031,6 +1059,7 @@ Fallback auf NAT-Netzwerk.</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>VHD mit geringer Dichte wird nur unter WSL2 unterstützt.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Das Ausführen von WSL als lokales System wird nicht unterstützt.</value>
@@ -1080,7 +1109,7 @@ Fallback auf NAT-Netzwerk.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Dies sieht wie eine VHD-Datei aus. Verwenden Sie „--vhd “, um eine VHD anstelle eines „tar“ zu importieren.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Fehler beim Installieren von {} aus dem Microsoft Store: {}
@@ -1128,23 +1157,26 @@ Fehlercode: {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Aufgrund eines aktuellen Kompatibilitätsproblems mit dem globalen Client für sicheren Zugriff ist DNS-Tunneling deaktiviert.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Die Unterstützung von Sparse VHD ist derzeit wegen möglicher Datenbeschädigung deaktiviert.
 Um eine Distribution zu zwingen, eine spärliche VHD zu verwenden, führen Sie bitte Folgendes aus:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Fehler beim Bereitstellen von {}. Weitere Informationen finden Sie in der DMESG.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>Fehler beim Verarbeiten von „/etc/fstab“ mit „mount -a“.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Fehler beim Einbinden des Distributionsdatenträgers. Er wurde schreibgeschützt als Fallback bereitgestellt.
 Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Fehler beim Übersetzen von „{}“</value>
@@ -1183,28 +1215,35 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Automatischer Proxy aktiviert</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Ermöglicht WSL die Verwendung der HTTP-Proxyinformationen von Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Automatischer Proxy aktiviert.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Ermöglicht WSL die Verwendung der HTTP-Proxyinformationen von Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>Bestmögliche DNS-Analyse verwenden</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.dnsTunneling“ auf „TRUE“ festgelegt ist. Wenn diese Option auf „TRUE“ festgelegt ist, extrahiert Windows die Frage aus der DNS-Anfrage und versucht, sie aufzulösen, wobei die unbekannten Einträge ignoriert werden.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Bestmögliche DNS-Analyse verwenden.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.dnsTunneling“ auf „TRUE“ festgelegt ist. Wenn diese Option auf „TRUE“ festgelegt ist, extrahiert Windows die Frage aus der DNS-Anfrage und versucht, sie aufzulösen, wobei die unbekannten Einträge ignoriert werden.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Benutzerdefinierter Kernel</value>
@@ -1226,6 +1265,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>Ein absoluter Windows-Pfad zu einer benutzerdefinierten VHD mit Linux-Kernelmodulen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Kernelmodule durchsuchen</value>
@@ -1235,6 +1275,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Ein absoluter Windows-Pfad zu einer benutzerdefinierten VHD mit Linux-Kernelmodulen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Benutzerdefinierte Systemverteiler</value>
@@ -1244,7 +1285,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Geben Sie einen Pfad zu einer VHD an, die als benutzerdefinierte Systemdistribution geladen wird, die in erster Linie zum Betrieb von GUI-Anwendungen in der WSL verwendet wird. [Weitere Informationen zu Systemverteilern finden Sie hier].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1255,6 +1296,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Geben Sie einen Pfad zu einer VHD an, die als benutzerdefinierte Systemdistribution geladen wird, die hauptsächlich zum Betreiben von GUI-Apps in WSL verwendet wird.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Aktivieren der Debugkonsole</value>
@@ -1270,18 +1312,22 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>VHD-Standardgröße</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Die maximale Standardgröße für die erweiterbare virtuelle WSL-Festplatte (VHD) nur für neu erstellte Distributionen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Größe zurücksetzen</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>VHD-Standardgröße</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Die standardmäßige maximale Größe (in MB) für die erweiterbare virtuelle WSL-Festplatte (VHD) nur für neu erstellte Distributionen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Entwickler</value>
@@ -1301,28 +1347,35 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS-Proxy aktiviert</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.networkingMode“ auf NAT festgelegt ist. Boolescher Wert, um WSL über die Konfiguration des DNS-Servers in Linux für die NAT auf dem Host zu informieren. Die Einstellung „FALSE“ spiegelt DNS-Server von Windows auf Linux.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-Proxy aktiviert.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.networkingMode“ auf NAT festgelegt ist. Boolescher Wert, um WSL über die Konfiguration des DNS-Servers in Linux für die NAT auf dem Host zu informieren. Die Einstellung „FALSE“ spiegelt DNS-Server von Windows auf Linux.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS-Tunneling aktiviert</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>Ändert, wie DNS-Anforderungen von WSL an Windows übermittelt werden.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-Tunneling aktiviert.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Ändert, wie DNS-Anforderungen von WSL an Windows übermittelt werden.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Dateisystem</value>
@@ -1398,19 +1451,22 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Timeout für den anfänglichen automatischen Proxy</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.autoProxy“ auf „TRUE“ festgelegt ist. Konfiguriert, wie lange (in Millisekunden) WSL beim Starten eines WSL-Containers auf das Abrufen von HTTP-Proxyinformationen wartet. Wenn die Proxyeinstellungen nach dieser Zeit aufgelöst werden, muss die WSL-Instanz neu gestartet werden, um die abgerufenen Proxy-Einstellungen zu verwenden.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Timeout zurücksetzen</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Timeout für den anfänglichen automatischen Proxy</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Gilt nur, wenn „wsl2.autoProxy“ auf „TRUE“ festgelegt ist. Konfiguriert, wie lange (in Millisekunden) WSL beim Starten eines WSL-Containers auf das Abrufen von HTTP-Proxyinformationen wartet. Wenn die Proxyeinstellungen nach dieser Zeit aufgelöst werden, muss die WSL-Instanz neu gestartet werden, um die abgerufenen Proxy-Einstellungen zu verwenden.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Kernelbefehlszeile</value>
@@ -1586,6 +1642,7 @@ Einige der Vorteile der Verwendung von Docker Desktop mit WSL sind:
 • Sie können Docker-Befehle in WSL oder unter Windows ausführen, indem Sie den gleichen Docker-Daemon und die gleichen Images verwenden.
 • Sie können Dateien und Ordner nahtlos zwischen Windows und Linux freigeben, indem Sie die automatische Einbindung von Windows-Laufwerken in WSL verwenden.
 • Dank der Interoperabilität von WSL können Sie Ihre bevorzugten Windows-Tools und -Editoren verwenden, um an Linux-Code und -Dateien zu arbeiten und umgekehrt.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker-Desktopintegration</value>
@@ -1753,15 +1810,19 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Aktivieren des abgesicherten Modus</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Distributionen gedacht.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Aktivieren des abgesicherten Modus.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Distributionen gedacht.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Info</value>
@@ -1826,45 +1887,58 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>Sparse VHD standardmäßig aktivieren</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
     <value>Jede neu erstellte VHD wird automatisch auf „geringe Dichte“ festgelegt, wenn sie aktiviert ist.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Sparse VHD wird standardmäßig aktiviert.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Jede neu erstellte VHD wird automatisch auf „geringe Dichte“ festgelegt, wenn sie aktiviert ist.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Speicherort der Auslagerungsdatei</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>Ein absoluter Windows-Pfad zur virtuellen Auslagerungsfestplatte.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Auslagerungsdateien durchsuchen</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Speicherort der Auslagerungsdatei</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Ein absoluter Windows-Pfad zur virtuellen Auslagerungsfestplatte.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Swap-Größe</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Gibt an, wie viel Auslagerungsspeicherplatz der VM WSL 2 hinzugefügt werden soll, 0 für keine Auslagerungsdatei. Der Auslagerungsspeicher ist datenträgerbasierter RAM, der verwendet wird, wenn der Arbeitsspeicherbedarf das Limit auf dem Hardwaregerät überschreitet.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Größe zurücksetzen</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Swap-Größe</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Wie viel Auslagerungsspeicher in Megabyte der WSL 2-VM hinzugefügt werden soll. 0 für keine Auslagerungsdatei. Der Auslagerungsspeicher ist datenträgerbasierter RAM, der verwendet wird, wenn der Arbeitsspeicherbedarf das Limit auf dem Hardwaregerät überschreitet.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>Aktivieren von VirtIO</value>
@@ -1877,6 +1951,7 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Aktiviert die Einbindung des 9P-Dateisystems vom Host über den Virtio-Transport.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>VM-Leerlauftimeout</value>
