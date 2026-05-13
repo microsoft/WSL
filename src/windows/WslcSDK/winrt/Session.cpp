@@ -17,11 +17,11 @@ Abstract:
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-winrt::Microsoft::WSL::Containers::Session Session::Create(winrt::Microsoft::WSL::Containers::SessionSettings const& settings)
+Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings)
 {
     throw hresult_not_implemented();
 }
-winrt::Microsoft::WSL::Containers::Session Session::Start()
+void Session::Start()
 {
     throw hresult_not_implemented();
 }

@@ -17,7 +17,7 @@ Abstract:
 #include "Microsoft.WSL.Containers.Process.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-winrt::Microsoft::WSL::Containers::Process Process::Start()
+void Process::Start()
 {
     throw hresult_not_implemented();
 }

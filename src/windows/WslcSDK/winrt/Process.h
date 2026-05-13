@@ -20,7 +20,7 @@ struct Process : ProcessT<Process>
 {
     Process() = default;
 
-    winrt::Microsoft::WSL::Containers::Process Start();
+    void Start();
     uint32_t Pid();
     winrt::Microsoft::WSL::Containers::ProcessState State();
     int32_t ExitCode();

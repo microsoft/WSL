@@ -51,7 +51,7 @@ namespace Microsoft.WSL.Containers
         void Start();
         void Terminate();
 
-        Container Createontainer(ContainerSettings containerSettings);
+        Container CreateContainer(ContainerSettings containerSettings);
 
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
         // TODO: Explore additional overloads for other types of input streams

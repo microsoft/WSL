@@ -19,9 +19,9 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Session : SessionT<Session>
 {
     Session() = default;
+    Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings);
 
-    static winrt::Microsoft::WSL::Containers::Session Create(winrt::Microsoft::WSL::Containers::SessionSettings const& settings);
-    winrt::Microsoft::WSL::Containers::Session Start();
+    void Start();
     void Terminate();
     winrt::Microsoft::WSL::Containers::Container CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PullImageAsync(
