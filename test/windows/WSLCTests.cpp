@@ -47,20 +47,6 @@ class WSLCTests
     wil::com_ptr<IWSLCSession> m_defaultSession;
     static inline auto c_testSessionName = L"wslc-test";
 
-    void LoadTestImage(std::string_view imageName, IWSLCSession* session = nullptr)
-    {
-        std::filesystem::path imagePath = GetTestImagePath(imageName);
-        wil::unique_hfile imageFile{
-            CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(!imageFile);
-
-        LARGE_INTEGER fileSize{};
-        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-
-        THROW_IF_FAILED(
-            (session ? session : m_defaultSession.get())->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
-    }
-
     TEST_CLASS_SETUP(TestClassSetup)
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
@@ -80,27 +66,27 @@ class WSLCTests
 
         if (!hasImage("debian:latest"))
         {
-            LoadTestImage("debian:latest");
+            LoadTestImage(*m_defaultSession, "debian:latest");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            LoadTestImage("python:3.12-alpine");
+            LoadTestImage(*m_defaultSession, "python:3.12-alpine");
         }
 
         if (!hasImage("hello-world:latest"))
         {
-            LoadTestImage("hello-world:latest");
+            LoadTestImage(*m_defaultSession, "hello-world:latest");
         }
 
         if (!hasImage("alpine:latest"))
         {
-            LoadTestImage("alpine:latest");
+            LoadTestImage(*m_defaultSession, "alpine:latest");
         }
 
         if (!hasImage("wslc-registry:latest"))
         {
-            LoadTestImage("wslc-registry:latest");
+            LoadTestImage(*m_defaultSession, "wslc-registry:latest");
         }
 
         PruneResult result;
@@ -973,7 +959,7 @@ class WSLCTests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage("alpine:latest");
+            LoadTestImage(*m_defaultSession, "alpine:latest");
             WSLCTagImageOptions tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";
@@ -1257,7 +1243,7 @@ class WSLCTests
     WSLC_TEST_METHOD(DeleteImage)
     {
         // Prepare alpine image to delete.
-        LoadTestImage("alpine:latest");
+        LoadTestImage(*m_defaultSession, "alpine:latest");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
@@ -8551,12 +8537,12 @@ class WSLCTests
         // Helper to create a dangling image using only test-local tags:
         // Load alpine and hello-world under unique tags, then overwrite one with the other.
         auto createDanglingImage = [this]() {
-            LoadTestImage("alpine:latest");
+            LoadTestImage(*m_defaultSession, "alpine:latest");
             WSLCTagImageOptions tagA{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagA));
             DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
 
-            LoadTestImage("hello-world:latest");
+            LoadTestImage(*m_defaultSession, "hello-world:latest");
             WSLCTagImageOptions tagB{.Image = "hello-world:latest", .Repo = "prune-test-b", .Tag = "v1"};
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagB));
             DeleteImage("hello-world:latest", WSLCDeleteImageFlagsNone);
@@ -8629,7 +8615,7 @@ class WSLCTests
 
         // Validate null Options uses defaults (dangling-only prune).
         {
-            LoadTestImage("alpine:latest");
+            LoadTestImage(*m_defaultSession, "alpine:latest");
             WSLCTagImageOptions renameOptions{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&renameOptions));
             DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
@@ -8766,7 +8752,7 @@ class WSLCTests
             auto revert = wil::impersonate_token(nonElevatedToken.get());
 
             nonElevatedSession = CreateSession(GetDefaultSessionSettings(L"non-elevated-session"), WSLCSessionFlagsNone);
-            LoadTestImage("debian:latest", nonElevatedSession.get());
+            LoadTestImage(*nonElevatedSession, "debian:latest");
 
             WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
             auto container = launcher.Launch(*nonElevatedSession);

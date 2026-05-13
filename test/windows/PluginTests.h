@@ -40,7 +40,8 @@ enum class PluginTestType
     GetUsername,
     WslcSuccess,
     WslcSessionRejected,
-    WslcContainerRejected
+    WslcContainerRejected,
+    WslcImagePull
 };
 
 constexpr auto c_testType = L"TestType";

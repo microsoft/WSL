@@ -2899,6 +2899,19 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     return result;
 }
 
+void LoadTestImage(IWSLCSession& session, std::string_view imageName)
+{
+    std::filesystem::path imagePath = GetTestImagePath(imageName);
+    wil::unique_hfile imageFile{
+        CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!imageFile);
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+}
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
 {
     const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
