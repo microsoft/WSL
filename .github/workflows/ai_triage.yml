@@ -20,8 +20,12 @@ on:
         required: false
         type: boolean
         default: false
-  issues:
-    types: [opened]
+  # Initial rollout is manual-only via workflow_dispatch so maintainers can
+  # vet output quality on real issues before opening the firehose. Once the
+  # comment style and signal-to-noise are validated, uncomment the block
+  # below to trigger automatically on every newly-opened issue.
+  # issues:
+  #   types: [opened]
 
 permissions:
   issues: write
