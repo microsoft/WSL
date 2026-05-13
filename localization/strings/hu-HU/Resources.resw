@@ -473,9 +473,6 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --resize &lt;MemoriaSztring&gt;
                 A disztribúció lemezének átméretezése a megadott méretre.
 
-            --compact
-                Compact the VHDX file of a stopped WSL 2 distribution.
-
     --mount &lt;Lemez&gt;
         Fizikai vagy virtuális lemez hozzárendelése és csatlakoztatása az összes WSL 2-disztribúcióban.
 
@@ -594,8 +591,7 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
-"}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

@@ -479,9 +479,6 @@ Argumentos para administrar Subsistema de Windows para Linux:
             --resize &lt;MemoryString&gt;
                 Cambia el tamaño del disco de la distribución al tamaño especificado.
 
-            --compact
-                Compacta el archivo VHDX de una distribución WSL 2 detenida.
-
     --mount &lt;Disk&gt;
         Conecta y monta un disco físico o virtual en todas las distribuciones de WSL 2.
 
@@ -600,8 +597,7 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
-"}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
