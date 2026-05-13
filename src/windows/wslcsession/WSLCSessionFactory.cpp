@@ -32,7 +32,7 @@ void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& ca
 HRESULT wslc::WSLCSessionFactory::CreateSession(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachine* Vm,
-    _In_opt_ IWSLCPluginNotifier* PluginNotifier,
+    _In_ IWSLCPluginNotifier* PluginNotifier,
     _Out_ IWSLCSession** Session,
     _Out_ IWSLCSessionReference** ServiceRef)
 try
@@ -47,7 +47,7 @@ try
     // One session per process, so when it's destroyed, exit.
     session->SetDestructionCallback(std::move(m_destructionCallback));
 
-    // Initialize the session with the VM and the optional plugin notifier.
+    // Initialize the session with the VM.
     RETURN_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.

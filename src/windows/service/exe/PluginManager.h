@@ -37,6 +37,7 @@ public:
     PluginManager& operator=(PluginManager&&) = delete;
 
     void LoadPlugins();
+    void UnloadPlugins();
     void OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSettings* Settings);
     void OnVmStopping(const WSLSessionInformation* Session) const;
     void OnDistributionStarted(const WSLSessionInformation* Session, const WSLDistributionInformation* distro);

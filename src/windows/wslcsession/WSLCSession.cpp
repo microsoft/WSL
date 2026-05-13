@@ -630,11 +630,6 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
-    if (!m_pluginNotifier || !m_dockerClient.has_value())
-    {
-        return;
-    }
-
     LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
 }
 CATCH_LOG()
@@ -642,11 +637,6 @@ CATCH_LOG()
 void WSLCSession::OnImageDeleted(const std::string& ImageId) noexcept
 try
 {
-    if (!m_pluginNotifier)
-    {
-        return;
-    }
-
     LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(ImageId.c_str()));
 }
 CATCH_LOG()

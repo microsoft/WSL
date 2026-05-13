@@ -226,9 +226,6 @@ private:
     std::atomic<bool> m_terminating{false};
     std::atomic<bool> m_terminated{false};
 
-    // Optional cross-process notifier used to forward plugin-related events
-    // (container started/stopped, image created/deleted) back to the SYSTEM
-    // service's PluginManager. Null when no plugins are loaded.
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // User-provided handles that the session is currently doing IO on.

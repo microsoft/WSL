@@ -258,6 +258,8 @@ void WslService::ServiceStopped()
         LxssClientUninitialize();
     }
 
+    // Unload plugins.
+
     // There is a potential deadlock if CoUninitialize() is called before the LanguageChangeNotifyThread
     // isn't done initializing. Clearing the COM objects before calling CoUninitialize() works around the issue.
     winrt::clear_factory_cache();

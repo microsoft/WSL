@@ -88,8 +88,6 @@ public:
     // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
     wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
 
-    // Returns the global instance used by SYSTEM-side singletons (e.g. PluginManager).
-    // May be null during shutdown.
     static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:

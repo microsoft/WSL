@@ -907,7 +907,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 {
     unique_com_disconnect comWrapper;
 
-    // Notify plugin manager (best-effort) that the container is stopping. Errors are ignored.
+    // Notify plugin manager that the container is stopping. Errors are ignored.
     if (m_state == WslcContainerStateRunning)
     {
         try
