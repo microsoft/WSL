@@ -482,17 +482,8 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
         catch (const wil::ResultException& ex)
         {
-            if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
-            {
-                // If user input bad container input or the container is no longer present this is expected.
-                continue;
-            }
-            else
-            {
-                // Don't fail on unexpected error, but log it.
-                LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
-                continue;
-            }
+            LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
+            throw;
         }
 
         // Calculate CPU %
