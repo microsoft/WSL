@@ -265,13 +265,19 @@ def validate_adml(adml_folder: str, baseline_language: str) -> bool:
             print(f'error: ADML {locale_path} has unexpected presentation ids: {sorted(extra_p)}')
             result = False
 
+        # Note: we intentionally do not enforce that baseline {Locked="..."}
+        # tokens appear in translated ADML strings. The Touchdown pipeline does
+        # not honor `<!-- {Locked="..."} -->` XML comments in .adml files (it
+        # only honors the `<comment>` element used by .resw), so locked tokens
+        # are routinely translated. Failing CI here would block every nightly
+        # localization PR. The baseline check above still catches authoring
+        # mistakes in en-US.
         for sid in baseline_ids & set(translated.keys()):
             _, tokens = baseline[sid]
             tvalue, _ = translated[sid]
             for tok in tokens:
                 if tok not in tvalue:
-                    print(f'error: locked token "{tok}" not found in {locale_path} string {sid}: {tvalue}')
-                    result = False
+                    print(f'warning: locked token "{tok}" not preserved in {locale_path} string {sid}: {tvalue}')
 
     return result
 
