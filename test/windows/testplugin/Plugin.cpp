@@ -503,8 +503,8 @@ try
 {
     auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
 
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
-              << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id
+              << ", name=" << container.Name << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
