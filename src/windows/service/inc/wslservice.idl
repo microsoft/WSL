@@ -39,7 +39,8 @@ typedef enum _LxssDistributionState
     LxssDistributionStateInstalling,
     LxssDistributionStateUninstalling,
     LxssDistributionStateConverting,
-    LxssDistributionStateExporting
+    LxssDistributionStateExporting,
+    LxssDistributionStateCompacting
 } LxssDistributionState;
 
 typedef

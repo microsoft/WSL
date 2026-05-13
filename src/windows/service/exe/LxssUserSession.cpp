@@ -2496,14 +2496,16 @@ _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_CompactionBegin(_In_ GUID DistroGuid)
 {
     _EnsureNotLocked(&DistroGuid);
-    m_compactingDistributions.push_back(DistroGuid);
+    m_lockedDistributions.emplace_back(DistroGuid, LxssDistributionStateCompacting);
 }
 
 _Requires_lock_not_held_(m_instanceLock)
 void LxssUserSessionImpl::_CompactionComplete(_In_ GUID DistroGuid)
 {
     std::lock_guard lock(m_instanceLock);
-    std::erase_if(m_compactingDistributions, [&](const auto& entry) { return (IsEqualGUID(entry, DistroGuid)); });
+    std::erase_if(m_lockedDistributions, [&](const auto& pair) { return (IsEqualGUID(pair.first, DistroGuid)); });
+
+    _VmCheckIdle();
 }
 
 _Requires_exclusive_lock_held_(m_instanceLock)
@@ -3178,13 +3180,9 @@ void LxssUserSessionImpl::_EnsureNotLocked(_In_ LPCGUID DistroGuid, const std::s
         return IsEqualGUID(entry.first, *DistroGuid);
     });
 
-    const auto compacting = std::find_if(m_compactingDistributions.begin(), m_compactingDistributions.end(), [&DistroGuid](const auto& entry) {
-        return IsEqualGUID(entry, *DistroGuid);
-    });
-
     THROW_HR_IF_MSG(
         E_ILLEGAL_STATE_CHANGE,
-        (locked != m_lockedDistributions.end()) || (compacting != m_compactingDistributions.end()),
+        locked != m_lockedDistributions.end(),
         "%hs, %hs:%u",
         location.function_name(),
         location.file_name(),
