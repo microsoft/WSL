@@ -433,10 +433,10 @@ void ProcessAdditionalNetworks(
 
     for (ULONG i = startIndex; i < network.NetworksCount; i++)
     {
-        // NetworkName may arrive as null when the caller passed "" (MIDL marshals empty LPCSTR as null).
-        // Both null and empty fall through to the network lookup, returning WSLC_E_NETWORK_NOT_FOUND.
         const char* rawName = network.Networks[i].NetworkName;
-        const std::string networkName = rawName != nullptr ? rawName : "";
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !rawName || strlen(rawName) == 0);
+
+        const std::string networkName = rawName;
 
         auto [_, inserted] = endpointsConfig.insert({networkName, EmptyObject{}});
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !inserted);
