@@ -660,7 +660,7 @@ class PluginTests
             WSLCProcessGetFd(999): {}
             WSLCProcessGetExitCode(<running>): {}
             WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
-            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/testfile.txt', status=0, stdout: Windows-content, stderr: 
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-test.txt', status=0, stdout: Windows-content, stderr: 
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
             Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}
