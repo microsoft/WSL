@@ -487,8 +487,8 @@ try
         // Validate that trying to escape the /mnt folder fails.
         {
             char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(../escape): "
-                      << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"../escape", mountpoint) << std::endl;
+            g_logfile << "WSLCMountFolder(../escape): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"../escape", mountpoint)
+                      << std::endl;
         }
 
         g_logfile << "Test completed" << std::endl;
