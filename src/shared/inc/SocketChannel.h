@@ -63,21 +63,31 @@ public:
     void SendResultMessage(TResult value);
 
     template <typename TMessage>
-    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveOrClosed(TTimeout timeout = DefaultSocketTimeout);
+    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveOrClosed();
 
     template <typename TMessage>
-    TMessage& Receive(gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout);
+    TMessage& Receive(gsl::span<gsl::byte>* responseSpan = nullptr);
 
 private:
-    Transaction(SocketChannel& channel, uint32_t id) :
-        m_channel(channel), m_id(id), m_step(static_cast<uint32_t>(TRANSACTION_STEP::REQUEST))
+    Transaction(SocketChannel& channel, uint32_t id, TTimeout timeout) :
+        m_channel(channel), m_id(id), m_step(static_cast<uint32_t>(TRANSACTION_STEP::REQUEST)), m_deadline(ComputeDeadline(timeout))
     {
     }
+
+    TTimeout RemainingTimeout() const;
+
+    static std::optional<std::chrono::steady_clock::time_point> ComputeDeadline(TTimeout timeout);
 
     SocketChannel& m_channel;
     uint32_t m_id;
     /** Use uint32_t as step can go beyond FIRST_REPLY */
     uint32_t m_step;
+    std::optional<std::chrono::steady_clock::time_point> m_deadline;
+
+#ifndef WIN32
+    // This is required because the Linux timeout logic requires a pointer. Returning a pointer is OK because only thread can use a transaction at a given time.
+    mutable timeval m_timeoutStorage{};
+#endif
 };
 
 class SocketChannel
@@ -99,7 +109,7 @@ public:
         m_socket = std::move(other.m_socket);
 
 #ifdef WIN32
-        m_exitEvent = std::move(other.m_exitEvent);
+        m_exitEvents = std::move(other.m_exitEvents);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -115,15 +125,27 @@ public:
 
 #ifdef WIN32
 
-    SocketChannel(TSocket&& socket, std::string&& name, HANDLE exitEvent) :
-        m_socket(std::move(socket)), m_exitEvent(exitEvent), m_name(std::move(name))
+    SocketChannel(TSocket&& socket, std::string&& name, std::vector<HANDLE>&& exitEvents) :
+        m_socket(std::move(socket)), m_exitEvents(std::move(exitEvents)), m_name(std::move(name))
     {
+    }
+
+    std::vector<HANDLE> SetExitEvents(std::vector<HANDLE>&& exitEvents)
+    {
+        std::vector<HANDLE> oldEvents;
+        std::swap(oldEvents, m_exitEvents);
+        return oldEvents;
+    }
+
+    const std::vector<HANDLE>& GetExitEvents() const
+    {
+        return m_exitEvents;
     }
 
 #endif
 
     template <typename TMessage>
-    void SendMessage(gsl::span<gsl::byte> span, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0)
+    void SendMessage(gsl::span<gsl::byte> span, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0, TTimeout timeout = DefaultSocketTimeout)
     {
         // Ensure that no other thread is using this channel.
         const std::unique_lock<std::mutex> lock{m_sendMutex, std::try_to_lock};
@@ -161,13 +183,15 @@ public:
 
 #ifdef WIN32
 
-        auto sentBytes = wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+        auto io = CreateIO();
+        io.AddHandle(std::make_unique<windows::common::relay::WriteHandle>(m_socket.get(), span));
+
+        io.Run(TimeoutToMilliseconds(timeout));
 
         WSL_LOG(
             "SentMessage",
             TraceLoggingValue(m_name.c_str(), "Name"),
-            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"),
-            TraceLoggingValue(sentBytes, "SentBytes"));
+            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"));
 
 #else
 
@@ -206,7 +230,7 @@ public:
     }
 
     template <typename TMessage>
-    void SendMessage(TMessage& message, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0)
+    void SendMessage(TMessage& message, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0, TTimeout timeout = DefaultSocketTimeout)
     {
         // Catch situations where the other SendMessage() method should be used
         const auto& header = GetMessageHeader(message);
@@ -220,7 +244,7 @@ public:
 #endif
         }
 
-        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message), transactionStep, transactionId);
+        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message), transactionStep, transactionId, timeout);
     }
 
     template <typename TResult>
@@ -267,7 +291,7 @@ public:
                 m_received_non_transaction_messages++;
             }
 
-            receivedSpan = ReceiveImpl(TMessage::Type, timeout);
+            receivedSpan = ReceiveImpl(timeout);
             if (receivedSpan.empty())
             {
 
@@ -508,24 +532,24 @@ public:
         return *message;
     }
 
-    Transaction StartTransaction()
+    Transaction StartTransaction(TTimeout timeout = DefaultSocketTimeout)
     {
         uint32_t transactionId = m_transaction_id_seed++;
-        return wsl::shared::Transaction(*this, transactionId);
+        return wsl::shared::Transaction(*this, transactionId, timeout);
     }
 
-    Transaction ReceiveTransaction()
+    Transaction ReceiveTransaction(TTimeout timeout = DefaultSocketTimeout)
     {
         // Transaction id should follow the received one on the receive end.
-        return wsl::shared::Transaction(*this, 0);
+        return wsl::shared::Transaction(*this, 0, timeout);
     }
 
     template <typename TSentMessage>
     typename TSentMessage::TResponse& Transaction(gsl::span<gsl::byte> message, gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout)
     {
-        auto transaction = StartTransaction();
-        transaction.Send<TSentMessage>(message);
-        return transaction.Receive<typename TSentMessage::TResponse>(responseSpan, timeout);
+        auto transaction = StartTransaction(timeout);
+        transaction.template Send<TSentMessage>(message);
+        return transaction.template Receive<typename TSentMessage::TResponse>(responseSpan);
     }
 
     template <typename TSentMessage>
@@ -537,12 +561,12 @@ public:
     }
 
     template <typename TSentMessage>
-    TSentMessage::TResponse& Transaction()
+    TSentMessage::TResponse& Transaction(TTimeout timeout = DefaultSocketTimeout)
     {
         TSentMessage message{};
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = TSentMessage::Type;
-        return Transaction<TSentMessage>(message);
+        return Transaction<TSentMessage>(message, nullptr, timeout);
     }
 
     void Close()
@@ -581,15 +605,49 @@ public:
 
 private:
 #ifdef WIN32
-
-    gsl::span<gsl::byte> ReceiveImpl(auto expectedMessage, TTimeout timeout)
+    windows::common::relay::MultiHandleWait CreateIO() const
     {
-        return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, m_exitEvent, timeout);
+        wsl::windows::common::relay::MultiHandleWait io;
+
+        for (const auto event : m_exitEvents)
+        {
+            io.AddHandle(
+                std::make_unique<windows::common::relay::EventHandle>(
+                    event,
+                    [this, event]() { THROW_HR_MSG(E_ABORT, "Exit event 0x%p signaled on channel: %hs", event, m_name.c_str()); }),
+                windows::common::relay::MultiHandleWait::CancelOnCompleted | windows::common::relay::MultiHandleWait::NeedNotComplete);
+        }
+
+        return io;
+    }
+
+    static std::optional<std::chrono::milliseconds> TimeoutToMilliseconds(TTimeout timeout)
+    {
+        if (timeout == INFINITE)
+        {
+            return std::nullopt;
+        }
+
+        return std::chrono::milliseconds{timeout};
+    }
+
+    gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
+    {
+        auto io = CreateIO();
+
+        gsl::span<gsl::byte> message;
+
+        io.AddHandle(std::make_unique<windows::common::relay::ReadSocketMessageHandle>(
+            m_socket.get(), m_buffer, [&message](auto& received) { message = received; }));
+
+        io.Run(TimeoutToMilliseconds(timeout));
+
+        return message;
     }
 
 #else
 
-    gsl::span<gsl::byte> ReceiveImpl(auto expectedMessage, TTimeout timeout)
+    gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
     {
         return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, timeout);
     }
@@ -664,7 +722,7 @@ private:
 
 #ifdef WIN32
 
-    HANDLE m_exitEvent{};
+    std::vector<HANDLE> m_exitEvents;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;
@@ -676,10 +734,52 @@ private:
     std::mutex m_receiveMutex;
 };
 
+inline std::optional<std::chrono::steady_clock::time_point> Transaction::ComputeDeadline(TTimeout timeout)
+{
+#ifdef WIN32
+    if (timeout == INFINITE)
+    {
+        return std::nullopt;
+    }
+
+    return std::chrono::steady_clock::now() + std::chrono::milliseconds{timeout};
+#else
+    if (timeout == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    return std::chrono::steady_clock::now() + std::chrono::seconds{timeout->tv_sec} + std::chrono::microseconds{timeout->tv_usec};
+#endif
+}
+
+inline TTimeout Transaction::RemainingTimeout() const
+{
+    if (!m_deadline.has_value())
+    {
+        return DefaultSocketTimeout;
+    }
+
+#ifdef WIN32
+
+    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
+    return remaining.count() > 0 ? static_cast<DWORD>(remaining.count()) : 0;
+
+#else
+
+    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
+
+    m_timeoutStorage.tv_sec = static_cast<time_t>(remaining.count() / 1000);
+    m_timeoutStorage.tv_usec = static_cast<suseconds_t>((remaining.count() % 1000) * 1000);
+    return &m_timeoutStorage;
+
+#endif
+}
+
 template <typename TMessage>
 void Transaction::Send(gsl::span<gsl::byte> span)
 {
-    m_channel.SendMessage<TMessage>(span, m_step, m_id);
+    m_channel.SendMessage<TMessage>(span, m_step, m_id, RemainingTimeout());
     m_step++;
 }
 
@@ -701,9 +801,9 @@ void Transaction::SendResultMessage(TResult value)
 }
 
 template <typename TMessage>
-std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed(TTimeout timeout)
+std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed()
 {
-    auto result = m_channel.ReceiveMessageOrClosed<TMessage>(timeout, m_step, m_id);
+    auto result = m_channel.ReceiveMessageOrClosed<TMessage>(RemainingTimeout(), m_step, m_id);
     if (m_step == static_cast<uint32_t>(TRANSACTION_STEP::REQUEST) && result.first != nullptr)
     {
         // Use the request's id for the reply side transaction.
@@ -715,9 +815,9 @@ std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed(TTimeout
 }
 
 template <typename TMessage>
-TMessage& Transaction::Receive(gsl::span<gsl::byte>* responseSpan, TTimeout timeout)
+TMessage& Transaction::Receive(gsl::span<gsl::byte>* responseSpan)
 {
-    auto& message = m_channel.ReceiveMessage<TMessage>(responseSpan, timeout, m_step, m_id);
+    auto& message = m_channel.ReceiveMessage<TMessage>(responseSpan, RemainingTimeout(), m_step, m_id);
     if (m_step == static_cast<uint32_t>(TRANSACTION_STEP::REQUEST))
     {
         // Use the request's id for the reply side transaction.

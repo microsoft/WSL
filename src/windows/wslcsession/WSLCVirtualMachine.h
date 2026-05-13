@@ -120,7 +120,7 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings);
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -134,6 +134,7 @@ public:
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
     void OnProcessReleased(int Pid);
+    void OnSessionTerminated();
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
     std::shared_ptr<VmPortAllocation> AllocatePort(int Family, int Protocol);
@@ -223,8 +224,11 @@ private:
     std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
+    HANDLE m_sessionTerminatingEvent{};
 
     wsl::shared::SocketChannel m_initChannel;
+    DWORD m_initChannelTimeout = 30 * 1000;
+
     wil::unique_handle m_portRelayChannelRead;
     wil::unique_handle m_portRelayChannelWrite;
 

@@ -2461,6 +2461,12 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Hantera autentiseringsuppgifter för registret, inklusive in- och utloggning från containerregister.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Kommandon på systemnivå</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Hanteringskommandon på systemnivå.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tagga en bild.</value>
   </data>

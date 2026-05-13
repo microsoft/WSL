@@ -571,7 +571,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     // Connect the new hvsocket.
     wsl::shared::SocketChannel newChannel{
-        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_exitingEvent, m_connectTimeoutMs), "DockerClient", m_exitingEvent};
+        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_exitingEvent, m_connectTimeoutMs), "DockerClient", {m_exitingEvent}};
     lock.reset();
 
     // Connect that socket to the docker unix socket.

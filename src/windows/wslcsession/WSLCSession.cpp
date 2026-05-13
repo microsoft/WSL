@@ -258,7 +258,7 @@ try
         TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
     // Create the VM.
-    m_virtualMachine.emplace(Vm, Settings);
+    m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
@@ -2078,7 +2078,12 @@ HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WS
 
 int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
 {
-    LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGTERM));
+    auto signalResult = Process.Get().Signal(WSLCSignalSIGTERM);
+    if (FAILED(signalResult))
+    {
+        LOG_HR_MSG(signalResult, "Failed to terminate process %i", Process.Get().GetPid());
+        return -1;
+    }
 
     try
     {
@@ -2437,22 +2442,24 @@ try
     }
     else
     {
-        // Stop dockerd first, then containerd (dockerd is a client of containerd).
-        // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-        if (m_dockerdProcess.has_value())
-        {
-            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-            WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-        }
-
-        if (m_containerdProcess.has_value())
-        {
-            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-            WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
-        }
-
         if (m_virtualMachine)
         {
+            m_virtualMachine->OnSessionTerminated();
+
+            // Stop dockerd first, then containerd (dockerd is a client of containerd).
+            // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
+            if (m_dockerdProcess.has_value())
+            {
+                auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+                WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
+            }
+
+            if (m_containerdProcess.has_value())
+            {
+                auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+                WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+            }
+
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
             try
             {

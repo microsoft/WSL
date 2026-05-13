@@ -2615,6 +2615,32 @@ std::string ReadToString(SOCKET Handle)
     return output;
 }
 
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair()
+{
+    wil::unique_socket listenSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!listenSocket);
+
+    sockaddr_in bindAddr{};
+    bindAddr.sin_family = AF_INET;
+    bindAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bindAddr.sin_port = 0;
+    THROW_LAST_ERROR_IF(bind(listenSocket.get(), reinterpret_cast<sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF(listen(listenSocket.get(), 1) == SOCKET_ERROR);
+
+    sockaddr_in boundAddr{};
+    int boundAddrLen = sizeof(boundAddr);
+    THROW_LAST_ERROR_IF(getsockname(listenSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), &boundAddrLen) == SOCKET_ERROR);
+
+    wil::unique_socket clientSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!clientSocket);
+    THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
+
+    wil::unique_socket serverSocket{accept(listenSocket.get(), nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!serverSocket);
+
+    return {std::move(clientSocket), std::move(serverSocket)};
+}
+
 std::string ReadToString(HANDLE Handle)
 {
     std::string output;
@@ -2947,4 +2973,16 @@ void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_
 
     THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
         const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+}
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size)
+{
+    while (size > 0)
+    {
+        auto result = send(Socket, static_cast<const char*>(data), gsl::narrow_cast<int>(size), 0);
+        VERIFY_IS_TRUE(result > 0);
+
+        size -= result;
+        data = static_cast<const char*>(data) + result;
+    }
 }
