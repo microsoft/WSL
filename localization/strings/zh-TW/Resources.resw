@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Windows 子系統 Linux 版</value>
   </data>
@@ -137,24 +153,27 @@
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>該磁碟區已掛接在 WSL2 內。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>已掛接具有該名稱的磁碟; 請卸載磁碟或選擇新名稱，然後再試一次。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>指定的掛接名稱包含不正確 '/' 字元。請不要使用不正確字元再試一次。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>磁碟已成功掛接為 『/mnt/wsl/{}』。
 注意： 如果您在 /etc/wsl.conf 中修改 automount.root 設定，位置會不一樣。
 若要卸除並卸離磁碟，請執行 'wsl.exe {} {}'。</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>磁碟已連結，但無法掛接： {}。
 如需詳細數據，請在 WSL2 內執行 'dmesg'。
 若要中斷連結磁碟，請執行 'wsl.exe {} {}'。</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>下列是可安裝的有效發佈清單。
@@ -177,6 +196,7 @@
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>需要系統管理員存取權才能掛接磁碟。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>匯出發佈失敗。</value>
@@ -309,7 +329,7 @@
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD 已透過 wsl.exe --mount, 掛接，請先卸載磁碟再啟動。</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>您目前的電腦設定不支援 WSL1。
@@ -380,215 +400,215 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. 著作權所有，並保留一切權利。
-如需有關此產品的隱私權資訊，請造訪 https://aka.ms/privacy。
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-使用方式: wsl.exe [Argument] [Options...] [CommandLine]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-用於執行 Linux 二進位檔的引數:
+Arguments for running Linux binaries:
 
-    如果未提供任何命令列，wsl.exe 會啟動預設殼層。.
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        執行指定的命令，而不使用預設的 Linux 殼層。
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        使用提供的殼層類型執行指定的命令。.
+        Execute the specified command with the provided shell type.
 
     --
-      依原樣傳遞其餘的命令列。
+        Pass the remaining command line as-is.
 
-選項:
+Options:
     --cd &lt;Directory&gt;
-        將指定的目錄設定為目前的工作目錄。
-        如果使用 ~，則會使用 Linux 使用者的常用路徑。如果路徑的開頭為
-        / 字元，它則會被解譯為絕對 Linux 路徑。
-        否則，該值必須是絕對 Windows 路徑。
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        執行指定的發佈。
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        執行指定的發佈識別碼。
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        以指定使用者身分執行。
+        Run as the specified user.
 
     --system
-        啟動系統發佈的殼層。
+        Launches a shell for the system distribution.
 
-用於管理 Linux 版 Windows 子系統的引數:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        顯示使用方式資訊。
+        Display usage information.
 
     --debug-shell
-        開啟用於診斷用途的 WSL2 偵錯殼層。
+        Open a WSL2 debug shell for diagnostics purposes.
 
     --install [Distro] [Options...]
-        安裝 Linux 版 Windows 子系統發行版本。
-        如需有效發行版本的清單，請使用 'wsl.exe --list --online'。
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-       選項:
+        Options:
             --enable-wsl1
-                啟用 WSL1 支援。 
+                Enable WSL1 support.
 
             --fixed-vhd
-                建立大小固定的磁碟，以儲存發佈。 
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                從本機檔案安裝發佈。
+                Install a distribution from a local file.
 
             --legacy
-                使用舊版發佈資訊清單。
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                設定發佈的安裝路徑。
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                設定發佈的名稱。
+                Set the name of the distribution.
 
             --no-distribution
-                僅安裝必須的選擇性元件，不安裝發行版本。
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                安裝後請勿啟動發佈。
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                指定要用於新發佈的版本。
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                指定磁碟大小，以儲存發佈。
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                從網際網路下載發佈，而非從 Microsoft Store 下載。
- 
-    --manage &lt;Distro&gt; &lt;Options...&gt; 
-        變更 distro 指定選項。
+                Download the distribution from the internet instead of the Microsoft Store.
 
-        選項:
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Changes distro specific options.
+
+        Options:
             --move &lt;Location&gt;
-                將發佈移動到新位置。
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                設定發佈的預設使用者。
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                將發佈的磁碟大小調整為指定大小。
+                Resize the disk of the distribution to the specified size.
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 發行版本中連結和掛接實體或虛擬磁碟。
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        選項:
-		--vhd
-                指定 &lt;Disk&gt; 參考虛擬硬碟。
+        Options:
+            --vhd
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                將磁碟連結到 WSL2，但不要掛接。
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                使用掛接點的自訂名稱掛接磁碟。
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                掛接磁碟時要使用的檔案系統，如果未指定，則預設為 ext4。
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                其他掛接選項。
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                要掛接之磁碟分割的索引，如果未指定，則預設為整個磁碟。
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        為新的發行版本變更預設安裝版本。
+        Changes the default install version for new distributions.
 
     --shutdown
-        立即終止所有正在執行的發行版本和 WSL 2
-        輕量型公用程式虛擬機器。
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        選項:
+        Options:
             --force
-                結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
- 
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+
     --status
-        顯示 Linux 版 Windows 子系統的狀態。
+        Show the status of Windows Subsystem for Linux.
 
     --unmount [Disk]
-        從所有 WSL2 發行版本卸載並中斷連結磁碟。
-        如果呼叫時沒有引數，則卸載並中斷連結所有磁碟。
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        從此電腦取消安裝 Linux 套件的 Windows 子系統。
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        更新 Linux 版 Windows 子系統套件。
+        Update the Windows Subsystem for Linux package.
 
-        選項:
+        Options:
             --pre-release
-                下載預先發行版本 (如果有提供)。
+                Download a pre-release version if available.
 
     --version, -v
-       顯示版本資訊。
+        Display version information.
 
-用於在 Linux 版 Windows 子系統中管理發行版本的引數:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        將發行版本匯出至 tar 檔案。
-        stdout 的檔案名稱可以是 -。
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        選項: 
+        Options:
             --format &lt;Format&gt;
-                指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        匯入指定的 tar 檔案以做為新發行版本。
-        標準輸出的檔案名稱可以是 -。
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        選項:
+        Options:
             --version &lt;Version&gt;
-                指定要用於新發行版本的版本。
+                Specifies the version to use for the new distribution.
 
             --vhd
-                指定提供的檔案是 .vhd 或 .vhdx 檔案，而不是 tar 檔案。
-                此作業會在指定的安裝位置複製 .vhdx 檔案。
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        匯入指定的 VHD 檔案以做為新發行版本。
-        此虛擬硬碟必須格式化為 ext4 檔案系統類型。
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
-        列出發行版本。
+        Lists distributions.
 
         Options:
             --all
-                列出所有發行版本，包括
-                目前正在安裝或解除安裝的發行版本。
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                僅列出目前正在執行的發行版本。
+                List only distributions that are currently running.
 
             --quiet, -q
-                只顯示發行版本名稱。
+                Only show distribution names.
 
             --verbose, -v
-                顯示所有發行版本的詳細資訊
+                Show detailed information about all distributions.
 
             --online, -o
-                顯示可使用 'wsl.exe --install' 安裝的可用發行版本清單。
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        將發行版本設定為預設值。
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        變更指定發行版本的版本。
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        終止指定的發行版本。
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        取消註冊發行版本並刪除根檔案系統。</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -608,7 +628,7 @@
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL 版本： {}
@@ -632,7 +652,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
     <value>找不到 {} 中的自訂核心模組 VHD：'{}'。</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>找不到 {} 中指定的自定義系統發佈，或其格式不正確。</value>
@@ -693,7 +713,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>ARM64 上的 wsl.exe --mount 需要 Windows 27653 版或更新版本。</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>已安裝最新版的Windows 子系統 Linux 版。</value>
@@ -828,6 +848,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>使用舊版散發註冊。請考慮改用 tar 型發佈。</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>舊版散發註冊不支援 --version 自變數。</value>
@@ -859,7 +880,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>無法在 '{}'： {} 中建立交換磁碟</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>無法建立磁碟 '{}': {}</value>
@@ -878,6 +899,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>安全模式已啟用 - 許多功能將會停用</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>不支援鏡像網路模式： {}。
@@ -900,24 +922,30 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>不支援 DNS 通道</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>使用鏡像網路模式時，wsl2.localhostForwarding 設定沒有作用</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>在主機上偵測到 Http Proxy 變更。請重新開機 WSL 以套用變更。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>偵測到 localhost Proxy 設定，但未鏡像到 WSL。NAT 模式中的 WSL 不支援 localhost Proxy。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>偵測到 IPv6 Proxy 設定，但未鏡像到 WSL。NAT 模式中的 WSL 不支援 IPv6。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>偵測到 localhost IPv6 Proxy 設定，但未鏡像到 WSL。WSL 不支援 localhost IPv6 Proxy。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>嘗試解析 Proxy 設定時發生意外的錯誤，Proxy 設定未鏡像到 WSL。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>存取登錄時發生錯誤。路徑： '{}'。錯誤： {}</value>
@@ -960,7 +988,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount 已由電腦原則停用。</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 已由電腦原則停用。</value>
@@ -1023,7 +1051,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>無法完成作業，因為 VHD 目前正在使用中。若要強制 WSL 停止使用： wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} 不是有效的布林值，&lt;true|false&gt;</value>
@@ -1031,6 +1059,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>只有 WSL2 支援稀疏 VHD。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>系統不支援將 WSL 執行為本機系統。</value>
@@ -1080,7 +1109,7 @@ Windows 版本： {}</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>這看起來像一個 VHD 文件。使用 --vhd 匯入 VHD 而不是 tar。</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>無法從Microsoft Store安裝 {}： {}
@@ -1128,23 +1157,26 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>由於可能會導致資料損毀，目前已停用稀疏 VHD 支援。
 若要強制發行版本以使用稀疏 VHD，請執行:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>無法掛接 {}，如需詳細數據，請參閱 dmesg。</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>處理掛載 -a 的 /etc/fstab 失敗。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>掛接散發磁碟時發生錯誤，它是以唯讀方式掛接為遞補。
 請參閱復原指示： https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>無法翻譯 '{}'</value>
@@ -1183,28 +1215,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>已啟用自動 Proxy</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>讓 WSL 使用 Windows 的 HTTP Proxy 資訊。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>已啟用自動 Proxy。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>讓 WSL 使用 Windows 的 HTTP Proxy 資訊。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>使用最佳作業效果的 DNS 剖析</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>僅適用於 wsl2.dnsTunneling 設為 true 時。設定為 true 時，Windows 會從 DNS 要求擷取問題，並嘗試加以解決，並忽略未知的記錄。</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>使用最佳作用的 DNS 剖析。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>僅適用於 wsl2.dnsTunneling 設為 true 時。設定為 true 時，Windows 會從 DNS 要求擷取問題，並嘗試加以解決，並忽略未知的記錄。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>自訂核心</value>
@@ -1226,6 +1265,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>自訂Linux核心模組 VHD 的絕對 Windows 路徑。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>瀏覽核心模組</value>
@@ -1235,6 +1275,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>自訂Linux核心模組 VHD 的絕對 Windows 路徑。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>自訂系統發行版</value>
@@ -1244,7 +1285,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>指定要載入為自訂系統發行版的 VHD 路徑，主要用於在 WSL 中啟用 GUI 應用程式。[在此深入了解系統發行]。</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1255,6 +1296,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>指定要載入為自訂系統發行版的 VHD 路徑，主要用於在 WSL 中啟用 GUI 應用程式。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>啟用偵錯主控台</value>
@@ -1270,18 +1312,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>預設 VHD 大小</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>僅新建立之發佈之可擴充 WSL 虛擬硬碟 (VHD) 的預設大小上限。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>重設大小</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>預設 VHD 大小</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>只針對新建的發佈指定可擴充 WSL 虛擬硬碟 (VHD) 的預設大小上限，以 MB 為單位。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>開發人員</value>
@@ -1301,28 +1347,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>已啟用 DNS Proxy</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>只有在 wsl2.networkingMode 設為 NAT 時才適用。布爾值會通知 WSL 將 Linux 中的 DNS 伺服器設定為主機上的 NAT。設定為 false 會將 DNS 伺服器從 Windows 鏡像到 Linux。</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>已啟用 DNS Proxy。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>只有在 wsl2.networkingMode 設定為 NAT 時才適用。布爾值會通知 WSL 將 Linux 中的 DNS 伺服器設定為主機上的 NAT。設定為 false 會將 DNS 伺服器從 Windows 鏡像到 Linux。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>已啟用 DNS 通道</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>變更從 WSL 到 Windows 進行 DNS 要求的 Proxy 處理方式。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>已啟用 DNS 通道。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>變更從 WSL 到 Windows 進行 DNS 要求的 Proxy 處理方式。</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>檔案系統</value>
@@ -1398,19 +1451,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>初始自動 Proxy 逾時</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>僅適用於 wsl2.autoProxy 設為 true 時。設定 WSL 啟動 WSL 容器時，WSL 等候擷取 HTTP Proxy 資訊的時間) (毫秒。如果在此時間之後解析 Proxy 設定，則必須重新啟動 WSL 實例，才能使用擷取的 Proxy 設定。</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>重設逾時</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>初始自動 Proxy 逾時</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>僅適用於 wsl2.autoProxy 設為 true 時。設定啟動 WSL 容器時，WSL 將等候擷取 HTTP Proxy 資訊的時間，以毫秒為單位。如果在此時間之後解析 Proxy 設定，則必須重新啟動 WSL 實例，才能使用擷取的 Proxy 設定。</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>核心命令列</value>
@@ -1586,6 +1642,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
 • 您可以使用相同的 Docker 精靈和映像，在 WSL 或 Windows 中執行 Docker 命令。
 • 您可以使用 WSL 中的 Windows 磁碟自動掛接，在 Windows 和 Linux 之間平順無礙地分享檔案和資料夾。
 • 您可以透過 WSL 的互通性，使用偏好的 Windows 工具和編輯器處理 Linux 程式碼和檔案，反之亦然。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Desktop 整合</value>
@@ -1753,15 +1810,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>啟用安全模式</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>以「安全模式」執行 WSL，此模式會停用許多功能，並用於復原處於錯誤狀態的發佈。</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>啟用安全模式。</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>以「安全模式」執行 WSL，此模式會停用許多功能，並用於復原處於錯誤狀態的發佈。</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>關於</value>
@@ -1826,45 +1887,58 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>預設啟用疏鬆 VHD</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
     <value>啟用時，任何新建立的 VHD 都會自動設定為疏鬆。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>預設啟用疏鬆 VHD。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>啟用時，任何新建立的 VHD 都會自動設定為疏鬆。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>交換檔案位置</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>交換虛擬硬碟的絕對 Windows 路徑。</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>瀏覽交換檔案</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>交換檔案位置</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>交換虛擬硬碟的絕對 Windows 路徑。</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>交換大小</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>要新增多少交換空間至 WSL 2 VM，0 表示沒有交換檔。當記憶體需求超過硬體裝置的限制時，交換記憶體是磁碟型 RAM 所使用。</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>重設大小</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>交換大小</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>要新增至 WSL 2 VM 的交換空間，以 MB 為單位。0 表示沒有交換檔。當記憶體需求超過硬體裝置的限制時，交換記憶體是磁碟型 RAM 所使用。</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>啟用 VirtIO</value>
@@ -1877,6 +1951,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>使用 virtio 傳輸，從主機啟用 9P 檔案系統掛接。</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>VM 閒置逾時</value>
