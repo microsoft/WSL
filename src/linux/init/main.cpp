@@ -3925,9 +3925,11 @@ try
         return;
     }
 
-    if (info.totalram <= c_systemReservedMemory)
+    uint64_t totalRam = info.totalram * info.mem_unit;
+
+    if (totalRam <= c_systemReservedMemory)
     {
-        LOG_WARNING("Total RAM ({}) is too small to reserve {} for system processes", info.totalram, c_systemReservedMemory);
+        LOG_WARNING("Total RAM ({}) is too small to reserve {} for system processes", totalRam, c_systemReservedMemory);
         return;
     }
 
@@ -3943,14 +3945,14 @@ try
         return;
     }
 
-    auto userMemoryMax = std::to_string(info.totalram - c_systemReservedMemory);
+    auto userMemoryMax = std::to_string(totalRam - c_systemReservedMemory);
     if (WriteToFile(WSL_USER_CGROUP_MEMORY_MAX, userMemoryMax.c_str()) < 0)
     {
         LOG_ERROR("Failed to set memory.max for wsl-user cgroup {}", errno);
         return;
     }
 
-    LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, info.totalram, c_systemReservedMemory);
+    LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, totalRam, c_systemReservedMemory);
 }
 CATCH_LOG()
 
@@ -4161,9 +4163,14 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
-
-    SetupWslUserCgroup();
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) != 0)
+    {
+        LOG_ERROR("Failed to mount cgroup2 filesystem: {}", errno);
+    }
+    else
+    {
+        SetupWslUserCgroup();
+    }
 
     UtilSetThreadName("mini_init");
 

@@ -3418,7 +3418,11 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         // Move child into the memory-limited user cgroup.
-        WriteToFile(WSL_USER_CGROUP_PROCS, "0");
+        if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+        {
+            // Non-critical
+            LOG_ERROR("Failed to add process to user cgroup: {}", errno);
+        }
 
         try
         {
