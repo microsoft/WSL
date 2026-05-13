@@ -172,13 +172,6 @@ struct TableOutput
         m_consoleWidthOverride = width;
     }
 
-    // Set whether to drop columns that have no data rows (default: false).
-    // When false, columns are always rendered at least as wide as their header.
-    void SetDropEmptyColumns(bool drop)
-    {
-        m_dropEmptyColumns = drop;
-    }
-
     void OutputLine(line_t&& line)
     {
         m_empty = false;
