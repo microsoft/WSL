@@ -279,8 +279,7 @@ void BuildView::ProcessMessage(const wsl::windows::common::docker_schema::BuildK
             }
             else if (step.startTime != std::chrono::steady_clock::time_point{})
             {
-                step.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - step.startTime);
+                step.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - step.startTime);
             }
         }
     }

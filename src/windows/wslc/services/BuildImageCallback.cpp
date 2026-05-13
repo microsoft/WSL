@@ -49,21 +49,6 @@ static std::wstring FormatBytes(int64_t b)
     return std::format(L"{}B", b);
 }
 
-static std::wstring FormatElapsed(std::chrono::steady_clock::time_point start)
-{
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
-    auto totalSeconds = elapsed.count() / 1000;
-
-    if (totalSeconds >= 60)
-    {
-        auto minutes = totalSeconds / 60;
-        auto seconds = totalSeconds % 60;
-        return std::format(L"{}m{:.0f}s", minutes, static_cast<double>(seconds));
-    }
-
-    return std::format(L"{:.1f}s", elapsed.count() / 1000.0);
-}
-
 static std::wstring FormatDuration(std::chrono::milliseconds d)
 {
     auto totalSeconds = d.count() / 1000;
@@ -76,6 +61,11 @@ static std::wstring FormatDuration(std::chrono::milliseconds d)
     }
 
     return std::format(L"{:.1f}s", d.count() / 1000.0);
+}
+
+static std::wstring FormatElapsed(std::chrono::steady_clock::time_point start)
+{
+    return FormatDuration(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start));
 }
 
 // ── BuildImageCallback ──────────────────────────────────────────────
@@ -362,10 +352,11 @@ std::vector<std::wstring> BuildImageCallback::BuildFrameLines(SHORT consoleWidth
                         wlabel.resize(consoleWidth - 13);
                         wlabel += L"...";
                     }
-                    auto padLen =
-                        (wlabel.size() + 6 < static_cast<size_t>(consoleWidth)) ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6 : 0;
-                    lines.push_back(std::format(
-                        L"\033[36m{}{}{}\033[0m", wlabel, std::wstring(std::max<size_t>(1, padLen), L' '), L"CACHED"));
+                    auto padLen = (wlabel.size() + 6 < static_cast<size_t>(consoleWidth))
+                                      ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6
+                                      : 0;
+                    lines.push_back(
+                        std::format(L"\033[36m{}{}{}\033[0m", wlabel, std::wstring(std::max<size_t>(1, padLen), L' '), L"CACHED"));
                 }
             }
         }
@@ -384,8 +375,8 @@ std::vector<std::wstring> BuildImageCallback::BuildFrameLines(SHORT consoleWidth
             bool showLayers = false;
             if (!step.completed && !step.subStatuses.empty())
             {
-                showLayers = std::any_of(
-                    step.subStatuses.begin(), step.subStatuses.end(), [](const auto& p) { return !p.second.completed; });
+                showLayers =
+                    std::any_of(step.subStatuses.begin(), step.subStatuses.end(), [](const auto& p) { return !p.second.completed; });
             }
 
             if (showLayers)
@@ -417,8 +408,7 @@ std::vector<std::wstring> BuildImageCallback::BuildFrameLines(SHORT consoleWidth
                         }
 
                         lines.push_back(std::format(
-                            L"\033[2m  {}: [\033[32m{}\033[0m\033[2m{}] {}/{}\033[0m",
-                            sid, filledBar, emptyBar, FormatBytes(sub.current), FormatBytes(sub.total)));
+                            L"\033[2m  {}: [\033[32m{}\033[0m\033[2m{}] {}/{}\033[0m", sid, filledBar, emptyBar, FormatBytes(sub.current), FormatBytes(sub.total)));
                     }
                     else
                     {
@@ -461,7 +451,7 @@ std::vector<std::wstring> BuildImageCallback::BuildFrameLines(SHORT consoleWidth
 // ── Frame renderer ──────────────────────────────────────────────────
 //   Renders in two modes. First it appends and then once it hits the
 //   max viewport width it goes to fixed mode.
-// 
+//
 //
 //   Append mode (totalLines < viewportHeight):
 //     Content fits in the viewport. Use cursor-up to overwrite previous
