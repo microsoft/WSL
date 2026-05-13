@@ -262,7 +262,8 @@ try
         wslcFd = WSLCFDStderr;
         break;
     default:
-        WSL_LOG("WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
+        WSL_LOG(
+            "WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
         return E_INVALIDARG;
     }
 
@@ -292,10 +293,7 @@ try
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
     auto result = wrapper->Process->GetExitEvent(ExitEvent);
 
-    WSL_LOG(
-        "WslcPluginProcessGetExitEvent",
-        TraceLoggingValue(*ExitEvent, "ExitEvent"),
-        TraceLoggingValue(result, "Result"));
+    WSL_LOG("WslcPluginProcessGetExitEvent", TraceLoggingValue(*ExitEvent, "ExitEvent"), TraceLoggingValue(result, "Result"));
 
     return result;
 }
@@ -642,7 +640,7 @@ try
 }
 CATCH_RETURN()
 
-void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const
 {
     ExecutionContext context(Context::Plugin);
 
@@ -653,9 +651,10 @@ void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Sessio
             WSL_LOG(
                 "PluginOnWslcContainerStoppingCall",
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"));
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(ContainerId, "ContainerId"));
 
-            const auto result = e.hooks.ContainerStopping(Session, InspectJson);
+            const auto result = e.hooks.ContainerStopping(Session, ContainerId);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }

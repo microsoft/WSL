@@ -630,7 +630,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
-    if (!m_dockerClient.has_value())
+    if (!m_pluginNotifier || !m_dockerClient.has_value())
     {
         return;
     }
@@ -639,12 +639,15 @@ try
 }
 CATCH_LOG()
 
-void WSLCSession::OnImageDeleted(const std::string& ImageNameOrId) noexcept
+void WSLCSession::OnImageDeleted(const std::string& ImageId) noexcept
 try
 {
-    // The image is already deleted so we can't inspect it. Build a minimal JSON.
-    auto json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
-    LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(json.c_str()));
+    if (!m_pluginNotifier)
+    {
+        return;
+    }
+
+    LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(ImageId.c_str()));
 }
 CATCH_LOG()
 
@@ -1443,14 +1446,26 @@ try
     *DeletedImages = output.release();
 
     // Notify plugin manager that the image was deleted (best-effort).
-    // Use the first Deleted entry which corresponds to the top-level image.
+    // Prefer the first Deleted entry (actual layer removal); fall back to the first
+    // Untagged entry (tag removal only, e.g. when containers still reference the image).
+    std::string deletedId;
     for (const auto& image : deletedImages)
     {
         if (!image.Deleted.empty())
         {
-            OnImageDeleted(image.Deleted);
+            deletedId = image.Deleted;
             break;
         }
+
+        if (deletedId.empty() && !image.Untagged.empty())
+        {
+            deletedId = image.Untagged;
+        }
+    }
+
+    if (!deletedId.empty())
+    {
+        OnImageDeleted(deletedId);
     }
 
     return S_OK;

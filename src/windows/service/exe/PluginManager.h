@@ -49,7 +49,7 @@ public:
     void OnWslcSessionCreated(const WSLCSessionInformation* Session);
     void OnWslcSessionStopping(const WSLCSessionInformation* Session) const;
     HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
-    void OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
+    void OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const;
     void OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
     void OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
 

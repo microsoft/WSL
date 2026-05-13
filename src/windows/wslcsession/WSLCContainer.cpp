@@ -901,7 +901,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     {
         try
         {
-            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(InspectLockHeld().c_str()));
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
         }
         CATCH_LOG();
     }

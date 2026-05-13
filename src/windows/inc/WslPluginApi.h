@@ -134,8 +134,8 @@ typedef HRESULT (*WSLPluginAPI_OnSessionStopping)(const struct WSLCSessionInform
 // 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format.
 typedef HRESULT (*WSLPluginAPI_ContainerStarted)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
 
-// Called when a container is about to stop. Errors are ignored.
-typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
+// Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are ignored.
+typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInformation* Session, LPCSTR ContainerId);
 
 // Called when an image is created (either pulled, or imported). Errors are ignored.
 // 'InspectImage' is a JSON document that follows the wslc_schema::InspectImage format.

@@ -653,7 +653,6 @@ class PluginTests
 
             LoadDebianImage(session.get());
 
-
             // Create a container that will have a stuck process so it's still in a running state when the callback is made.
             wsl::windows::common::WSLCContainerLauncher launcher(
                 "debian:latest", "wslc-plugin-container", {"/bin/sh", "-c", "sleep 120"});
@@ -670,23 +669,23 @@ class PluginTests
         const auto ExpectedOutput = std::format(
             LR"(Plugin loaded. TestMode=18
             WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
-            WSLC Image created, session=*, id=*, name=*
-            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
-            Command'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
-            Command'cat', status=0, stdout: stdin-ok, stderr: 
-            Command'exit 12', status=12, stdout: , stderr: 
-            Command'echo -n $ENV', status=0, stdout: env-ok, stderr: 
+            Command: 'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
+            Command: 'cat', status=0, stdout: stdin-ok, stderr: 
+            Command: 'exit 12', status=12, stdout: , stderr: 
+            Command: 'echo -n $ENV', status=0, stdout: env-ok, stderr: 
             WSLCCreateProcess(does-not-exist): {:x}, errno=2
             WSLCProcessGetFd(999): {}
             WSLCProcessGetExitCode(<running>): {}
             WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
-            Command'cat /mnt/wsl-plugin/plugin-rw-test/testfile.txt', status=0, stdout: Windows-content, stderr: 
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/testfile.txt', status=0, stdout: Windows-content, stderr: 
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
-            Command'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
+            Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}
             Test completed
-            WSLC Container stopping, session=*, id=*, name=*, state=*
-            WSLC Image deleted, session=*, id=*, name=*
+            WSLC Image created, session=*, id=*, name=*
+            WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container stopping, session=*, id=*
+            WSLC Image deleted, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-test, id=*)",
             static_cast<uint32_t>(E_FAIL),
             E_INVALIDARG,

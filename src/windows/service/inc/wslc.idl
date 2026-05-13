@@ -133,14 +133,14 @@ interface IWSLCPluginNotifier : IUnknown
     // Returning failure prevents the container creation.
     HRESULT OnContainerStarted([in] LPCSTR InspectJson);
 
-    // Called when a container is about to stop. Errors are logged but ignored.
-    HRESULT OnContainerStopping([in] LPCSTR InspectJson);
+    // Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are logged but ignored.
+    HRESULT OnContainerStopping([in] LPCSTR ContainerId);
 
     // 'InspectJson' follows the wslc_schema::InspectImage format. Errors are logged but ignored.
     HRESULT OnImageCreated([in] LPCSTR InspectJson);
 
-    // Called when an image is deleted. Errors are logged but ignored.
-    HRESULT OnImageDeleted([in] LPCSTR InspectJson);
+    // Called when an image is deleted. 'ImageId' is the image identifier. Errors are logged but ignored.
+    HRESULT OnImageDeleted([in] LPCSTR ImageId);
 };
 
 typedef struct _WSLCImageInformation

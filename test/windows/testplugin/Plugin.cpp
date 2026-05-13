@@ -343,6 +343,7 @@ HRESULT OnDistributionUnregistered(const WSLSessionInformation* Session, const W
 }
 
 HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
+try
 {
     g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName) << ", id=" << Session->SessionId
               << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
@@ -351,31 +352,6 @@ HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
     if (g_testType == PluginTestType::WslcSessionRejected)
     {
         g_logfile << "OnWslcSessionCreated: ERROR_ACCESS_DENIED" << std::endl;
-        return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
-    }
-
-    return S_OK;
-}
-
-HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
-{
-    g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
-              << ", id=" << Session->SessionId << std::endl;
-
-    return S_OK;
-}
-
-HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
-try
-{
-    auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
-
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
-              << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
-
-    if (g_testType == PluginTestType::WslcContainerRejected)
-    {
-        g_logfile << "OnWslcContainerStarted: ERROR_ACCESS_DENIED" << std::endl;
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
@@ -424,7 +400,7 @@ try
 
             int status = 0;
             THROW_IF_FAILED(g_api->WSLCProcessGetExitCode(process, &status));
-            g_logfile << "Command'" << cmd << "', status=" << status << ", stdout: " << out << ", stderr: " << err << std::endl;
+            g_logfile << "Command: '" << cmd << "', status=" << status << ", stdout: " << out << ", stderr: " << err << std::endl;
 
             return {status, out, err};
         };
@@ -514,11 +490,35 @@ try
 }
 CATCH_RETURN();
 
-HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectJson)
+HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
+{
+    g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
+              << ", id=" << Session->SessionId << std::endl;
+
+    return S_OK;
+}
+
+HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
+try
 {
     auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
-    g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
-              << ", state=" << container.State.Status << std::endl;
+
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+              << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerRejected)
+    {
+        g_logfile << "OnWslcContainerStarted: ERROR_ACCESS_DENIED" << std::endl;
+        return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
+{
+    g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << ContainerId << std::endl;
     return S_OK;
 }
 
@@ -530,11 +530,9 @@ HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR Inspect
     return S_OK;
 }
 
-HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
+HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId)
 {
-    auto image = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(InspectJson);
-    auto name = (image.RepoTags.has_value() && !image.RepoTags->empty()) ? image.RepoTags->front() : "<none>";
-    g_logfile << "WSLC Image deleted, session=" << Session->SessionId << ", id=" << image.Id << ", name=" << name << std::endl;
+    g_logfile << "WSLC Image deleted, session=" << Session->SessionId << ", id=" << ImageId << std::endl;
     return S_OK;
 }
 
