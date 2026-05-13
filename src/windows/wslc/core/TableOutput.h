@@ -96,7 +96,7 @@ struct TableOutput
 
     static constexpr size_t DefaultColumnPadding = 3; // Docker-like spacing between columns
 
-    // For redirected console the receiver controls the width. This should be a large value but mpt
+    // For redirected console the receiver controls the width. This should be a large value but not
     // too large. A few thousand should be reasonable and prevents potential arithmetic issues later.
     static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
 
