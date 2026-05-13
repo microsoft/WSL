@@ -656,10 +656,7 @@ HRESULT
 wsl::windows::common::SvcComm::CompactDistribution(_In_ LPCGUID DistroGuid) const
 {
     ClientExecutionContext context;
-    wil::com_ptr<ILxssUserSession2> userSession2;
-
-    RETURN_IF_FAILED(m_userSession->QueryInterface(IID_PPV_ARGS(&userSession2)));
-    RETURN_HR(userSession2->CompactDistribution(DistroGuid, context.OutError()));
+    RETURN_HR(m_userSession->CompactDistribution(DistroGuid, context.OutError()));
 }
 
 HRESULT
