@@ -96,23 +96,6 @@ struct InspectNetworkSettings
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectNetworkSettings, Networks);
 };
 
-struct InspectEndpointSettings
-{
-    std::string IPAddress;
-    std::string Gateway;
-    std::string MacAddress;
-    int IPPrefixLen{};
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
-};
-
-struct InspectNetworkSettings
-{
-    std::map<std::string, InspectEndpointSettings> Networks;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectNetworkSettings, Networks);
-};
-
 struct InspectContainer
 {
     std::string Id;
