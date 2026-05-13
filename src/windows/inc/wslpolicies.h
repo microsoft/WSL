@@ -36,15 +36,6 @@ inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
 
-inline wil::unique_hkey CreatePoliciesKey(DWORD desiredAccess)
-{
-    wil::unique_hkey key;
-    LOG_IF_WIN32_ERROR(
-        RegCreateKeyExW(HKEY_LOCAL_MACHINE, c_registryKey, 0, nullptr, REG_OPTION_NON_VOLATILE, desiredAccess, nullptr, &key, nullptr));
-
-    return key;
-}
-
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)
 try
 {
