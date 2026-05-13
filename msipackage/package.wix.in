@@ -683,3 +683,4 @@
         <Property Id="MSIRMSHUTDOWN" Value="1" Secure="yes" />
     </Package>
 </Wix>
+
