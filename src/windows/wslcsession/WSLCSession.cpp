@@ -53,7 +53,7 @@ void EnforceRegistryAllowlist(const std::string& Repo)
         return;
     }
 
-    THROW_HR_WITH_USER_ERROR(WSL_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
+    THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
 std::string IndentLines(const std::string& input, const std::string& prefix)
@@ -700,7 +700,7 @@ try
     // build outright since we cannot reliably attribute its registry traffic.
     if (wsl::windows::policies::HasRegistryAllowlist(wsl::windows::policies::OpenPoliciesKey().get()))
     {
-        THROW_HR_WITH_USER_ERROR(WSL_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
+        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
     }
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);

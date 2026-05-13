@@ -437,11 +437,13 @@ class PolicyTest
 
         wil::com_ptr<IWSLCSessionManager> sessionManager;
         HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager));
-        VERIFY_ARE_EQUAL(WSL_E_CONTAINER_DISABLED, hr);
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_DISABLED, hr);
         VERIFY_IS_NULL(sessionManager.get());
     }
 
-    // Verifies AllowWSLContainer=0 gates wslc.exe at startup with a friendly message.
+    // Verifies AllowWSLContainer=0 gates wslc.exe at startup with a friendly message that is
+    // surfaced on stderr (and not stdout). Locks down both the exact rendered text and the
+    // handle the message is written to so future regressions show up here.
     WSLC_TEST_METHOD(WSLContainerDisabledCli)
     {
         auto revert = SetPolicy(c_allowWSLContainer, 0);
@@ -450,11 +452,15 @@ class PolicyTest
         auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
 
         VERIFY_ARE_EQUAL(1, exitCode);
-        if (stderrText.find(L"WSL container is disabled by the computer policy") == std::wstring::npos)
-        {
-            LogError("Expected stderr to contain disabled message, got: '%ls'", stderrText.c_str());
-            VERIFY_FAIL();
-        }
+
+        // The disabled message must go to stderr only -- never to stdout.
+        VERIFY_ARE_EQUAL(L"", stdoutText);
+
+        // The wslc CLI renders failures via MessageErrorCode("{}\nError code: {}") and
+        // PrintMessage adds a trailing newline; line endings are \r\n through console pipes.
+        const auto expected =
+            wsl::shared::Localization::MessageWSLContainerDisabled() + L"\r\nError code: WSLC_E_CONTAINER_DISABLED\r\n";
+        VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
     // Verifies the WSLContainerRegistryAllowlist denies image pulls from registries not in the
