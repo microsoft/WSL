@@ -341,7 +341,8 @@ void WSLCVirtualMachine::ConfigureNetworking()
     std::vector<WSLCProcessFd> fds;
     fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
 
-    bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling);
+    // Virtio proxy forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
+    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeVirtioProxy;
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
@@ -850,6 +851,7 @@ void WSLCVirtualMachine::LaunchPortRelay()
 
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
+    process.InheritHandle(m_vmTerminatingEvent.get());
     process.Start();
 
     readPipe.release();

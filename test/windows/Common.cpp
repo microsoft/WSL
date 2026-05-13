@@ -58,6 +58,7 @@ static HANDLE g_OriginalStderr;
 static BOOL g_RelogEverything = TRUE;
 static bool g_LogDmesgAfterEachTest = false;
 static PTP_TIMER g_WatchdogTimer;
+
 static BOOL g_VmMode;
 static std::wstring g_originalConfig;
 static std::wstring g_originalDefaultDistro;
@@ -1976,6 +1977,17 @@ Return Value:
     wsl::windows::common::wslutil::InitializeWil();
 
     THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
+    // Assign a job object to the current process to ensure that we don't leak processes on failure.
+    // N.B. When the job object is closed, all processes associated with the job will be terminated.
+    // Because of that, we're purposefully leaking this job object so we don't kill the test process on cleanup.
+    auto job = CreateJobObjectW(nullptr, nullptr);
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(job, GetCurrentProcess()));
 
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG

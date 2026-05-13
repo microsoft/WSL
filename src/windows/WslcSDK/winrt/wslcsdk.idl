@@ -1,0 +1,59 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    wslcsdk.idl
+
+Abstract:
+
+    This file contains the definition of a WinRT projection of the WSL Container SDK API.
+
+--*/
+
+namespace Microsoft.WSL.Containers
+{
+    runtimeclass SessionSettings
+    {
+        SessionSettings(String name, String storagePath);
+
+        String Name { get; };
+        String StoragePath { get; };
+
+        UInt32 CpuCount { get; set; };
+        UInt32 MemoryMb { get; set; };
+        UInt32 TimeoutMS { get; set; };
+        VhdRequirements VhdRequirements { get; set; };
+        SessionFeatureFlags FeatureFlags { get; set; };
+    };
+
+    runtimeclass Session
+    {
+        static Session Create(SessionSettings settings);
+
+        void Terminate();
+    };
+
+    [flags]
+    enum SessionFeatureFlags
+    {
+        None = 0x00000000,
+        EnableGpu = 0x00000004
+    };
+
+    enum VhdType
+    {
+        Dynamic = 0,
+        Fixed = 1,
+    };
+
+    runtimeclass VhdRequirements
+    {
+        VhdRequirements(String name, UInt64 sizeInBytes, VhdType type);
+
+        String Name { get; };
+        UInt64 SizeInBytes { get; };
+        VhdType Type { get; };
+    };
+}

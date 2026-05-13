@@ -174,6 +174,29 @@ void WSLCContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
     m_dnsOptions = std::move(DnsOptions);
 }
 
+void WSLCContainerLauncher::SetMemoryLimit(std::int64_t Bytes)
+{
+    m_memoryBytes = Bytes;
+}
+
+void WSLCContainerLauncher::SetNanoCpus(std::int64_t NanoCpus)
+{
+    m_nanoCpus = NanoCpus;
+}
+
+void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard)
+{
+    // Store a copy of the name string to keep the WSLCUlimit pointer valid.
+    const auto& name = m_ulimitNames.emplace_back(Name);
+
+    WSLCUlimit ulimit{};
+    ulimit.Name = name.c_str();
+    ulimit.Soft = Soft;
+    ulimit.Hard = Hard;
+
+    m_ulimits.push_back(ulimit);
+}
+
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLCVolume remain valid.
@@ -331,6 +354,11 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
+
+    options.MemoryBytes = m_memoryBytes;
+    options.NanoCpus = m_nanoCpus;
+    options.UlimitsCount = static_cast<ULONG>(m_ulimits.size());
+    options.Ulimits = m_ulimits.size() > 0 ? m_ulimits.data() : nullptr;
 
     // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;

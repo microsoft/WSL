@@ -321,13 +321,6 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Session
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLCSessionManagerImpl::GetVersion(_Out_ WSLCVersion* Version)
-{
-    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
-    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
-    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
-}
-
 void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
@@ -450,9 +443,39 @@ WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplCl
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
+try
 {
-    return CallImpl(&WSLCSessionManagerImpl::GetVersion, Version);
+    RETURN_HR_IF(E_POINTER, Version == nullptr);
+
+    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
+    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
+    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
+
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported)
+try
+{
+    RETURN_HR_IF(E_POINTER, ClientVersion == nullptr || IsSupported == nullptr);
+
+    WSL_LOG(
+        "ClientVersionCheck",
+        TraceLoggingValue(ClientVersion->Major, "Major"),
+        TraceLoggingValue(ClientVersion->Minor, "Minor"),
+        TraceLoggingValue(ClientVersion->Revision, "Revision"));
+
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
+
+    const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{ClientVersion->Major, ClientVersion->Minor, ClientVersion->Revision};
+
+    // For now set 2.9.0 as the floor version. Also support if the client version exactly matches ours to cover builds before 2.9.0.
+    *IsSupported = (clientVersion >= c_minClientVersion || wsl::shared::PackageVersion == clientVersion);
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
