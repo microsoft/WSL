@@ -28,7 +28,7 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
 {
     if (options != InputStreamOptions::None)
     {
-        winrt::throw_hresult(ERROR_NOT_SUPPORTED);
+        throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), L"Only InputStreamOptions::None is supported");
     }
 
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.

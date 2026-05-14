@@ -286,7 +286,7 @@ class WslcSdkWinRtTests
             VERIFY_IS_NOT_NULL(session);
         }
 
-        // Negative: Must throw if used used before Start()
+        // Negative: Must throw if used before Start()
         {
             auto session = WSLCSDK::Session(settings);
             VERIFY_THROWS_HR(std::ignore = session.Images(), E_ILLEGAL_METHOD_CALL);
@@ -353,7 +353,7 @@ class WslcSdkWinRtTests
     {
         // Positive: load a saved image tar and verify the image can be run
         {
-            // Remote the image if it already exists
+            // Remove the image if it already exists
             IGNORE_ERRORS(m_defaultSession.DeleteImage(L"hello-world:latest"));
 
             const auto imageTar = GetTestImagePath("hello-world:latest");
