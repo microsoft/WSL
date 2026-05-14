@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Subsistema Windows para Linux</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Subsistema Windows para Linux</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Permitir o Subsistema Windows para Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">Quando definida como desativada, esta política desativa o acesso a distribuições de Linux em execução na Subsistema Windows para Linux para todos os utilizadores no computador.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">Permitir a versão de Caixa de Entrada do Subsistema Windows para Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">Quando definida como desativada, esta política desativa a versão incluída (componente opcional) do Subsistema Windows para Linux. Se esta política estiver desativada, só pode ser utilizada a versão da Loja do WSL.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">Permitir WSL1</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">Quando definida como desativada, esta política desativa o WSL1. Quando desativada, apenas podem ser utilizadas distribuições WSL2.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Permitir configuração personalizada do kernel</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">Quando definida como desativada, esta política desativa a configuração personalizada do kernel através de .wslconfig (wsl2.kernel). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Permitir a configuração personalizada da distribuição do sistema</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">Quando definida como desativada, esta política desativa a configuração personalizada da distribuição do sistema através de .wslconfig (wsl2.systemDistro). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Permitir configuração da linha de comandos do kernel</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">Quando definida como desativada, esta política desativa a configuração da linha de comandos do kernel através de .wslconfig (wsl2.kernelCommandLine). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="AllowDebugShell">Permitir a shell de depuração</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">Quando definida como desativada, esta política desativa a shell de depuração (wsl.exe --debug-shell). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Permitir virtualização aninhada</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">Quando definida como desativada, esta política desativa a configuração de virtualização aninhada através de .wslconfig (wsl2.nestedVirtualization). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Permitir depuração de kernel</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">Quando definida como desativada, esta política desativa a configuração de depuração do kernel através de .wslconfig (wsl2.kernelDebugPort). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Permitir configuração de rede personalizada</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">Quando definida como desativada, esta política desativa a configuração de rede personalizada através de .wslconfig (wsl2.networkingmode). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="FirewallUserSettingConfigurable">Permitir a configuração de firewall definida pelo utilizador</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">Quando definida como desativada, esta política desativa a configuração da firewall através de .wslconfig (wsl2.firewall). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="AllowDiskMount">Permitir montagem de disco em passthrough</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">Quando definida como desativada, esta política desativa a montagem de discos em passthrough no WSL2 (wsl.exe --mount). Esta política aplica-se apenas ao WSL da Loja.</string>
+
+        <string id="DefaultNetworkingMode">Configurar o modo de rede predefinido</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Esta política especifica o modo de rede predefinido a utilizar para o WSL2.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Nenhum</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Espelhado</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">Contentor do WSL</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">Permitir o contentor WSL</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Esta política controla se o contentor WSL pode ser utilizado neste computador. Quando ativada ou não configurada, os utilizadores e as aplicações do Windows podem executar contentores Linux através do WSL. Quando definido como desativado, o contentor WSL é bloqueado para todos os utilizadores e as aplicações do Windows não podem executar Linux contentores. Aviso: definir como "Desativado" pode quebrar as aplicações do Windows que dependem Linux contentores.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">Lista de permissões para registos de contentor WSL</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">Quando ativado, o contentor WSL só poderá solicitar imagens dos registos listados aqui. Isto afeta tanto a CLI do contentor WSL como todas as aplicações que utilizam a API do contentor WSL.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Modo de Rede Predefinido</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Registos permitidos</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

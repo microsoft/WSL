@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Windows-undersystem för Linux</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Windows-undersystem för Linux</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Tillåt Windows-undersystem för Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">När den är inaktiverad inaktiverar den här principen åtkomst till att köra Linux-distributioner i Windows-undersystem för Linux för alla användare på datorn.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">Tillåt inkorgsversionen av Windows-undersystem för Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">När inställningen är inaktiverad inaktiverar den här principen inkorgsversionen (valfri komponent) för Windows-undersystem för Linux. Om den här principen är inaktiverad kan endast store-versionen av WSL användas.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">Tillåt WSL1</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">När den här principen är inaktiverad inaktiveras WSL1. När det är inaktiverat kan endast WSL2-distributioner användas.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Tillåt anpassad kernelkonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">När inställningen är inaktiverad inaktiverar den här principen anpassad kernelkonfiguration via .wslconfig (wsl2.kernel). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Tillåt anpassad systemdistributionskonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">När den här principen är inaktiverad inaktiveras konfigurationen av anpassad systemdistribution via .wslconfig (wsl2.systemDistro). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Tillåt kernel-kommandoradskonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">När inställningen är inaktiverad inaktiverar den här principen kernelkommandoradskonfigurationen via .wslconfig (wsl2.kernelCommandLine). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="AllowDebugShell">Tillåt felsökningsgränssnittet</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">När den här principen är inaktiverad inaktiveras felsökningsgränssnittet (wsl.exe --debug-shell). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Tillåt kapslad virtualisering</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">När inställningen är inaktiverad inaktiverar den här principen kapslad virtualiseringskonfiguration via .wslconfig (wsl2.nestedVirtualization). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Tillåt kernelfelsökning</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">När inställningen är inaktiverad inaktiverar den här principen kernelfelsökningskonfigurationen via .wslconfig (wsl2.kernelDebugPort). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Tillåt anpassad nätverkskonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">När inställningen är inaktiverad inaktiverar den här principen anpassad nätverkskonfiguration via .wslconfig (wsl2.networkingmode). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Tillåt användarinställning av brandväggskonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">När den här principen är inaktiverad inaktiveras brandväggskonfigurationen via .wslconfig (wsl2.firewall). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="AllowDiskMount">Tillåt genomströmningsdiskmontering</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">När inställningen är inaktiverad inaktiverar den här principen genomströmningsdiskmontering i WSL2 (wsl.exe --mount). Den här principen gäller endast för Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Konfigurera standardnätverksläge</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Den här principen anger standardnätverksläget som ska användas för WSL2.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Inget</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Speglad</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL-container</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">Tillåt WSL-container</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Den här principen styr om WSL-containern kan användas på den här datorn. När det är aktiverat eller inte konfigurerat kan användare och Windows-program köra Linux-behållare via WSL. När det är inaktiverat blockeras WSL-containern för alla användare och Windows-appar kan inte köra Linux-containrar. Varning! Om du ställer in detta på Inaktiverat kan Windows-appar som är beroende av Linux-behållare sluta fungera.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">Tillåt lista för WSL-containerregister</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">När WSL-containern är aktiverad tillåts den bara att hämta avbildningar från de register som anges här. Detta påverkar både WSL-containerns CLI och alla program som använder WSL-container-API:et.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Standardnätverksläge</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Tillåtna register</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

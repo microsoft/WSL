@@ -2814,13 +2814,13 @@ try
 }
 CATCH_LOG();
 
-class ReadHandleWithTargetValue : public wsl::windows::common::relay::ReadHandle
+class ReadHandleWithTargetValue : public wsl::windows::common::io::ReadHandle
 {
 public:
     NON_COPYABLE(ReadHandleWithTargetValue);
     NON_MOVABLE(ReadHandleWithTargetValue);
 
-    ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
+    ReadHandleWithTargetValue(wsl::windows::common::io::HandleWrapper&& MovedHandle, std::string_view targetValue) :
         ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
         m_targetValue(targetValue)
     {
@@ -2841,7 +2841,7 @@ public:
 private:
     void CheckIfTargetFound()
     {
-        using namespace wsl::windows::common::relay;
+        using namespace wsl::windows::common::io;
 
         if (State == IOHandleStatus::Standby || State == IOHandleStatus::Completed)
         {
@@ -2867,7 +2867,7 @@ private:
 
 void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
 {
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
     io.Run(timeout);
 }

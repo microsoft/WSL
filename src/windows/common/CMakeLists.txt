@@ -18,6 +18,7 @@ set(SOURCES
     helpers.cpp
     hvsocket.cpp
     interop.cpp
+    HandleIO.cpp
     Localization.cpp
     lxssbusclient.cpp
     lxssclient.cpp
@@ -101,6 +102,7 @@ set(HEADERS
     hvsocket.hpp
     INetworkingEngine.h
     interop.hpp
+    HandleIO.h
     LxssMessagePort.h
     LxssPort.h
     LxssSecurity.h

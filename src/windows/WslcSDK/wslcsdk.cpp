@@ -268,7 +268,7 @@ struct ImageFileResolver
     }
 
 private:
-    wsl::windows::common::relay::HandleWrapper m_fileHandle;
+    wsl::windows::common::io::HandleWrapper m_fileHandle;
     ULONGLONG m_length;
 };
 

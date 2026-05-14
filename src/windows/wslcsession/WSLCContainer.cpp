@@ -25,12 +25,12 @@ Abstract:
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
-using wsl::windows::common::relay::DockerIORelayHandle;
-using wsl::windows::common::relay::HandleWrapper;
-using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
-using wsl::windows::common::relay::OverlappedIOHandle;
-using wsl::windows::common::relay::ReadHandle;
-using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::common::io::DockerIORelayHandle;
+using wsl::windows::common::io::HandleWrapper;
+using wsl::windows::common::io::HTTPChunkBasedReadHandle;
+using wsl::windows::common::io::OverlappedIOHandle;
+using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::NetworkEntry;
@@ -47,7 +47,7 @@ using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
 
-using namespace wsl::windows::common::relay;
+using namespace wsl::windows::common::io;
 using namespace wsl::windows::common::docker_schema;
 using namespace wsl::windows::common::wslutil;
 using namespace std::chrono_literals;
@@ -1023,7 +1023,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
-    wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
+    wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
@@ -1039,7 +1039,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     {
         io.AddHandle(
             std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
+            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
@@ -1840,6 +1840,12 @@ void WSLCContainerImpl::Stats(LPSTR* Output) const
     try
     {
         auto stats = m_dockerClient.ContainerStats(m_id);
+
+        // Always inject the authoritative id and name from this instance.
+        // The response may omit them or use inconsistent casing.
+        stats.id = m_id;
+        stats.name = m_name;
+
         std::string json = wsl::shared::ToJson(stats);
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
     }
@@ -1878,7 +1884,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 

@@ -42,7 +42,7 @@ HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
         namespace policies = wsl::windows::policies;
         THROW_HR_WITH_USER_ERROR_IF(
-            WSL_E_CONTAINER_DISABLED,
+            WSLC_E_CONTAINER_DISABLED,
             wsl::shared::Localization::MessageWSLContainerDisabled(),
             !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainer));
 

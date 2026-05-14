@@ -666,6 +666,25 @@ typedef struct _WSLCPruneImagesOptions
     ULONG LabelsCount;
 } WSLCPruneImagesOptions;
 
+typedef enum _WSLCListContainersFlags
+{
+    WSLCListContainersFlagsNone = 0,
+    WSLCListContainersFlagsAll = 1,
+} WSLCListContainersFlags;
+
+cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
+
+typedef struct _WSLCListContainersOptions
+{
+    DWORD Flags; // WSLCListContainersFlags
+    LONG Limit;
+
+    [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
+    ULONG FiltersCount;
+} WSLCListContainersOptions;
+
 typedef enum _WSLCSessionState
 {
     WSLCSessionStateRunning = 0,
@@ -713,11 +732,8 @@ interface IWSLCSession : IUnknown
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
-    HRESULT ListContainers([out, size_is(, *Count)] WSLCContainerEntry** Containers,
-                                            [out] ULONG* Count,
-                                            [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports,
-                                            [out] ULONG* PortsCount);
-    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCPruneLabelFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
+    HRESULT ListContainers([in, unique] const WSLCListContainersOptions* Options,[out, size_is(, *Count)] WSLCContainerEntry** Containers,[out] ULONG* Count, [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports, [out] ULONG* PortsCount);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [out] IWSLCProcess** Process, [out] int* Errno);
@@ -852,3 +868,5 @@ cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACI
 cpp_quote("#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9) /* 0x80040609 */")
 cpp_quote("#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10) /* 0x8004060A */")
 cpp_quote("#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11) /* 0x8004060B */")
+cpp_quote("#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12) /* 0x8004060C */")
+cpp_quote("#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */")

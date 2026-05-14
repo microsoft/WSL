@@ -994,6 +994,16 @@ Voltando à rede NAT.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>O WSL1 está desabilitado pela política do computador.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>O contêiner WSL está desabilitado pela política do computador.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>O registro de imagem de contêiner '{}' está bloqueado pela política do computador.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>A criação de imagens de contêiner está bloqueada porque uma lista de permissões do registro de contêiner está configurada pela política do computador. Os builds de imagem podem extrair imagens base de registros arbitrários e não podem ser restritos de forma confiável à lista de permissões.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Execute 'wsl.exe --set-version {} 2' para atualizar para o WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1351,7 +1361,7 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
-    <value>Only applicable when wsl2.networkingMode is set to NAT. Boolean to inform WSL to configure the DNS Server in Linux to the NAT on the host. Setting to false will mirror DNS servers from Windows to Linux.</value>
+    <value>Aplicável somente quando wsl2.networkingMode estiver definido como NAT. Booliano para informar ao WSL para configurar o servidor DNS no Linux com o NAT do host. Definir como false espelha os servidores DNS do Windows no Linux.</value>
     <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
@@ -2100,6 +2110,10 @@ Uso:
     <value>O contêiner '{}' não está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress is not yet supported.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>O contêiner '{}' está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2110,6 +2124,9 @@ Uso:
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>O nome da rede do contêiner é necessário para o tipo de rede personalizado.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Network name cannot be empty.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando não reconhecido: '{}'</value>
@@ -2261,6 +2278,14 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Opção obrigatória ausente: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Unknown option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Tipo de volume não suportado: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2289,6 +2314,14 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>A rede '{}' já existe.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Redes adicionais não são permitidas quando o modo de rede principal é 'host' ou 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Duplicate network: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Falha ao criar o volume ''{}'': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2304,6 +2337,9 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>Falha ao abrir "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Não há suporte para a importação de um pipe. Redirecione stdin de um arquivo.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Nenhum Containerfile ou Dockerfile encontrado em "{}"</value>
@@ -2394,6 +2430,12 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Inicia um contêiner.</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Display container resource usage statistics.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Interrompa contêineres.</value>
   </data>
@@ -2419,6 +2461,12 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Inspecionar imagens.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Importe uma imagem de um tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Importa o conteúdo de um tarball para criar uma imagem do sistema de arquivos. Opcionalmente, marque a imagem com um repositório e um nome de marca.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Liste imagens.</value>
@@ -2675,6 +2723,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Nome da imagem</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Arquivo ou - para ler da entrada padrão</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Fornece o caminho para o arquivo morto tar que contém a imagem</value>
@@ -2950,6 +3001,42 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Objeto não encontrado: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>CONTAINER ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>CREATED</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>STATUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MEM USAGE / LIMIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOCK I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Aviso: valor inválido para a configuração '{}' em {}:{}.</value>

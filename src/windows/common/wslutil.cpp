@@ -88,8 +88,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
-    X(WSL_E_CONTAINER_DISABLED),
-    X(WSL_E_REGISTRY_BLOCKED_BY_POLICY),
+    X(WSLC_E_CONTAINER_DISABLED),
+    X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
     X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
@@ -785,7 +785,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_NOT_A_LINUX_DISTRO:
         return Localization::MessageInvalidDistributionTar();
 
-    case WSL_E_CONTAINER_DISABLED:
+    case WSLC_E_CONTAINER_DISABLED:
         return Localization::MessageWSLContainerDisabled();
 
     case WSL_E_INVALID_USAGE:

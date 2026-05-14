@@ -14,6 +14,8 @@ Abstract:
 
 #pragma once
 
+#include "registry.hpp"
+
 #define ROOT_POLICIES_KEY L"Software\\Policies"
 
 namespace wsl::windows::policies {
@@ -33,15 +35,6 @@ inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSett
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
-
-inline wil::unique_hkey CreatePoliciesKey(DWORD desiredAccess)
-{
-    wil::unique_hkey key;
-    LOG_IF_WIN32_ERROR(
-        RegCreateKeyExW(HKEY_LOCAL_MACHINE, c_registryKey, 0, nullptr, REG_OPTION_NON_VOLATILE, desiredAccess, nullptr, &key, nullptr));
-
-    return key;
-}
 
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)
 try
@@ -143,46 +136,16 @@ try
         return entries;
     }
 
-    DWORD maxValueNameChars = 0;
-    DWORD maxValueDataBytes = 0;
-    THROW_IF_WIN32_ERROR(RegQueryInfoKeyW(
-        subKey, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &maxValueNameChars, &maxValueDataBytes, nullptr, nullptr));
-
-    std::wstring nameBuffer(static_cast<size_t>(maxValueNameChars) + 1, L'\0');
-    std::wstring dataBuffer(maxValueDataBytes / sizeof(wchar_t) + 1, L'\0');
-    for (DWORD index = 0;; ++index)
+    for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey))
     {
-        DWORD nameSize = static_cast<DWORD>(nameBuffer.size());
-        DWORD dataSize = static_cast<DWORD>(dataBuffer.size() * sizeof(wchar_t));
-        DWORD type = 0;
-        const auto status =
-            RegEnumValueW(subKey, index, nameBuffer.data(), &nameSize, nullptr, &type, reinterpret_cast<BYTE*>(dataBuffer.data()), &dataSize);
-        if (status == ERROR_NO_MORE_ITEMS)
-        {
-            break;
-        }
-
-        THROW_IF_WIN32_ERROR(status);
-        if (type != REG_SZ && type != REG_EXPAND_SZ)
-        {
-            continue;
-        }
-
-        const size_t chars = dataSize / sizeof(wchar_t);
-        std::wstring_view entry{dataBuffer.data(), chars};
-        if (!entry.empty() && entry.back() == L'\0')
-        {
-            entry.remove_suffix(1);
-        }
-
         // Skip empty entries so a stray blank list item in the GP editor doesn't make the
         // allowlist non-empty (which would otherwise deny every registry).
-        if (entry.empty())
+        if (value.empty())
         {
             continue;
         }
 
-        entries.emplace_back(entry);
+        entries.emplace_back(std::move(value));
     }
 
     return entries;

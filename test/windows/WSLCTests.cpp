@@ -28,8 +28,8 @@ using wsl::windows::common::RunningWSLCContainer;
 using wsl::windows::common::RunningWSLCProcess;
 using wsl::windows::common::WSLCContainerLauncher;
 using wsl::windows::common::WSLCProcessLauncher;
-using wsl::windows::common::relay::OverlappedIOHandle;
-using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::io::OverlappedIOHandle;
+using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
 
 extern std::wstring g_testDataPath;
@@ -102,7 +102,7 @@ class WSLCTests
         }
 
         PruneResult result;
-        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         if (result.result.ContainersCount > 0)
         {
             LogInfo("Pruned %lu containers", result.result.ContainersCount);
@@ -181,6 +181,30 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->OpenContainer(name.c_str(), &rawContainer));
 
         return RunningWSLCContainer(std::move(rawContainer), {});
+    }
+
+    struct ListContainersResult
+    {
+        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> Containers;
+        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> Ports;
+    };
+
+    // Issues IWSLCSession::ListContainers with WSLCListContainersFlagsAll (all containers, no filter).
+    // If a future caller needs a different flag set, add a parameter.
+    ListContainersResult ListContainers(IWSLCSession* session)
+    {
+        WSLCListContainersOptions options{};
+        options.Flags = WSLCListContainersFlagsAll;
+
+        ListContainersResult result;
+        VERIFY_SUCCEEDED(session->ListContainers(
+            &options,
+            result.Containers.addressof(),
+            result.Containers.size_address<ULONG>(),
+            result.Ports.addressof(),
+            result.Ports.size_address<ULONG>()));
+
+        return result;
     }
 
     std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, USHORT port = 5000)
@@ -2097,11 +2121,7 @@ class WSLCTests
             });
 
             // Validate that the session is correctly restarted.
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-
-            VERIFY_SUCCEEDED(
-                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            auto [containers, ports] = ListContainers(m_defaultSession.get());
 
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].Id, containerId);
@@ -3970,7 +3990,7 @@ class WSLCTests
         // Prune containers on exit so this test doesn't leak "wslc-test-container-vhd" on exit.
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             PruneResult result;
-            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         });
 
         WSLCVolumeOptions volumeOptions{};
@@ -5552,11 +5572,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerState)
     {
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLCContainerState>>& expectedContainers) {
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-
-            VERIFY_SUCCEEDED(
-                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            auto [containers, ports] = ListContainers(m_defaultSession.get());
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -5598,10 +5614,7 @@ class WSLCTests
             ULONGLONG runningStateChangedAt{};
             ULONGLONG runningCreatedAt{};
             {
-                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
-                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                auto [containers, ports] = ListContainers(m_defaultSession.get());
                 VERIFY_ARE_EQUAL(containers.size(), 1);
                 runningStateChangedAt = containers[0].StateChangedAt;
                 runningCreatedAt = containers[0].CreatedAt;
@@ -5627,10 +5640,7 @@ class WSLCTests
 
             // Verify that StateChangedAt was updated after the state transition.
             {
-                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
-                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                auto [containers, ports] = ListContainers(m_defaultSession.get());
                 VERIFY_ARE_EQUAL(containers.size(), 1);
 
                 auto now = static_cast<ULONGLONG>(time(nullptr));
@@ -5871,14 +5881,123 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerListFilter)
+    {
+        // Lists containers with the given filter options and returns the names as a set.
+        auto listContainers = [&](DWORD flags, std::initializer_list<std::pair<std::string, std::string>> filterPairs) {
+            std::vector<std::pair<std::string, std::string>> storage(filterPairs.begin(), filterPairs.end());
+            std::vector<WSLCFilter> filters;
+            filters.reserve(storage.size());
+            for (const auto& [k, v] : storage)
+            {
+                filters.push_back({.Key = k.c_str(), .Value = v.c_str()});
+            }
+
+            WSLCListContainersOptions options{};
+            options.Flags = flags;
+            options.Filters = filters.data();
+            options.FiltersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+            std::set<std::string> names;
+            for (const auto& c : containers)
+            {
+                names.insert(c.Name);
+            }
+            return names;
+        };
+
+        auto expectContainers =
+            [&](DWORD flags, std::initializer_list<std::pair<std::string, std::string>> filterPairs, std::set<std::string> expected) {
+                VERIFY_ARE_EQUAL(expected, listContainers(flags, filterPairs));
+            };
+
+        // Set up: one running container, one exited container, one created container.
+        WSLCContainerLauncher runningLauncher("debian:latest", "filter-running", {"sleep", "99999"});
+        runningLauncher.AddLabel("filter.test", "yes");
+        runningLauncher.AddLabel("filter.role", "primary");
+        auto runningContainer = runningLauncher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(runningContainer.State(), WslcContainerStateRunning);
+        std::string runningId = runningContainer.Id();
+
+        WSLCContainerLauncher exitedLauncher("debian:latest", "filter-exited", {"true"});
+        exitedLauncher.AddLabel("filter.test", "yes");
+        auto exitedContainer = exitedLauncher.Launch(*m_defaultSession);
+        exitedContainer.GetInitProcess().Wait();
+        VERIFY_ARE_EQUAL(exitedContainer.State(), WslcContainerStateExited);
+
+        WSLCContainerLauncher createdLauncher("debian:latest", "filter-created", {"echo", "hi"});
+        auto createdContainer = createdLauncher.Create(*m_defaultSession);
+        VERIFY_ARE_EQUAL(createdContainer.State(), WslcContainerStateCreated);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(runningContainer.Get().Delete(WSLCDeleteFlagsForce));
+            LOG_IF_FAILED(exitedContainer.Get().Delete(WSLCDeleteFlagsForce));
+            LOG_IF_FAILED(createdContainer.Get().Delete(WSLCDeleteFlagsForce));
+        });
+
+        // Default (Flags=None, no filters) -> only running containers visible.
+        expectContainers(WSLCListContainersFlagsNone, {}, {"filter-running"});
+
+        // --all (Flags=All, no filters) -> all three visible.
+        expectContainers(WSLCListContainersFlagsAll, {}, {"filter-running", "filter-exited", "filter-created"});
+
+        // status=exited
+        expectContainers(WSLCListContainersFlagsAll, {{"status", "exited"}}, {"filter-exited"});
+
+        // status=running OR status=created (multiple values for the same key are OR'd by Docker).
+        expectContainers(
+            WSLCListContainersFlagsAll, {{"status", "running"}, {"status", "created"}}, {"filter-running", "filter-created"});
+
+        // name=filter-running
+        expectContainers(WSLCListContainersFlagsAll, {{"name", "filter-running"}}, {"filter-running"});
+
+        // id prefix match
+        expectContainers(WSLCListContainersFlagsAll, {{"id", runningId.substr(0, 12)}}, {"filter-running"});
+
+        // label=filter.test (key-only) matches running and exited (both have the label).
+        expectContainers(WSLCListContainersFlagsAll, {{"label", "filter.test"}}, {"filter-running", "filter-exited"});
+
+        // label=filter.role=primary (key=value) matches only the running container.
+        expectContainers(WSLCListContainersFlagsAll, {{"label", "filter.role=primary"}}, {"filter-running"});
+
+        // Multiple keys are AND'd: status=exited AND label=filter.test.
+        expectContainers(WSLCListContainersFlagsAll, {{"status", "exited"}, {"label", "filter.test"}}, {"filter-exited"});
+
+        // before=filter-exited -> only containers created before filter-exited are visible.
+        expectContainers(WSLCListContainersFlagsAll, {{"before", "filter-exited"}}, {"filter-running"});
+
+        // since=filter-running -> only containers created after filter-running are visible.
+        expectContainers(WSLCListContainersFlagsAll, {{"since", "filter-running"}}, {"filter-exited", "filter-created"});
+
+        // exited=0 -> only the exited container that completed successfully.
+        expectContainers(WSLCListContainersFlagsAll, {{"exited", "0"}}, {"filter-exited"});
+
+        // Limit caps the result count.
+        {
+            WSLCListContainersOptions options{};
+            options.Flags = WSLCListContainersFlagsAll;
+            options.Limit = 1;
+
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+            // Docker returns at most one container; we intersect with the
+            // session list so the actual count should also be at most one.
+            VERIFY_IS_TRUE(containers.size() <= 1u);
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerNetwork)
     {
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLCContainerState>>& expectedContainers) {
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-
-            VERIFY_SUCCEEDED(
-                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            auto [containers, ports] = ListContainers(m_defaultSession.get());
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -6812,7 +6931,8 @@ class WSLCTests
             {
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                VERIFY_SUCCEEDED(session.ListContainers(
+                    nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
                 // Find the container ID for "test-ports"
                 std::string testPortsId;
@@ -6856,7 +6976,8 @@ class WSLCTests
 
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                VERIFY_SUCCEEDED(session.ListContainers(
+                    nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
                 std::string createdId = createdContainer.Id();
                 for (const auto& port : ports)
@@ -6882,7 +7003,8 @@ class WSLCTests
             {
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                VERIFY_SUCCEEDED(session.ListContainers(
+                    nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
                 std::string stoppedId = container.Id();
                 for (const auto& port : ports)
@@ -7379,12 +7501,12 @@ class WSLCTests
             std::vector<std::string> lines;
             auto onData = [&](const gsl::span<char>& data) { lines.emplace_back(data.data(), data.size()); };
 
-            wsl::windows::common::relay::MultiHandleWait io;
+            wsl::windows::common::io::MultiHandleWait io;
 
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::LineBasedReadHandle>(std::move(readPipe), std::move(onData), Crlf));
+            io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(std::move(readPipe), std::move(onData), Crlf));
 
             std::vector<char> buffer{Data.begin(), Data.end()};
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+            io.AddHandle(std::make_unique<wsl::windows::common::io::WriteHandle>(std::move(writePipe), buffer));
 
             io.Run({});
 
@@ -7443,12 +7565,12 @@ class WSLCTests
             std::vector<std::string> chunks;
             auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
 
-            wsl::windows::common::relay::MultiHandleWait io;
+            wsl::windows::common::io::MultiHandleWait io;
 
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(std::move(readPipe), std::move(onData)));
+            io.AddHandle(std::make_unique<wsl::windows::common::io::HTTPChunkBasedReadHandle>(std::move(readPipe), std::move(onData)));
 
             std::vector<char> buffer{Data.begin(), Data.end()};
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+            io.AddHandle(std::make_unique<wsl::windows::common::io::WriteHandle>(std::move(writePipe), buffer));
 
             io.Run({});
 
@@ -7511,8 +7633,8 @@ class WSLCTests
             std::vector<std::string> chunks;
             auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
 
-            auto reader = std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(
-                wsl::windows::common::relay::HandleWrapper{nullptr}, std::move(onData));
+            auto reader = std::make_unique<wsl::windows::common::io::HTTPChunkBasedReadHandle>(
+                wsl::windows::common::io::HandleWrapper{nullptr}, std::move(onData));
 
             std::string allData;
             for (const auto& datum : Data)
@@ -7582,9 +7704,9 @@ class WSLCTests
             auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
 
             std::string readData;
-            wsl::windows::common::relay::MultiHandleWait io;
+            wsl::windows::common::io::MultiHandleWait io;
 
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(std::move(readPipe), [&](const gsl::span<char>& buffer) {
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(std::move(readPipe), [&](const gsl::span<char>& buffer) {
                 if (!buffer.empty())
                 {
                     readData.append(buffer.data(), buffer.size());
@@ -7616,7 +7738,7 @@ class WSLCTests
                 std::filesystem::remove("write-handle-test");
             });
 
-            wsl::windows::common::relay::MultiHandleWait io;
+            wsl::windows::common::io::MultiHandleWait io;
             io.AddHandle(std::make_unique<WriteHandle>(outputFile.get(), writeBuffer));
             io.Run({});
 
@@ -7636,7 +7758,7 @@ class WSLCTests
 
     TEST_METHOD(DockerIORelay)
     {
-        using namespace wsl::windows::common::relay;
+        using namespace wsl::windows::common::io;
 
         auto runTest = [](const std::vector<char>& Input, const std::string& ExpectedStdout, const std::string& ExpectedStderr) {
             auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
@@ -7738,9 +7860,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
             // Capture StateChangedAt and CreatedAt before the session is destroyed.
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            auto [containers, ports] = ListContainers(session.get());
             VERIFY_ARE_EQUAL(containers.size(), 1);
             originalStateChangedAt = containers[0].StateChangedAt;
             originalCreatedAt = containers[0].CreatedAt;
@@ -7756,9 +7876,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
             // Verify that StateChangedAt was correctly restored from the Docker timestamp.
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            auto [containers, ports] = ListContainers(session.get());
             VERIFY_ARE_EQUAL(containers.size(), 1);
 
             // StateChangedAt may differ by ~1s between live (event time) and recovery (FinishedAt).
@@ -8493,7 +8611,6 @@ class WSLCTests
         WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
 
         auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
 
         wil::com_ptr<IWSLCContainer> container;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats", &container));
@@ -8576,7 +8693,6 @@ class WSLCTests
     {
         WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-null", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
         auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
 
         wil::com_ptr<IWSLCContainer> container;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-null", &container));
@@ -8771,8 +8887,8 @@ class WSLCTests
 
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-            VERIFY_SUCCEEDED(
-                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
@@ -8806,7 +8922,8 @@ class WSLCTests
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
         wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+            nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(containers.size(), 0);
     }
 
@@ -8936,8 +9053,8 @@ class WSLCTests
         {
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-            VERIFY_SUCCEEDED(
-                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             if (containers.size() > 0)
             {
@@ -9037,7 +9154,7 @@ class WSLCTests
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             PruneResult result;
-            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         });
 
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
@@ -9061,8 +9178,8 @@ class WSLCTests
             std::string output;
             auto onRead = [&](const gsl::span<char>& data) { output.append(data.data(), data.size()); };
 
-            wsl::windows::common::relay::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(TtyOut, std::move(onRead)));
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(TtyOut, std::move(onRead)));
 
             io.Run(60s);
 
@@ -9154,19 +9271,19 @@ class WSLCTests
     {
         auto expectPrune = [this](
                                const std::vector<std::string>& expectedIds = {},
-                               const std::map<std::string, std::pair<const char*, bool>>& labels = {},
-                               uint64_t until = 0,
+                               const std::vector<std::pair<std::string, std::string>>& filterPairs = {},
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
-            std::vector<WSLCPruneLabelFilter> labelsFilter;
-            for (const auto& e : labels)
+            std::vector<WSLCFilter> filters;
+            filters.reserve(filterPairs.size());
+            for (const auto& [key, value] : filterPairs)
             {
-                labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
+                filters.push_back({key.c_str(), value.c_str()});
             }
 
             VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(
-                labels.empty() ? nullptr : labelsFilter.data(), static_cast<DWORD>(labelsFilter.size()), until, &result.result));
+                filters.empty() ? nullptr : filters.data(), static_cast<ULONG>(filters.size()), &result.result));
 
             std::vector<std::string> prunedContainers;
             for (size_t i = 0; i < result.result.ContainersCount; i++)
@@ -9230,16 +9347,16 @@ class WSLCTests
             auto testPrune4 = RunAndWait(testPrune4Launcher);
 
             // Expect testPrune1 to be selected via key=value.
-            expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
+            expectPrune({testPrune1.Id()}, {{"label", "key=value"}});
 
             // Expect testPrune2 to be selected via key being present.
-            expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
+            expectPrune({testPrune2.Id()}, {{"label", "key"}});
 
             // Prune by absence of 'anotherKey' label.
-            expectPrune({testPrune4.Id()}, {{"anotherKey", {nullptr, false}}});
+            expectPrune({testPrune4.Id()}, {{"label!", "anotherKey"}});
 
             // Prune by label inequality.
-            expectPrune({testPrune3.Id()}, {{"anotherKey", {"someValue", false}}});
+            expectPrune({testPrune3.Id()}, {{"label!", "anotherKey=someValue"}});
         }
 
         // Validate that the 'until' filter works.
@@ -9250,17 +9367,17 @@ class WSLCTests
 
             auto now = time(nullptr);
 
-            expectPrune({}, {}, now - 3600);
-            expectPrune({container.Id()}, {}, now + 3600);
+            expectPrune({}, {{"until", std::to_string(now - 3600)}});
+            expectPrune({container.Id()}, {{"until", std::to_string(now + 3600)}});
         }
 
         // Validate error paths.
         {
-            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = "", .Present = false};
+            WSLCFilter filter{.Key = nullptr, .Value = nullptr};
             PruneResult result;
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, &result.result), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 

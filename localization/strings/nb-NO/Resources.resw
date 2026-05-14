@@ -987,6 +987,16 @@ Faller tilbake til NAT-nettverk.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 er deaktivert av datamaskinpolicyen.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>The container image registry '{}' is blocked by the computer policy.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Bygging av beholderavbildninger blokkeres fordi en tillatelsesliste for beholderregister er konfigurert av datamaskinpolicyen. Bildebygg kan hente basisavbildninger fra vilkårlige registre og kan ikke begrenses pålitelig til tillatelseslisten.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Kjør wsl.exe --set-version {} 2 for å oppgradere til WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2093,6 +2103,10 @@ Bruk:
     <value>Beholderen «{}» kjører ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress støttes ikke ennå.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Beholderen «{}» kjører.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2103,6 +2117,9 @@ Bruk:
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Navn på beholdernettverk kreves for egendefinert nettverkstype.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Nettverksnavnet kan ikke være tomt</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Ukjent kommando: »{}»</value>
@@ -2254,6 +2271,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Mangler obligatorisk alternativ: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Unknown option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Ustøttet volumtype: «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2282,6 +2307,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Nettverket {} finnes allerede.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Flere nettverk er ikke tillatt når den primære nettverksmodusen er «vert» (host) eller «ingen» (none).</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Duplisert nettverk: «{}»</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Kunne ikke opprette volumet «{}»: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2297,6 +2330,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>Kan ikke åpne {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Import fra en datakanal støttes ikke. Omdiriger stdin fra en fil.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Finner ingen Containerfile eller Dockerfile i {}</value>
@@ -2387,6 +2423,12 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Starter en beholder.</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Display container resource usage statistics.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Stopp beholdere.</value>
   </data>
@@ -2412,6 +2454,12 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Inspiser avbildninger.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Importer et bilde fra en tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Importerer innholdet i en tarball for å opprette en filsystemavbildning. Du kan også merke bildet med et repositoriums- og kodenavn.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Vis avbildninger.</value>
@@ -2668,6 +2716,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Navn på avbildning</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Fil eller - for å lese fra stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Oppgir banen til tar-arkivfilen som inneholder avbildningen</value>
@@ -2943,6 +2994,42 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Finner ikke objekt: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>CONTAINER ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>CREATED</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>STATUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MEM USAGE / LIMIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOCK I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Advarsel: Ugyldig verdi for innstilling {} i {}:{}.</value>

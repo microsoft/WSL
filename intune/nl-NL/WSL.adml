@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Windows-subsysteem voor Linux</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Windows-subsysteem voor Linux</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Het Windows-subsysteem voor Linux toestaan</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">Wanneer deze optie is uitgeschakeld, wordt met dit beleid de toegang tot het uitvoeren van Linux distributies in de Windows-subsysteem voor Linux voor alle gebruikers op de computer uitgeschakeld.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">De Postvak IN-versie van het Windows-subsysteem voor Linux toestaan</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">Als dit beleid is uitgeschakeld, wordt de inbox-versie (optioneel onderdeel) van het Windows-subsysteem voor Linux uitgeschakeld. Als dit beleid is uitgeschakeld, kan alleen de Store-versie van WSL worden gebruikt.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">WSL1 toestaan</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">Als deze optie is uitgeschakeld, wordt WSL1 met dit beleid uitgeschakeld. Als deze optie is uitgeschakeld, kunnen alleen WSL2-distributies worden gebruikt.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Aangepaste kernelconfiguratie toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">Als dit beleid is uitgeschakeld, wordt aangepaste kernelconfiguratie via .wslconfig (wsl2.kernel) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Aangepaste systeemdistributieconfiguratie toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">Als dit beleid is uitgeschakeld, wordt aangepaste systeemdistributieconfiguratie via .wslconfig (wsl2.systemDistro) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Configuratie van de kernelopdrachtregel toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">Als dit beleid is uitgeschakeld, wordt kernelcommandoconfiguratie via .wslconfig (wsl2.kernelCommandLine) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="AllowDebugShell">De foutopsporingsshell toestaan</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">Als dit beleid is uitgeschakeld, wordt de foutopsporingsshell (wsl.exe --debug-shell) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Geneste virtualisatie toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">Als dit beleid is uitgeschakeld, wordt configuratie van geneste virtualisatie via .wslconfig (wsl2.nestedVirtualization) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Kernelfoutopsporing toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">Als dit beleid is uitgeschakeld, wordt configuratie voor kernelfoutopsporing via .wslconfig (wsl2.kernelDebugPort) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Aangepaste netwerkconfiguratie toestaan</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">Als dit beleid is uitgeschakeld, wordt aangepaste netwerkconfiguratie via .wslconfig (wsl2.networkingmode) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Sta de gebruiker toe de firewallconfiguratie in te stellen</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">Als dit beleid is uitgeschakeld, wordt firewallconfiguratie via .wslconfig (wsl2.firewall) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="AllowDiskMount">Sta passthrough-schijfkoppeling toe</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">Als dit beleid is uitgeschakeld, wordt het koppelen van passthrough-schijven in WSL2 (wsl.exe --mount) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Standaardnetwerkmodus configureren</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Dit beleid geeft de standaardnetwerkmodus op die moet worden gebruikt voor WSL2.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Geen</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Gespiegeld</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL-container</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">WSL-container toestaan</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Met dit beleid bepaalt u of een WSL-container op deze computer kan worden gebruikt. Wanneer deze optie is ingeschakeld of niet is geconfigureerd, kunnen gebruikers en Windows-toepassingen Linux-containers uitvoeren via WSL. Als deze optie is uitgeschakeld, wordt de WSL-container geblokkeerd voor alle gebruikers en kunnen Windows-apps geen Linux-containers uitvoeren. Waarschuwing: als u deze optie instelt op Uitgeschakeld, kunnen Windows-apps die afhankelijk zijn van Linux-containers, worden onderbroken.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">Acceptatielijst voor WSL-containerregisters</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">Als deze optie is ingeschakeld, mag de WSL-container alleen installatiekopieën ophalen uit de registers die hier worden vermeld. Dit is van invloed op zowel de WSL-container-CLI als alle toepassingen die gebruikmaken van de WSL-container-API.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Standaardnetwerkmodus</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Toegestane registers</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>
