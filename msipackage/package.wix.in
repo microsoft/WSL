@@ -611,6 +611,29 @@
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
         <CustomAction Id="CalculateWslSettingsProtocolIds" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="CalculateWslSettingsProtocolIds" Return="check" Execute='immediate' />
 
+        <!-- Builds the list of files this MSI will install (resolved to absolute target
+             paths) and stashes it into the property whose name matches the deferred CA
+             below. MSI propagates that property as CustomActionData. -->
+        <CustomAction Id="BuildPendingDeleteScrubList"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="BuildPendingDeleteScrubList"
+            Return="check"
+            Execute="immediate" />
+
+        <!-- Walks HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations
+             and drops any delete-on-reboot entries whose source path matches a file this
+             MSI is about to (re)install. Required because the major-upgrade uninstall pass
+             can schedule delete-on-reboot for files held open by vmwp.exe (e.g. system.vhd
+             and tools\modules.vhd). Without this, Session Manager would wipe the
+             freshly-installed files at the next reboot. -->
+        <CustomAction Id="CancelPendingDeletesForInstalledFiles"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="CancelPendingDeletesForInstalledFiles"
+            Return="check"
+            Execute="deferred" />
+
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
@@ -665,6 +688,14 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+
+            <Custom Action="BuildPendingDeleteScrubList"
+                After="CostFinalize"
+                Condition='(not REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
+
+            <Custom Action="CancelPendingDeletesForInstalledFiles"
+                Before="InstallFiles"
+                Condition='(not REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
 
         </InstallExecuteSequence>
 

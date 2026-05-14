@@ -940,6 +940,243 @@ extern "C" UINT __stdcall CalculateWslSettingsProtocolIds(MSIHANDLE install)
     return NOERROR;
 }
 
+std::wstring GetRecordString(MSIHANDLE record, UINT field)
+{
+    DWORD size = 0;
+    std::wstring output(1, L'\0');
+    UINT result = MsiRecordGetStringW(record, field, output.data(), &size);
+    THROW_HR_IF_MSG(E_UNEXPECTED, result != ERROR_SUCCESS && result != ERROR_MORE_DATA, "MsiRecordGetString failed with %u", result);
+
+    output.resize(size);
+    size = static_cast<DWORD>(output.size() + 1);
+    result = MsiRecordGetStringW(record, field, output.data(), &size);
+    THROW_HR_IF_MSG(E_UNEXPECTED, result != ERROR_SUCCESS, "MsiRecordGetString failed with %u", result);
+
+    return output;
+}
+
+std::wstring GetTargetPath(MSIHANDLE install, LPCWSTR directory)
+{
+    DWORD size = 0;
+    std::wstring output(1, L'\0');
+    UINT result = MsiGetTargetPathW(install, directory, output.data(), &size);
+    THROW_HR_IF_MSG(E_UNEXPECTED, result != ERROR_SUCCESS && result != ERROR_MORE_DATA, "MsiGetTargetPath failed with %u", result);
+
+    output.resize(size);
+    size = static_cast<DWORD>(output.size() + 1);
+    result = MsiGetTargetPathW(install, directory, output.data(), &size);
+    THROW_HR_IF_MSG(E_UNEXPECTED, result != ERROR_SUCCESS, "MsiGetTargetPath failed with %u", result);
+
+    return output;
+}
+
+std::wstring NormalizePendingPath(std::wstring path)
+{
+    constexpr std::wstring_view prefix = LR"(\??\)";
+    if (path.starts_with(prefix))
+    {
+        path.erase(0, prefix.size());
+    }
+    std::transform(path.begin(), path.end(), path.begin(), [](wchar_t c) { return static_cast<wchar_t>(towlower(c)); });
+    return path;
+}
+
+// Immediate CA: enumerate the File table for components being installed, resolve
+// absolute target paths, and stash the '|'-separated list into the property whose
+// name matches the deferred CA "CancelPendingDeletesForInstalledFiles". MSI
+// propagates that property to the deferred CA as CustomActionData.
+extern "C" UINT __stdcall BuildPendingDeleteScrubList(MSIHANDLE install)
+try
+{
+    WSL_INSTALL_LOG("BuildPendingDeleteScrubList");
+
+    const MSIHANDLE rawDatabase = MsiGetActiveDatabase(install);
+    THROW_HR_IF(E_UNEXPECTED, rawDatabase == 0);
+    unique_msi_handle database{rawDatabase};
+
+    unique_msi_handle view;
+    THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(
+        database.get(),
+        L"SELECT `File`.`FileName`, `File`.`Component_`, `Component`.`Directory_` "
+        L"FROM `File`, `Component` "
+        L"WHERE `File`.`Component_` = `Component`.`Component`",
+        &view));
+    THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), 0));
+
+    std::wstring paths;
+    for (;;)
+    {
+        MSIHANDLE rawRecord{};
+        const auto rc = MsiViewFetch(view.get(), &rawRecord);
+        if (rc == ERROR_NO_MORE_ITEMS)
+        {
+            break;
+        }
+        THROW_IF_WIN32_ERROR(rc);
+        unique_msi_handle record{rawRecord};
+
+        const auto fileName = GetRecordString(record.get(), 1);
+        const auto component = GetRecordString(record.get(), 2);
+        const auto directory = GetRecordString(record.get(), 3);
+        if (fileName.empty() || component.empty() || directory.empty())
+        {
+            continue;
+        }
+
+        // Only include files whose component will actually be (re)installed.
+        INSTALLSTATE installed = INSTALLSTATE_UNKNOWN;
+        INSTALLSTATE action = INSTALLSTATE_UNKNOWN;
+        if (MsiGetComponentStateW(install, component.c_str(), &installed, &action) != ERROR_SUCCESS || action != INSTALLSTATE_LOCAL)
+        {
+            continue;
+        }
+
+        // File.FileName is "shortname|longname"; prefer the long name when present.
+        const auto bar = fileName.find(L'|');
+        const std::wstring longName = (bar == std::wstring::npos) ? fileName : fileName.substr(bar + 1);
+
+        auto dir = GetTargetPath(install, directory.c_str());
+        if (dir.empty())
+        {
+            continue;
+        }
+        if (dir.back() != L'\\')
+        {
+            dir.push_back(L'\\');
+        }
+
+        if (!paths.empty())
+        {
+            paths.push_back(L'|');
+        }
+        paths.append(dir).append(longName);
+    }
+
+    THROW_IF_WIN32_ERROR(MsiSetPropertyW(install, L"CancelPendingDeletesForInstalledFiles", paths.c_str()));
+
+    return NOERROR;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return NOERROR;
+}
+
+// Deferred CA (runs as LocalSystem): walk PendingFileRenameOperations and drop
+// any delete-on-reboot entries whose source path is one this MSI is about to
+// (re)install. This protects against the scenario where a previous version's
+// uninstall scheduled the old file for delete-on-reboot (because the file was
+// in use), and the next-boot Session Manager pass would otherwise wipe the
+// freshly-installed file at the same path.
+extern "C" UINT __stdcall CancelPendingDeletesForInstalledFiles(MSIHANDLE install)
+try
+{
+    WSL_INSTALL_LOG("CancelPendingDeletesForInstalledFiles");
+
+    const auto data = GetMsiProperty(install, L"CustomActionData");
+    if (data.empty())
+    {
+        return NOERROR;
+    }
+
+    std::unordered_set<std::wstring> installSet;
+    for (size_t pos = 0; pos < data.size();)
+    {
+        const auto next = data.find(L'|', pos);
+        const auto end = (next == std::wstring::npos) ? data.size() : next;
+        installSet.insert(NormalizePendingPath(data.substr(pos, end - pos)));
+        pos = (next == std::wstring::npos) ? data.size() : next + 1;
+    }
+
+    if (installSet.empty())
+    {
+        return NOERROR;
+    }
+
+    static constexpr auto c_keyPath = LR"(SYSTEM\CurrentControlSet\Control\Session Manager)";
+    static constexpr auto c_valueName = L"PendingFileRenameOperations";
+
+    wil::unique_hkey key;
+    auto status = RegOpenKeyExW(HKEY_LOCAL_MACHINE, c_keyPath, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &key);
+    if (status == ERROR_FILE_NOT_FOUND)
+    {
+        return NOERROR;
+    }
+    THROW_IF_WIN32_ERROR(status);
+
+    DWORD type = 0;
+    DWORD size = 0;
+    status = RegQueryValueExW(key.get(), c_valueName, nullptr, &type, nullptr, &size);
+    if (status == ERROR_FILE_NOT_FOUND || size == 0)
+    {
+        return NOERROR;
+    }
+    THROW_IF_WIN32_ERROR(status);
+    THROW_HR_IF(E_UNEXPECTED, type != REG_MULTI_SZ);
+
+    std::wstring buffer(size / sizeof(wchar_t), L'\0');
+    THROW_IF_WIN32_ERROR(RegQueryValueExW(key.get(), c_valueName, nullptr, nullptr, reinterpret_cast<BYTE*>(buffer.data()), &size));
+
+    // Each entry in PendingFileRenameOperations is a pair of NUL-terminated wide
+    // strings (source, target). The whole REG_MULTI_SZ value is terminated by an
+    // extra NUL.
+    std::wstring rebuilt;
+    rebuilt.reserve(buffer.size());
+    bool changed = false;
+
+    size_t i = 0;
+    while (i < buffer.size() && buffer[i] != L'\0')
+    {
+        const std::wstring source{buffer.data() + i};
+        i += source.size() + 1;
+        if (i >= buffer.size())
+        {
+            break; // malformed pair; bail without further damage
+        }
+        const std::wstring target{buffer.data() + i};
+        i += target.size() + 1;
+
+        if (target.empty() && installSet.contains(NormalizePendingPath(source)))
+        {
+            WSL_LOG("CancelPendingDelete", TraceLoggingValue(source.c_str(), "Path"));
+            changed = true;
+            continue;
+        }
+
+        rebuilt.append(source).push_back(L'\0');
+        rebuilt.append(target).push_back(L'\0');
+    }
+
+    if (!changed)
+    {
+        return NOERROR;
+    }
+
+    if (rebuilt.empty())
+    {
+        const auto rc = RegDeleteValueW(key.get(), c_valueName);
+        LOG_HR_IF_MSG(HRESULT_FROM_WIN32(rc), rc != ERROR_SUCCESS && rc != ERROR_FILE_NOT_FOUND, "RegDeleteValue failed with %u", rc);
+    }
+    else
+    {
+        rebuilt.push_back(L'\0'); // double-NUL terminator
+        THROW_IF_WIN32_ERROR(RegSetValueExW(
+            key.get(),
+            c_valueName,
+            0,
+            REG_MULTI_SZ,
+            reinterpret_cast<const BYTE*>(rebuilt.data()),
+            static_cast<DWORD>(rebuilt.size() * sizeof(wchar_t))));
+    }
+
+    return NOERROR;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return NOERROR;
+}
+
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
     wil::DLLMain(Instance, Reason, Reserved);
