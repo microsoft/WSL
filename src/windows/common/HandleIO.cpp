@@ -757,8 +757,8 @@ DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapp
     }
     else
     {
-        Read = std::make_unique<io::ReadHandle>(
-            std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { this->OnRead(Buffer); });
+        Read =
+            std::make_unique<io::ReadHandle>(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { this->OnRead(Buffer); });
     }
 }
 
