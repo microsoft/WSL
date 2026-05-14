@@ -295,7 +295,7 @@ class WslcSdkWinRtTests
 
         // Negative: Null settings must fail.
         {
-            VERIFY_THROWS_HR(WSLCSDK::Session(nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER));
+            VERIFY_THROWS_HR(WSLCSDK::Session(WSLCSDK::SessionSettings{nullptr}), HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER));
         }
     }
 
@@ -1279,14 +1279,8 @@ class WslcSdkWinRtTests
         constexpr uint64_t c_vhdSizeBytes = 1ull * 1024 * 1024 * 1024; // 1 GiB
 
         const std::filesystem::path vhdSessionStorage = m_storagePath / "wslc-winrt-vhd-test-storage";
-        auto removeStorage = wil::scope_exit([&]() {
-            std::error_code error;
-            std::filesystem::remove_all(vhdSessionStorage, error);
-            if (error)
-            {
-                LogError("Failed to remove VHD test storage %ws: %hs", vhdSessionStorage.c_str(), error.message().c_str());
-            }
-        });
+        IGNORE_ERRORS(std::filesystem::remove_all(vhdSessionStorage));
+        auto cleanup = SCOPE_CLEANUP(std::filesystem::remove_all(vhdSessionStorage));
 
         // Create a dedicated session so that volume creation does not affect the shared default session.
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-vhd-test", vhdSessionStorage.wstring());
@@ -1491,6 +1485,10 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::Attach);
 
+        // Wait for the short-lived init process to exit
+        auto initProcess = container.InitProcess();
+        WaitForProcess(initProcess, 30s);
+
         // The init process has now exited. Attempting to exec on a stopped container must fail.
         auto execSettings = WSLCSDK::ProcessSettings();
         execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/echo", L"should-fail"}));
@@ -1513,7 +1511,8 @@ class WslcSdkWinRtTests
         auto cleanup = DELETE_ON_SCOPE_EXIT(container1);
 
         // Creating a second container with the same name must fail.
-        VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        auto container2 = m_defaultSession.CreateContainer(containerSettings);
+        VERIFY_THROWS_HR(container2.Start(WSLCSDK::ContainerStartFlags::None), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
     }
 
     WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
@@ -1550,7 +1549,7 @@ class WslcSdkWinRtTests
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
 
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings).Start(WSLCSDK::ContainerStartFlags::None), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
         }
 
         // Create a GPU-enabled session.
