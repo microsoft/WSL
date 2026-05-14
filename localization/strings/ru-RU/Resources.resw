@@ -401,215 +401,215 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>(c) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
+Сведения о конфиденциальности этого продукта см. на странице https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Использование: wsl.exe [аргумент] [параметры...] [командная_строка]
 
-Arguments for running Linux binaries:
+Аргументы для запуска двоичных файлов Linux:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Если командная строка не указана, wsl.exe запускает оболочку по умолчанию.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Выполнить указанную команду без использования оболочки Linux по умолчанию.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Выполнить указанную команду с указанным типом оболочки.
 
     --
-        Pass the remaining command line as-is.
+        Передать оставшуюся командную строку без изменений.
 
-Options:
+Параметры:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Задает указанный каталог в качестве текущего рабочего каталога.
+        Если указан символ "~", будет использоваться домашний путь пользователя Linux. Если путь начинается
+        с символа "/", он будет интерпретироваться как абсолютный путь Linux.
+        В противном случае значение должно быть абсолютным путем Windows.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Запуск указанного дистрибутива.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Запуск дистрибутива с указанным ИД.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Запуск от имени указанного пользователя.
 
     --system
-        Launches a shell for the system distribution.
+        Запускает оболочку для дистрибутива системы.
 
-Arguments for managing Windows Subsystem for Linux:
+Аргументы для управления подсистемой Windows для Linux:
 
     --help
-        Display usage information.
+        Вывод сведений об использовании.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Открыть оболочку отладки WSL2 для целей диагностики.
 
-    --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+    --install [дистрибутив] [параметры...]
+        Установить дистрибутив подсистемы Windows для Linux.
+        Для получения списка допустимых дистрибутивов используйте 'wsl.exe --list --online'.
 
-        Options:
+        Параметры:
             --enable-wsl1
-                Enable WSL1 support.
+                Включить поддержку WSL1.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Создать диск фиксированного размера для хранения дистрибутива.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Установить дистрибутив из локального файла.
 
             --legacy
-                Use the legacy distribution manifest.
+                Использовать устаревший манифест дистрибутива.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Задать путь установки для дистрибутива.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Задать имя дистрибутива.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Устанавливать только необходимые дополнительные компоненты, но не дистрибутив.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Не запускать дистрибутив после установки.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Указывает версию, используемую для нового дистрибутива.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Указывает размер диска для хранения дистрибутива.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Скачать дистрибутив из Интернета вместо Microsoft Store.
 
-    --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+    --manage [дистрибутив] [параметры...]
+        Изменяет определенные параметры дистрибутива.
 
-        Options:
+        Параметры:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Переместить дистрибутив в новое местоположение.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Задать для VHD дистрибутива значение "разреженный", чтобы обеспечить автоматическое освобождение дискового пространства.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Задать пользователя по умолчанию для дистрибутива.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Изменить размер диска дистрибутива до указанного размера.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Присоединяет и подключает физический или виртуальный диск во всех дистрибутивах WSL 2.
 
-        Options:
+        Параметры:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Указывает, что &lt;Disk&gt; относится к виртуальному жесткому диску.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Присоединить диск к WSL2, но не подключать его.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Подключить диск, используя собственное имя для точки подключения.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Файловая система, используемая при подключении диска. Если не указано, по умолчанию используется ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Дополнительные параметры подключения.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Индекс подключаемого раздела. Если не указано, по умолчанию используется весь диск.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Изменяет версию установки по умолчанию для новых дистрибутивов.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Немедленно завершает все выполняющиеся дистрибутивы и
+        упрощенную виртуальную машину служебной программы WSL 2.
 
-        Options:
+        Параметры:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Прервать работу виртуальной машины WSL 2, даже если операция выполняется. Может привести к потере данных.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Показывает состояние подсистемы Windows для Linux.
 
-    --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+    --unmount [диск]
+        Отключает и отсоединяет диск от всех дистрибутивов WSL2.
+        При вызове без аргумента отключает и отсоединяет все диски.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Удаляет с этого компьютера пакет подсистемы Windows для Linux.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Обновление пакета подсистемы Windows для Linux.
 
-        Options:
+        Параметры:
             --pre-release
-                Download a pre-release version if available.
+                Скачивание предварительной версии, если она доступна.
 
     --version, -v
-        Display version information.
+        Вывод сведений о версии.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Аргументы для управления дистрибутивами в подсистеме Windows для Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [параметры]
+        Экспорт дистрибутива в tar-файл.
+        Имя файла может быть "-" для stdout.
 
-        Options:
+        Параметры:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Указывает формат экспорта. Поддерживаемые значения: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [параметры]
+        Импортирует указанный tar-файл в качестве нового дистрибутива.
+        Имя файла может быть "-" для stdin.
 
-        Options:
-            --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+        Параметры:
+            --version &lt;версия&gt;
+                Указывает версию, используемую для нового дистрибутива.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Указывает, что предоставленный файл является файлом VHD или VHDX, а не tar-файлом.
+                Эта операция создает копию VHD-файла в указанном расположении установки.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Импортирует указанный VHD-файл в качестве нового дистрибутива.
+        Этот VHD должен быть отформатирован с типом файловой системы ext4.
 
-    --list, -l [Options]
-        Lists distributions.
+    --list, -l [параметры]
+        Перечисление дистрибутивов.
 
-        Options:
+        Параметры:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Перечислить все дистрибутивы, включая дистрибутивы,
+                которые устанавливаются или удаляются в настоящий момент.
 
             --running
-                List only distributions that are currently running.
+                Перечислить только дистрибутивы, которые сейчас запущены.
 
             --quiet, -q
-                Only show distribution names.
+                Показывать только имена дистрибутивов.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Вывод подробных сведений обо всех дистрибутивах.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Вывод списка дистрибутивов, доступных для установки с помощью команды 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Задает дистрибутив по умолчанию.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Изменяет версию указанного дистрибутива.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Прерывает работу указанного дистрибутива.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Отменяет регистрацию дистрибутива и удаляет корневую файловую систему.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -652,7 +652,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>The custom kernel modules VHD in {} was not found: '{}'.</value>
+    <value>VHD пользовательских модулей ядра в {} не найден: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -994,6 +994,16 @@ Arguments for managing distributions in Windows Subsystem for Linux:
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>Подсистема WSL1 отключена политикой компьютера.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>Реестр образов контейнера "{}" заблокирован политикой компьютера.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Выполните команду "wsl.exe --set-version {} 2", чтобы перейти на WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1285,7 +1295,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Обзор дистрибутивов</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Specify a path to a VHD which will load as a custom system distro, primarily used to power GUI apps in WSL. [Learn more about system distros here].</value>
+    <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
     <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1312,7 +1322,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Логическое значение для включения окна вывода консоли, в котором отображается содержимое диагностических сообщений при запуске экземпляра дистрибутива WSL 2.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Default VHD Size</value>
+    <value>Размер VHD по умолчанию</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
@@ -1323,7 +1333,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Восстановить размер</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Default VHD Size</value>
+    <value>Размер VHD по умолчанию</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
@@ -1887,19 +1897,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Enable sparse VHD by default</value>
+    <value>Включить разреженный VHD по умолчанию</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <value>Все вновь созданные VHD будут автоматически настроены на разрежение при включении.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Enable sparse VHD by default.</value>
+    <value>Включить разреженный VHD по умолчанию.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <value>Все вновь созданные VHD будут автоматически настроены на разрежение при включении.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
@@ -2100,6 +2110,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Контейнер "{}" не запущен.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress is not yet supported.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Контейнер "{}" запущен.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2110,6 +2124,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Для пользовательского типа сети требуется имя сети контейнера.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Network name cannot be empty.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Нераспознанная команда: "{}"</value>
@@ -2261,6 +2278,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Отсутствует обязательный параметр: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Недопустимое значение варианта "{}": "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Неизвестный вариант: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Неподдерживаемый тип тома: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2289,6 +2314,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Сеть "{}" уже существует.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Duplicate network: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Не удалось создать том '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2304,6 +2337,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>Не удалось открыть "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Importing from a pipe is not supported. Please redirect stdin from a file.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Containerfile или Dockerfile не найдены в '{}'.</value>
@@ -2394,6 +2430,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Запускает контейнер.</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Display container resource usage statistics.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Остановить контейнеры.</value>
   </data>
@@ -2419,6 +2461,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Проверить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Import an image from a tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Imports the contents of a tarball to create a filesystem image. Optionally tag the image with a repository and tag name.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Список изображений.</value>
@@ -2675,6 +2723,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Имя образа</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>File or - to read from stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Указывает путь к tar-архиву с образом</value>
@@ -2950,6 +3001,42 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Объект не найден: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>CONTAINER ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>CREATED</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>STATUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MEM USAGE / LIMIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOCK I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Предупреждение: недопустимое значение параметра "{}" в {}:{}.</value>

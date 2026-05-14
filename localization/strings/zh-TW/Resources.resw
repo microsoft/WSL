@@ -400,215 +400,215 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. 著作權所有，並保留一切權利。
+如需有關此產品的隱私權資訊，請造訪 https://aka.ms/privacy。
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+使用方式: wsl.exe [Argument] [Options...] [CommandLine]
 
-Arguments for running Linux binaries:
+用於執行 Linux 二進位檔的引數:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    如果未提供任何命令列，wsl.exe 會啟動預設殼層。.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        執行指定的命令，而不使用預設的 Linux 殼層。
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        使用提供的殼層類型執行指定的命令。.
 
     --
-        Pass the remaining command line as-is.
+      依原樣傳遞其餘的命令列。
 
-Options:
+選項:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        將指定的目錄設定為目前的工作目錄。
+        如果使用 ~，則會使用 Linux 使用者的常用路徑。如果路徑的開頭為
+        / 字元，它則會被解譯為絕對 Linux 路徑。
+        否則，該值必須是絕對 Windows 路徑。
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        執行指定的發佈。
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        執行指定的發佈識別碼。
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        以指定使用者身分執行。
 
     --system
-        Launches a shell for the system distribution.
+        啟動系統發佈的殼層。
 
-Arguments for managing Windows Subsystem for Linux:
+用於管理 Linux 版 Windows 子系統的引數:
 
     --help
-        Display usage information.
+        顯示使用方式資訊。
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        開啟用於診斷用途的 WSL2 偵錯殼層。
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        安裝 Linux 版 Windows 子系統發行版本。
+        如需有效發行版本的清單，請使用 'wsl.exe --list --online'。
 
-        Options:
+       選項:
             --enable-wsl1
-                Enable WSL1 support.
+                啟用 WSL1 支援。 
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                建立大小固定的磁碟，以儲存發佈。 
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                從本機檔案安裝發佈。
 
             --legacy
-                Use the legacy distribution manifest.
+                使用舊版發佈資訊清單。
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                設定發佈的安裝路徑。
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                設定發佈的名稱。
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                僅安裝必須的選擇性元件，不安裝發行版本。
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                安裝後請勿啟動發佈。
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                指定要用於新發佈的版本。
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                指定磁碟大小，以儲存發佈。
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                從網際網路下載發佈，而非從 Microsoft Store 下載。
+ 
+    --manage &lt;Distro&gt; &lt;Options...&gt; 
+        變更 distro 指定選項。
 
-    --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
-
-        Options:
+        選項:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                設定發佈的預設使用者。
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                將發佈的磁碟大小調整為指定大小。
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        在所有 WSL 2 發行版本中連結和掛接實體或虛擬磁碟。
 
-        Options:
-            --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+        選項:
+		--vhd
+                指定 &lt;Disk&gt; 參考虛擬硬碟。
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                將磁碟連結到 WSL2，但不要掛接。
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                使用掛接點的自訂名稱掛接磁碟。
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                掛接磁碟時要使用的檔案系統，如果未指定，則預設為 ext4。
 
             --options &lt;Options&gt;
-                Additional mount options.
+                其他掛接選項。
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                要掛接之磁碟分割的索引，如果未指定，則預設為整個磁碟。
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        為新的發行版本變更預設安裝版本。
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        立即終止所有正在執行的發行版本和 WSL 2
+        輕量型公用程式虛擬機器。
 
-        Options:
+        選項:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
-
+                結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
+ 
     --status
-        Show the status of Windows Subsystem for Linux.
+        顯示 Linux 版 Windows 子系統的狀態。
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        從所有 WSL2 發行版本卸載並中斷連結磁碟。
+        如果呼叫時沒有引數，則卸載並中斷連結所有磁碟。
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        從此電腦取消安裝 Linux 套件的 Windows 子系統。
 
     --update
-        Update the Windows Subsystem for Linux package.
+        更新 Linux 版 Windows 子系統套件。
 
-        Options:
+        選項:
             --pre-release
-                Download a pre-release version if available.
+                下載預先發行版本 (如果有提供)。
 
     --version, -v
-        Display version information.
+       顯示版本資訊。
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+用於在 Linux 版 Windows 子系統中管理發行版本的引數:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        將發行版本匯出至 tar 檔案。
+        stdout 的檔案名稱可以是 -。
 
-        Options:
+        選項: 
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        匯入指定的 tar 檔案以做為新發行版本。
+        標準輸出的檔案名稱可以是 -。
 
-        Options:
+        選項:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                指定要用於新發行版本的版本。
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                指定提供的檔案是 .vhd 或 .vhdx 檔案，而不是 tar 檔案。
+                此作業會在指定的安裝位置複製 .VHD 檔案。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        匯入指定的 VHD 檔案以做為新發行版本。
+        此虛擬硬碟必須格式化為 ext4 檔案系統類型。
 
     --list, -l [Options]
-        Lists distributions.
+        列出發行版本。
 
         Options:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                列出所有發行版本，包括
+                目前正在安裝或解除安裝的發行版本。
 
             --running
-                List only distributions that are currently running.
+                僅列出目前正在執行的發行版本。
 
             --quiet, -q
-                Only show distribution names.
+                只顯示發行版本名稱。
 
             --verbose, -v
-                Show detailed information about all distributions.
+                顯示所有發行版本的詳細資訊
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                顯示可使用 'wsl.exe --install' 安裝的可用發行版本清單。
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        將發行版本設定為預設值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        變更指定發行版本的版本。
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        終止指定的發行版本。
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        取消註冊發行版本並刪除根檔案系統。</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -992,6 +992,16 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1 已由電腦原則停用。</value>
+  </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>此電腦的原則已停用 WSL 容器。</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>容器映像登錄 '{}' 已由電腦原則封鎖。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>由於電腦原則已設定容器登錄允許清單，因此無法建立容器映像。映像建置可能會從任意登錄擷取基底映像，且無法可靠地將其限制在允許清單內。</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>請執行 'wsl.exe --set-version {} 2' 以升級至 WSL2。</value>
@@ -2099,6 +2109,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器 '{}' 未執行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress 尚未支援。</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>容器 '{}' 正在執行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2109,6 +2123,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>自訂網路類型需要容器網路名稱。</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>網路名稱不可為空白。</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>無法辨識的命令: '{}'</value>
@@ -2260,6 +2277,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>缺少必要的選項: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>選項 '{}' 的值無效: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>未知選項: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>不支援的音量類型: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2288,6 +2313,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>網路 '{}' 已存在。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>當主要網路模式為 'host' 或 'none' 時，不允許使用其他網路。</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>重複的網路: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>無法建立磁碟區 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2303,6 +2336,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>無法開啟 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>不支援從管道匯入。請從檔案重新導向 stdin。</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>在 '{}' 中找不到 Containerfile 或 Dockerfile</value>
@@ -2393,6 +2429,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>啟動容器。</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Display container resource usage statistics.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>停止容器。</value>
   </data>
@@ -2418,6 +2460,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>檢查映像。</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>從 tarball 匯入映像。</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>匯入 tarball 的內容，以建立檔案系統映像。選擇性地使用存放庫和標籤名稱標記映像。</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>列出映像。</value>
@@ -2674,6 +2722,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>影像名稱</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>檔案或 - 從 stdin 讀取</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>提供包含該映像的 tar 封存檔案路徑</value>
@@ -2949,6 +3000,42 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>找不到物件: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>CONTAINER ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>CREATED</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>STATUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MEM USAGE / LIMIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOCK I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>警告： 在 {}：{} 中設定 '{}' 的值無效。</value>

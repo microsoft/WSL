@@ -401,215 +401,215 @@ Utilisation :
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Tous droits réservés.
+Pour plus d’informations sur la confidentialité de ce produit, veuillez consulter https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Utilisation : wsl.exe [Argument] [Options...] [Ligne de commande]
 
-Arguments for running Linux binaries:
+Arguments pour l’exécution des fichiers binaires Linux :
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Si aucune ligne de commande n’est fournie, wsl.exe lance l’interpréteur de commandes par défaut.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Exécute la commande spécifiée sans utiliser l’interpréteur de commandes Linux par défaut.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Exécute la commande spécifiée avec le type d’interpréteur de commandes fourni.
 
     --
-        Pass the remaining command line as-is.
+        Passe la ligne de commande restante « en l’état ».
 
-Options:
+Options :
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Définit le répertoire spécifié comme répertoire de travail actuel.
+        Si ~ est utilisé, le chemin d’accès personnel de l’utilisateur Linux est utilisé. Si le chemin commence
+        par un caractère /, il est interprété en tant que chemin d’accès Linux absolu.
+        Sinon, la valeur doit être un chemin Windows absolu.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Exécute la distribution spécifiée.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Exécute l’ID de distribution spécifié.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Exécute en tant que l’utilisateur spécifié.
 
     --system
-        Launches a shell for the system distribution.
+        Lance un interpréteur de commandes pour la distribution du système.
 
-Arguments for managing Windows Subsystem for Linux:
+Arguments pour la gestion du sous-système Windows pour Linux :
 
     --help
-        Display usage information.
+        Affiche les informations d’utilisation.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Ouvre un interpréteur de commandes de débogage WSL2 pour le diagnostic.
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        Installe une distribution de sous-système Windows pour Linux.
+        Pour obtenir une liste des distributions valides, utilisez 'wsl.exe --list --online'.
 
-        Options:
+        Options :
             --enable-wsl1
-                Enable WSL1 support.
+                Active la prise en charge de WSL1.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Crée un disque de taille fixe pour stocker la distribution.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Installe une distribution à partir d’un fichier local.
 
             --legacy
-                Use the legacy distribution manifest.
+                Utilise le manifeste de distribution hérité.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Définit le chemin d’installation de la distribution.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Définit le nom de la distribution.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Installe uniquement les composants facultatifs requis ; n’installe pas une distribution.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Ne lance pas la distribution après l’installation.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Spécifie la version à utiliser pour la nouvelle distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Spécifie la taille du disque pour stocker la distribution.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Télécharge la distribution à partir d’Internet au lieu de la Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Modifie les options spécifiques à la distribution.
 
-        Options:
+        Options :
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Déplace la distribution vers un nouvel emplacement.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Définit le VHD de la distribution pour qu’il soit clairsemé. Cela permet de récupérer automatiquement de l’espace disque.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Définit l’utilisateur par défaut de la distribution.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Redimensionne le disque de la distribution à la taille spécifiée.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Attache et monte un disque physique ou virtuel dans toutes les distributions WSL 2.
 
-        Options:
+        Options :
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Spécifie que &lt;Disque&gt; fait référence à un disque dur virtuel.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Attache le disque à WSL2, mais ne le monte pas.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Monte le disque à l’aide d’un nom personnalisé pour le point de montage.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Le système de fichiers à utiliser lors du montage d’un disque, s’il n’est pas spécifié par défaut, est ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Options de montage supplémentaires.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                L’index de la partition à monter, s’il n’est pas spécifié par défaut, correspond à l’ensemble du disque.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Modifie la version d’installation par défaut pour les nouvelles distributions.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Arrête immédiatement toutes les distributions en cours d’exécution ainsi que WSL 2
+        machine virtuelle utilitaire légère.
 
-        Options:
+        Options :
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Terminez la machine virtuelle WSL 2 même si une opération est en cours. Peut entraîner une perte de données.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Afficher l’état du Sous-système Windows pour Linux.
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        Démonte et détache un disque de toutes les distributions WSL2.
+        Démonte et détache tous les disques s’ils sont appelés sans argument.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Désinstalle le package Sous-système Windows pour Linux de cet ordinateur.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Mettez à jour le package Sous-système Windows pour Linux.
 
-        Options:
+        Options : 
             --pre-release
-                Download a pre-release version if available.
+                Téléchargez une version préliminaire si disponible.
 
     --version, -v
-        Display version information.
+        Affichez les informations de version.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Arguments pour la gestion des distributions dans Sous-système Windows pour Linux :
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        Exporte la distribution dans un fichier tar.
+        Le nom de fichier peut être - pour stdout.
 
-        Options:
+        Options :
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Spécifie le format d’exportation. Valeurs prises en charge : tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        Importe le fichier tar spécifié en tant que nouvelle distribution.
+        Le nom de fichier peut être : pour stdin.
 
-        Options:
+        Options :
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Spécifie la version à utiliser pour la nouvelle distribution.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Spécifie que le fichier fourni est un fichier .vhd ou .vhdx, et non un fichier tar.
+                Cette opération effectue une copie du fichier VHD à l’emplacement d’installation spécifié.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Importe le fichier VHD spécifié en tant que nouvelle distribution.
+        Ce disque dur virtuel doit être formaté avec le type de système de fichiers ext4.
 
     --list, -l [Options]
-        Lists distributions.
+        Répertorie les distributions.
 
-        Options:
+        Options :
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Répertorier toutes les distributions, y compris les distributions qui sont
+                en cours d’installation ou de désinstallation.
 
             --running
-                List only distributions that are currently running.
+                Répertorie uniquement les distributions en cours d’exécution.
 
             --quiet, -q
-                Only show distribution names.
+                Afficher uniquement les noms de distribution.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Afficher des informations détaillées sur toutes les distributions.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Affiche la liste des distributions disponibles pour l’installation avec 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Définit la distribution comme valeur par défaut.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Modifie la version de la distribution spécifiée.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Met fin à la distribution spécifiée.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Annule l’inscription de la distribution et supprime le système de fichiers racine.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -652,7 +652,7 @@ Heure de génération : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>The custom kernel modules VHD in {} was not found: '{}'.</value>
+    <value>Le VHD des modules de noyau personnalisés dans {} n'a pas été trouvé : « {} ».</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -994,6 +994,16 @@ Retour à la mise en réseau NAT.</value>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>La stratégie de l’ordinateur a désactivé WSL1.</value>
   </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>Le conteneur WSL est désactivé par la stratégie de l’ordinateur.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>Le registre d’images conteneur « {} » est bloqué par la stratégie de l’ordinateur.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>La génération d’images conteneur est bloquée, car une liste verte de registre de conteneurs est configurée par la stratégie de l’ordinateur. Les générations d’images peuvent extraire des images de base de registres arbitraires et ne peuvent pas être limitées de manière fiable à la liste d’autorisation.</value>
+  </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Exécutez « wsl.exe --set-version {} 2 » pour effectuer la mise à niveau vers WSL2.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1051,7 +1061,7 @@ Retour à la mise en réseau NAT.</value>
     <value>Voir les documents</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe --shutdown</value>
+    <value>L'opération n'a pas pu être effectuée car le VHD est actuellement utilisé. Pour forcer l'arrêt de WSL, utilisez : wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1265,7 +1275,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <value>Modules de noyau personnalisés</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
-    <value>An absolute Windows path to a custom Linux kernel modules VHD.</value>
+    <value>Un chemin Windows absolu vers un VHD de modules de noyau Linux personnalisés.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
@@ -1275,7 +1285,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <value>Modules de noyau personnalisés</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>An absolute Windows path to a custom Linux kernel modules VHD.</value>
+    <value>Un chemin Windows absolu vers un VHD de modules de noyau Linux personnalisés.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
@@ -1296,7 +1306,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <value>Distribution système personnalisée</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Specify a path to a VHD which will load as a custom system distro, primarily used to power GUI apps in WSL.</value>
+    <value>Spécifiez un chemin d’accès à un VHD qui sera chargé en tant que distribution système personnalisée, principalement utilisée pour alimenter les applications GUI dans WSL.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
@@ -1312,7 +1322,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <value>Valeur booléenne permettant d’activer une fenêtre de console de sortie qui affiche le contenu des messages de diagnostic au démarrage d’une instance de distribution WSL 2.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Default VHD Size</value>
+    <value>Taille par défaut du VHD</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
@@ -1323,7 +1333,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <value>Réinitialiser la taille</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Default VHD Size</value>
+    <value>Taille par défaut du VHD</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
@@ -1887,19 +1897,19 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Enable sparse VHD by default</value>
+    <value>Activer le VHD partiellement alloué par défaut</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <value>Tous les VHD nouvellement créés sont automatiquement alloués lorsqu’ils sont activés.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Enable sparse VHD by default.</value>
+    <value>Activez le VHD partiellement alloué par défaut.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Any newly created VHD will be set to sparse automatically when enabled.</value>
+    <value>Tous les VHD nouvellement créés sont automatiquement alloués lorsqu’ils sont activés.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
@@ -2100,6 +2110,10 @@ Utilisation :
     <value>Le conteneur « {} » ne fonctionne pas.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress n’est pas encore pris en charge.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Le conteneur « {} » est en cours d’exécution.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2110,6 +2124,9 @@ Utilisation :
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Le nom du réseau de conteneurs est obligatoire pour le type de réseau personnalisé.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Le nom de Mise en réseau ne peut pas être vide.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Commande non reconnue : '{}'</value>
@@ -2261,6 +2278,14 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Option obligatoire manquante : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Valeur non valide pour l’option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Option inconnue : '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Type de volume non pris en charge : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2289,6 +2314,14 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Le réseau '{}' existe déjà.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Les réseaux supplémentaires ne sont pas autorisés lorsque le mode réseau principal est 'host' ou 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Dupliquer le réseau : '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Désolé... Nous n’avons pas pu créer le volume « {} » : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2304,6 +2337,9 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>Échec de l’ouverture '{}' : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>L’importation à partir d’un canal n’est pas prise en charge. Redirigez stdin à partir d’un fichier.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Aucun Containerfile ni Dockerfile trouvé dans '{}'</value>
@@ -2394,6 +2430,12 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Démarre un conteneur.</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Display container resource usage statistics.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Arrêtez les conteneurs.</value>
   </data>
@@ -2419,6 +2461,12 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Inspecter les images.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Importer une image depuis un tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Importe le contenu d’un tarball pour créer une image du système de fichiers. Vous pouvez également étiqueter l’image avec un nom de référentiel et une balise.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Lister les images.</value>
@@ -2675,6 +2723,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Nom de l’image</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Fichier ou - à lire depuis l’entrée standard</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Fournit le chemin d’accès au fichier archive tar contenant l’image</value>
@@ -2950,6 +3001,42 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Objet introuvable : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>CONTAINER ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>CREATED</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>STATUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MEM USAGE / LIMIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOCK I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Avertissement : valeur non valide pour le paramètre « {} » dans {} :{}.</value>
