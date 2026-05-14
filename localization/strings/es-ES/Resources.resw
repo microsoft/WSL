@@ -2948,10 +2948,6 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Nombre del volumen</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Especifica el nombre del controlador de volumen (predeterminado guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Establecer opciones específicas del controlador</value>
   </data>

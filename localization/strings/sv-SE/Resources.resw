@@ -2942,10 +2942,6 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volymnamn</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Ange volymdrivrutinens namn (standard guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Ange drivrutinsspecifika alternativ</value>
   </data>

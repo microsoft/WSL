@@ -2948,10 +2948,6 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volumename</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Geben Sie den Namen des Volumetreiber an (Standard: guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Treiberspezifische Optionen festlegen</value>
   </data>

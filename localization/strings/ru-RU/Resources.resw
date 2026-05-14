@@ -2949,10 +2949,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Имя тома</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Укажите имя драйвера тома (по умолчанию guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Настройка параметров драйвера</value>
   </data>

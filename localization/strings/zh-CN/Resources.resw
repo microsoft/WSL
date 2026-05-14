@@ -2948,10 +2948,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>卷名称</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>指定卷驱动程序名称(默认值 guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>设置特定于驱动程序的选项</value>
   </data>

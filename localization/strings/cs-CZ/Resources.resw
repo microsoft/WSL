@@ -2942,10 +2942,6 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Název svazku</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Zadejte název ovladače svazku (výchozí guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Nastavení možností specifických pro ovladač</value>
   </data>

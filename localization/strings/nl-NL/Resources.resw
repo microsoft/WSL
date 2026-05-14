@@ -2942,10 +2942,6 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volumenaam</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Geef de naam van het volumestuurprogramma op (standaard guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Stuurprogrammaspecifieke opties instellen</value>
   </data>

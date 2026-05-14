@@ -2949,10 +2949,6 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Nom de volume</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Spécifier le nom du pilote de volume (par défaut guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Définissez des options spécifiques au pilote</value>
   </data>

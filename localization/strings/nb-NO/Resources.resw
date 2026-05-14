@@ -2942,10 +2942,6 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volumnavn</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Angi navn på volumedriver (standard guest)</value>
-    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Angi driver-spesifikke alternativer</value>
   </data>
