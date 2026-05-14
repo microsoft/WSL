@@ -14,7 +14,6 @@ Abstract:
 
 #include "precomp.h"
 #include "BuildImageCallback.h"
-#include <docker_schema.h>
 
 namespace wsl::windows::wslc::services {
 
@@ -197,31 +196,44 @@ try
     }
 
     std::string statusStr(status);
-    std::string idStr(id ? id : "");
 
-    // BuildKit JSON messages are identified by the "buildkit" id
-    if (idStr == "buildkit")
+    try
     {
-        StartTimerThread();
-
         std::lock_guard lock(m_mutex);
+        m_buildView.ProcessMessage(statusStr);
 
-        try
+        if (!m_isConsole)
         {
-            auto json = nlohmann::json::parse(statusStr);
-            wsl::windows::common::docker_schema::BuildKitSolveStatus solveStatus{};
-            from_json(json, solveStatus);
-            m_buildView.ProcessMessage(solveStatus);
+            PrintPlainTextProgress();
         }
-        catch (...)
+        else 
         {
-            // Ignore malformed JSON
+            StartTimerThread();
         }
+    } 
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
     }
 
     return S_OK;
 }
 CATCH_RETURN();
+
+// ── Plain-text progress (non-console) ───────────────────────────────
+
+void BuildImageCallback::PrintPlainTextProgress()
+{
+    for (const auto* step : m_buildView.GetUnreportedSteps())
+    {
+        wprintf(L"%hs\n", step->stepLabel.c_str());
+
+        if (!step->error.empty())
+        {
+            wprintf(L"%hs\n", step->error.c_str());
+        }
+    }
+}
 
 // ── Step line formatter ─────────────────────────────────────────────
 
@@ -280,6 +292,51 @@ std::wstring BuildImageCallback::FormatStepLine(const ViewStep& step, SHORT cons
     }
 }
 
+// Synthesize cached FROM lines for base image steps that were skipped
+// because they were resolved from a shared stage.
+void BuildImageCallback::AppendCachedFromLines(
+    const ViewTarget& target, SHORT consoleWidth, std::vector<std::wstring>& lines) const
+{
+    if (target.steps.empty())
+    {
+        return;
+    }
+
+    const auto& firstStep = target.steps[0];
+    if (firstStep.stepNum <= 1 || firstStep.stepTotal == 0)
+    {
+        return;
+    }
+
+    for (uint32_t n = 1; n < firstStep.stepNum; n++)
+    {
+        std::string fromImage = " ...";
+        for (const auto& digest : firstStep.inputs)
+        {
+            auto* inputStep = m_buildView.StepByDigest(digest);
+            if (inputStep && inputStep->stepLabel.find("] FROM ") != std::string::npos)
+            {
+                auto pos = inputStep->stepLabel.find("] FROM ");
+                if (pos != std::string::npos)
+                {
+                    fromImage = inputStep->stepLabel.substr(pos + 6);
+                }
+                break;
+            }
+        }
+        auto label = std::format("[{} {}/{}] FROM{}", target.name, n, firstStep.stepTotal, fromImage);
+        auto wlabel = MultiByteToWide(label);
+        if (static_cast<SHORT>(wlabel.size()) > consoleWidth - 10)
+        {
+            wlabel.resize(consoleWidth - 13);
+            wlabel += L"...";
+        }
+        auto padLen =
+            (wlabel.size() + 6 < static_cast<size_t>(consoleWidth)) ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6 : 0;
+        lines.push_back(std::format(L"\033[36m{}{}{}\033[0m", wlabel, std::wstring(std::max<size_t>(1, padLen), L' '), L"CACHED"));
+    }
+}
+
 // ── Frame line builder ──────────────────────────────────────────────
 // Builds all frame lines into a vector. Each entry is one visual line
 // (no embedded newlines). Used by both RenderFrame and the destructor's
@@ -324,42 +381,7 @@ std::vector<std::wstring> BuildImageCallback::BuildFrameLines(SHORT consoleWidth
         firstTarget = false;
 
         // Synthesize cached FROM steps for shared base images
-        if (!target.steps.empty())
-        {
-            const auto& firstStep = target.steps[0];
-            if (firstStep.stepNum > 1 && firstStep.stepTotal > 0)
-            {
-                for (uint32_t n = 1; n < firstStep.stepNum; n++)
-                {
-                    std::string fromImage = " ...";
-                    for (const auto& digest : firstStep.inputs)
-                    {
-                        auto* inputStep = m_buildView.StepByDigest(digest);
-                        if (inputStep && inputStep->stepLabel.find("] FROM ") != std::string::npos)
-                        {
-                            auto pos = inputStep->stepLabel.find("] FROM ");
-                            if (pos != std::string::npos)
-                            {
-                                fromImage = inputStep->stepLabel.substr(pos + 6);
-                            }
-                            break;
-                        }
-                    }
-                    auto label = std::format("[{} {}/{}] FROM{}", target.name, n, firstStep.stepTotal, fromImage);
-                    auto wlabel = MultiByteToWide(label);
-                    if (static_cast<SHORT>(wlabel.size()) > consoleWidth - 10)
-                    {
-                        wlabel.resize(consoleWidth - 13);
-                        wlabel += L"...";
-                    }
-                    auto padLen = (wlabel.size() + 6 < static_cast<size_t>(consoleWidth))
-                                      ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6
-                                      : 0;
-                    lines.push_back(
-                        std::format(L"\033[36m{}{}{}\033[0m", wlabel, std::wstring(std::max<size_t>(1, padLen), L' '), L"CACHED"));
-                }
-            }
-        }
+        AppendCachedFromLines(target, consoleWidth, lines);
 
         // Steps
         for (const auto& step : target.steps)

@@ -15,6 +15,7 @@ Abstract:
 
 #include <chrono>
 #include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -24,6 +25,8 @@ struct BuildKitSolveStatus;
 }
 
 namespace wsl::windows::wslc::services {
+
+constexpr size_t c_maxLogLinesPerStep = 200;
 
 struct SubStatus
 {
@@ -61,9 +64,11 @@ struct ViewTarget
 class BuildView
 {
 public:
+    NON_COPYABLE(BuildView);
     BuildView();
 
-    void ProcessMessage(const wsl::windows::common::docker_schema::BuildKitSolveStatus& msg);
+    void ProcessMessage(const std::string& rawJson);
+    std::vector<const ViewStep*> GetUnreportedSteps();
 
     const ViewStep* StepByDigest(const std::string& digest) const;
     bool HasErrors() const;
@@ -81,6 +86,7 @@ public:
 private:
     std::unordered_map<std::string, std::pair<size_t, size_t>> m_digestIndex;
     std::unordered_map<std::string, size_t> m_targetNameToIdx;
+    std::set<std::string> m_reportedSteps;
     std::chrono::steady_clock::time_point m_totalStart;
     std::vector<ViewTarget> m_targets;
 };

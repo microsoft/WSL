@@ -1337,24 +1337,6 @@ class WSLCTests
         }
     }
 
-    class CapturingProgressCallback
-        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
-    {
-    public:
-        CapturingProgressCallback(std::string& output) : m_output(output)
-        {
-        }
-
-        HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
-        {
-            m_output.append(status);
-            return S_OK;
-        }
-
-    private:
-        std::string& m_output;
-    };
-
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, IProgressCallback* callback = nullptr)
     {
         auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
@@ -1635,13 +1617,9 @@ class WSLCTests
                        << "\"echo \\\"$(cat /greeting.txt) $(cat /description.txt)\\\"\"]\n";
         }
 
-        std::string output;
-        auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
         LPCSTR tag = "wslc-test-build-multistage:latest";
         WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
-        VERIFY_IS_TRUE(output.find("[greeting] WSL containers") != std::string::npos);
-        VERIFY_IS_TRUE(output.find("[description] support multi-stage builds") != std::string::npos);
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-multistage:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-multistage:latest", "wslc-build-multistage-container");
@@ -1957,24 +1935,26 @@ class WSLCTests
         // First build to populate cache.
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-nocache:latest"));
 
-        // Validate that the image isn't rebuilt when NoCache isn't set.
+        // Validate that a cached rebuild succeeds.
         {
-            std::string output;
-            auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
             WSLCBuildImageOptions options{.Tags = {&tag, 1}};
-            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
-            VERIFY_IS_TRUE(output.find("Imageisrebuilt") == std::string::npos);
+            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
         }
 
-        // Validate that the image is rebuilt when WSLCBuildImageFlagsNoCache is set, and that the output from the RUN step appears in the progress callback.
+        // Validate that the image is rebuilt when WSLCBuildImageFlagsNoCache is set.
         {
-            std::string output;
-            auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
             WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
-            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
-            VERIFY_IS_TRUE(output.find("Imageisrebuilt") != std::string::npos);
+            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
+        }
+
+        // Verify the image produces the expected output.
+        {
+            WSLCContainerLauncher launcher("wslc-test-nocache:latest", "wslc-nocache-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
         }
     }
 

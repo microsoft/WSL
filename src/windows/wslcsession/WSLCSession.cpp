@@ -715,10 +715,10 @@ try
     std::string allOutput;
     std::string pendingJson;
 
-    auto reportProgress = [&](const std::string& message, const char* id = "") {
+    auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
         }
     };
 
@@ -741,7 +741,7 @@ try
         }
 
         // Forward the raw JSON to the CLI-side BuildView via the progress callback.
-        reportProgress(pendingJson, "buildkit");
+        reportProgress(pendingJson);
         pendingJson.clear();
     };
 

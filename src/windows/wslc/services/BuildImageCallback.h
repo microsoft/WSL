@@ -34,11 +34,13 @@ private:
     static constexpr size_t c_maxLogPeekLines = 5;
 
     std::vector<std::wstring> BuildFrameLines(SHORT consoleWidth) const;
+    void AppendCachedFromLines(const ViewTarget& target, SHORT consoleWidth, std::vector<std::wstring>& lines) const;
     void RenderFrame();
     void StartTimerThread();
     void StopTimerThread();
     std::wstring FormatStepLine(const ViewStep& step, SHORT consoleWidth) const;
     void WriteTerminal(std::wstring_view content) const;
+    void PrintPlainTextProgress();
     bool IsCancelled() const;
 
     const bool m_verbose;

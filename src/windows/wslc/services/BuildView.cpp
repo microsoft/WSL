@@ -14,6 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "BuildView.h"
 #include <docker_schema.h>
+#include <unordered_set>
 #include <wslutil.h>
 
 using namespace wsl::windows::common;
@@ -87,7 +88,7 @@ std::chrono::milliseconds ParseElapsed(const std::string& started, const std::st
             {
                 return std::nullopt;
             }
-            auto fracStr = timePart.substr(dotPos + 1);
+            auto fracStr = timePart.substr(dotPos + 1, 9);
             fracNanos = std::stoull(fracStr);
             for (size_t i = fracStr.size(); i < 9; i++)
             {
@@ -182,9 +183,13 @@ BuildView::BuildView() : m_totalStart(std::chrono::steady_clock::now())
 {
 }
 
-void BuildView::ProcessMessage(const wsl::windows::common::docker_schema::BuildKitSolveStatus& msg)
+void BuildView::ProcessMessage(const std::string& rawJson)
 {
-    std::vector<size_t> targetsToSort;
+    wsl::windows::common::docker_schema::BuildKitSolveStatus msg{};
+    auto json = nlohmann::json::parse(rawJson);
+    from_json(json, msg);
+
+    std::unordered_set<size_t> targetsToSort;
 
     // Phase 1: Process vertexes
     for (const auto& vertex : msg.vertexes)
@@ -224,10 +229,7 @@ void BuildView::ProcessMessage(const wsl::windows::common::docker_schema::BuildK
             m_targets[targetIdx].steps.push_back(std::move(newStep));
             m_digestIndex[vertex.digest] = {targetIdx, stepIdx};
 
-            if (std::find(targetsToSort.begin(), targetsToSort.end(), targetIdx) == targetsToSort.end())
-            {
-                targetsToSort.push_back(targetIdx);
-            }
+            targetsToSort.insert(targetIdx);
         }
 
         auto& step = m_targets[targetIdx].steps[stepIdx];
@@ -370,9 +372,29 @@ void BuildView::ProcessMessage(const wsl::windows::common::docker_schema::BuildK
             if (!line.empty())
             {
                 step.logOutput.push_back(std::move(line));
+                if (step.logOutput.size() > c_maxLogLinesPerStep)
+                {
+                    step.logOutput.erase(step.logOutput.begin());
+                }
             }
         }
     }
+}
+
+std::vector<const ViewStep*> BuildView::GetUnreportedSteps()
+{
+    std::vector<const ViewStep*> result;
+    for (const auto& target : m_targets)
+    {
+        for (const auto& step : target.steps)
+        {
+            if ((step.completed || !step.error.empty()) && m_reportedSteps.insert(step.digest).second)
+            {
+                result.push_back(&step);
+            }
+        }
+    }
+    return result;
 }
 
 const ViewStep* BuildView::StepByDigest(const std::string& digest) const
