@@ -2944,7 +2944,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
     <value>Birim sürücü adını belirtin (varsayılan guest)</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Sürücüye özgü seçenekleri ayarlayın</value>

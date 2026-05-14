@@ -2944,7 +2944,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
     <value>Määritä äänenvoimakkuusohjaimen nimi (oletus guest)</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="guest"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Määritä ohjaimen erityisasetukset</value>
