@@ -63,8 +63,6 @@ catch (...)
     return std::nullopt;
 }
 
-
-
 inline bool IsFeatureAllowed(HKEY key, LPCWSTR name)
 try
 {
