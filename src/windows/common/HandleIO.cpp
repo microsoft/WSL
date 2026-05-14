@@ -63,6 +63,30 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
 
 } // namespace
 
+void wsl::windows::common::io::Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
+{
+    if (CreateIoCompletionPort(Handle, Iocp, Key, 0) == nullptr)
+    {
+        const auto error = GetLastError();
+        if (error == ERROR_INVALID_PARAMETER)
+        {
+            // Handle doesn't support overlapped I/O (anonymous pipe, console handle, ...).
+            // The caller is expected to complete its I/O synchronously inside Schedule().
+            return;
+        }
+
+        THROW_WIN32(error);
+    }
+
+    // Best-effort: not every device type supports FileCompletionNotificationModes. If
+    // unsupported, the worst case is a redundant packet for a synchronous success which
+    // is filtered out in MultiHandleWait::Run.
+    if (!SetFileCompletionNotificationModes(Handle, FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
+    }
+}
+
 // HandleWrapper
 
 HandleWrapper::HandleWrapper(wil::unique_handle&& handle, std::function<void()>&& OnClose) :
@@ -201,17 +225,18 @@ void EventHandle::Collect()
     OnSignalled();
 }
 
-void EventHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> EventHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
     m_iocp = Iocp;
-    m_completionKey = CompletionKey;
+    m_completionKey = reinterpret_cast<ULONG_PTR>(this);
 
     m_threadpoolWait.reset(CreateThreadpoolWait(EventHandle::WaitCallback, this, nullptr));
     THROW_LAST_ERROR_IF(!m_threadpoolWait);
 
     State = IOHandleStatus::Standby;
+    return {m_completionKey};
 }
 
 void NTAPI EventHandle::WaitCallback(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_WAIT, TP_WAIT_RESULT)
@@ -312,21 +337,15 @@ void ReadHandle::Collect()
     }
 }
 
-void ReadHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> ReadHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
-    THROW_LAST_ERROR_IF(CreateIoCompletionPort(Handle.Get(), Iocp, CompletionKey, 0) == nullptr);
-
-    // Best-effort: not every device type supports FileCompletionNotificationModes. If it
-    // is not supported the worst case is that we receive a redundant packet for a
-    // synchronous success which is filtered out in MultiHandleWait::Run.
-    if (!SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
-    {
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
-    }
+    const auto key = reinterpret_cast<ULONG_PTR>(this);
+    Associate(Handle.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
+    return {key};
 }
 
 // SingleAcceptHandle
@@ -387,17 +406,15 @@ void SingleAcceptHandle::Collect()
     OnAccepted();
 }
 
-void SingleAcceptHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> SingleAcceptHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
-    THROW_LAST_ERROR_IF(CreateIoCompletionPort(ListenSocket.Get(), Iocp, CompletionKey, 0) == nullptr);
-    if (!SetFileCompletionNotificationModes(ListenSocket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
-    {
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
-    }
+    const auto key = reinterpret_cast<ULONG_PTR>(this);
+    Associate(ListenSocket.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
+    return {key};
 }
 
 // LineBasedReadHandle
@@ -692,17 +709,15 @@ void ReadSocketMessageHandle::Collect()
     ProcessRecvResult(bytesRead);
 }
 
-void ReadSocketMessageHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> ReadSocketMessageHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
-    THROW_LAST_ERROR_IF(CreateIoCompletionPort(Socket.Get(), Iocp, CompletionKey, 0) == nullptr);
-    if (!SetFileCompletionNotificationModes(Socket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
-    {
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
-    }
+    const auto key = reinterpret_cast<ULONG_PTR>(this);
+    Associate(Socket.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
+    return {key};
 }
 
 // WriteHandle
@@ -791,17 +806,15 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     State = IOHandleStatus::Standby;
 }
 
-void WriteHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> WriteHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
-    THROW_LAST_ERROR_IF(CreateIoCompletionPort(Handle.Get(), Iocp, CompletionKey, 0) == nullptr);
-    if (!SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
-    {
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
-    }
+    const auto key = reinterpret_cast<ULONG_PTR>(this);
+    Associate(Handle.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
+    return {key};
 }
 
 // DockerIORelayHandle
@@ -920,16 +933,19 @@ void DockerIORelayHandle::Collect()
     }
 }
 
-void DockerIORelayHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
+std::vector<ULONG_PTR> DockerIORelayHandle::Bind(HANDLE Iocp)
 {
     WI_ASSERT(State == IOHandleStatus::Created);
 
-    // Bind every sub-handle with the parent's completion key so any read or write
-    // completion is routed back to DockerIORelayHandle::Collect.
-    Read->Bind(Iocp, CompletionKey);
-    WriteStdout.Bind(Iocp, CompletionKey);
-    WriteStderr.Bind(Iocp, CompletionKey);
+    // Each sub-handle picks its own unique completion key. Concatenate the lists so the
+    // parent MultiHandleWait can route any sub-completion back to this DockerIORelayHandle.
+    auto keys = Read->Bind(Iocp);
+    auto stdoutKeys = WriteStdout.Bind(Iocp);
+    auto stderrKeys = WriteStderr.Bind(Iocp);
+    keys.insert(keys.end(), stdoutKeys.begin(), stdoutKeys.end());
+    keys.insert(keys.end(), stderrKeys.begin(), stderrKeys.end());
     State = IOHandleStatus::Standby;
+    return keys;
 }
 
 void DockerIORelayHandle::ProcessNextHeader()
@@ -975,7 +991,7 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace(m_nextHandleId++, HandleEntry{flags, std::move(handle)});
+    m_handles.emplace_back(HandleEntry{flags, std::move(handle), {}});
 }
 
 void MultiHandleWait::Cancel()
@@ -1003,102 +1019,41 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         deadline = std::chrono::steady_clock::now() + Timeout.value();
     }
 
-    // Pulls a single packet from the IOCP. Returns true if a packet was processed (which
-    // may have been a stale / spurious packet that we filtered out), false on timeout.
-    auto processPacket = [&](DWORD WaitTimeoutMs) -> bool {
-        DWORD bytes = 0;
-        ULONG_PTR key = 0;
-        OVERLAPPED* ovl = nullptr;
-        const BOOL result = GetQueuedCompletionStatus(m_iocp.get(), &bytes, &key, &ovl, WaitTimeoutMs);
-
-        if (!result && ovl == nullptr)
-        {
-            const DWORD error = GetLastError();
-            if (error == WAIT_TIMEOUT)
-            {
-                return false;
-            }
-
-            THROW_WIN32_MSG(error, "GetQueuedCompletionStatus failed");
-        }
-
-        // Keys are the IDs assigned by AddHandle. Look them up - if the entry has been
-        // erased (or its handle reset by an IgnoreErrors path) the packet is stale.
-        const auto it = m_handles.find(key);
-        if (it == m_handles.end() || !it->second.Handle || it->second.Handle->GetState() != IOHandleStatus::Pending)
-        {
-            // Stale packet (e.g. from a synchronous error path that already transitioned
-            // the handle out of Pending, or a cancel notification). Ignore it.
-            return true;
-        }
-
-        try
-        {
-            it->second.Handle->Collect();
-        }
-        catch (...)
-        {
-            if (WI_IsFlagSet(it->second.Options, Flags::IgnoreErrors))
-            {
-                // Reset the handle (rather than erasing the entry) so we don't invalidate
-                // any iterator the schedule loop above might be holding. The cleanup pass
-                // at the top of the next outer iteration removes entries with !Handle.
-                it->second.Handle.reset();
-            }
-            else
-            {
-                throw;
-            }
-        }
-
-        return true;
-    };
-
     // Run until all handles are completed.
 
     while (!m_handles.empty() && !m_cancel)
     {
-        // Bind any newly added handles to the completion port.
-        for (auto& [id, entry] : m_handles)
+        // Bind any newly added handles to the completion port. Bind picks one unique
+        // completion key per leaf file/socket and returns the full list; we store it on
+        // the entry so processPacket can route incoming packets back to the right entry.
+        for (auto& entry : m_handles)
         {
             if (entry.Handle && entry.Handle->GetState() == IOHandleStatus::Created)
             {
-                entry.Handle->Bind(m_iocp.get(), id);
+                entry.Keys = entry.Handle->Bind(m_iocp.get());
             }
         }
 
         // Schedule IO on each handle until all are either pending, or completed.
         for (auto it = m_handles.begin(); it != m_handles.end() && !m_cancel; ++it)
         {
-            while (it->second.Handle && it->second.Handle->GetState() == IOHandleStatus::Standby && !m_cancel)
+            while (it->Handle && it->Handle->GetState() == IOHandleStatus::Standby && !m_cancel)
             {
                 try
                 {
-                    it->second.Handle->Schedule();
+                    it->Handle->Schedule();
                 }
                 catch (...)
                 {
-                    if (WI_IsFlagSet(it->second.Options, Flags::IgnoreErrors))
+                    if (WI_IsFlagSet(it->Options, Flags::IgnoreErrors))
                     {
-                        it->second.Handle.reset(); // Reset the handle so it can be deleted.
+                        it->Handle.reset(); // Reset the handle so it can be deleted.
                         break;
                     }
                     else
                     {
                         throw;
                     }
-                }
-
-                // Drain any IOCP packets that the IO we just issued may have queued. Sync
-                // success packets are usually suppressed by FILE_SKIP_COMPLETION_PORT_ON_SUCCESS,
-                // but that flag is best-effort (some device drivers do not honor it) and
-                // sync error packets (e.g. ERROR_BROKEN_PIPE) are queued unconditionally.
-                // If a stale packet is left in the IOCP for the OVERLAPPED we are about to
-                // reuse on the next Schedule, GetQueuedCompletionStatus would later report
-                // the wrong IO. Drain now while the handle is still in the state Schedule
-                // left it in, so the spurious-packet filter in processPacket discards it.
-                while (processPacket(0))
-                {
                 }
             }
         }
@@ -1107,13 +1062,13 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
-            if (!it->second.Handle)
+            if (!it->Handle)
             {
                 it = m_handles.erase(it);
             }
-            else if (it->second.Handle->GetState() == IOHandleStatus::Completed)
+            else if (it->Handle->GetState() == IOHandleStatus::Completed)
             {
-                if (WI_IsFlagSet(it->second.Options, Flags::CancelOnCompleted))
+                if (WI_IsFlagSet(it->Options, Flags::CancelOnCompleted))
                 {
                     m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
                 }
@@ -1123,7 +1078,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             else
             {
                 // If only NeedNotComplete handles are left, we want to exit Run.
-                if (WI_IsFlagClear(it->second.Options, Flags::NeedNotComplete))
+                if (WI_IsFlagClear(it->Options, Flags::NeedNotComplete))
                 {
                     hasHandleToWaitFor = true;
                 }
@@ -1146,9 +1101,44 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
         }
 
-        if (!processPacket(waitTimeout))
+        DWORD bytes = 0;
+        ULONG_PTR key = 0;
+        OVERLAPPED* ovl = nullptr;
+        THROW_IF_WIN32_BOOL_FALSE(GetQueuedCompletionStatus(m_iocp.get(), &bytes, &key, &ovl, waitTimeout));
+
+        // Find the entry that owns this completion key. Each leaf sub-handle picks one
+        // unique key in Bind() so a linear scan is the simplest correct lookup.
+        const auto it = std::find_if(m_handles.begin(), m_handles.end(), [key](const HandleEntry& entry) {
+            return std::find(entry.Keys.begin(), entry.Keys.end(), key) != entry.Keys.end();
+        });
+
+        if (it == m_handles.end() || it->Handle->GetState() != IOHandleStatus::Pending)
         {
-            THROW_WIN32(ERROR_TIMEOUT);
+            LOG_HR_MSG(
+                E_UNEXPECTED,
+                "Receive IO completion for stale handle. Key: 0x%p, Handle State: %d",
+                (void*)key,
+                it != m_handles.end() ? static_cast<int>(it->Handle->GetState()) : -1);
+                continue;
+        }
+
+        try
+        {
+            it->Handle->Collect();
+        }
+        catch (...)
+        {
+            if (WI_IsFlagSet(it->Options, Flags::IgnoreErrors))
+            {
+                // Reset the handle (rather than erasing the entry) so we don't invalidate
+                // any iterator the schedule loop above might be holding. The cleanup pass
+                // at the top of the next outer iteration removes entries with !Handle.
+                it->Handle.reset();
+            }
+            else
+            {
+                throw;
+            }
         }
     }
 

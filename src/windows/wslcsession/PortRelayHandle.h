@@ -32,7 +32,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 private:
     void LaunchRelay(wil::unique_socket&& AcceptedSocket);

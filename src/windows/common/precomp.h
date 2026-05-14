@@ -72,6 +72,7 @@ Abstract:
 #include <xstring>
 #include <algorithm>
 #include <map>
+#include <list>
 #include <memory>
 #include <vector>
 #include <locale>

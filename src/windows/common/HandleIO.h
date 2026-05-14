@@ -59,6 +59,17 @@ private:
     gsl::span<gsl::byte> m_unowned;
 };
 
+// Associate a file/socket handle with an I/O completion port, then opt out of the
+// success-completion packet (best-effort).
+//
+// CreateIoCompletionPort returns ERROR_INVALID_PARAMETER for handles that don't support
+// overlapped I/O - anonymous pipes from CreatePipe, console handles from GetStdHandle,
+// and a few other device types. This helper silently swallows that specific error so
+// callers don't need to know whether the handle is overlapped-capable; non-overlapped
+// handles simply won't generate IOCP packets and are expected to complete their I/O
+// synchronously inside Schedule().
+void Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key);
+
 class OverlappedIOHandle
 {
 public:
@@ -70,15 +81,20 @@ public:
     virtual void Schedule() = 0;
     virtual void Collect() = 0;
 
-    // Bind this handle's underlying file/socket to an I/O completion port. When the
-    // backing operation completes, GetQueuedCompletionStatus returns CompletionKey so
-    // MultiHandleWait can route the packet back to the correct entry. Subclasses that
-    // wrap an event (which cannot be associated with an IOCP) instead arrange for a
-    // thread pool wait to PostQueuedCompletionStatus when the event signals.
+    // Bind this handle's underlying file/socket to an I/O completion port. Each call
+    // returns the list of completion keys that were associated with the IOCP - one per
+    // file/socket. Completion keys must be unique across the IOCP so packets can be
+    // routed unambiguously back to the originating handle, so each leaf implementation
+    // picks its own key (typically the address of the leaf object). Composite handles
+    // forward to every sub-handle and concatenate the returned key lists.
+    //
+    // Subclasses that wrap an event (which cannot be associated with an IOCP) instead
+    // arrange for a thread pool wait to PostQueuedCompletionStatus when the event signals,
+    // using the chosen key.
     //
     // Bind must only be called when the handle is in the Created state. Implementations
     // transition the state to Standby on success.
-    virtual void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) = 0;
+    virtual std::vector<ULONG_PTR> Bind(HANDLE Iocp) = 0;
 
     IOHandleStatus GetState() const;
 
@@ -95,7 +111,7 @@ public:
     EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 private:
     static void NTAPI WaitCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context, PTP_WAIT Wait, TP_WAIT_RESULT WaitResult);
@@ -118,7 +134,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 private:
     HandleWrapper Handle;
@@ -140,7 +156,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 private:
     HandleWrapper ListenSocket;
@@ -197,7 +213,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 private:
     void ScheduleRecv();
@@ -224,7 +240,7 @@ public:
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
     void Push(const gsl::span<char>& Buffer);
 
 private:
@@ -302,15 +318,17 @@ public:
         }
     }
 
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override
     {
         WI_ASSERT(State == IOHandleStatus::Created);
 
-        // Both sub-handles share the parent's completion key so any sub-completion
-        // routes back to this RelayHandle's Collect.
-        Read.Bind(Iocp, CompletionKey);
-        Write.Bind(Iocp, CompletionKey);
+        // Each sub-handle picks its own unique completion key. Concatenate the lists so
+        // the parent MultiHandleWait can route either completion back to this RelayHandle.
+        auto keys = Read.Bind(Iocp);
+        auto writeKeys = Write.Bind(Iocp);
+        keys.insert(keys.end(), writeKeys.begin(), writeKeys.end());
         State = IOHandleStatus::Standby;
+        return keys;
     }
 
 private:
@@ -339,7 +357,7 @@ public:
     DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
     void Schedule() override;
     void Collect() override;
-    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
+    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
 
 #pragma pack(push, 1)
     struct MultiplexedHeader
@@ -389,6 +407,7 @@ private:
     {
         Flags Options;
         std::unique_ptr<OverlappedIOHandle> Handle;
+        std::vector<ULONG_PTR> Keys;
     };
 
     // m_iocp is declared first so it is destroyed last - after every handle has had a
@@ -396,8 +415,9 @@ private:
     // overlapped I/O outstanding could otherwise leave packets queued to a destroyed
     // completion port.
     wil::unique_handle m_iocp;
-    std::map<ULONG_PTR, HandleEntry> m_handles;
-    ULONG_PTR m_nextHandleId = 1;
+    // std::list (rather than std::vector) so iterators held by the schedule loop survive
+    // erasures performed by the cleanup pass and processPacket.
+    std::list<HandleEntry> m_handles;
     bool m_cancel = false;
 };
 
