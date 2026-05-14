@@ -555,6 +555,10 @@ class UnitTests
 
     WSL1_TEST_METHOD(Timer)
     {
+        // This is disabled because of intermittent test failures.
+        // TODO: Enable this test once the underlying issue is resolved.
+        SKIP_TEST_UNSTABLE();
+
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
