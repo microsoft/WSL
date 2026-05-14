@@ -17,6 +17,7 @@ Abstract:
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
+#include "ImageModel.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
@@ -673,5 +674,21 @@ void ViewContainerLogs(CLIExecutionContext& context)
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, tail);
+}
+
+void PruneContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    auto result = ContainerService::Prune(session);
+
+    for (const auto& containerId : result.Containers)
+    {
+        PrintMessage(MultiByteToWide(containerId));
+    }
+
+    PrintMessage(L"");
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task
