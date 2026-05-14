@@ -235,6 +235,30 @@ struct HostConfig
         HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
+struct EndpointSettings
+{
+    std::string IPAddress;
+    std::string Gateway;
+    std::string MacAddress;
+    int IPPrefixLen{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+};
+
+struct NetworkingConfig
+{
+    std::map<std::string, EmptyObject> EndpointsConfig;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(NetworkingConfig, EndpointsConfig);
+};
+
+struct NetworkSettings
+{
+    std::map<std::string, EndpointSettings> Networks;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkSettings, Networks);
+};
+
 struct CreateContainer
 {
     using TResponse = CreatedContainer;
@@ -257,9 +281,10 @@ struct CreateContainer
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;
     HostConfig HostConfig;
+    NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels);
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
 };
 
 struct ContainerInspectState
@@ -304,8 +329,9 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
+    NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings);
 };
 
 struct InspectExec
@@ -492,8 +518,9 @@ struct ContainerInfo
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
     HostConfig HostConfig;
+    NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

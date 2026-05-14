@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Windows-undersystem til Linux</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Windows-undersystem til Linux</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">Tillad Windows-undersystem til Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">Når denne politik er indstillet til deaktiveret, deaktiverer den adgangen til kørende Linux-distributioner i Windows-undersystem til Linux for alle brugere på computeren.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">Tillad indbakkeversionen af Windows-undersystem til Linux</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">Når denne politikindstilling er deaktiveret, deaktiveres indbakkeversionen (valgfri komponent) af Windows-undersystem til Linux. Hvis denne politik er deaktiveret, er det kun lagerversionen af WSL, der kan bruges.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">Tillad WSL1</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">Når denne politik er indstillet til deaktiveret, deaktiverer den WSL1. Når indstillingen er deaktiveret, er det kun WSL2-distributioner, der kan bruges.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Tillad brugerdefineret kernekonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">Når denne politik er indstillet til deaktiveret, deaktiveres brugerdefineret kernekonfiguration via .wslconfig (wsl2.kernel). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Tillad konfiguration af brugerdefineret systemdistribution</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">Når denne politik er angivet til deaktiveret, deaktiveres den brugerdefinerede systemdistributionskonfiguration via .wslconfig (wsl2.systemDistro). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Tillad konfiguration af kernekommandolinje</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">Når denne politik er angivet til deaktiveret, deaktiveres konfiguration af kernekommandolinjen via .wslconfig (wsl2.kernelCommandLine). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="AllowDebugShell">Tillad fejlfinding af shell</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">Når denne politik er angivet er deaktiveret, deaktiveres fejlfinding af shell (wsl.exe --debug-shell). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Tillad indlejret virtualisering</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">Når denne politik er angivet til deaktiveret, deaktiveres indlejret virtualiseringskonfiguration via .wslconfig (wsl2.nestedVirtualization). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Tillad kernefejlfinding</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">Når denne politik er angivet til deaktiveret, deaktiveres konfiguration af kernefejlfinding via .wslconfig (wsl2.kernelDebugPort). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Tillad brugerdefineret netværkskonfiguration</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">Når denne politik er angivet til deaktiveret, deaktiveres brugerdefineret netværkskonfiguration via .wslconfig (wsl2.networkingmode). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Tillad at brugeren indstiller firewall-konfigurationen</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">Når denne politik er angivet til deaktiveret, deaktiveres konfiguration af firewall via .wslconfig (wsl2.firewall). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="AllowDiskMount">Tillad tilslutning af passthrough-disk</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">Når denne politik er angivet til deaktiveret, deaktiveres tilslutning af passthrough-disk i WSL2 (wsl.exe --mount). Denne politik gælder kun for Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Konfigurer standardnetværkstilstand</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Denne politik angiver den standardnetværkstilstand, der skal bruges til WSL2.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Ingen</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Spejlet</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL-objektbeholder</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">Tillad WSL-objektbeholder</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Denne politik styrer, om WSL-objektbeholderen kan bruges på denne maskine. Når indstillingen er aktiveret eller ikke konfigureret, kan brugere og Windows-programmer køre Linux-objektbeholdere via WSL. Når den er indstillet til deaktiveret, blokeres WSL-objektbeholderen for alle brugere, og Windows-apps kan ikke køre Linux-objektbeholdere. Advarsel! Hvis du angiver dette til "Deaktiveret", kan det ødelægge Windows-apps, der er afhængige af Linux-objektbeholdere.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">Liste over tilladte registreringsdatabaser for WSL-objektbeholdere</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">Når den er aktiveret, har WSL-objektbeholderen kun tilladelse til at hente billeder fra de registreringsdatabaser, der er angivet her. Dette påvirker både WSL-objektbeholderens CLI og alle programmer, der bruger WSL-objektbeholder-API'et.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Standardnetværkstilstand</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Tilladte registreringsdatabaser</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

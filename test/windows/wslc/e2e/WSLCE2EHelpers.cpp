@@ -278,34 +278,30 @@ wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName)
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = RunWslc(L"container list --no-trunc --all");
-    listResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto stdoutLines = listResult.GetStdoutLines();
-    for (const auto& line : stdoutLines)
+    const auto name = wsl::shared::string::WideToMultiByte(containerName);
+    const auto containers = ListAllContainers();
+    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Name == name; });
+    if (it == containers.end())
     {
-        if (line.find(containerName) != std::wstring::npos)
-        {
-            if (line.find(L"running") != std::wstring::npos)
-            {
-                auto result = RunWslc(std::format(L"container kill {}", containerName));
-                // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
-                if (result.ExitCode != 0 &&
-                    (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
-                {
-                    result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-                }
-            }
+        return;
+    }
 
-            auto result = RunWslc(std::format(L"container remove --force {}", containerName));
-            // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
-            if (result.ExitCode != 0 &&
-                (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
-            {
-                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-            }
-            break;
+    if (it->State == WSLCContainerState::WslcContainerStateRunning)
+    {
+        auto result = RunWslc(std::format(L"container kill {}", containerName));
+        // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
+        if (result.ExitCode != 0 &&
+            (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+        {
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
         }
+    }
+
+    auto result = RunWslc(std::format(L"container remove --force {}", containerName));
+    // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
+    if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+    {
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 }
 

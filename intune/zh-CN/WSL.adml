@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>适用于 Linux 的 Windows 子系统</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">适用于 Linux 的 Windows 子系统</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">允许使用适用于 Linux 的 Windows 子系统</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">设置为“已禁用”后，此策略将禁止计算机上的所有用户访问在适用于 Linux 的 Windows 子系统中运行的 Linux 分发版。</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">允许使用适用于 Linux 的 Windows 子系统的预装版本</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">设置为“已禁用”后，此策略将禁用适用于 Linux 的 Windows 子系统的预装版本(可选组件)。如果禁用此策略，则只能使用 WSL 的 Microsoft Store 版本。</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">允许 WSL1</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">设置为禁用时，此策略将禁用 WSL1。禁用后，只能使用 WSL2 分发。</string>
+
+        <string id="CustomKernelUserSettingConfigurable">允许自定义内核配置</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">设置为“已禁用”后，此策略将通过 .wslconfig (wsl2.kernel)禁用自定义内核配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">允许自定义系统分发配置</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">设置为“已禁用”后，此策略通过 .wslconfig (wsl2.systemDistro)禁用自定义系统分发配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">允许内核命令行配置</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">设置为“已禁用”后，此策略通过 .wslconfig (wsl2.kernelCommandLine)禁用内核命令行配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="AllowDebugShell">允许调试 shell</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">设置为“已禁用”后，此策略将禁用调试 shell (wsl.exe --debug-shell)。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">允许嵌套虚拟化</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">设置为“已禁用”后，此策略通过 .wslconfig (wsl2.nestedVirtualization)禁用嵌套虚拟化配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="KernelDebugUserSettingConfigurable">允许内核调试</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">设置为“已禁用”后，此策略通过 .wslconfig (wsl2.kernelDebugPort)禁用内核调试配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">允许自定义网络配置</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">设置为“已禁用”后，此策略将通过 .wslconfig (wsl2.networkingMode)禁用自定义网络配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="FirewallUserSettingConfigurable">允许用户设置防火墙配置</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">设置为“已禁用”后，此策略将通过 .wslconfig (wsl2.firewall)禁用防火墙配置。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="AllowDiskMount">允许直通磁盘装载</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">设置为“已禁用”后，此策略将禁用 WSL2 中的直通磁盘装载(wsl.exe --mount)。此策略仅适用于 Microsoft Store WSL。</string>
+
+        <string id="DefaultNetworkingMode">配置默认网络模式</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">此策略指定要用于 WSL2 的默认网络模式。</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">无</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">NAT</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">镜像</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL 容器</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">允许 WSL 容器</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">此策略控制是否可以在此计算机上使用 WSL 容器。启用或未配置后，用户和 Windows 应用程序都可以通过 WSL 运行 Linux 容器。设置为禁用时，将对所有用户阻止 WSL 容器，并且 Windows 应用无法运行 Linux 容器。警告： 将此项设置为“已禁用”可能会中断依赖于 Linux 容器的 Windows 应用。</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">WSL 容器注册表的允许列表</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">启用后，WSL 容器将仅允许从此处列出的注册表中拉取映像。这会影响 WSL 容器 CLI 和所有使用 WSL 容器 API 的应用程序。</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">默认网络模式</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">允许的注册表</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

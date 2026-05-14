@@ -62,6 +62,7 @@ public:
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
+    void AddAdditionalNetwork(const std::string& Name);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session);
     RunningWSLCContainer Create(IWSLCSession& Session);
@@ -108,6 +109,7 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
+    std::vector<std::string> m_additionalNetworks;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;

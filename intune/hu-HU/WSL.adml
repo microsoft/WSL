@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Linuxos Windows-alrendszer</description>
+  <resources>
+    <stringTable>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="WindowsSubsystemForLinux">Linuxos Windows-alrendszer</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSL">A Linuxos Windows-alrendszer engedélyezése</string>
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowWSLExplain">Ha le van tiltva, ez a házirend letiltja a Linux-disztribúciók futtatásához való hozzáférést a Linuxos Windows-alrendszer minden felhasználója számára a gépen.</string>
+
+        <!-- {Locked="Windows Subsystem for Linux"} -->
+        <string id="AllowInboxWSL">A Linuxos Windows-alrendszer beérkezett üzenetek mappája verziójának engedélyezése</string>
+        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
+        <string id="AllowInboxWSLExplain">Ha le van tiltva, ez a házirend letiltja a Linuxos Windows-alrendszer beérkezett üzenetek mappájának verzióját (választható összetevő). Ha ez a házirend le van tiltva, csak a WSL áruházi verziója használható.</string>
+
+        <!-- {Locked="WSL1"} -->
+        <string id="AllowWSL1">WSL1 engedélyezése</string>
+        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
+        <string id="AllowWSL1Explain">Ha le van tiltva, ez a házirend letiltja a WSL1-et. Ha le van tiltva, csak WSL2-disztribúciók használhatók.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Egyéni kernelkonfiguráció engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
+        <string id="CustomKernelExplain">Ha le van tiltva, ez a házirend letiltja az egyéni kernelkonfigurációt a .wslconfig (wsl2.kernel) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Egyéni rendszerelosztási konfiguráció engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
+        <string id="CustomSystemDistroExplain">Ha le van tiltva, ez a házirend letiltja az egyéni rendszerelosztási konfigurációt a .wslconfig (wsl2.systemDistro) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Kernel parancssori konfigurációjának engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
+        <string id="CustomKernelCommandLineExplain">Ha le van tiltva, ez a házirend letiltja a kernel parancssori konfigurációját a .wslconfig (wsl2.kernelCommandLine) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="AllowDebugShell">A hibakeresési felület engedélyezése</string>
+        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
+        <string id="AllowDebugShellExplain">Ha le van tiltva, ez a házirend letiltja a hibakeresési felületet (wsl.exe --debug-shell). Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Beágyazott virtualizálás engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
+        <string id="NestedVirtualizationExplain">Ha le van tiltva, ez a házirend letiltja a beágyazott virtualizálási konfigurációt a .wslconfig (wsl2.nestedVirtualization) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Kernel-hibakeresés engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
+        <string id="KernelDebugExplain">Ha le van tiltva, ez a házirend letiltja a kernel hibakeresési konfigurációját a .wslconfig (wsl2.kernelDebugPort) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Egyéni hálózati konfiguráció engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
+        <string id="CustomNetworkingExplain">Ha le van tiltva, ez a házirend letiltja az egyéni hálózatkezelési konfigurációt a .wslconfig (wsl2.networkingmode) használatával. Ez a házirend csak a Store WSL-re vonatkozik.</string>
+
+        <string id="FirewallUserSettingConfigurable">A tűzfal-konfiguráció felhasználói beállításának engedélyezése</string>
+        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
+        <string id="FirewallExplain">Ha le van tiltva, ez a házirend letiltja a tűzfal-konfigurációt a .wslconfig (wsl2.firewall) használatával. Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="AllowDiskMount">Áthaladó lemez csatolásának engedélyezése</string>
+        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
+        <string id="AllowDiskMountExplain">Ha le van tiltva, ez a házirend letiltja az áthaladó lemezek csatlakoztatását a WSL2-ben (wsl.exe --mount). Ez a házirend csak az áruházi WSL-re vonatkozik.</string>
+
+        <string id="DefaultNetworkingMode">Az alapértelmezett hálózati mód konfigurálása</string>
+        <!-- {Locked="WSL2"} -->
+        <string id="DefaultNetworkingModeExplain">Ez a házirend a WSL2 alapértelmezett hálózati módját határozza meg.</string>
+        <!-- {Locked="None"} -->
+        <string id="NetworkingModeNone">Nincs</string>
+        <!-- {Locked="NAT"} -->
+        <string id="NetworkingModeNAT">Hálózati címfordítás</string>
+        <!-- {Locked="Mirrored"} -->
+        <string id="NetworkingModeMirrored">Tükrözött</string>
+        <!-- {Locked="VirtioProxy"} -->
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainer">WSL-tároló</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="AllowWSLContainer">WSL-tároló engedélyezése</string>
+        <!-- {Locked="WSL"}{Locked="Disabled"} -->
+        <string id="AllowWSLContainerExplain">Ez a házirend szabályozza, hogy ezen a gépen használható-e WSL-tároló. Ha engedélyezve van vagy nincs beállítva, a felhasználók és a Windows-alkalmazások WSL-en keresztül futtathatnak Linux-tárolókat. Ha le van tiltva, a WSL-tároló minden felhasználó számára blokkolva van, és a Windows-alkalmazások nem futtathatnak Linux-tárolókat. Figyelmeztetés: Ha ezt „Letiltva” értékre állítja, az megszakíthatja azokat a Windows-alkalmazásokat, amelyek Linux-tárolóktól függenek.</string>
+
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlist">WSL-tárolóregisztrációs adatbázisok engedélyezési listája</string>
+        <!-- {Locked="WSL"} -->
+        <string id="WSLContainerRegistryAllowlistExplain">Ha engedélyezve van, a WSL-tároló csak az itt felsorolt tárolókból kérhet le lemezképeket. Ez hatással van a WSL-tároló CLI-re és a WSL-tároló API-t használó összes alkalmazásra is.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Alapértelmezett hálózati mód</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Engedélyezett regisztrációs adatbázisok</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

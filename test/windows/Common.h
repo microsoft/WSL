@@ -535,6 +535,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernelModules;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
+    std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
