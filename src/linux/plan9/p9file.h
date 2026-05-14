@@ -118,12 +118,21 @@ private:
     Expected<struct stat> Stat();
     LX_INT ReadDirHelper(UINT64 offset, SpanWriter& writer, bool extendedAttributes);
 
+    // Returns the fd backing this fid for self-targeted ops (fstatat with
+    // AT_EMPTY_PATH, /proc/self/fd reopens, openat using this fid as dirfd).
+    // Non-root fids return the O_PATH fd pinned by Walk/Create; the root fid
+    // returns m_Root->RootFd. Caller must hold m_Lock.
+    int PathFd() const noexcept;
+
     // This lock protects all state except:
     // - Read access to m_File: once non-NULL, this member never becomes NULL
     //   again.
     // - m_Root, m_Uid: these members don't change after initialization.
     mutable std::shared_mutex m_Lock;
     std::string m_FileName;
+    // O_PATH | O_NOFOLLOW fd pinning the inode this fid refers to. Empty for
+    // the root fid (PathFd() falls back to m_Root->RootFd).
+    wil::unique_fd m_PathFd;
     std::unique_ptr<DirectoryEnumerator> m_Enumerator;
     wil::unique_fd m_File;
     CoroutineIoIssuer m_Io;
