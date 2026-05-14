@@ -1001,7 +1001,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+    <value>La creazione di immagini del contenitore è bloccata perché un elenco di elementi consentiti del registro dei contenitori è configurato dal criterio del computer. Le creazioni delle immagini possono eseguire il pull immagini base da registri arbitrari e non possono essere limitate in modo affidabile all'elenco di elementi consentiti.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Eseguire 'wsl.exe --set-version {} 2' per eseguire l'aggiornamento a WSL2.</value>
@@ -2110,7 +2110,7 @@ Utilizzo:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>ContainerIpAddress non è ancora supportato.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
@@ -2125,7 +2125,7 @@ Utilizzo:
     <value>Il nome della rete del contenitore è obbligatorio per il tipo di rete personalizzato.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>Il nome della rete non può essere vuoto.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando non riconosciuto: '{}'</value>
@@ -2278,11 +2278,11 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
-    <value>Invalid value for option '{}': '{}'</value>
+    <value>Valore non valido per l'opzione '{}': '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
-    <value>Unknown option: '{}'</value>
+    <value>Opzione sconosciuta: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2318,7 +2318,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Rete duplicata: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2338,7 +2338,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
-    <value>Importing from a pipe is not supported. Please redirect stdin from a file.</value>
+    <value>L'importazione da una pipe non è supportata. Reindirizza stdin da un file.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Nessun Containerfile o Dockerfile trovato in '{}'</value>
@@ -2430,10 +2430,10 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <value>Avvia un contenitore.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Visualizza le statistiche di utilizzo delle risorse del contenitore.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Visualizza uno snapshot dell'utilizzo delle risorse di un contenitore in esecuzione: CPU, memoria, I/O di rete, I/O a blocchi e PID.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Arresta i contenitori.</value>
@@ -2462,7 +2462,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <value>Ispeziona le immagini.</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
-    <value>Import an image from a tarball.</value>
+    <value>Importa un'immagine da un tarball.</value>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importa il contenuto di un tarball per creare un'immagine del file system. Facoltativamente, contrassegna l'immagine con un repository e un nome di tag.</value>
@@ -2699,6 +2699,12 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Percorso del Dockerfile (usare "-" per leggere da stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filter output based on conditions provided</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Argomento "{}" non valido per '-f, --filter' flag: formato non valido del filtro (previsto nome=valore)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Segui l'output del log</value>
   </data>
@@ -2724,7 +2730,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Nome dell'immagine</value>
   </data>
   <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
-    <value>File or - to read from stdin</value>
+    <value>File o - per leggere da stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Fornisce il percorso del file di archivio tar contenente l'immagine</value>
@@ -2734,6 +2740,12 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>La chiave dell'etichetta non può essere vuota</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Mostra n ultimi contenitori creati (include tutti gli stati)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Mostra l'ultimo contenitore creato (include tutti gli stati)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nome host del contenitore</value>
@@ -3005,22 +3017,22 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>CONTAINER ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NOME</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>IMMAGINE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>CREATO</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
     <value>STATUS</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
-    <value>CPU %</value>
+    <value>% CPU</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
     <value>MEM USAGE / LIMIT</value>

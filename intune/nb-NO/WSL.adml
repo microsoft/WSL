@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Tillat egendefinert nettverkskonfigurasjon</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Når deaktivert, vil denne policyen deaktivere egendefinert nettverkskonfigurasjon via .wslconfig (wsl2.networkingmode). Denne policyen gjelder bare for Store WSL.</string>
+        <string id="CustomNetworkingExplain">Når den er angitt til deaktivert, vil denne policyen deaktivere egendefinert nettverkskonfigurasjon via .wslconfig (wsl2.networkingmode). Denne policyen gjelder bare for Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Tillat brukerinnstilling for brannmurkonfigurasjon</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

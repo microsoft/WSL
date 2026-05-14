@@ -49,13 +49,13 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Zezwalaj na niestandardową konfigurację sieciową</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza niestandardową konfigurację sieci za pomocą pliku .wslconfig (wsl2.networkingmode). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="CustomNetworkingExplain">Gdy ta zasada jest wyłączona, blokuje ona niestandardową konfigurację sieci za pomocą pliku .wslconfig (wsl2.networkingMode). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
-        <string id="FirewallUserSettingConfigurable">Zezwalaj na konfigurację zapory ustawienia użytkownika</string>
+        <string id="FirewallUserSettingConfigurable">Zezwalaj użytkownikowi na konfigurowanie zapory</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
         <string id="FirewallExplain">Jeśli ta zasada jest wyłączona, wyłącza konfigurację zapory za pośrednictwem pliku wslconfig (wsl2.firewall). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
-        <string id="AllowDiskMount">Zezwalaj na instalację dysku przekazującego</string>
+        <string id="AllowDiskMount">Zezwalaj na instalowanie dysków pass-through</string>
         <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
         <string id="AllowDiskMountExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza podłączanie dysków z użyciem trybu passthrough w WSL2 (wsl.exe --mount). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 

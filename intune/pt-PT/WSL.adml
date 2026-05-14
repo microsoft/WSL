@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Permitir configuração de rede personalizada</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Quando definida como desativada, esta política desativa a configuração de rede personalizada através de .wslconfig (wsl2.networkingmode). Esta política aplica-se apenas ao WSL da Loja.</string>
+        <string id="CustomNetworkingExplain">Quando definida como desativada, esta política desativa a configuração de rede personalizada através de .wslconfig (wsl2.networkingMode). Esta política aplica-se apenas ao WSL da Loja.</string>
 
         <string id="FirewallUserSettingConfigurable">Permitir a configuração de firewall definida pelo utilizador</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

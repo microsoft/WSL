@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Tillad brugerdefineret netværkskonfiguration</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Når denne politik er angivet til deaktiveret, deaktiveres brugerdefineret netværkskonfiguration via .wslconfig (wsl2.networkingmode). Denne politik gælder kun for Store WSL.</string>
+        <string id="CustomNetworkingExplain">Når denne politik er angivet til deaktiveret, deaktiveres brugerdefineret netværkskonfiguration via .wslconfig (wsl2.networkingMode). Denne politik gælder kun for Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Tillad at brugeren indstiller firewall-konfigurationen</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

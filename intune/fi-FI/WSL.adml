@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Salli mukautettu verkkomääritys</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Kun tämä käytäntö on poissa käytöstä, mukautettu verkkomääritys .wslconfig (wsl2.networkingmode) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="CustomNetworkingExplain">Kun tämä käytäntö on poissa käytöstä, se poistaa mukautetun verkkomäärityksen käytöstä .wslconfig-tiedoston kautta (wsl2.networkingMode). Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="FirewallUserSettingConfigurable">Salli käyttäjän määrittää palomuuriasetukset</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

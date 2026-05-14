@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Benutzerdefinierte Netzwerkkonfiguration zulassen</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die benutzerdefinierte Netzwerkkonfiguration über .wslconfig (wsl2.networkingmode). Diese Richtlinie gilt nur für Store-WSL.</string>
+        <string id="CustomNetworkingExplain">Wenn diese Richtlinie auf „Deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die benutzerdefinierte Netzwerkkonfiguration über .wslconfig (wsl2.networkingMode). Diese Richtlinie gilt nur für Store-WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Benutzern das Festlegen der Firewallkonfiguration erlauben</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

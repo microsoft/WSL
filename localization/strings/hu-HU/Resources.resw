@@ -2104,7 +2104,7 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>A ContainerIpAddress még nem támogatott.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
@@ -2119,7 +2119,7 @@ Usage:
     <value>Az egyéni hálózattípushoz meg kell adni a tárolóhálózat nevét.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>A hálózat neve nem lehet üres.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Ismeretlen parancs: {}</value>
@@ -2312,7 +2312,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Duplikált hálózat: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2332,7 +2332,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
-    <value>Importing from a pipe is not supported. Please redirect stdin from a file.</value>
+    <value>A csőből történő importálás nem támogatott. Kérjük, a standard bemenetet fájlból irányítsa át.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Nem található Containerfile vagy Dockerfile a(z) {} helyen</value>
@@ -2424,10 +2424,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Elindít egy tárolót.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Tároló erőforrás-használati statisztikák megjelenítése.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Egy futó tároló erőforrás-használatának pillanatképét jeleníti meg: CPU, memória, hálózati I/O, blokk I/O és PID-k.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Tárolók leállítása.</value>
@@ -2456,10 +2456,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Képek vizsgálata.</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
-    <value>Import an image from a tarball.</value>
+    <value>Kép importálása egy tarballból.</value>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
-    <value>Imports the contents of a tarball to create a filesystem image. Optionally tag the image with a repository and tag name.</value>
+    <value>Egy tarball tartalmát importálja egy fájlrendszerkép létrehozásához. Igény szerint a rendszerképet egy adattár- és címkenévvel is elláthatja.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Képek listázása.</value>
@@ -2693,6 +2693,12 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A Dockerfile elérési útja (az stdinből való olvasáshoz használja a „-” karaktert)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filter output based on conditions provided</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Naplókimenet követése</value>
   </data>
@@ -2718,7 +2724,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Lemezkép neve</value>
   </data>
   <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
-    <value>File or - to read from stdin</value>
+    <value>Fájl vagy -, ha az standard bemenetből szeretne olvasni</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>A lemezképet tartalmazó archív tar fájl elérési útját adja meg</value>
@@ -2728,6 +2734,12 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>A címkekulcs nem lehet üres</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>N utoljára létrehozott tároló megjelenítése (tartalmazza az összes állapotot)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Show the latest created container (includes all states)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Tároló gazdagépének neve</value>
@@ -2996,28 +3008,28 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>TÁROLÓAZONOSÍTÓ</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NÉV</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>KÉP</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>LÉTREHOZVA</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
-    <value>STATUS</value>
+    <value>ÁLLAPOT</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTOK</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>MEM-HASZNÁLAT/KORLÁT</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
     <value>MEM %</value>

@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">사용자 지정 네트워킹 구성 허용</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.networkingmode)를 통한 사용자 지정 네트워킹 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
+        <string id="CustomNetworkingExplain">사용하지 않도록 설정할 경우, 이 정책은 .wslconfig(wsl2.networkingMode)를 통한 사용자 지정 네트워킹 구성을 사용하지 않도록 설정합니다. 이 정책은 Store WSL에만 적용됩니다.</string>
 
         <string id="FirewallUserSettingConfigurable">사용자 설정 방화벽 구성 허용</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

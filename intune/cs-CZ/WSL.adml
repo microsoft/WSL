@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">Povolit vlastní konfiguraci sítě</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Když je tato zásada zakázaná, zakáže se vlastní konfigurace sítě prostřednictvím .wslconfig (wsl2.networkingmode). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="CustomNetworkingExplain">Když je tato zásada zakázaná, zakáže se vlastní konfigurace sítě prostřednictvím .wslconfig (wsl2.networkingMode). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="FirewallUserSettingConfigurable">Povolit uživatelskou konfiguraci brány firewall</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->

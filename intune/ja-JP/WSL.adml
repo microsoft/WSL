@@ -49,7 +49,7 @@
 
         <string id="CustomNetworkingUserSettingConfigurable">カスタム ネットワーク構成を許可する</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.networkingmode) によるカスタム ネットワーク構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="CustomNetworkingExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.networkingMode) によるカスタム ネットワーク構成を無効にします。このポリシーはストア WSL にのみ適用されます。</string>
 
         <string id="FirewallUserSettingConfigurable">ユーザーがファイアウォール構成を設定できるようにする</string>
         <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
