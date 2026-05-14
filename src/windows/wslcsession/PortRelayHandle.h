@@ -32,7 +32,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 private:
     void LaunchRelay(wil::unique_socket&& AcceptedSocket);

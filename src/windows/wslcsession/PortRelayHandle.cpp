@@ -90,9 +90,18 @@ void PortRelayAcceptHandle::Collect()
     State = io::IOHandleStatus::Standby;
 }
 
-HANDLE PortRelayAcceptHandle::GetHandle() const
+void PortRelayAcceptHandle::Bind(HANDLE Iocp, ULONG_PTR CompletionKey)
 {
-    return Event.get();
+    WI_ASSERT(State == io::IOHandleStatus::Created);
+
+    THROW_LAST_ERROR_IF(
+        CreateIoCompletionPort(reinterpret_cast<HANDLE>(ListenSocket.get()), Iocp, CompletionKey, 0) == nullptr);
+    if (!SetFileCompletionNotificationModes(reinterpret_cast<HANDLE>(ListenSocket.get()), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
+    }
+
+    State = io::IOHandleStatus::Standby;
 }
 
 void PortRelayAcceptHandle::LaunchRelay(wil::unique_socket&& AcceptedSocket)

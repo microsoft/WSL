@@ -6828,6 +6828,70 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    TEST_METHOD(MultiHandleWaitMoreThan64Handles)
+    {
+        // Validate that MultiHandleWait can drive more than MAXIMUM_WAIT_OBJECTS (64)
+        // pending handles in parallel. The implementation uses an I/O completion port to
+        // bypass the WaitForMultipleObjects limit; before the IOCP rewrite this would
+        // have asserted or failed inside Run.
+        constexpr size_t handleCount = 65;
+        static_assert(handleCount > MAXIMUM_WAIT_OBJECTS, "Test must exceed the WaitForMultipleObjects limit");
+
+        std::vector<wil::unique_hfile> writeEnds;
+        writeEnds.reserve(handleCount);
+
+        std::vector<std::string> received(handleCount);
+        std::vector<bool> sawEof(handleCount, false);
+
+        wsl::windows::common::io::MultiHandleWait io;
+
+        for (size_t i = 0; i < handleCount; ++i)
+        {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            writeEnds.emplace_back(std::move(writePipe));
+
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
+                std::move(readPipe), [&received, &sawEof, i](const gsl::span<char>& buffer) {
+                    if (buffer.empty())
+                    {
+                        sawEof[i] = true;
+                    }
+                    else
+                    {
+                        received[i].append(buffer.data(), buffer.size());
+                    }
+                }));
+        }
+
+        // Background producer: write a unique payload to each pipe and close it. Doing
+        // this from a separate thread guarantees that the reads queued by Run have to
+        // wait asynchronously through the completion port.
+        std::thread producer([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                const std::string payload = std::format("handle-{}", i);
+                DWORD written = 0;
+                if (!WriteFile(writeEnds[i].get(), payload.data(), static_cast<DWORD>(payload.size()), &written, nullptr))
+                {
+                    LOG_LAST_ERROR();
+                }
+                writeEnds[i].reset();
+            }
+        });
+
+        auto producerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { producer.join(); });
+
+        io.Run(std::chrono::seconds(60));
+
+        for (size_t i = 0; i < handleCount; ++i)
+        {
+            const std::string expected = std::format("handle-{}", i);
+            VERIFY_ARE_EQUAL(expected, received[i]);
+            VERIFY_IS_TRUE(sawEof[i]);
+        }
+    }
+
     TEST_METHOD(SocketChannel)
     {
         // Read exactly `size` bytes from a raw socket into the destination buffer.

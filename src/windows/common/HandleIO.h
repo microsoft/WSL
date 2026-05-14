@@ -8,6 +8,7 @@ namespace wsl::windows::common::io {
 
 enum class IOHandleStatus
 {
+    Created,
     Standby,
     Pending,
     Completed
@@ -68,11 +69,21 @@ public:
     virtual ~OverlappedIOHandle() = default;
     virtual void Schedule() = 0;
     virtual void Collect() = 0;
-    virtual HANDLE GetHandle() const = 0;
+
+    // Bind this handle's underlying file/socket to an I/O completion port. When the
+    // backing operation completes, GetQueuedCompletionStatus returns CompletionKey so
+    // MultiHandleWait can route the packet back to the correct entry. Subclasses that
+    // wrap an event (which cannot be associated with an IOCP) instead arrange for a
+    // thread pool wait to PostQueuedCompletionStatus when the event signals.
+    //
+    // Bind must only be called when the handle is in the Created state. Implementations
+    // transition the state to Standby on success.
+    virtual void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) = 0;
+
     IOHandleStatus GetState() const;
 
 protected:
-    IOHandleStatus State = IOHandleStatus::Standby;
+    IOHandleStatus State = IOHandleStatus::Created;
 };
 
 class EventHandle : public OverlappedIOHandle
@@ -84,11 +95,16 @@ public:
     EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 private:
+    static void NTAPI WaitCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context, PTP_WAIT Wait, TP_WAIT_RESULT WaitResult);
+
     HandleWrapper Handle;
     std::function<void()> OnSignalled;
+    HANDLE m_iocp{};
+    ULONG_PTR m_completionKey{};
+    wil::unique_threadpool_wait m_threadpoolWait;
 };
 
 class ReadHandle : public OverlappedIOHandle
@@ -102,7 +118,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 private:
     HandleWrapper Handle;
@@ -124,7 +140,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 private:
     HandleWrapper ListenSocket;
@@ -181,7 +197,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 private:
     void ScheduleRecv();
@@ -208,7 +224,7 @@ public:
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
     void Push(const gsl::span<char>& Buffer);
 
 private:
@@ -286,17 +302,15 @@ public:
         }
     }
 
-    HANDLE GetHandle() const override
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override
     {
-        if (Read.GetState() == IOHandleStatus::Pending)
-        {
-            return Read.GetHandle();
-        }
-        else
-        {
-            WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
-            return Write.GetHandle();
-        }
+        WI_ASSERT(State == IOHandleStatus::Created);
+
+        // Both sub-handles share the parent's completion key so any sub-completion
+        // routes back to this RelayHandle's Collect.
+        Read.Bind(Iocp, CompletionKey);
+        Write.Bind(Iocp, CompletionKey);
+        State = IOHandleStatus::Standby;
     }
 
 private:
@@ -325,7 +339,7 @@ public:
     DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
     void Schedule() override;
     void Collect() override;
-    HANDLE GetHandle() const override;
+    void Bind(HANDLE Iocp, ULONG_PTR CompletionKey) override;
 
 #pragma pack(push, 1)
     struct MultiplexedHeader
@@ -371,7 +385,19 @@ public:
     void Cancel();
 
 private:
-    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
+    struct HandleEntry
+    {
+        Flags Options;
+        std::unique_ptr<OverlappedIOHandle> Handle;
+    };
+
+    // m_iocp is declared first so it is destroyed last - after every handle has had a
+    // chance to cancel its pending I/O. Closing a handle while its file/socket still has
+    // overlapped I/O outstanding could otherwise leave packets queued to a destroyed
+    // completion port.
+    wil::unique_handle m_iocp;
+    std::map<ULONG_PTR, HandleEntry> m_handles;
+    ULONG_PTR m_nextHandleId = 1;
     bool m_cancel = false;
 };
 
