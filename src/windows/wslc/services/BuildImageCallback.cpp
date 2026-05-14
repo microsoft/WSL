@@ -206,11 +206,11 @@ try
         {
             PrintPlainTextProgress();
         }
-        else 
+        else
         {
             StartTimerThread();
         }
-    } 
+    }
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
@@ -294,8 +294,7 @@ std::wstring BuildImageCallback::FormatStepLine(const ViewStep& step, SHORT cons
 
 // Synthesize cached FROM lines for base image steps that were skipped
 // because they were resolved from a shared stage.
-void BuildImageCallback::AppendCachedFromLines(
-    const ViewTarget& target, SHORT consoleWidth, std::vector<std::wstring>& lines) const
+void BuildImageCallback::AppendCachedFromLines(const ViewTarget& target, SHORT consoleWidth, std::vector<std::wstring>& lines) const
 {
     if (target.steps.empty())
     {
@@ -331,8 +330,7 @@ void BuildImageCallback::AppendCachedFromLines(
             wlabel.resize(consoleWidth - 13);
             wlabel += L"...";
         }
-        auto padLen =
-            (wlabel.size() + 6 < static_cast<size_t>(consoleWidth)) ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6 : 0;
+        auto padLen = (wlabel.size() + 6 < static_cast<size_t>(consoleWidth)) ? static_cast<size_t>(consoleWidth) - wlabel.size() - 6 : 0;
         lines.push_back(std::format(L"\033[36m{}{}{}\033[0m", wlabel, std::wstring(std::max<size_t>(1, padLen), L' '), L"CACHED"));
     }
 }
