@@ -1161,12 +1161,7 @@ try
     {
         rebuilt.push_back(L'\0'); // double-NUL terminator
         THROW_IF_WIN32_ERROR(RegSetValueExW(
-            key.get(),
-            c_valueName,
-            0,
-            REG_MULTI_SZ,
-            reinterpret_cast<const BYTE*>(rebuilt.data()),
-            static_cast<DWORD>(rebuilt.size() * sizeof(wchar_t))));
+            key.get(), c_valueName, 0, REG_MULTI_SZ, reinterpret_cast<const BYTE*>(rebuilt.data()), static_cast<DWORD>(rebuilt.size() * sizeof(wchar_t))));
     }
 
     return NOERROR;

@@ -1125,4 +1125,162 @@ class InstallerTests
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
+
+    TEST_METHOD(InstallScrubsPendingDeletesForInstalledFiles)
+    {
+        // Verify that the deferred CA "CancelPendingDeletesForInstalledFiles"
+        // removes delete-on-reboot entries pointing at files our MSI is about to
+        // install, while leaving renames and unrelated deletes untouched.
+        //
+        // See: msipackage/package.wix.in and src/windows/wslinstall/DllMain.cpp.
+
+        constexpr auto c_sessionManagerKey = LR"(SYSTEM\CurrentControlSet\Control\Session Manager)";
+        constexpr auto c_valueName = L"PendingFileRenameOperations";
+
+        const auto key = wsl::windows::common::registry::OpenKey(HKEY_LOCAL_MACHINE, c_sessionManagerKey, KEY_QUERY_VALUE | KEY_SET_VALUE);
+
+        // Snapshot the existing value (if any) so we can restore it on exit.
+        const auto readValue = [&]() -> std::optional<std::vector<wchar_t>> {
+            DWORD type = 0;
+            DWORD size = 0;
+            const auto rc = RegQueryValueExW(key.get(), c_valueName, nullptr, &type, nullptr, &size);
+            if (rc == ERROR_FILE_NOT_FOUND)
+            {
+                return std::nullopt;
+            }
+            VERIFY_ARE_EQUAL(static_cast<LSTATUS>(ERROR_SUCCESS), rc);
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(REG_MULTI_SZ), type);
+            std::vector<wchar_t> buffer(size / sizeof(wchar_t));
+            VERIFY_ARE_EQUAL(
+                static_cast<LSTATUS>(ERROR_SUCCESS),
+                RegQueryValueExW(key.get(), c_valueName, nullptr, nullptr, reinterpret_cast<BYTE*>(buffer.data()), &size));
+            return buffer;
+        };
+
+        const auto writeValue = [&](const std::optional<std::vector<wchar_t>>& value) {
+            if (!value.has_value())
+            {
+                const auto rc = RegDeleteValueW(key.get(), c_valueName);
+                if (rc != ERROR_SUCCESS && rc != ERROR_FILE_NOT_FOUND)
+                {
+                    THROW_WIN32(rc);
+                }
+            }
+            else
+            {
+                THROW_IF_WIN32_ERROR(RegSetValueExW(
+                    key.get(),
+                    c_valueName,
+                    0,
+                    REG_MULTI_SZ,
+                    reinterpret_cast<const BYTE*>(value->data()),
+                    static_cast<DWORD>(value->size() * sizeof(wchar_t))));
+            }
+        };
+
+        // Encode (source, target) pairs into a REG_MULTI_SZ buffer.
+        const auto encode = [](const std::vector<std::pair<std::wstring, std::wstring>>& pairs) {
+            std::vector<wchar_t> buffer;
+            for (const auto& [src, dst] : pairs)
+            {
+                buffer.insert(buffer.end(), src.begin(), src.end());
+                buffer.push_back(L'\0');
+                buffer.insert(buffer.end(), dst.begin(), dst.end());
+                buffer.push_back(L'\0');
+            }
+            buffer.push_back(L'\0'); // double-NUL terminator
+            return buffer;
+        };
+
+        // Decode a REG_MULTI_SZ buffer into (source, target) pairs.
+        const auto decode = [](const std::vector<wchar_t>& buffer) {
+            std::vector<std::pair<std::wstring, std::wstring>> pairs;
+            size_t i = 0;
+            while (i < buffer.size() && buffer[i] != L'\0')
+            {
+                std::wstring src{buffer.data() + i};
+                i += src.size() + 1;
+                if (i >= buffer.size())
+                {
+                    break;
+                }
+                std::wstring dst{buffer.data() + i};
+                i += dst.size() + 1;
+                pairs.emplace_back(std::move(src), std::move(dst));
+            }
+            return pairs;
+        };
+
+        const auto saved = readValue();
+        auto restore = wil::scope_exit([&]() {
+            try
+            {
+                writeValue(saved);
+            }
+            CATCH_LOG();
+        });
+
+        // Uninstall first so the subsequent InstallMsi() is a fresh install
+        // where every component's action is INSTALLSTATE_LOCAL. A maintenance
+        // reinstall over the existing product leaves component states as Null,
+        // so the CA's File-table walk would produce an empty CustomActionData
+        // and the scrub would be a no-op.
+        UninstallMsi();
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+
+        const auto installedSystemVhd = m_installedPath / L"system.vhd";
+        const auto installedModulesVhd = m_installedPath / L"tools" / L"modules.vhd";
+        const auto orphanPath = (m_installedPath / L"wsltest-orphan.tmp").wstring();
+        const auto renameSourcePath = (m_installedPath / L"wsltest-rename-src.tmp").wstring();
+
+        const auto ntPrefixed = [](const std::wstring& path) { return LR"(\??\)" + path; };
+
+        std::vector<std::pair<std::wstring, std::wstring>> injected;
+
+        // Two delete entries for files this MSI installs - both should be scrubbed.
+        injected.emplace_back(ntPrefixed(installedSystemVhd.wstring()), L"");
+        injected.emplace_back(ntPrefixed(installedModulesVhd.wstring()), L"");
+
+        // Delete entry for an unrelated path - must survive scrub.
+        injected.emplace_back(ntPrefixed(orphanPath), L"");
+
+        // Rename entry pointing AT one of our installed paths - must survive scrub.
+        injected.emplace_back(ntPrefixed(renameSourcePath), ntPrefixed(installedSystemVhd.wstring()));
+
+        writeValue(encode(injected));
+
+        // Re-install the MSI in place; the deferred CA fires inside InstallFinalize.
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        ValidatePackageInstalledProperly();
+
+        // Read back and verify exactly which test entries survived.
+        const auto post = readValue();
+        VERIFY_IS_TRUE(post.has_value(), L"PendingFileRenameOperations should still exist after the install");
+        const auto postPairs = decode(*post);
+
+        const auto containsDelete = [&](const std::wstring& source) {
+            return std::any_of(
+                postPairs.begin(), postPairs.end(), [&](const auto& p) { return p.first == source && p.second.empty(); });
+        };
+
+        const auto containsRename = [&](const std::wstring& source, const std::wstring& target) {
+            return std::any_of(
+                postPairs.begin(), postPairs.end(), [&](const auto& p) { return p.first == source && p.second == target; });
+        };
+
+        // Both delete entries pointing at installed files should be gone.
+        VERIFY_IS_FALSE(
+            containsDelete(ntPrefixed(installedSystemVhd.wstring())),
+            L"Delete-on-reboot entry for system.vhd should have been scrubbed");
+        VERIFY_IS_FALSE(
+            containsDelete(ntPrefixed(installedModulesVhd.wstring())),
+            L"Delete-on-reboot entry for tools\\modules.vhd should have been scrubbed");
+
+        // Orphan delete and the rename pointing at an installed path must survive.
+        VERIFY_IS_TRUE(containsDelete(ntPrefixed(orphanPath)), L"Unrelated delete-on-reboot entry must be preserved");
+        VERIFY_IS_TRUE(
+            containsRename(ntPrefixed(renameSourcePath), ntPrefixed(installedSystemVhd.wstring())),
+            L"Rename entry pointing at an installed path must be preserved (only deletes are dropped)");
+    }
 };
