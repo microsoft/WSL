@@ -2056,10 +2056,12 @@ try
     *Volumes = nullptr;
     *Count = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
-    auto volumeList = m_volumes->ListVolumes(Filters, FiltersCount);
+    auto volumeList = m_volumes->ListVolumes(std::move(filters));
 
     if (volumeList.empty())
     {
@@ -2067,10 +2069,7 @@ try
     }
 
     auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    for (size_t i = 0; i < volumeList.size(); i++)
-    {
-        output[i] = volumeList[i];
-    }
+    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
 
     *Count = static_cast<ULONG>(volumeList.size());
     *Volumes = output.release();

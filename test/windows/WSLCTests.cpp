@@ -4429,7 +4429,7 @@ class WSLCTests
         expectList({guestA, guestB, otherName, emptyValVol}, {{"driver", "guest"}});
         expectList({}, {{"driver", "nonexistent"}});
 
-        // Filter by volume name (substring match).
+        // Filter by volume name.
         expectList({vhdA, vhdB}, {{"name", "vhd"}});
 
         // Anchored regex matches exactly one volume.
@@ -4438,9 +4438,6 @@ class WSLCTests
 
         // Regex name filter.
         expectList({vhdA, vhdB}, {{"name", "vhd-."}});
-
-        // Invalid regex is rejected.
-        expectListFails(E_INVALIDARG, {{"name", "["}});
 
         // Filter by label key (any value matches): label=<key> form.
         expectList({vhdA, vhdB, guestA, otherName}, {{"label", "env"}});
@@ -4460,8 +4457,10 @@ class WSLCTests
         // Combined driver + name + label filter.
         expectList({vhdA}, {{"driver", "vhd"}, {"name", "a"}, {"label", "env=prod"}});
 
-        // Dangling filter is not currently supported.
-        expectListFails(E_INVALIDARG, {{"dangling", "true"}});
+        // Dangling filter is supported by docker. All our named test volumes
+        // are unused, so they are all dangling; combine with a name prefix to
+        // exclude any leftover dangling volumes from other tests.
+        expectList(all, {{"dangling", "true"}, {"name", "^wslc-list-"}});
 
         // label=<key> (key-only) matches the volume with the marker label regardless of stored value.
         expectList({emptyValVol}, {{"label", "marker"}});

@@ -23,69 +23,6 @@ using wsl::shared::Localization;
 
 namespace wsl::windows::service::wslc {
 
-namespace {
-    auto ParseListFilters(_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, ULONG FiltersCount)
-    {
-        std::vector<std::string> drivers;
-        std::vector<std::regex> nameRegexes;
-        std::vector<std::pair<std::string, std::optional<std::string>>> labels;
-
-        THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
-
-        for (ULONG i = 0; i < FiltersCount; ++i)
-        {
-            const auto& filter = Filters[i];
-            THROW_HR_IF_NULL(E_POINTER, filter.Key);
-            THROW_HR_IF_NULL(E_POINTER, filter.Value);
-
-            std::string key{filter.Key};
-            std::string value{filter.Value};
-
-            if (key == "driver")
-            {
-                drivers.push_back(value);
-            }
-            else if (key == "name")
-            {
-                try
-                {
-                    nameRegexes.emplace_back(value);
-                }
-                catch (const std::regex_error&)
-                {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(value));
-                }
-            }
-            else if (key == "label")
-            {
-                // label=<key> or label=<key>=<value>
-                const auto eq = value.find('=');
-
-                if (eq == 0)
-                {
-                    // Reject empty label keys (e.g. "label==value"). They are not valid in Docker.
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidFilter("label=" + value));
-                }
-                else if (eq == std::string::npos)
-                {
-                    labels.emplace_back(value, std::nullopt);
-                }
-                else
-                {
-                    labels.emplace_back(value.substr(0, eq), value.substr(eq + 1));
-                }
-            }
-            else
-            {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidFilter(key));
-            }
-        }
-
-        return std::make_tuple(std::move(drivers), std::move(nameRegexes), std::move(labels));
-    }
-
-} // namespace
-
 WSLCVolumes::WSLCVolumes(
     DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath) :
     m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
@@ -203,40 +140,47 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
-std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount) const
+std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const
 {
-    const auto [drivers, nameRegexes, labels] = ParseListFilters(Filters, FiltersCount);
+    // Pull the driver filter out and forward everything else to docker for filtering.
+    // Driver filter is special-cased because our driver concept doesn't map 1:1 to docker's.
+    std::vector<std::string> drivers;
+    auto it = Filters.find("driver");
+    if (it != Filters.end())
+    {
+        drivers = std::move(it->second);
+        Filters.erase(it);
+    }
 
-    auto matchLabel = [](const std::map<std::string, std::string>& volLabels, const std::pair<std::string, std::optional<std::string>>& f) {
-        const auto it = volLabels.find(f.first);
+    std::vector<wsl::windows::common::docker_schema::Volume> dockerVolumes;
+    try
+    {
+        dockerVolumes = m_dockerClient.ListVolumes(Filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list volumes");
 
-        if (it == volLabels.end())
-        {
-            return false;
-        }
-
-        return !f.second.has_value() || it->second == *f.second;
-    };
+    std::unordered_set<std::string> dockerVolumeNames;
+    dockerVolumeNames.reserve(dockerVolumes.size());
+    for (const auto& vol : dockerVolumes)
+    {
+        dockerVolumeNames.insert(vol.Name);
+    }
 
     auto lock = m_lock.lock_shared();
 
     std::vector<WSLCVolumeInformation> result;
-    result.reserve(m_volumes.size());
+    result.reserve(dockerVolumeNames.size());
 
     for (const auto& [name, vol] : m_volumes)
     {
+        // Must be in docker's filtered list.
+        if (!dockerVolumeNames.contains(name))
+        {
+            continue;
+        }
+
+        // Apply driver filter using the WSLC driver names.
         if (!drivers.empty() && std::ranges::find(drivers, vol->Driver()) == drivers.end())
-        {
-            continue;
-        }
-
-        if (!nameRegexes.empty() && !std::ranges::any_of(nameRegexes, [&](const auto& r) { return std::regex_search(name, r); }))
-        {
-            continue;
-        }
-
-        const auto& volLabels = vol->Labels();
-        if (!std::ranges::all_of(labels, [&](const auto& f) { return matchLabel(volLabels, f); }))
         {
             continue;
         }

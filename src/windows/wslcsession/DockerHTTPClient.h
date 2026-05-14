@@ -148,7 +148,7 @@ public:
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     common::docker_schema::Volume InspectVolume(const std::string& Name);
     void RemoveVolume(const std::string& Name);
-    std::vector<common::docker_schema::Volume> ListVolumes();
+    std::vector<common::docker_schema::Volume> ListVolumes(const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::PruneVolumeResult PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Network management.

@@ -40,7 +40,7 @@ public:
 
     void DeleteVolume(_In_ LPCSTR Name);
 
-    std::vector<WSLCVolumeInformation> ListVolumes(_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount) const;
+    std::vector<WSLCVolumeInformation> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;
 
     struct PruneVolumesResult
     {

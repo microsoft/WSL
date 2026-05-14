@@ -456,9 +456,16 @@ void DockerHTTPClient::RemoveVolume(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
 }
 
-std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
+std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes(const std::map<std::string, std::vector<std::string>>& filters)
 {
-    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
+    auto url = URL::Create("/volumes");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, url);
     return response.Volumes;
 }
 
