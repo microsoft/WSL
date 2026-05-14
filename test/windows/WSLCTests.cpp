@@ -6142,9 +6142,8 @@ class WSLCTests
 
         const std::string containerAId = containerA.Id();
 
-        WSLCContainerLauncher launcherB(
-            "debian:latest", containerBName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeContainer);
-        launcherB.SetContainerNetworkName(std::string(containerAName));
+        WSLCContainerLauncher launcherB("debian:latest", containerBName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcherB.SetContainerNetworkName("container:" + containerAName);
 
         auto containerB = launcherB.Launch(*m_defaultSession);
         VERIFY_ARE_EQUAL(containerB.State(), WslcContainerStateRunning);
@@ -6163,9 +6162,9 @@ class WSLCTests
         options.Image = "debian:latest";
         options.Name = "test-container-mode-no-target";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
-        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeContainer;
+        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
         WSLCNetworkAttachment emptyTarget{};
-        emptyTarget.NetworkName = "";
+        emptyTarget.NetworkName = "container:";
         options.ContainerNetwork.Networks = &emptyTarget;
         options.ContainerNetwork.NetworksCount = 1;
 
@@ -6182,8 +6181,8 @@ class WSLCTests
         const std::string targetName = "does-not-exist-container-target";
 
         WSLCContainerLauncher launcher(
-            "debian:latest", "test-container-mode-notfound", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeContainer);
-        launcher.SetContainerNetworkName(std::string(targetName));
+            "debian:latest", "test-container-mode-notfound", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName("container:" + targetName);
 
         auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
         VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, retVal.first);
@@ -6200,8 +6199,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(containerA.State(), WslcContainerStateRunning);
 
         WSLCContainerLauncher launcherB(
-            "debian:latest", "test-container-mode-ports-b", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeContainer);
-        launcherB.SetContainerNetworkName(std::string(containerAName));
+            "debian:latest", "test-container-mode-ports-b", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcherB.SetContainerNetworkName("container:" + containerAName);
         launcherB.AddPort(8080, 80, AF_INET);
 
         auto retVal = launcherB.LaunchNoThrow(*m_defaultSession);
@@ -6220,8 +6219,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(containerA.State(), WslcContainerStateRunning);
 
         WSLCContainerLauncher launcherB(
-            "debian:latest", "test-container-mode-addnet-b", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeContainer);
-        launcherB.SetContainerNetworkName(std::string(containerAName));
+            "debian:latest", "test-container-mode-addnet-b", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcherB.SetContainerNetworkName("container:" + containerAName);
         launcherB.AddAdditionalNetwork("bridge");
 
         auto retVal = launcherB.LaunchNoThrow(*m_defaultSession);
@@ -6246,8 +6245,8 @@ class WSLCTests
             containerA.SetDeleteOnClose(false);
 
             WSLCContainerLauncher launcherB(
-                "debian:latest", containerBName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeContainer);
-            launcherB.SetContainerNetworkName(std::string(containerAName));
+                "debian:latest", containerBName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+            launcherB.SetContainerNetworkName("container:" + containerAName);
             auto containerB = launcherB.Create(*m_defaultSession);
             VERIFY_ARE_EQUAL(containerB.State(), WslcContainerStateCreated);
             containerB.SetDeleteOnClose(false);
@@ -6279,9 +6278,10 @@ class WSLCTests
         options.Image = "debian:latest";
         options.Name = "test-container-mode-ip-b";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
-        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeContainer;
+        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
+        const std::string containerNetName = "container:" + containerAName;
         WSLCNetworkAttachment netWithIp{};
-        netWithIp.NetworkName = containerAName.c_str();
+        netWithIp.NetworkName = containerNetName.c_str();
         netWithIp.ContainerIpAddress = "10.0.0.5";
         options.ContainerNetwork.Networks = &netWithIp;
         options.ContainerNetwork.NetworksCount = 1;

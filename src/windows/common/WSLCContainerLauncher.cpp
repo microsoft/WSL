@@ -360,7 +360,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
     std::vector<WSLCNetworkAttachment> networkAttachments;
-    if (m_containerNetworkType == WSLCContainerNetworkTypeCustom || m_containerNetworkType == WSLCContainerNetworkTypeContainer)
+    if (m_containerNetworkType == WSLCContainerNetworkTypeCustom)
     {
         networkAttachments.push_back({m_containerNetworkName.c_str(), nullptr});
     }
