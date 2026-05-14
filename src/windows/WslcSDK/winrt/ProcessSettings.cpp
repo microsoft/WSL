@@ -45,7 +45,7 @@ void ProcessSettings::WorkingDirectory(hstring const& value)
 {
     if (m_processSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change working directory after the options have been applied");
     }
 
     m_workingDirectory = winrt::to_string(value);
@@ -60,7 +60,7 @@ void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<h
 {
     if (m_processSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change command line after the options have been applied");
     }
 
     m_cmdLine = value;
@@ -75,7 +75,7 @@ void ProcessSettings::EnvironmentVariables(winrt::Windows::Foundation::Collectio
 {
     if (m_processSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change environment variables after the options have been applied");
     }
 
     m_environmentVariables = value;

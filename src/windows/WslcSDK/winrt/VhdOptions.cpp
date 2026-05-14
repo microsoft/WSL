@@ -21,9 +21,14 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 VhdOptions::VhdOptions(hstring const& name, uint64_t sizeInBytes, VhdType const& type) :
     m_name(winrt::to_string(name)), m_sizeInBytes(sizeInBytes), m_type(type)
 {
+    if (name.empty())
+    {
+        throw hresult_invalid_argument(L"VHD name cannot be empty");
+    }
+
     if (sizeInBytes == 0)
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"VHD size cannot be zero");
     }
 }
 
@@ -36,12 +41,12 @@ void VhdOptions::Name(hstring const& value)
 {
     if (m_VhdOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change VHD name after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"VHD name cannot be empty");
     }
 
     m_name = winrt::to_string(value);
@@ -56,12 +61,12 @@ void VhdOptions::SizeInBytes(uint64_t value)
 {
     if (m_VhdOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change VHD size after the options have been applied");
     }
 
     if (value == 0)
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"VHD size cannot be zero");
     }
 
     m_sizeInBytes = value;
@@ -76,7 +81,7 @@ void VhdOptions::Type(VhdType const& value)
 {
     if (m_VhdOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change VHD type after the options have been applied");
     }
 
     m_type = value;

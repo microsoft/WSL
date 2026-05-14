@@ -21,9 +21,19 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 TagImageOptions::TagImageOptions(hstring const& image, hstring const& repository, hstring const& tag) :
     m_image(winrt::to_string(image)), m_repository(winrt::to_string(repository)), m_tag(winrt::to_string(tag))
 {
-    if (m_image.empty() || m_repository.empty() || m_tag.empty())
+    if (m_image.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Image cannot be empty");
+    }
+
+    if (m_repository.empty())
+    {
+        throw hresult_invalid_argument(L"Repository cannot be empty");
+    }
+
+    if (m_tag.empty())
+    {
+        throw hresult_invalid_argument(L"Tag cannot be empty");
     }
 }
 
@@ -36,12 +46,12 @@ void TagImageOptions::Image(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change image after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Image cannot be empty");
     }
 
     m_image = winrt::to_string(value);
@@ -56,12 +66,12 @@ void TagImageOptions::Repository(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change repository after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Repository cannot be empty");
     }
 
     m_repository = winrt::to_string(value);
@@ -76,12 +86,12 @@ void TagImageOptions::Tag(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change tag after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Tag cannot be empty");
     }
 
     m_tag = winrt::to_string(value);

@@ -32,7 +32,7 @@ void ContainerPortMapping::WindowsPort(uint16_t value)
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change Windows port after the options have been applied");
     }
 
     m_windowsPort = value;
@@ -47,7 +47,7 @@ void ContainerPortMapping::ContainerPort(uint16_t value)
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change container port after the options have been applied");
     }
 
     m_containerPort = value;
@@ -62,7 +62,7 @@ void ContainerPortMapping::Protocol(winrt::Microsoft::WSL::Containers::PortProto
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change protocol after the options have been applied");
     }
 
     m_protocol = value;
@@ -77,12 +77,12 @@ void ContainerPortMapping::WindowsAddress(winrt::Windows::Networking::HostName c
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change Windows address after the options have been applied");
     }
 
     if (value && value.Type() != winrt::Windows::Networking::HostNameType::Ipv4 && value.Type() != winrt::Windows::Networking::HostNameType::Ipv6)
     {
-        throw hresult_invalid_argument(); // only IP addresses are supported
+        throw hresult_invalid_argument(L"Only IP addresses are supported for port mapping");
     }
 
     m_windowsAddress = value;
@@ -108,17 +108,23 @@ WslcContainerPortMapping ContainerPortMapping::ToStruct()
             {
                 auto addr = static_cast<sockaddr_in*>(addrPtr);
                 addr->sin_family = AF_INET;
-                THROW_HR_IF(E_INVALIDARG, inet_pton(AF_INET, rawName.c_str(), &addr->sin_addr) != 1);
+                if (inet_pton(AF_INET, rawName.c_str(), &addr->sin_addr) != 1)
+                {
+                    throw winrt::hresult_invalid_argument(L"Invalid IPv4 address format");
+                }
             }
             else if (m_windowsAddress.Type() == winrt::Windows::Networking::HostNameType::Ipv6)
             {
                 auto addr = static_cast<sockaddr_in6*>(addrPtr);
                 addr->sin6_family = AF_INET6;
-                THROW_HR_IF(E_INVALIDARG, inet_pton(AF_INET6, rawName.c_str(), &addr->sin6_addr) != 1);
+                if (inet_pton(AF_INET6, rawName.c_str(), &addr->sin6_addr) != 1)
+                {
+                    throw winrt::hresult_invalid_argument(L"Invalid IPv6 address format");
+                }
             }
             else
             {
-                throw hresult_invalid_argument(); // only IP addresses are supported
+                throw winrt::hresult_invalid_argument(L"Only IP addresses are supported for port mapping");
             }
 
             m_containerPortMapping->windowsAddress = &m_windowsAddressStorage.value();

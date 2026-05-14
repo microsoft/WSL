@@ -63,7 +63,7 @@ void Process::AttachHandle(WslcProcess handle)
 {
     if (m_process)
     {
-        throw winrt::hresult_illegal_method_call();
+        throw winrt::hresult_illegal_method_call(L"Process handle has already been attached");
     }
 
     m_process.reset(handle);
@@ -149,7 +149,7 @@ void Process::EnsureStarted() const
 {
     if (!m_process)
     {
-        throw winrt::hresult_illegal_method_call();
+        throw winrt::hresult_illegal_method_call(L"Process has not been started");
     }
 }
 
@@ -157,7 +157,7 @@ void Process::EnsureNotStarted() const
 {
     if (m_process)
     {
-        throw winrt::hresult_illegal_method_call();
+        throw winrt::hresult_illegal_method_call(L"Process has already been started");
     }
 }
 
@@ -193,7 +193,7 @@ winrt::Windows::Storage::Streams::IInputStream Process::GetOutputStream(winrt::M
         (outputHandle == ProcessOutputHandle::StandardError && m_errorReceivedEvent))
     {
         // Using callbacks and using streams for output are mutually exclusive.
-        throw winrt::hresult_illegal_method_call();
+        throw winrt::hresult_illegal_method_call(L"Cannot get output stream when using output callbacks");
     }
 
     wil::unique_handle handle;

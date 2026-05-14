@@ -20,109 +20,147 @@ Abstract:
 namespace winrt::Microsoft::WSL::Containers::implementation {
 SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) : m_name(name), m_storagePath(storagePath)
 {
+    if (name.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Session name cannot be empty");
+    }
+
+    if (storagePath.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Storage path cannot be empty");
+    }
 }
+
 hstring SessionSettings::Name()
 {
     return hstring(m_name);
 }
+
 void SessionSettings::Name(hstring const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change session name after session has been initialized");
+    }
+
+    if (value.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Session name cannot be empty");
     }
 
     m_name = value;
 }
+
 hstring SessionSettings::StoragePath()
 {
     return hstring(m_storagePath);
 }
+
 void SessionSettings::StoragePath(hstring const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change storage path after session has been initialized");
+    }
+
+    if (value.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Storage path cannot be empty");
     }
 
     m_storagePath = value;
 }
+
 winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::CpuCount()
 {
     return m_cpuCount;
 }
+
 void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change CPU count after session has been initialized");
     }
 
     if (value && value.Value() == 0)
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"CPU count cannot be 0");
     }
 
     m_cpuCount = value;
 }
+
 winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::MemoryMB()
 {
     return m_memoryMB;
 }
+
 void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change memory size after session has been initialized");
     }
 
     if (value && value.Value() == 0)
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Memory size cannot be 0");
     }
 
     m_memoryMB = value;
 }
+
 winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::TimeoutMS()
 {
     return m_timeoutMS;
 }
+
 void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change timeout after session has been initialized");
     }
 
     if (value && value.Value() == 0)
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Timeout cannot be 0");
     }
 
     m_timeoutMS = value;
 }
+
 winrt::Microsoft::WSL::Containers::VhdOptions SessionSettings::VhdRequirements()
 {
     return m_vhdRequirements;
 }
+
 void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change VHD requirements after session has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"VHD requirements cannot be null");
     }
 
     m_vhdRequirements = value;
 }
+
 winrt::Microsoft::WSL::Containers::SessionFeatureFlags SessionSettings::FeatureFlags()
 {
     return m_featureFlags;
 }
+
 void SessionSettings::FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change feature flags after session has been initialized");
     }
 
     m_featureFlags = value;

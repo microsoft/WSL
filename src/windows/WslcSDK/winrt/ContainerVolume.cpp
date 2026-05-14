@@ -21,9 +21,14 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 ContainerVolume::ContainerVolume(hstring const& windowsPath, hstring const& containerPath, bool readOnly) :
     m_windowsPath(windowsPath), m_containerPath(winrt::to_string(containerPath)), m_readOnly(readOnly)
 {
-    if (windowsPath.empty() || containerPath.empty())
+    if (windowsPath.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Windows path cannot be empty");
+    }
+
+    if (containerPath.empty())
+    {
+        throw hresult_invalid_argument(L"Container path cannot be empty");
     }
 }
 
@@ -36,12 +41,12 @@ void ContainerVolume::WindowsPath(hstring const& value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change Windows path after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Windows path cannot be empty");
     }
 
     m_windowsPath = value;
@@ -56,12 +61,12 @@ void ContainerVolume::ContainerPath(hstring const& value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change container path after the options have been applied");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument();
+        throw hresult_invalid_argument(L"Container path cannot be empty");
     }
 
     m_containerPath = winrt::to_string(value);
@@ -76,7 +81,7 @@ void ContainerVolume::ReadOnly(bool value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change read-only flag after the options have been applied");
     }
 
     m_readOnly = value;

@@ -20,6 +20,10 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 
 PullImageOptions::PullImageOptions(hstring const& uri) : m_uri(winrt::to_string(uri))
 {
+    if (uri.empty())
+    {
+        throw hresult_invalid_argument(L"URI cannot be empty");
+    }
 }
 
 hstring PullImageOptions::Uri()
@@ -31,7 +35,12 @@ void PullImageOptions::Uri(hstring const& value)
 {
     if (m_pullImageOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change URI after the options have been applied");
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument(L"URI cannot be empty");
     }
 
     m_uri = winrt::to_string(value);
@@ -46,7 +55,7 @@ void PullImageOptions::RegistryAuth(hstring const& value)
 {
     if (m_pullImageOptions)
     {
-        throw hresult_illegal_state_change();
+        throw hresult_illegal_state_change(L"Cannot change registry auth after the options have been applied");
     }
 
     m_registryAuth = winrt::to_string(value);

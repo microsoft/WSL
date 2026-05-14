@@ -37,7 +37,7 @@ Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& setti
 {
     if (!m_settings)
     {
-        throw winrt::hresult_invalid_argument(L"Session settings cannot be null");
+        throw winrt::hresult_error(E_POINTER, L"Session settings cannot be null");
     }
 }
 
@@ -79,7 +79,7 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
 
     if (!containerSettings)
     {
-        throw winrt::hresult_error(E_POINTER);
+        throw winrt::hresult_error(E_POINTER, L"Container settings cannot be null");
     }
 
     return winrt::make<implementation::Container>(ToHandle(), containerSettings);
@@ -87,6 +87,13 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
 
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(winrt::Microsoft::WSL::Containers::PullImageOptions options)
 {
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for pull cannot be null");
+    }
+
+    EnsureStarted();
+
     auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
 
@@ -108,10 +115,17 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::ImportImageAsync(hstring path, hstring imageName)
 {
-    if (path.empty() || imageName.empty())
+    if (path.empty())
     {
-        throw winrt::hresult_invalid_argument();
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
     }
+
+    if (imageName.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
+    }
+
+    EnsureStarted();
 
     auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
@@ -133,8 +147,10 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 {
     if (path.empty())
     {
-        throw winrt::hresult_invalid_argument();
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
     }
+
+    EnsureStarted();
 
     auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
@@ -152,6 +168,13 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PushImageAsync(winrt::Microsoft::WSL::Containers::PushImageOptions options)
 {
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for push cannot be null");
+    }
+
+    EnsureStarted();
+
     auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
 
@@ -168,6 +191,13 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
 void Session::DeleteImage(hstring const& nameOrId)
 {
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
+    }
+
+    EnsureStarted();
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcDeleteSessionImage(ToHandle(), winrt::to_string(nameOrId).c_str(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
@@ -175,6 +205,13 @@ void Session::DeleteImage(hstring const& nameOrId)
 
 void Session::TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const& options)
 {
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Tag image options cannot be null");
+    }
+
+    EnsureStarted();
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcTagSessionImage(ToHandle(), GetStructPointer(options), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
@@ -182,6 +219,13 @@ void Session::TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const&
 
 void Session::CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options)
 {
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"VHD options cannot be null");
+    }
+
+    EnsureStarted();
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateSessionVhdVolume(ToHandle(), GetStructPointer(options), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
@@ -189,6 +233,13 @@ void Session::CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions cons
 
 void Session::DeleteVhdVolume(hstring const& name)
 {
+    if (name.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"VHD name cannot be empty");
+    }
+
+    EnsureStarted();
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcDeleteSessionVhdVolume(ToHandle(), winrt::to_string(name).c_str(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
@@ -196,6 +247,18 @@ void Session::DeleteVhdVolume(hstring const& name)
 
 hstring Session::Authenticate(Uri const& serverAddress, hstring const& username, hstring const& password)
 {
+    if (!serverAddress)
+    {
+        throw winrt::hresult_invalid_argument(L"Server address cannot be null");
+    }
+
+    if (username.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Username cannot be empty");
+    }
+
+    EnsureStarted();
+
     wil::unique_cotaskmem_string errorMessage;
     wil::unique_cotaskmem_ansistring token;
     auto hr = WslcSessionAuthenticate(
@@ -221,6 +284,8 @@ void Session::Terminated(winrt::event_token const& token) noexcept
 
 IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
 {
+    EnsureStarted();
+
     WslcImageInfo* imagesArrayPtr = nullptr;
     uint32_t count = 0;
     winrt::check_hresult(WslcListSessionImages(ToHandle(), &imagesArrayPtr, &count));
