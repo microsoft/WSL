@@ -502,7 +502,46 @@ s
 {
     auto CommandLine = L"Powershell -NoProfile -Command \"" + Cmd + L"\"";
     LogInfo("Running the command: %ls\n", CommandLine.c_str());
-    return LxsstuLaunchCommandAndCaptureOutput(CommandLine.data(), ExpectedExitCode);
+
+    //
+    // PowerShell has been observed to crash on the test agents with an unhandled CLR
+    // exception (e.g., AccessViolationException while JIT-compiling cmdlet code), exiting
+    // with a non-zero status and printing "Unhandled Exception:" to stderr before the
+    // requested command runs. Retry once on that signature so that infrastructure flakes
+    // don't fail the test.
+    //
+
+    constexpr int c_maxAttempts = 2;
+    for (int attempt = 1; attempt <= c_maxAttempts; ++attempt)
+    {
+        auto [Out, Err, ExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(CommandLine.data());
+        if (ExitCode == ExpectedExitCode)
+        {
+            return std::make_pair(std::move(Out), std::move(Err));
+        }
+
+        const bool powershellCrashed = Err.find(L"Unhandled Exception:") != std::wstring::npos;
+        if (attempt < c_maxAttempts && powershellCrashed)
+        {
+            LogWarning("Powershell crashed (exit code %lu); retrying. Stderr: '%ls'", static_cast<unsigned long>(ExitCode), Err.c_str());
+            Sleep(1000);
+            continue;
+        }
+
+        THROW_HR_MSG(
+            E_UNEXPECTED,
+            "Command \"%ls\" "
+            "returned unexpected exit code (%lu != %i). "
+            "Stdout: '%ls' "
+            "Stderr: '%ls'",
+            CommandLine.c_str(),
+            ExitCode,
+            ExpectedExitCode,
+            Out.c_str(),
+            Err.c_str());
+    }
+
+    THROW_HR(E_UNEXPECTED);
 }
 
 // LxsstuUninitialize
