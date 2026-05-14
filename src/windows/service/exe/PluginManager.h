@@ -57,7 +57,7 @@ public:
 
 private:
     void LoadPlugin(LPCWSTR Name, LPCWSTR Path);
-    static void ThrowIfPluginError(HRESULT Result, WSLSessionId session, LPCWSTR Plugin);
+    static void ThrowIfPluginError(HRESULT Result, LPCWSTR Plugin);
 
     struct LoadedPlugin
     {

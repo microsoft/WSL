@@ -130,6 +130,8 @@ WSLCSessionManagerImpl::WSLCSessionManagerImpl()
 
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
+    g_managerInstance.store(nullptr);
+
     // Terminate all sessions on shutdown.
     // Call Terminate() directly rather than going through ForEachSession(),
     // which would needlessly resolve weak references and call GetState().
@@ -140,8 +142,6 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
         NotifySessionStoppingLockHeld(entry);
         LOG_IF_FAILED(entry.Ref->Terminate());
     }
-
-    g_managerInstance.store(nullptr);
 }
 
 void WSLCSessionManagerImpl::NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept

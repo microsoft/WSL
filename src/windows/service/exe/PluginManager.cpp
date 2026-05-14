@@ -124,7 +124,14 @@ HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnl
 try
 {
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
-    RETURN_HR_IF_MSG(E_INVALIDARG, StrStrW(Name, L"..") != nullptr, "Name cannot contain '..': %ls", WindowsPath);
+    auto nameLength = wcslen(Name);
+
+    RETURN_HR_IF_MSG(
+        E_INVALIDARG,
+        nameLength == 0 ||
+            !std::ranges::all_of(Name, Name + nameLength, [&](auto c) { return c == '-' || c == '_' || iswalpha(c); }),
+        "Invalid mount name: %ls",
+        Name);
 
     auto session = ResolveWslcSession(Session);
 
@@ -278,6 +285,7 @@ try
         TraceLoggingValue(result, "Result"));
 
     RETURN_IF_FAILED(result);
+    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
 
     *Handle = handle.Handle.Socket;
     return S_OK;
@@ -431,7 +439,7 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
             WSL_LOG(
                 "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
-            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), Session->SessionId, e.name.c_str());
+            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), e.name.c_str());
         }
     }
 }
@@ -467,7 +475,7 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), Session->SessionId, e.name.c_str());
+            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), e.name.c_str());
         }
     }
 }
@@ -532,7 +540,7 @@ void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Sess
     }
 }
 
-void PluginManager::ThrowIfPluginError(HRESULT Result, WSLSessionId Session, LPCWSTR Plugin)
+void PluginManager::ThrowIfPluginError(HRESULT Result, LPCWSTR Plugin)
 {
     const auto message = std::move(g_pluginErrorMessage);
     g_pluginErrorMessage.reset(); // std::move() doesn't clear the previous std::optional
@@ -589,7 +597,7 @@ void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
                 TraceLoggingValue(Session->DisplayName, "DisplayName"),
                 TraceLoggingValue(result, "Result"));
 
-            ThrowIfPluginError(result, Session->SessionId, e.name.c_str());
+            ThrowIfPluginError(result, e.name.c_str());
         }
     }
 }
@@ -631,11 +639,7 @@ try
                 TraceLoggingValue(Session->SessionId, "SessionId"),
                 TraceLoggingValue(result, "Result"));
 
-            if (FAILED(result))
-            {
-                LOG_HR_MSG(result, "Plugin '%ls' rejected container creation", e.name.c_str());
-                THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageFatalPluginError(e.name));
-            }
+            ThrowIfPluginError(result, e.name.c_str());
         }
     }
     return S_OK;

@@ -491,6 +491,12 @@ try
                       << std::endl;
         }
 
+        // Validate that empty names are rejected.
+        {
+            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
+            g_logfile << "WSLCMountFolder(): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"", mountpoint) << std::endl;
+        }
+
         g_logfile << "Test completed" << std::endl;
     }
 
