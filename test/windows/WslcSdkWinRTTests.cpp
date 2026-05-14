@@ -94,7 +94,10 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
 
-    void StartContainerAndWaitForInitProcessExit(WSLCSDK::Container const& container, WSLCSDK::ContainerStartFlags startFlags = WSLCSDK::ContainerStartFlags::None, std::chrono::milliseconds timeout = 2min)
+    void StartContainerAndWaitForInitProcessExit(
+        WSLCSDK::Container const& container,
+        WSLCSDK::ContainerStartFlags startFlags = WSLCSDK::ContainerStartFlags::None,
+        std::chrono::milliseconds timeout = 2min)
     {
         auto initProcess = container.InitProcess();
         std::promise<void> promise;
@@ -1532,7 +1535,9 @@ class WslcSdkWinRtTests
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
 
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings).Start(WSLCSDK::ContainerStartFlags::None), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_THROWS_HR(
+                m_defaultSession.CreateContainer(containerSettings).Start(WSLCSDK::ContainerStartFlags::None),
+                HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
         }
 
         // Create a GPU-enabled session.
