@@ -195,28 +195,6 @@ class WSLCTests
         return result;
     }
 
-    std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, USHORT port = 5000)
-    {
-        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-        if (!username.empty())
-        {
-            env.push_back(std::format("USERNAME={}", username));
-            env.push_back(std::format("PASSWORD={}", password));
-        }
-
-        WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddPort(port, port, AF_INET);
-
-        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-
-        auto registryAddress = std::format("127.0.0.1:{}", port);
-        auto registryUrl = std::format(L"http://{}", registryAddress);
-        ExpectHttpResponse(registryUrl.c_str(), 200, true);
-
-        return {std::move(container), std::move(registryAddress)};
-    }
-
     std::string PushImageToRegistry(const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
     {
         auto [repo, tag] = ParseImage(imageName);
