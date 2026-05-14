@@ -128,6 +128,7 @@ void Process::Start()
         wil::unique_cotaskmem_string errorMessage;
         auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
         THROW_MSG_IF_FAILED(hr, errorMessage);
+        StartExitThread();
     }
     m_settings = nullptr;
 }
@@ -189,8 +190,7 @@ void Process::Signal(winrt::Microsoft::WSL::Containers::Signal const& signal)
 
 winrt::Windows::Storage::Streams::IInputStream Process::GetOutputStream(winrt::Microsoft::WSL::Containers::ProcessOutputHandle const& outputHandle)
 {
-    if ((outputHandle == ProcessOutputHandle::StandardOutput && m_outputReceivedEvent) ||
-        (outputHandle == ProcessOutputHandle::StandardError && m_errorReceivedEvent))
+    if (m_outputReceivedEvent || m_errorReceivedEvent)
     {
         // Using callbacks and using streams for output are mutually exclusive.
         throw winrt::hresult_illegal_method_call(L"Cannot get output stream when using output callbacks");

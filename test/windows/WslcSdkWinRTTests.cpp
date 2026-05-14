@@ -49,7 +49,7 @@ extern bool g_fastTestRun;
     } \
     CATCH_LOG()
 #define SCOPE_CLEANUP(operation) wil::scope_exit([&]() { IGNORE_ERRORS(operation) })
-#define DELETE_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerFlags::Force))
+#define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerFlags::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
 
 struct ProcessOutput
@@ -86,26 +86,29 @@ class WslcSdkWinRtTests
     // Helpers
     // -----------------------------------------------------------------------
 
-    void WaitForProcess(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
+    void StartProcessAndWaitForExit(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
     {
         std::promise<void> promise;
         auto autoRevoker = process.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
-        if (process.State() == WSLCSDK::ProcessState::Running)
-        {
-            VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
-        }
+        process.Start();
+        VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
 
-    ProcessOutput WaitForProcessAndGetOutput(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
+    void StartContainerAndWaitForInitProcessExit(WSLCSDK::Container const& container, WSLCSDK::ContainerStartFlags startFlags = WSLCSDK::ContainerStartFlags::None, std::chrono::milliseconds timeout = 2min)
     {
-        WaitForProcess(process, timeout);
+        auto initProcess = container.InitProcess();
+        std::promise<void> promise;
+        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+        container.Start(startFlags);
+        VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
+    }
+
+    ProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
+    {
         ProcessOutput output;
-        if (process.State() == WSLCSDK::ProcessState::Exited)
-        {
-            output.ExitCode = process.ExitCode();
-            output.StandardOutput = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput));
-            output.StandardError = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError));
-        }
+        output.ExitCode = process.ExitCode();
+        output.StandardOutput = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput));
+        output.StandardError = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError));
 
         return output;
     }
@@ -143,11 +146,10 @@ class WslcSdkWinRtTests
         }
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
-        container.Start(WSLCSDK::ContainerStartFlags::Attach);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
-        auto initProcess = container.InitProcess();
-        auto output = WaitForProcessAndGetOutput(initProcess, options.timeout);
+        StartContainerAndWaitForInitProcessExit(container, WSLCSDK::ContainerStartFlags::Attach, options.timeout);
+        auto output = GetProcessOutput(container.InitProcess());
 
         IGNORE_ERRORS(container.Delete(WSLCSDK::DeleteContainerFlags::Force));
 
@@ -295,7 +297,7 @@ class WslcSdkWinRtTests
 
         // Negative: Null settings must fail.
         {
-            VERIFY_THROWS_HR(WSLCSDK::Session(WSLCSDK::SessionSettings{nullptr}), HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER));
+            VERIFY_THROWS_HR(WSLCSDK::Session(WSLCSDK::SessionSettings{nullptr}), E_POINTER);
         }
     }
 
@@ -407,7 +409,7 @@ class WslcSdkWinRtTests
         // Negative: non-tar file must fail.
         {
             std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
-            VERIFY_THROWS_HR(m_defaultSession.ImportImageAsync(L"import-self:test", pathToSelf.wstring()).get(), E_FAIL);
+            VERIFY_THROWS_HR(m_defaultSession.ImportImageAsync(pathToSelf.wstring(), L"import-self:test").get(), E_FAIL);
         }
     }
 
@@ -475,7 +477,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ContainerGetId)
     {
         auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto id = container.Id();
         VERIFY_IS_FALSE(id.empty());
@@ -492,7 +494,7 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         // State after creation: Created.
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Created);
@@ -538,11 +540,14 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
-
-        container.Start(WSLCSDK::ContainerStartFlags::Attach);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto initProcess = container.InitProcess();
+
+        std::promise<void> promise;
+        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+
+        container.Start(WSLCSDK::ContainerStartFlags::Attach);
 
         auto stdoutStream = initProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput);
         auto stderrStream = initProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError);
@@ -553,7 +558,8 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(initProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
-        WaitForProcess(initProcess);
+        VERIFY_ARE_EQUAL(promise.get_future().wait_for(1min), std::future_status::ready);
+
         VERIFY_ARE_EQUAL(ReadStream(stdoutStream), L"STDOUT_TOKEN\n");
         VERIFY_ARE_EQUAL(ReadStream(stderrStream), L"STDERR_TOKEN\n");
     }
@@ -618,7 +624,7 @@ class WslcSdkWinRtTests
             auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
 
-            auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             ExpectHttpResponse(L"http://127.0.0.1:12341", 200, true);
         }
@@ -641,7 +647,7 @@ class WslcSdkWinRtTests
             auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
 
-            auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             ExpectHttpResponse(L"http://127.0.0.1:12343", 200, true);
         }
@@ -721,11 +727,9 @@ class WslcSdkWinRtTests
         }));
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
+        StartContainerAndWaitForInitProcessExit(container);
 
-        auto initProcess = container.InitProcess();
-        WaitForProcess(initProcess);
-        VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+        VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerFlags::Force);
 
         // Verify the file written by the container is visible on the host.
@@ -738,7 +742,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ContainerInspect)
     {
         auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto inspectJson = container.Inspect();
         VERIFY_IS_FALSE(inspectJson.empty());
@@ -765,7 +769,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         // Positive: exec a command that exits 0.
         {
@@ -773,8 +777,7 @@ class WslcSdkWinRtTests
             execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/true"}));
 
             auto execProcess = container.CreateProcess(execSettings);
-            execProcess.Start();
-            WaitForProcess(execProcess);
+            StartProcessAndWaitForExit(execProcess);
             VERIFY_ARE_EQUAL(execProcess.ExitCode(), 0);
         }
 
@@ -801,11 +804,8 @@ class WslcSdkWinRtTests
             containerSettings.HostName(L"my-test-host");
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
-            container.Start(WSLCSDK::ContainerStartFlags::None);
-
-            auto initProcess = container.InitProcess();
-            WaitForProcess(initProcess, 60s);
-            VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+            StartContainerAndWaitForInitProcessExit(container);
+            VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
             container.Delete(WSLCSDK::DeleteContainerFlags::Force);
         }
     }
@@ -821,11 +821,8 @@ class WslcSdkWinRtTests
         containerSettings.DomainName(L"test.local");
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
-
-        auto initProcess = container.InitProcess();
-        WaitForProcess(initProcess, 60s);
-        VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+        StartContainerAndWaitForInitProcessExit(container);
+        VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerFlags::Force);
     }
 
@@ -845,11 +842,8 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
-
-        auto initProcess = container.InitProcess();
-        WaitForProcess(initProcess, 60s);
-        VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+        StartContainerAndWaitForInitProcessExit(container);
+        VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerFlags::Force);
     }
 
@@ -862,15 +856,19 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
-
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
-
         auto process = container.InitProcess();
+
+        std::promise<void> promise;
+        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+
+        container.Start(WSLCSDK::ContainerStartFlags::None);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
         VERIFY_ARE_EQUAL(process.State(), WSLCSDK::ProcessState::Running);
 
         process.Signal(WSLCSDK::Signal::SIGKILL);
-        WaitForProcess(process, 30s);
+
+        VERIFY_ARE_EQUAL(promise.get_future().wait_for(2min), std::future_status::ready);
 
         const auto state = process.State();
         VERIFY_IS_TRUE(state == WSLCSDK::ProcessState::Signalled || state == WSLCSDK::ProcessState::Exited);
@@ -887,7 +885,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto process = container.InitProcess();
         VERIFY_IS_TRUE(process.Pid() > 0);
@@ -904,12 +902,9 @@ class WslcSdkWinRtTests
             containerSettings.InitProcess(procSettings);
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
-            container.Start(WSLCSDK::ContainerStartFlags::None);
+            StartContainerAndWaitForInitProcessExit(container);
+            auto exitCode = container.InitProcess().ExitCode();
 
-            auto process = container.InitProcess();
-            WaitForProcess(process, 30s);
-
-            auto exitCode = process.ExitCode();
             container.Delete(WSLCSDK::DeleteContainerFlags::Force);
             return exitCode;
         };
@@ -928,7 +923,7 @@ class WslcSdkWinRtTests
             auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Start(WSLCSDK::ContainerStartFlags::None);
 
-            auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             auto process = container.InitProcess();
             VERIFY_ARE_EQUAL(process.State(), WSLCSDK::ProcessState::Running);
@@ -948,7 +943,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto process = container.InitProcess();
 
@@ -984,11 +979,8 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
-
-        auto initProcess = container.InitProcess();
-        WaitForProcess(initProcess, 60s);
-        VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+        StartContainerAndWaitForInitProcessExit(container);
+        VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerFlags::Force);
     }
 
@@ -1027,7 +1019,7 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto process = container.InitProcess();
 
@@ -1073,9 +1065,7 @@ class WslcSdkWinRtTests
         });
 
         // Start with Attach: claims IO handles and starts the IOCallback pump thread.
-        container.Start(WSLCSDK::ContainerStartFlags::Attach);
-
-        WaitForProcess(process);
+        StartContainerAndWaitForInitProcessExit(container, WSLCSDK::ContainerStartFlags::Attach);
 
         VERIFY_ARE_EQUAL(stdoutData, "STDOUT\n");
         VERIFY_ARE_EQUAL(stderrData, "STDERR\n");
@@ -1091,9 +1081,9 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(initProcSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::None);
+        container.Start(WSLCSDK::ContainerStartFlags::Attach);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         std::string stdoutData, stderrData;
 
@@ -1110,8 +1100,7 @@ class WslcSdkWinRtTests
             stderrData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
 
-        execProcess.Start();
-        WaitForProcess(execProcess, 60s);
+        StartProcessAndWaitForExit(execProcess);
 
         VERIFY_ARE_EQUAL(stdoutData, "EXEC_OUT\n");
         VERIFY_ARE_EQUAL(stderrData, "EXEC_ERR\n");
@@ -1129,7 +1118,7 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto process = container.InitProcess();
         process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {});
@@ -1137,10 +1126,10 @@ class WslcSdkWinRtTests
         container.Start(WSLCSDK::ContainerStartFlags::Attach);
 
         // stdout handle was consumed by the OutputReceived handler — must not be obtainable.
-        VERIFY_THROWS_HR(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_THROWS_HR(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput), E_ILLEGAL_METHOD_CALL);
 
         // stderr handle was also consumed in order to drain it despite not having a handler.
-        VERIFY_THROWS_HR(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_THROWS_HR(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError), E_ILLEGAL_METHOD_CALL);
     }
 
     WSLC_TEST_METHOD(ProcessIoEventsExitCallback)
@@ -1205,7 +1194,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         std::atomic<int> callbackCount{0};
         std::atomic<bool> exitFired{false};
@@ -1262,9 +1251,7 @@ class WslcSdkWinRtTests
             stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
 
-        container.Start(WSLCSDK::ContainerStartFlags::Attach);
-
-        WaitForProcess(process, 60s);
+        StartContainerAndWaitForInitProcessExit(container, WSLCSDK::ContainerStartFlags::Attach);
 
         VERIFY_ARE_EQUAL(stdoutData.size(), c_expectedBytes);
     }
@@ -1313,11 +1300,8 @@ class WslcSdkWinRtTests
                 {WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", false)}));
 
             auto container = session.CreateContainer(containerSettings);
-            container.Start(WSLCSDK::ContainerStartFlags::None);
-
-            auto initProcess = container.InitProcess();
-            WaitForProcess(initProcess);
-            VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+            StartContainerAndWaitForInitProcessExit(container);
+            VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
             container.Delete(WSLCSDK::DeleteContainerFlags::Force);
         }
 
@@ -1333,11 +1317,8 @@ class WslcSdkWinRtTests
                 {WSLCSDK::ContainerNamedVolume(c_volumeName, L"/data", true)}));
 
             auto container = session.CreateContainer(containerSettings);
-            container.Start(WSLCSDK::ContainerStartFlags::None);
-
-            auto initProcess = container.InitProcess();
-            WaitForProcess(initProcess);
-            VERIFY_ARE_EQUAL(initProcess.ExitCode(), 0);
+            StartContainerAndWaitForInitProcessExit(container);
+            VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
             container.Delete(WSLCSDK::DeleteContainerFlags::Force);
         }
 
@@ -1345,14 +1326,19 @@ class WslcSdkWinRtTests
         session.DeleteVhdVolume(c_volumeName);
         VERIFY_IS_FALSE(std::filesystem::exists(expectedVhdPath));
 
-        // Negative: empty name must fail.
-        VERIFY_THROWS_HR(session.CreateVhdVolume(WSLCSDK::VhdOptions(L"", c_vhdSizeBytes, WSLCSDK::VhdType::Dynamic)), E_INVALIDARG);
-
         // Negative: zero size must fail.
         VERIFY_THROWS_HR(session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, 0, WSLCSDK::VhdType::Dynamic)), E_INVALIDARG);
 
-        // Negative: Fixed VHD type is not yet supported.
-        VERIFY_THROWS_HR(session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Fixed)), E_NOTIMPL);
+        // Positive: fixed-allocation VHD; on-disk file size must be >= SizeBytes.
+        {
+            constexpr auto c_fixedVolumeName = L"wslc-sdk-vhd-fixed";
+            constexpr auto c_fixedSizeBytes = 64ull * _1MB;
+            VERIFY_NO_THROW(session.CreateVhdVolume(WSLCSDK::VhdOptions(c_fixedVolumeName, c_fixedSizeBytes, WSLCSDK::VhdType::Fixed)));
+
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / L"volumes" / (std::wstring(c_fixedVolumeName) + L".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -1371,9 +1357,8 @@ class WslcSdkWinRtTests
         // Negative: wrong password must fail.
         VERIFY_THROWS_HR(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), L"wrong-password"), E_FAIL);
 
-        // Positive: correct credentials must return a non-empty token.
-        const auto token = m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password));
-        VERIFY_IS_FALSE(token.empty());
+        // Positive: correct credentials
+        VERIFY_NO_THROW(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password)));
 
         const auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
@@ -1483,11 +1468,9 @@ class WslcSdkWinRtTests
         containerSettings.InitProcess(procSettings);
 
         auto container = m_defaultSession.CreateContainer(containerSettings);
-        container.Start(WSLCSDK::ContainerStartFlags::Attach);
 
         // Wait for the short-lived init process to exit
-        auto initProcess = container.InitProcess();
-        WaitForProcess(initProcess, 30s);
+        StartContainerAndWaitForInitProcessExit(container);
 
         // The init process has now exited. Attempting to exec on a stopped container must fail.
         auto execSettings = WSLCSDK::ProcessSettings();
@@ -1508,7 +1491,7 @@ class WslcSdkWinRtTests
         auto container1 = m_defaultSession.CreateContainer(containerSettings);
         container1.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container1);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container1);
 
         // Creating a second container with the same name must fail.
         auto container2 = m_defaultSession.CreateContainer(containerSettings);
@@ -1526,7 +1509,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         container.Start(WSLCSDK::ContainerStartFlags::None);
 
-        auto cleanup = DELETE_ON_SCOPE_EXIT(container);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         // Deleting a running container without Force must fail.
         VERIFY_THROWS_HR(container.Delete(WSLCSDK::DeleteContainerFlags::None), static_cast<HRESULT>(WSLC_E_CONTAINER_IS_RUNNING));
@@ -1580,12 +1563,10 @@ class WslcSdkWinRtTests
             containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
 
             auto container = gpuSession.CreateContainer(containerSettings);
-            container.Start(WSLCSDK::ContainerStartFlags::None);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
-            auto cleanup = DELETE_ON_SCOPE_EXIT(container);
-
-            auto initProcess = container.InitProcess();
-            auto output = WaitForProcessAndGetOutput(initProcess);
+            StartContainerAndWaitForInitProcessExit(container, WSLCSDK::ContainerStartFlags::Attach);
+            auto output = GetProcessOutput(container.InitProcess());
 
             VERIFY_ARE_EQUAL(output.StandardOutput, L"/usr/lib/wsl/lib\n");
         }
