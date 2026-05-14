@@ -2111,7 +2111,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>ContainerIpAddress ainda não tem suporte.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
@@ -2126,7 +2126,7 @@ Uso:
     <value>O nome da rede do contêiner é necessário para o tipo de rede personalizado.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>O nome da rede não pode ficar vazio.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando não reconhecido: '{}'</value>
@@ -2279,11 +2279,11 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
-    <value>Invalid value for option '{}': '{}'</value>
+    <value>Valor inválido para a opção '{}': '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
-    <value>Unknown option: '{}'</value>
+    <value>Opção desconhecida: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2319,7 +2319,7 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Rede duplicada: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2431,10 +2431,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Inicia um contêiner.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Exibir estatísticas de uso de recursos do contêiner.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Exiba um snapshot do uso de recursos de um contêiner em execução: CPU, memória, E/S de rede, E/S de bloco e PIDs.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Interrompa contêineres.</value>
@@ -2700,6 +2700,12 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Caminho para o Dockerfile (use "-" para ler do stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filter output based on conditions provided</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Argumento inválido "{}" para '-f, --filter' sinalizador: formato de filtro incorreto (nome esperado=valor)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seguir a saída do log</value>
   </data>
@@ -2735,6 +2741,12 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>A chave do rótulo não pode estar vazia</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Mostrar n últimos contêineres criados (inclui todos os estados)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Mostrar o contêiner criado mais recentemente (inclui todos os estados)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nome do host do contêiner</value>
@@ -3003,37 +3015,37 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>ID DO CONTÊINER</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NOME</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>IMAGEM</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>CRIADO</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
     <value>STATUS</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTAS</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
-    <value>CPU %</value>
+    <value>% DE CPU</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>LIMITE/USO DE MEM</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
     <value>MEM %</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
-    <value>NET I/O</value>
+    <value>E/S DE REDE</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>E/S DE BLOCO</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

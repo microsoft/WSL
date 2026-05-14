@@ -2110,7 +2110,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>ContainerIpAddress aún no se admite.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
@@ -2125,7 +2125,7 @@ Uso:
     <value>El nombre de red de contenedor es necesario para el tipo de red personalizado.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>El nombre de red no puede estar vacío.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando no reconocido: '{}'</value>
@@ -2278,11 +2278,11 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
-    <value>Invalid value for option '{}': '{}'</value>
+    <value>Valor no válido para la opción "{}": "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
-    <value>Unknown option: '{}'</value>
+    <value>Opción desconocida: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2314,11 +2314,11 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <value>No se permiten redes adicionales cuando el modo de red principal es "host" o "none".</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Red duplicada: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2433,7 +2433,7 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Display container resource usage statistics.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Muestra una instantánea del uso de recursos de un contenedor en ejecución: CPU, memoria, E/S de red, E/S de bloque y PID.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Detén los contenedores.</value>
@@ -2462,7 +2462,7 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Inspecciona las imágenes.</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
-    <value>Import an image from a tarball.</value>
+    <value>Importar una imagen desde un tarball.</value>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importa el contenido de un tarball para crear una imagen del sistema de archivos. Opcionalmente, etiquete la imagen con un repositorio y un nombre de etiqueta.</value>
@@ -2699,6 +2699,12 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Ruta de acceso al Dockerfile (use "-" para leer de stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filtrar salida en función de las condiciones proporcionadas</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Argumento "{}" no válido para '-f, marca --filter': formato incorrecto del filtro (se esperaba nombre=valor)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seguimiento de la salida del registro</value>
   </data>
@@ -2724,7 +2730,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Nombre de imagen</value>
   </data>
   <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
-    <value>File or - to read from stdin</value>
+    <value>Archivo o: para leer desde stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Proporciona la ruta de acceso al archivo de almacenamiento tar que contiene la imagen</value>
@@ -2734,6 +2740,12 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>La clave de etiqueta no puede estar vacía</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Mostrar n últimos contenedores creados (incluye todos los estados)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Mostrar el último contenedor creado (incluye todos los estados)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nombre de host de contenedor</value>

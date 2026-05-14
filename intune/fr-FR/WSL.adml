@@ -5,84 +5,58 @@
   <description>Sous-système Windows pour Linux</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Sous-système Windows pour Linux</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Sous-système Windows pour Linux</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Autoriser les sous-système Windows pour Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">Lorsqu’elle est désactivée, cette stratégie désactive l’accès aux distributions de Linux en cours d’exécution dans le Sous-système Windows pour Linux pour tous les utilisateurs de l’ordinateur.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Autoriser les sous-système Windows pour Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Lorsqu’elle est désactivée, cette stratégie désactive l’accès aux distributions de Linux en cours d’exécution dans le Sous-système Windows pour Linux pour tous les utilisateurs de l’ordinateur.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Autoriser la version de boîte de réception du sous-système Windows pour Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">Quand elle est définie sur désactivée, cette stratégie désactive la version fournie en boîte de réception (composant facultatif) du Sous-système Windows pour Linux. Si cette stratégie est désactivée, seule la version du Store de WSL peut être utilisée.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Autoriser la version de boîte de réception du sous-système Windows pour Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la version fournie en boîte de réception (composant facultatif) du Sous-système Windows pour Linux. Si cette stratégie est désactivée, seule la version du Store de WSL peut être utilisée.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Autoriser WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">Lorsqu’elle est désactivée, cette stratégie désactive WSL1. Lorsque cette option est désactivée, seules les distributions WSL2 peuvent être utilisées.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Autoriser WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->Lorsqu’elle est désactivée, cette stratégie désactive WSL1. Lorsque cette option est désactivée, seules les distributions WSL2 peuvent être utilisées.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Autoriser la configuration personnalisée du noyau</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">Quand elle est définie sur désactivée, cette stratégie désactive la configuration personnalisée du noyau via .wslconfig (wsl2.kernel). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la configuration personnalisée du noyau via .wslconfig (wsl2.kernel). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Autoriser la configuration personnalisée de la distribution système</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">Quand elle est définie sur désactivée, cette stratégie désactive la configuration personnalisée de la distribution système via .wslconfig (wsl2.systemDistro). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la configuration personnalisée de la distribution système via .wslconfig (wsl2.systemDistro). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Autoriser la configuration de la ligne de commande du noyau</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">Quand elle est définie sur désactivée, cette stratégie désactive la configuration de la ligne de commande du noyau via .wslconfig (wsl2.kernelCommandLine). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la configuration de la ligne de commande du noyau via .wslconfig (wsl2.kernelCommandLine). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="AllowDebugShell">Autoriser l’interpréteur de commandes de débogage</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">Quand elle est définie sur désactivée, cette stratégie désactive le débogueur interactif (wsl.exe --debug-shell). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive le débogueur interactif (wsl.exe --debug-shell). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Autoriser la virtualisation imbriquée</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">Quand elle est définie sur désactivée, cette stratégie désactive la configuration de la virtualisation imbriquée via .wslconfig (wsl2.nestedVirtualization). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la configuration de la virtualisation imbriquée via .wslconfig (wsl2.nestedVirtualization). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Autoriser le débogage du noyau</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">Quand elle est définie sur désactivée, cette stratégie désactive la configuration du débogage du noyau via .wslconfig (wsl2.kernelDebugPort). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive la configuration du débogage du noyau via .wslconfig (wsl2.kernelDebugPort). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Autoriser la configuration réseau personnalisée</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Lorsqu’elle est définie sur désactivée, cette stratégie désactive la configuration réseau personnalisée via .wsnfnfig (wsl2.networkingmode). Cette stratégie s’applique uniquement au Store WSL.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Lorsqu’elle est définie sur désactivée, cette stratégie désactive la configuration réseau personnalisée via .wsnfnfig (wsl2.networkingmode). Cette stratégie s’applique uniquement au Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Autoriser l’utilisateur à configurer le pare-feu</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">Lorsque la valeur est désactivée, cette stratégie désactive la configuration du pare-feu via .wsnfnfig (wsl2.firewall). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Lorsque la valeur est désactivée, cette stratégie désactive la configuration du pare-feu via .wsnfnfig (wsl2.firewall). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="AllowDiskMount">Autoriser le montage de disque en mode passthrough</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">Quand elle est définie sur désactivée, cette stratégie désactive le montage direct de disques dans WSL2 (wsl.exe --mount). Cette stratégie s’applique uniquement à WSL de Store.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->Quand elle est définie sur désactivée, cette stratégie désactive le montage direct de disques dans WSL2 (wsl.exe --mount). Cette stratégie s’applique uniquement à WSL de Store.</string>
 
         <string id="DefaultNetworkingMode">Configurer le mode de mise en réseau par défaut</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">Cette stratégie spécifie le mode réseau par défaut à utiliser pour WSL2.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">Aucun</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">En miroir</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->Cette stratégie spécifie le mode réseau par défaut à utiliser pour WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">Conteneur WSL</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->Conteneur WSL</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Autoriser le conteneur WSL</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">Cette stratégie contrôle si le conteneur WSL peut être utilisé sur cette machine. Lorsqu’ils sont activés ou non configurés, les utilisateurs et les applications Windows peuvent exécuter des conteneurs Linux via WSL. Lorsqu’il est désactivé, le conteneur WSL est bloqué pour tous les utilisateurs et les applications Windows ne peuvent pas exécuter de conteneurs Linux. Avertissement : si la valeur est « Désactivé », les applications Windows qui dépendent de conteneurs Linux risquent de s’arrêter.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Autoriser le conteneur WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->Cette stratégie contrôle si le conteneur WSL peut être utilisé sur cette machine. Lorsqu’ils sont activés ou non configurés, les utilisateurs et les applications Windows peuvent exécuter des conteneurs Linux via WSL. Lorsqu’il est désactivé, le conteneur WSL est bloqué pour tous les utilisateurs et les applications Windows ne peuvent pas exécuter de conteneurs Linux. Avertissement : si la valeur est « Désactivé », les applications Windows qui dépendent de conteneurs Linux risquent de s’arrêter.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">Liste d'autorisation pour les registres de conteneurs WSL</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">Lorsqu’il est activé, le conteneur WSL n’est autorisé à extraire des images qu’à partir des registres répertoriés ici. Cela affecte à la fois l’interface CLI du conteneur WSL et toutes les applications utilisant l’API de conteneur WSL.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->Liste d'autorisation pour les registres de conteneurs WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->Lorsqu’il est activé, le conteneur WSL n’est autorisé à extraire des images qu’à partir des registres répertoriés ici. Cela affecte à la fois l’interface CLI du conteneur WSL et toutes les applications utilisant l’API de conteneur WSL.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

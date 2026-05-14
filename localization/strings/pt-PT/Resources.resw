@@ -2104,7 +2104,7 @@ Utilização:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>ContainerIpAddress ainda não é suportado.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
@@ -2119,7 +2119,7 @@ Utilização:
     <value>O nome de rede do contentor é necessário para o tipo de rede personalizado.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>O nome da rede não pode estar vazio.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando não reconhecido: '{}'</value>
@@ -2308,11 +2308,11 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <value>Não são permitidas redes adicionais quando o modo de rede principal é "host" ou "none".</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Rede duplicada: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2332,7 +2332,7 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
-    <value>Importing from a pipe is not supported. Please redirect stdin from a file.</value>
+    <value>A importação a partir de um pipe não é suportada. Redirecione o stdin a partir de um ficheiro.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Não foi encontrado Containerfile ou Dockerfile em "{}"</value>
@@ -2427,7 +2427,7 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Display container resource usage statistics.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Apresentar um instantâneo da utilização de recursos de um contentor em execução: CPU, memória, E/S de rede, E/S de bloco e PIDs.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Parar contentores.</value>
@@ -2456,7 +2456,7 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Inspecionar imagens.</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
-    <value>Import an image from a tarball.</value>
+    <value>Importar uma imagem de um tarball.</value>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importa o conteúdo de um tarball para criar uma imagem de sistema de ficheiros. Opcionalmente, marque a imagem com um repositório e um nome de marca.</value>
@@ -2693,6 +2693,12 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Caminho para o Dockerfile (utilize "-" para ler a partir de stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filter output based on conditions provided</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seguir a saída do registo</value>
   </data>
@@ -2718,7 +2724,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Nome da imagem</value>
   </data>
   <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
-    <value>File or - to read from stdin</value>
+    <value>Ficheiro ou - para ler a partir do stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Fornece o caminho para o ficheiro de arquivo tar que contém a imagem</value>
@@ -2728,6 +2734,12 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>A chave da etiqueta não pode estar vazia</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Mostrar n últimos contentores criados (inclui todos os estados)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Mostrar o contentor criado mais recentemente (inclui todos os estados)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nome do anfitrião do contentor</value>

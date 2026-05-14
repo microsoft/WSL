@@ -2332,7 +2332,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
-    <value>Import från ett rör stöds inte. Omdirigera stdin från en fil.</value>
+    <value>Import från en pipe stöds inte. Omdirigera stdin från en fil.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Ingen Containerfile eller Dockerfile hittades i '{}'</value>
@@ -2427,7 +2427,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Display container resource usage statistics.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Visa en ögonblicksbild av resursanvändningen för en container som körs: CPU, minne, nätverks-I/O, block-I/O och PID:er.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Stoppa containrar.</value>
@@ -2693,6 +2693,12 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Sökväg till Dockerfile (använd "-" för att läsa från stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filter output based on conditions provided</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Följ loggutdata</value>
   </data>
@@ -2728,6 +2734,12 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>Etikettens nyckel får inte vara tom</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Visa n senast skapade containrar (inkluderar alla tillstånd)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Show the latest created container (includes all states)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Containerns värdnamn</value>
