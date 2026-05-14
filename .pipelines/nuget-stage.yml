@@ -11,7 +11,10 @@ parameters:
 
 stages:
 - stage: nuget
-  dependsOn: [package, test]
+  # DRY RUN: dropped 'test' from dependsOn so nuget can run while the test stage
+  # is disabled in wsl-build-release-onebranch.yml. nuget-stage consumes outputs
+  # only from the package stage. REVERT BEFORE MERGING.
+  dependsOn: [package]
   jobs:
   - job: nuget
     displayName: 'Publish nuget packages'
@@ -38,12 +41,17 @@ stages:
         path: $(Build.SourcesDirectory)\drop
 
       # Note: this task might fail if there's been no commits between two nightly pipelines, which is fine.
+    # DRY RUN: nuget push replaced with a no-op so we never publish to the live
+    # feed during the dry run. Post-analysis still runs at end of job. REVERT
+    # BEFORE MERGING.
     - ${{ each package in parameters.nugetPackages }}:
-        - task: NuGetCommand@2
-          displayName: Push nuget/${{ package }}.*.nupkg
-          inputs:
-            command: 'push'
-            packagesToPush: $(Build.SourcesDirectory)\drop\nuget\${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
-            nuGetFeedType: 'internal'
-            publishVstsFeed: wsl
-            allowPackageConflicts: ${{ parameters.isNightly }}
+        - script: echo "DRY RUN -- nuget push of ${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg skipped"
+          displayName: "(DRY RUN) Skip push of ${{ package }}"
+        # - task: NuGetCommand@2
+        #   displayName: Push nuget/${{ package }}.*.nupkg
+        #   inputs:
+        #     command: 'push'
+        #     packagesToPush: $(Build.SourcesDirectory)\drop\nuget\${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
+        #     nuGetFeedType: 'internal'
+        #     publishVstsFeed: wsl
+        #     allowPackageConflicts: ${{ parameters.isNightly }}

@@ -90,47 +90,51 @@ stages:
   - stage: build_arm64
     dependsOn: []
     jobs:
-      - job: checks
-        displayName: "Formatting & localization checks"
-        timeoutInMinutes: 30
-
-        variables:
-          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
-
-        ${{ if eq(parameters.pool, '') }}:
-          pool: {'type': 'windows'}
-
-        ${{ else }}:
-          pool: ${{ parameters.pool }}
-
-        steps:
-          - script: python tools/devops/validate-localization.py
-            displayName: Validate localization resources
-
-          - script: python tools\devops\validate-copyright-headers.py src
-            displayName: Validate copyright headers (src/)
-
-          - script: python tools\devops\validate-copyright-headers.py test
-            displayName: Validate copyright headers (test/)
-
-          - task: CMake@1
-            displayName: "CMake ."
-            inputs:
-              workingDirectory: "."
-              cmakeArgs: .
-
-          - task: PowerShell@2
-            inputs:
-              targetType: "filePath"
-              filePath: FormatSource.ps1
-              arguments: "-ModifiedOnly $false -Verify $true"
-            displayName: "Clang-format check"
+      # DRY RUN: 'checks' job (formatting / localization / copyright / clang-format
+      # validation) skipped to shorten the arm64 critical path. arm64 build below
+      # also has its `dependsOn: checks` removed. REVERT BEFORE MERGING.
+      # - job: checks
+      #   displayName: "Formatting & localization checks"
+      #   timeoutInMinutes: 30
+      #
+      #   variables:
+      #     ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+      #
+      #   ${{ if eq(parameters.pool, '') }}:
+      #     pool: {'type': 'windows'}
+      #
+      #   ${{ else }}:
+      #     pool: ${{ parameters.pool }}
+      #
+      #   steps:
+      #     - script: python tools/devops/validate-localization.py
+      #       displayName: Validate localization resources
+      #
+      #     - script: python tools\devops\validate-copyright-headers.py src
+      #       displayName: Validate copyright headers (src/)
+      #
+      #     - script: python tools\devops\validate-copyright-headers.py test
+      #       displayName: Validate copyright headers (test/)
+      #
+      #     - task: CMake@1
+      #       displayName: "CMake ."
+      #       inputs:
+      #         workingDirectory: "."
+      #         cmakeArgs: .
+      #
+      #     - task: PowerShell@2
+      #       inputs:
+      #         targetType: "filePath"
+      #         filePath: FormatSource.ps1
+      #         arguments: "-ModifiedOnly $false -Verify $true"
+      #       displayName: "Clang-format check"
 
       - template: build-job.yml
         parameters:
           platform: arm64
           artifactSuffix: '_build_arm64'
-          dependsOn: checks
+          # DRY RUN: dropped `dependsOn: checks` since the checks job above is
+          # disabled. REVERT BEFORE MERGING.
           isRelease: ${{ parameters.isRelease }}
           isNightly: ${{ parameters.isNightly }}
           packageVersion: ${{ parameters.packageVersion }}

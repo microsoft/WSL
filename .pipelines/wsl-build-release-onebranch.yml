@@ -68,17 +68,20 @@ extends:
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
 
-    - template: test-stage.yml@self
-      parameters:
-        rs_prerelease_only: false
+    # DRY RUN: test and flight stages disabled to shorten the feedback loop while
+    # validating the CodeSign post-analysis exclusion. REVERT BEFORE MERGING.
+    # - template: test-stage.yml@self
+    #   parameters:
+    #     rs_prerelease_only: false
+    #
+    # - template: flight-stage.yml@self
+    #   parameters:
+    #     publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
+    #     packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+    #     bypassTests: ${{ parameters.bypassTests }}
 
-    - template: flight-stage.yml@self
+    # DRY RUN: keep nuget-stage unconditional so it always runs (this is the stage
+    # whose CodeSign post-analysis we're trying to validate). REVERT BEFORE MERGING.
+    - template: nuget-stage.yml@self
       parameters:
-        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
-        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
-        bypassTests: ${{ parameters.bypassTests }}
-
-    - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
-        - template: nuget-stage.yml@self
-          parameters:
-            isNightly: false
+        isNightly: false
