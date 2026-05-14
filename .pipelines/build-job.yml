@@ -70,8 +70,12 @@ jobs:
       ob_artifactBaseName: 'drop_wsl'
       ob_artifactSuffix: '${{ parameters.artifactSuffix }}'
       packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
-      ${{ if parameters.includeTestArtifacts }}:
-        ob_sdl_codeSignValidation_excludes: -|**testbin\**
+      # PowerShell scripts in this repo are dev/test/diagnostic helpers, not shipped binaries (the
+      # signed targetGlob in the OneBranch pipelines covers only the binary artifacts). Exclude
+      # them from CodeSign post-analysis so the in-repo .ps1 files don't break the build. The
+      # **\testbin\** pattern is a no-op when test artifacts aren't staged, so apply it
+      # unconditionally to keep this in one place. Each pattern needs its own '-|' prefix.
+      ob_sdl_codeSignValidation_excludes: -|**\*.ps1;-|**\testbin\**
       ${{ if parameters.includeCodeQL }}:
         Codeql.PublishDatabaseLog: true
         Codeql.SourceRoot: src

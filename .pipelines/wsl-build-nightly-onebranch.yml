@@ -11,6 +11,9 @@ schedules:
 variables:
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
   WindowsHostVersion: '1ESWindows2022'
+  # PowerShell scripts in this repo are dev/test/diagnostic helpers, not shipped binaries.
+  # Exclude them from CodeSign post-analysis so the in-repo .ps1 files don't break the build.
+  ob_sdl_codeSignValidation_excludes: -|**\*.ps1
 
 resources:
   repositories:
