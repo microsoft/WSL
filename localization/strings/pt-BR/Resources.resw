@@ -2950,7 +2950,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Nome do volume</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Especifique o nome do driver de volume (padrão {})</value>
+    <value>Especifique o nome do driver de volume (padrão guest)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

@@ -2943,7 +2943,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Navn på diskenhed</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Angiv navn på diskenhedsdriveren (standard {})</value>
+    <value>Angiv navn på diskenhedsdriveren (standard guest)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
