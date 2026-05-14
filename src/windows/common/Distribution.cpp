@@ -16,6 +16,7 @@ Abstract:
 #include "Distribution.h"
 #include "ConsoleProgressBar.h"
 #include "registry.hpp"
+#include "wslpolicies.h"
 
 constexpr auto c_defaultDistroListUrl =
     L"https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json";
@@ -220,14 +221,24 @@ AvailableDistributions wsl::windows::common::distribution::GetAvailable()
     std::optional<std::wstring> appendUrl;
     try
     {
-        const auto registryKey = registry::OpenLxssMachineKey();
-        url = registry::ReadString(registryKey.get(), nullptr, c_distroUrlRegistryValue, c_defaultDistroListUrl);
+        // Check policy value first - it takes precedence over the Lxss registry value
+        const auto policiesKey = wsl::windows::policies::OpenPoliciesKey();
+        url = registry::ReadString(policiesKey.get(), nullptr, wsl::windows::policies::c_distributionListUrl, c_defaultDistroListUrl);
         if (url != c_defaultDistroListUrl)
         {
-            WSL_LOG("Found custom URL for distribution list", TraceLoggingValue(url.c_str(), "url"));
+            WSL_LOG("Found policy URL for distribution list", TraceLoggingValue(url.c_str(), "url"));
         }
+        else
+        {
+            const auto registryKey = registry::OpenLxssMachineKey();
+            url = registry::ReadString(registryKey.get(), nullptr, c_distroUrlRegistryValue, c_defaultDistroListUrl);
+            if (url != c_defaultDistroListUrl)
+            {
+                WSL_LOG("Found custom URL for distribution list", TraceLoggingValue(url.c_str(), "url"));
+            }
 
-        appendUrl = registry::ReadOptionalString(registryKey.get(), nullptr, c_distroUrlAppendRegistryValue);
+            appendUrl = registry::ReadOptionalString(registryKey.get(), nullptr, c_distroUrlAppendRegistryValue);
+        }
     }
     CATCH_LOG()
 

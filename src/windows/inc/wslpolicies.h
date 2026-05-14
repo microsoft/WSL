@@ -35,6 +35,7 @@ inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSett
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
+inline constexpr auto c_distributionListUrl = L"CustomDistributionManifest";
 
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)
 try
@@ -61,6 +62,8 @@ catch (...)
     LOG_CAUGHT_EXCEPTION_MSG("Error reading the policy value: %ls", name);
     return std::nullopt;
 }
+
+
 
 inline bool IsFeatureAllowed(HKEY key, LPCWSTR name)
 try

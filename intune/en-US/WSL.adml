@@ -62,6 +62,9 @@
         <string id="DefaultNetworkingMode">Configure default networking mode</string>
         <!-- {Locked="WSL2"} -->
         <string id="DefaultNetworkingModeExplain">This policy specifies the default networking mode to be used for WSL2.</string>
+
+        <string id="CustomDistributionManifest">Configure custom distribution manifest</string>
+        <string id="CustomDistributionManifestExplain">This policy specifies a custom distribution manifest for WSL. When enabled, the specified value overrides the default and any user-configured distribution list. The value can be a URL pointing to a distribution manifest JSON file, or a direct JSON string containing the distribution manifest. See https://learn.microsoft.com/windows/wsl/build-custom-distro for the manifest format.</string>
         <!-- {Locked="None"} -->
         <string id="NetworkingModeNone">None</string>
         <!-- {Locked="NAT"} -->
@@ -87,6 +90,11 @@
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
         <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Default Networking Mode</dropdownList>
+      </presentation>
+      <presentation id="CustomDistributionManifest">
+        <textBox refId="CustomDistributionManifest_Value">
+          <label>Distribution manifest URL or JSON</label>
+        </textBox>
       </presentation>
       <presentation id="WSLContainerRegistryAllowlist">
         <listBox refId="WSLContainerRegistryAllowlist_Input">Allowed registries</listBox>
