@@ -2,7 +2,6 @@
 
 #include "precomp.h"
 #include "HandleIO.h"
-#include <unordered_map>
 #pragma hdrstop
 
 using wsl::windows::common::io::BufferWrapper;
@@ -96,35 +95,18 @@ void DetachFromIocp(HANDLE Handle)
     }
 }
 
-// Process-wide registry recording the current IOCPHandle owner of each kernel handle's
-// IOCP binding. Used by the IOCPHandle destructor to skip detach when another IOCPHandle
-// has subsequently rebound the same kernel handle (e.g. two leaves in one MultiHandleWait
-// wrapping the same underlying socket - the later Bind takes over and the older leaf must
-// not tear that binding back out when it is destroyed first).
-std::mutex g_iocpRegistryLock;
-std::unordered_map<HANDLE, const IOCPHandle*> g_iocpRegistry;
-
 } // namespace
 
 void IOCPHandle::Bind(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
 {
     WI_ASSERT(m_handle == nullptr);
 
-    // Claim ownership of this kernel handle's IOCP binding before doing any work. If a
-    // previous IOCPHandle is still alive and recorded as the owner, replacing it here
-    // means its destructor will skip the detach (we'll do it instead).
-    {
-        std::lock_guard lk{g_iocpRegistryLock};
-        g_iocpRegistry[Handle] = this;
-    }
-    m_handle = Handle;
-
     // Detach the handle from any previous IOCP first. The previous IOCP may have
     // been closed (a prior MultiHandleWait that owned it has gone out of scope) or
-    // may still be live with a different leaf currently bound to the same kernel
-    // handle. Either way the kernel only ever permits one IOCP+key association per
-    // handle, so the new association will fail with ERROR_INVALID_PARAMETER unless
-    // the existing one is cleared first.
+    // may still be live (e.g. a sibling boost::asio::stream::assign just bound it).
+    // Either way the kernel only ever permits one IOCP+key association per handle,
+    // so the new association will fail with ERROR_INVALID_PARAMETER unless any
+    // existing one is cleared first.
     DetachFromIocp(Handle);
 
     if (CreateIoCompletionPort(Handle, Iocp, Key, 0) == nullptr)
@@ -134,19 +116,14 @@ void IOCPHandle::Bind(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
         {
             // Handle doesn't support overlapped I/O (anonymous pipe, console handle, ...).
             // The caller is expected to complete its I/O synchronously inside Schedule().
-            // Drop our registry entry since the kernel won't notify us anyway and there's
-            // nothing for the destructor to detach.
-            std::lock_guard lk{g_iocpRegistryLock};
-            if (auto it = g_iocpRegistry.find(Handle); it != g_iocpRegistry.end() && it->second == this)
-            {
-                g_iocpRegistry.erase(it);
-            }
-            m_handle = nullptr;
+            // Leave m_handle == nullptr so the destructor is a no-op.
             return;
         }
 
         THROW_WIN32(error);
     }
+
+    m_handle = Handle;
 
     // Best-effort: not every device type supports FileCompletionNotificationModes. If
     // unsupported, the worst case is a redundant packet for a synchronous success which
@@ -159,20 +136,13 @@ void IOCPHandle::Bind(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
 
 IOCPHandle::~IOCPHandle()
 {
-    if (m_handle == nullptr)
+    if (m_handle != nullptr)
     {
-        return;
-    }
-
-    // Only detach if we are still the registered owner. If another IOCPHandle has bound
-    // the same kernel handle since our Bind, it took ownership of the detach responsibility
-    // and our binding has already been replaced; tearing it out now would yank the active
-    // binding away from in-flight I/O.
-    std::lock_guard lk{g_iocpRegistryLock};
-    if (auto it = g_iocpRegistry.find(m_handle); it != g_iocpRegistry.end() && it->second == this)
-    {
+        // MultiHandleWait owns one IOCPHandle per kernel handle, so there is no other
+        // IOCPHandle to step on. Detach so any external consumer (boost::asio, or a
+        // later MultiHandleWait reusing the same socket) can rebind to its own IOCP
+        // without hitting ERROR_INVALID_PARAMETER.
         DetachFromIocp(m_handle);
-        g_iocpRegistry.erase(it);
     }
 }
 
@@ -314,27 +284,18 @@ void EventHandle::Collect()
     OnSignalled();
 }
 
-std::vector<ULONG_PTR> EventHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> EventHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
+    // Events cannot be associated with an IOCP directly. Arm a thread pool wait that
+    // posts a packet to the IOCP via PostQueuedCompletionStatus when the event signals,
+    // then return no kernel handles for MultiHandleWait to bind.
     m_iocp = Iocp;
-    m_completionKey = reinterpret_cast<ULONG_PTR>(this);
+    m_completionKey = Key;
 
     m_threadpoolWait.reset(CreateThreadpoolWait(EventHandle::WaitCallback, this, nullptr));
     THROW_LAST_ERROR_IF(!m_threadpoolWait);
 
-    State = IOHandleStatus::Standby;
-    return {m_completionKey};
-}
-
-bool EventHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    // EventHandle posts via PostQueuedCompletionStatus with no OVERLAPPED, so its
-    // completions are never owned via OVL. MultiHandleWait::Run falls back to key-based
-    // dispatch when ovl is nullptr.
-    UNREFERENCED_PARAMETER(OverlappedPtr);
-    return false;
+    return {};
 }
 
 void NTAPI EventHandle::WaitCallback(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_WAIT, TP_WAIT_RESULT)
@@ -435,20 +396,11 @@ void ReadHandle::Collect()
     }
 }
 
-std::vector<ULONG_PTR> ReadHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> ReadHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
-    const auto key = reinterpret_cast<ULONG_PTR>(this);
-    m_iocpBinding.Bind(Handle.Get(), Iocp, key);
-
-    State = IOHandleStatus::Standby;
-    return {key};
-}
-
-bool ReadHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    return OverlappedPtr == &Overlapped;
+    UNREFERENCED_PARAMETER(Iocp);
+    UNREFERENCED_PARAMETER(Key);
+    return {{Handle.Get(), &Overlapped}};
 }
 
 // SingleAcceptHandle
@@ -509,20 +461,11 @@ void SingleAcceptHandle::Collect()
     OnAccepted();
 }
 
-std::vector<ULONG_PTR> SingleAcceptHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> SingleAcceptHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
-    const auto key = reinterpret_cast<ULONG_PTR>(this);
-    m_iocpBinding.Bind(ListenSocket.Get(), Iocp, key);
-
-    State = IOHandleStatus::Standby;
-    return {key};
-}
-
-bool SingleAcceptHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    return OverlappedPtr == &Overlapped;
+    UNREFERENCED_PARAMETER(Iocp);
+    UNREFERENCED_PARAMETER(Key);
+    return {{ListenSocket.Get(), &Overlapped}};
 }
 
 // LineBasedReadHandle
@@ -817,20 +760,11 @@ void ReadSocketMessageHandle::Collect()
     ProcessRecvResult(bytesRead);
 }
 
-std::vector<ULONG_PTR> ReadSocketMessageHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> ReadSocketMessageHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
-    const auto key = reinterpret_cast<ULONG_PTR>(this);
-    m_iocpBinding.Bind(Socket.Get(), Iocp, key);
-
-    State = IOHandleStatus::Standby;
-    return {key};
-}
-
-bool ReadSocketMessageHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    return OverlappedPtr == &Overlapped;
+    UNREFERENCED_PARAMETER(Iocp);
+    UNREFERENCED_PARAMETER(Key);
+    return {{Socket.Get(), &Overlapped}};
 }
 
 // WriteHandle
@@ -919,20 +853,11 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     State = IOHandleStatus::Standby;
 }
 
-std::vector<ULONG_PTR> WriteHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> WriteHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
-    const auto key = reinterpret_cast<ULONG_PTR>(this);
-    m_iocpBinding.Bind(Handle.Get(), Iocp, key);
-
-    State = IOHandleStatus::Standby;
-    return {key};
-}
-
-bool WriteHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    return OverlappedPtr == &Overlapped;
+    UNREFERENCED_PARAMETER(Iocp);
+    UNREFERENCED_PARAMETER(Key);
+    return {{Handle.Get(), &Overlapped}};
 }
 
 // DockerIORelayHandle
@@ -1051,25 +976,17 @@ void DockerIORelayHandle::Collect()
     }
 }
 
-std::vector<ULONG_PTR> DockerIORelayHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> DockerIORelayHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == IOHandleStatus::Created);
-
-    // Each sub-handle picks its own unique completion key. Concatenate the lists so the
-    // parent MultiHandleWait can route any sub-completion back to this DockerIORelayHandle.
-    auto keys = Read->Bind(Iocp);
-    auto stdoutKeys = WriteStdout.Bind(Iocp);
-    auto stderrKeys = WriteStderr.Bind(Iocp);
-    keys.insert(keys.end(), stdoutKeys.begin(), stdoutKeys.end());
-    keys.insert(keys.end(), stderrKeys.begin(), stderrKeys.end());
-    State = IOHandleStatus::Standby;
-    return keys;
-}
-
-bool DockerIORelayHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
-{
-    return Read->OwnsOverlapped(OverlappedPtr) || WriteStdout.OwnsOverlapped(OverlappedPtr) ||
-           WriteStderr.OwnsOverlapped(OverlappedPtr);
+    // Concatenate every sub-handle's pairs so the parent MultiHandleWait associates
+    // each underlying kernel handle with its IOCP exactly once and routes any of the
+    // sub-completions back to this DockerIORelayHandle by OVERLAPPED pointer.
+    auto handles = Read->Bind(Iocp, Key);
+    auto stdoutHandles = WriteStdout.Bind(Iocp, Key);
+    auto stderrHandles = WriteStderr.Bind(Iocp, Key);
+    handles.insert(handles.end(), stdoutHandles.begin(), stdoutHandles.end());
+    handles.insert(handles.end(), stderrHandles.begin(), stderrHandles.end());
+    return handles;
 }
 
 void DockerIORelayHandle::ProcessNextHeader()
@@ -1115,7 +1032,36 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace_back(HandleEntry{flags, std::move(handle), {}});
+    HandleEntry entry{flags, std::move(handle), {}};
+
+    // Each leaf reports the kernel handles it operates on along with the OVERLAPPED it
+    // will use; we associate every unique kernel handle with our IOCP exactly once
+    // (sharing across leaves is fine since dispatch routes by OVERLAPPED pointer in
+    // Run()) and remember the OVL list on the entry so completions can be matched back
+    // to the entry quickly. The completion key is the leaf's address - guaranteed
+    // unique while the entry exists; only EventHandle uses it (to post via
+    // PostQueuedCompletionStatus).
+    const auto bindings = entry.Handle->Bind(m_iocp.get(), reinterpret_cast<ULONG_PTR>(entry.Handle.get()));
+    entry.Overlappeds.reserve(bindings.size());
+    for (const auto& [kernelHandle, overlapped] : bindings)
+    {
+        auto [it, inserted] = m_iocpBindings.try_emplace(kernelHandle);
+        if (inserted)
+        {
+            try
+            {
+                it->second.Bind(kernelHandle, m_iocp.get(), 0);
+            }
+            catch (...)
+            {
+                m_iocpBindings.erase(it);
+                throw;
+            }
+        }
+        entry.Overlappeds.push_back(overlapped);
+    }
+
+    m_handles.push_back(std::move(entry));
 }
 
 void MultiHandleWait::Cancel()
@@ -1126,15 +1072,6 @@ void MultiHandleWait::Cancel()
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
-
-    // Lazily create a single IOCP that persists across Run invocations. Each handle is
-    // bound exactly once (file/socket handles can only ever be associated with one
-    // completion port for their lifetime).
-    if (!m_iocp)
-    {
-        m_iocp.reset(CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0));
-        THROW_LAST_ERROR_IF(!m_iocp);
-    }
 
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
@@ -1147,17 +1084,6 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 
     while (!m_handles.empty() && !m_cancel)
     {
-        // Bind any newly added handles to the completion port. Bind picks one unique
-        // completion key per leaf file/socket and returns the full list; we store it on
-        // the entry so processPacket can route incoming packets back to the right entry.
-        for (auto& entry : m_handles)
-        {
-            if (entry.Handle && entry.Handle->GetState() == IOHandleStatus::Created)
-            {
-                entry.Keys = entry.Handle->Bind(m_iocp.get());
-            }
-        }
-
         // Schedule IO on each handle until all are either pending, or completed.
         for (auto it = m_handles.begin(); it != m_handles.end() && !m_cancel; ++it)
         {
@@ -1256,12 +1182,12 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // Find the entry that owns this completion. When the OS provides an OVERLAPPED
         // pointer (any real I/O completion), route by OVL because a single kernel handle
         // can only be associated with one IOCP+key pair: when two leaves share the same
-        // kernel handle (e.g. RelayHandle::Write and DockerHttpResponseHandle wrapping the
-        // same docker socket), the second Bind detaches and re-binds, leaving every
-        // completion on that handle dispatched to the latest leaf only. Each leaf's I/O
-        // carries its own OVERLAPPED, so the pointer is always unambiguous. Fall back to
-        // key-based dispatch when OVL is nullptr (EventHandle posts via
-        // PostQueuedCompletionStatus with no OVL).
+        // kernel handle (e.g. RelayHandle::Write and DockerHttpResponseHandle wrapping
+        // the same docker socket), the kernel-level key is identical for every
+        // completion on that handle. Each leaf's I/O carries its own OVERLAPPED, so the
+        // pointer is always unambiguous. Fall back to key-based dispatch when OVL is
+        // nullptr (EventHandle posts via PostQueuedCompletionStatus with no OVL, using
+        // the leaf address as key).
         const auto it = std::find_if(m_handles.begin(), m_handles.end(), [key, ovl](const HandleEntry& entry) {
             if (!entry.Handle)
             {
@@ -1270,10 +1196,10 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 
             if (ovl != nullptr)
             {
-                return entry.Handle->OwnsOverlapped(ovl);
+                return std::find(entry.Overlappeds.begin(), entry.Overlappeds.end(), ovl) != entry.Overlappeds.end();
             }
 
-            return std::find(entry.Keys.begin(), entry.Keys.end(), key) != entry.Keys.end();
+            return reinterpret_cast<ULONG_PTR>(entry.Handle.get()) == key;
         });
 
         if (it == m_handles.end() || it->Handle->GetState() != IOHandleStatus::Pending)

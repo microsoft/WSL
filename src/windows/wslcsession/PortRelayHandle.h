@@ -32,7 +32,7 @@ public:
 
     void Schedule() override;
     void Collect() override;
-    std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    std::vector<std::pair<HANDLE, OVERLAPPED*>> Bind(HANDLE Iocp, ULONG_PTR Key) override;
 
 private:
     void LaunchRelay(wil::unique_socket&& AcceptedSocket);
@@ -47,7 +47,6 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
-    common::io::IOCPHandle m_iocpBinding;
 };
 
 } // namespace wsl::windows::service::wslc

@@ -90,15 +90,11 @@ void PortRelayAcceptHandle::Collect()
     State = io::IOHandleStatus::Standby;
 }
 
-std::vector<ULONG_PTR> PortRelayAcceptHandle::Bind(HANDLE Iocp)
+std::vector<std::pair<HANDLE, OVERLAPPED*>> PortRelayAcceptHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    WI_ASSERT(State == io::IOHandleStatus::Created);
-
-    const auto key = reinterpret_cast<ULONG_PTR>(this);
-    m_iocpBinding.Bind(reinterpret_cast<HANDLE>(ListenSocket.get()), Iocp, key);
-
-    State = io::IOHandleStatus::Standby;
-    return {key};
+    UNREFERENCED_PARAMETER(Iocp);
+    UNREFERENCED_PARAMETER(Key);
+    return {{reinterpret_cast<HANDLE>(ListenSocket.get()), &Overlapped}};
 }
 
 void PortRelayAcceptHandle::LaunchRelay(wil::unique_socket&& AcceptedSocket)
