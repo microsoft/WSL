@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "HandleIO.h"
+#include <unordered_map>
 #pragma hdrstop
 
 using wsl::windows::common::io::BufferWrapper;
@@ -9,6 +10,7 @@ using wsl::windows::common::io::DockerIORelayHandle;
 using wsl::windows::common::io::EventHandle;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::HTTPChunkBasedReadHandle;
+using wsl::windows::common::io::IOCPHandle;
 using wsl::windows::common::io::IOHandleStatus;
 using wsl::windows::common::io::LineBasedReadHandle;
 using wsl::windows::common::io::MultiHandleWait;
@@ -61,10 +63,70 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
 }
 
+// FileReplaceCompletionInformation (introduced in Windows 8.1) lets us swap or remove
+// the I/O completion port association of a kernel file object. Neither the info class
+// constant nor the FILE_COMPLETION_INFORMATION layout are exposed via the user-mode
+// SDK headers, so they're declared locally.
+constexpr auto c_fileReplaceCompletionInformation = static_cast<FILE_INFORMATION_CLASS>(61);
+
+struct FILE_COMPLETION_INFORMATION
+{
+    HANDLE Port;
+    PVOID Key;
+};
+
+// NTSTATUS codes - winnt.h only exposes a small subset, the rest are in ntstatus.h
+// which conflicts with windows.h. Defined locally to avoid the conflict.
+constexpr NTSTATUS c_statusInvalidInfoClass = static_cast<NTSTATUS>(0xC0000003L);
+constexpr NTSTATUS c_statusObjectTypeMismatch = static_cast<NTSTATUS>(0xC0000024L);
+
+void DetachFromIocp(HANDLE Handle)
+{
+    FILE_COMPLETION_INFORMATION info{};
+    IO_STATUS_BLOCK iosb{};
+    const NTSTATUS status = NtSetInformationFile(Handle, &iosb, &info, sizeof(info), c_fileReplaceCompletionInformation);
+
+    // Best-effort: failures are expected for handles that were never associated, for
+    // objects that aren't kernel file objects (events, console handles, ...), and on
+    // pre-Windows 8.1 systems that don't recognize the info class. The handle is being
+    // destroyed regardless so there's nothing to recover.
+    if (!NT_SUCCESS(status))
+    {
+        LOG_HR_IF(HRESULT_FROM_NT(status), status != STATUS_INVALID_PARAMETER && status != c_statusObjectTypeMismatch && status != c_statusInvalidInfoClass);
+    }
+}
+
+// Process-wide registry recording the current IOCPHandle owner of each kernel handle's
+// IOCP binding. Used by the IOCPHandle destructor to skip detach when another IOCPHandle
+// has subsequently rebound the same kernel handle (e.g. two leaves in one MultiHandleWait
+// wrapping the same underlying socket - the later Bind takes over and the older leaf must
+// not tear that binding back out when it is destroyed first).
+std::mutex g_iocpRegistryLock;
+std::unordered_map<HANDLE, const IOCPHandle*> g_iocpRegistry;
+
 } // namespace
 
-void wsl::windows::common::io::Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
+void IOCPHandle::Bind(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key)
 {
+    WI_ASSERT(m_handle == nullptr);
+
+    // Claim ownership of this kernel handle's IOCP binding before doing any work. If a
+    // previous IOCPHandle is still alive and recorded as the owner, replacing it here
+    // means its destructor will skip the detach (we'll do it instead).
+    {
+        std::lock_guard lk{g_iocpRegistryLock};
+        g_iocpRegistry[Handle] = this;
+    }
+    m_handle = Handle;
+
+    // Detach the handle from any previous IOCP first. The previous IOCP may have
+    // been closed (a prior MultiHandleWait that owned it has gone out of scope) or
+    // may still be live with a different leaf currently bound to the same kernel
+    // handle. Either way the kernel only ever permits one IOCP+key association per
+    // handle, so the new association will fail with ERROR_INVALID_PARAMETER unless
+    // the existing one is cleared first.
+    DetachFromIocp(Handle);
+
     if (CreateIoCompletionPort(Handle, Iocp, Key, 0) == nullptr)
     {
         const auto error = GetLastError();
@@ -72,6 +134,14 @@ void wsl::windows::common::io::Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR K
         {
             // Handle doesn't support overlapped I/O (anonymous pipe, console handle, ...).
             // The caller is expected to complete its I/O synchronously inside Schedule().
+            // Drop our registry entry since the kernel won't notify us anyway and there's
+            // nothing for the destructor to detach.
+            std::lock_guard lk{g_iocpRegistryLock};
+            if (auto it = g_iocpRegistry.find(Handle); it != g_iocpRegistry.end() && it->second == this)
+            {
+                g_iocpRegistry.erase(it);
+            }
+            m_handle = nullptr;
             return;
         }
 
@@ -84,6 +154,25 @@ void wsl::windows::common::io::Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR K
     if (!SetFileCompletionNotificationModes(Handle, FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
     {
         LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_FUNCTION);
+    }
+}
+
+IOCPHandle::~IOCPHandle()
+{
+    if (m_handle == nullptr)
+    {
+        return;
+    }
+
+    // Only detach if we are still the registered owner. If another IOCPHandle has bound
+    // the same kernel handle since our Bind, it took ownership of the detach responsibility
+    // and our binding has already been replaced; tearing it out now would yank the active
+    // binding away from in-flight I/O.
+    std::lock_guard lk{g_iocpRegistryLock};
+    if (auto it = g_iocpRegistry.find(m_handle); it != g_iocpRegistry.end() && it->second == this)
+    {
+        DetachFromIocp(m_handle);
+        g_iocpRegistry.erase(it);
     }
 }
 
@@ -239,6 +328,15 @@ std::vector<ULONG_PTR> EventHandle::Bind(HANDLE Iocp)
     return {m_completionKey};
 }
 
+bool EventHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    // EventHandle posts via PostQueuedCompletionStatus with no OVERLAPPED, so its
+    // completions are never owned via OVL. MultiHandleWait::Run falls back to key-based
+    // dispatch when ovl is nullptr.
+    UNREFERENCED_PARAMETER(OverlappedPtr);
+    return false;
+}
+
 void NTAPI EventHandle::WaitCallback(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_WAIT, TP_WAIT_RESULT)
 {
     auto* self = static_cast<EventHandle*>(Context);
@@ -342,10 +440,15 @@ std::vector<ULONG_PTR> ReadHandle::Bind(HANDLE Iocp)
     WI_ASSERT(State == IOHandleStatus::Created);
 
     const auto key = reinterpret_cast<ULONG_PTR>(this);
-    Associate(Handle.Get(), Iocp, key);
+    m_iocpBinding.Bind(Handle.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
     return {key};
+}
+
+bool ReadHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    return OverlappedPtr == &Overlapped;
 }
 
 // SingleAcceptHandle
@@ -411,10 +514,15 @@ std::vector<ULONG_PTR> SingleAcceptHandle::Bind(HANDLE Iocp)
     WI_ASSERT(State == IOHandleStatus::Created);
 
     const auto key = reinterpret_cast<ULONG_PTR>(this);
-    Associate(ListenSocket.Get(), Iocp, key);
+    m_iocpBinding.Bind(ListenSocket.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
     return {key};
+}
+
+bool SingleAcceptHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    return OverlappedPtr == &Overlapped;
 }
 
 // LineBasedReadHandle
@@ -714,10 +822,15 @@ std::vector<ULONG_PTR> ReadSocketMessageHandle::Bind(HANDLE Iocp)
     WI_ASSERT(State == IOHandleStatus::Created);
 
     const auto key = reinterpret_cast<ULONG_PTR>(this);
-    Associate(Socket.Get(), Iocp, key);
+    m_iocpBinding.Bind(Socket.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
     return {key};
+}
+
+bool ReadSocketMessageHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    return OverlappedPtr == &Overlapped;
 }
 
 // WriteHandle
@@ -811,10 +924,15 @@ std::vector<ULONG_PTR> WriteHandle::Bind(HANDLE Iocp)
     WI_ASSERT(State == IOHandleStatus::Created);
 
     const auto key = reinterpret_cast<ULONG_PTR>(this);
-    Associate(Handle.Get(), Iocp, key);
+    m_iocpBinding.Bind(Handle.Get(), Iocp, key);
 
     State = IOHandleStatus::Standby;
     return {key};
+}
+
+bool WriteHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    return OverlappedPtr == &Overlapped;
 }
 
 // DockerIORelayHandle
@@ -946,6 +1064,12 @@ std::vector<ULONG_PTR> DockerIORelayHandle::Bind(HANDLE Iocp)
     keys.insert(keys.end(), stderrKeys.begin(), stderrKeys.end());
     State = IOHandleStatus::Standby;
     return keys;
+}
+
+bool DockerIORelayHandle::OwnsOverlapped(OVERLAPPED* OverlappedPtr) const
+{
+    return Read->OwnsOverlapped(OverlappedPtr) || WriteStdout.OwnsOverlapped(OverlappedPtr) ||
+           WriteStderr.OwnsOverlapped(OverlappedPtr);
 }
 
 void DockerIORelayHandle::ProcessNextHeader()
@@ -1104,11 +1228,51 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         DWORD bytes = 0;
         ULONG_PTR key = 0;
         OVERLAPPED* ovl = nullptr;
-        THROW_IF_WIN32_BOOL_FALSE(GetQueuedCompletionStatus(m_iocp.get(), &bytes, &key, &ovl, waitTimeout));
+        if (!GetQueuedCompletionStatus(m_iocp.get(), &bytes, &key, &ovl, waitTimeout))
+        {
+            // GetQueuedCompletionStatus returns FALSE for two distinct conditions:
+            //
+            // - ovl == nullptr: no packet was dequeued. This is either a wait timeout
+            //   (treated as success: just exit the loop) or a real failure of the IOCP
+            //   itself (rethrow).
+            //
+            // - ovl != nullptr: a completion packet for a failed I/O operation was
+            //   dequeued. key/bytes/ovl are all valid and the failure should be
+            //   dispatched to the owning leaf, whose Collect() reads the actual status
+            //   via GetOverlappedResult and decides how to react (e.g. ReadHandle
+            //   treats ERROR_BROKEN_PIPE/ERROR_HANDLE_EOF as a clean EOF).
+            const auto error = GetLastError();
+            if (ovl == nullptr)
+            {
+                if (error == WAIT_TIMEOUT)
+                {
+                    break;
+                }
 
-        // Find the entry that owns this completion key. Each leaf sub-handle picks one
-        // unique key in Bind() so a linear scan is the simplest correct lookup.
-        const auto it = std::find_if(m_handles.begin(), m_handles.end(), [key](const HandleEntry& entry) {
+                THROW_WIN32(error);
+            }
+        }
+
+        // Find the entry that owns this completion. When the OS provides an OVERLAPPED
+        // pointer (any real I/O completion), route by OVL because a single kernel handle
+        // can only be associated with one IOCP+key pair: when two leaves share the same
+        // kernel handle (e.g. RelayHandle::Write and DockerHttpResponseHandle wrapping the
+        // same docker socket), the second Bind detaches and re-binds, leaving every
+        // completion on that handle dispatched to the latest leaf only. Each leaf's I/O
+        // carries its own OVERLAPPED, so the pointer is always unambiguous. Fall back to
+        // key-based dispatch when OVL is nullptr (EventHandle posts via
+        // PostQueuedCompletionStatus with no OVL).
+        const auto it = std::find_if(m_handles.begin(), m_handles.end(), [key, ovl](const HandleEntry& entry) {
+            if (!entry.Handle)
+            {
+                return false;
+            }
+
+            if (ovl != nullptr)
+            {
+                return entry.Handle->OwnsOverlapped(ovl);
+            }
+
             return std::find(entry.Keys.begin(), entry.Keys.end(), key) != entry.Keys.end();
         });
 
@@ -1116,10 +1280,11 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         {
             LOG_HR_MSG(
                 E_UNEXPECTED,
-                "Receive IO completion for stale handle. Key: 0x%p, Handle State: %d",
+                "Receive IO completion for stale handle. Key: 0x%p, Overlapped: 0x%p, Handle State: %d",
                 (void*)key,
-                it != m_handles.end() ? static_cast<int>(it->Handle->GetState()) : -1);
-                continue;
+                (void*)ovl,
+                it != m_handles.end() && it->Handle ? static_cast<int>(it->Handle->GetState()) : -1);
+            continue;
         }
 
         try

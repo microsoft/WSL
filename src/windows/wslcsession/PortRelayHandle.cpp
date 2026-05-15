@@ -95,7 +95,7 @@ std::vector<ULONG_PTR> PortRelayAcceptHandle::Bind(HANDLE Iocp)
     WI_ASSERT(State == io::IOHandleStatus::Created);
 
     const auto key = reinterpret_cast<ULONG_PTR>(this);
-    io::Associate(reinterpret_cast<HANDLE>(ListenSocket.get()), Iocp, key);
+    m_iocpBinding.Bind(reinterpret_cast<HANDLE>(ListenSocket.get()), Iocp, key);
 
     State = io::IOHandleStatus::Standby;
     return {key};

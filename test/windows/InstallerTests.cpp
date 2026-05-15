@@ -379,7 +379,7 @@ class InstallerTests
         if (wsl::shared::string::EndsWith<wchar_t>(installerFile, L".msi"))
         {
             PrepareForMsiOperation();
-            CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", installerFile, GenerateMsiLogPath()));
+            CallMsiExec(std::format(L"/qn /norestart /i \"{}\" /L*V \"{}\"", installerFile, GenerateMsiLogPath()));
         }
         else
         {

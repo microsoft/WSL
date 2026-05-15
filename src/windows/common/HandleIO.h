@@ -59,16 +59,45 @@ private:
     gsl::span<gsl::byte> m_unowned;
 };
 
-// Associate a file/socket handle with an I/O completion port, then opt out of the
-// success-completion packet (best-effort).
+// RAII helper for binding a file/socket to an I/O completion port. Bind detaches
+// any prior IOCP association on the handle before installing the new one, so the
+// same underlying file/socket can be re-bound to a different IOCP from a later
+// MultiHandleWait instance even after the previous instance's IOCP has been
+// closed. The destructor likewise detaches the binding so external consumers
+// (e.g. boost::asio::stream::assign which calls CreateIoCompletionPort with its
+// own IOCP) can take ownership of the kernel handle without hitting
+// ERROR_INVALID_PARAMETER.
 //
-// CreateIoCompletionPort returns ERROR_INVALID_PARAMETER for handles that don't support
-// overlapped I/O - anonymous pipes from CreatePipe, console handles from GetStdHandle,
-// and a few other device types. This helper silently swallows that specific error so
-// callers don't need to know whether the handle is overlapped-capable; non-overlapped
-// handles simply won't generate IOCP packets and are expected to complete their I/O
-// synchronously inside Schedule().
-void Associate(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key);
+// Detach uses the undocumented NtSetInformationFile +
+// FileReplaceCompletionInformation NTAPI (introduced in Windows 8.1).
+//
+// CreateIoCompletionPort returns ERROR_INVALID_PARAMETER for handles that don't
+// support overlapped I/O - anonymous pipes from CreatePipe, console handles from
+// GetStdHandle, and a few other device types. Bind silently treats those as a
+// no-op; such handles are expected to complete their I/O synchronously inside
+// Schedule() so no IOCP packet is required.
+//
+// When two leaves of the same MultiHandleWait wrap the same kernel handle
+// (e.g. RelayHandle::Write and a separate response ReadHandle both targeting one
+// docker socket), the second leaf's Bind detaches the first leaf's binding and
+// installs its own. To avoid the first leaf's destructor tearing the active
+// (second leaf's) binding back out, IOCPHandle records the latest binder for
+// each kernel handle in a process-wide registry; the destructor only detaches
+// when it finds itself still recorded as the current binder.
+class IOCPHandle
+{
+public:
+    IOCPHandle() = default;
+    ~IOCPHandle();
+
+    NON_COPYABLE(IOCPHandle)
+    NON_MOVABLE(IOCPHandle)
+
+    void Bind(HANDLE Handle, HANDLE Iocp, ULONG_PTR Key);
+
+private:
+    HANDLE m_handle = nullptr;
+};
 
 class OverlappedIOHandle
 {
@@ -96,6 +125,15 @@ public:
     // transition the state to Standby on success.
     virtual std::vector<ULONG_PTR> Bind(HANDLE Iocp) = 0;
 
+    // Returns true if this handle (or any of its sub-handles) issued the I/O described by
+    // the given OVERLAPPED pointer. MultiHandleWait::Run uses this to route completion
+    // packets back to the originating leaf because the kernel-level completion key cannot
+    // distinguish between two leaves that share the same kernel handle (e.g. a request
+    // socket used by both a RelayHandle::Write and a separate response ReadHandle): only
+    // one Bind survives in the kernel, so all completions arrive with the latest key.
+    // Each leaf's I/O carries its own OVERLAPPED, so the pointer is always unambiguous.
+    virtual bool OwnsOverlapped(OVERLAPPED* Overlapped) const = 0;
+
     IOHandleStatus GetState() const;
 
 protected:
@@ -112,6 +150,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* Overlapped) const override;
 
 private:
     static void NTAPI WaitCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context, PTP_WAIT Wait, TP_WAIT_RESULT WaitResult);
@@ -135,6 +174,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override;
 
 private:
     HandleWrapper Handle;
@@ -143,6 +183,7 @@ private:
     OVERLAPPED Overlapped{};
     BufferWrapper Buffer{LX_RELAY_BUFFER_SIZE};
     LARGE_INTEGER Offset{};
+    IOCPHandle m_iocpBinding;
 };
 
 class SingleAcceptHandle : public OverlappedIOHandle
@@ -157,6 +198,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override;
 
 private:
     HandleWrapper ListenSocket;
@@ -165,6 +207,7 @@ private:
     OVERLAPPED Overlapped{};
     std::function<void()> OnAccepted;
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
+    IOCPHandle m_iocpBinding;
 };
 
 class LineBasedReadHandle : public ReadHandle
@@ -214,6 +257,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override;
 
 private:
     void ScheduleRecv();
@@ -227,6 +271,7 @@ private:
     bool ReadingHeader = true;
     size_t BytesRemaining = sizeof(MESSAGE_HEADER);
     size_t CurrentOffset = 0;
+    IOCPHandle m_iocpBinding;
 };
 
 class WriteHandle : public OverlappedIOHandle
@@ -241,6 +286,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override;
     void Push(const gsl::span<char>& Buffer);
 
 private:
@@ -249,6 +295,7 @@ private:
     OVERLAPPED Overlapped{};
     BufferWrapper Buffer;
     LARGE_INTEGER Offset{};
+    IOCPHandle m_iocpBinding;
 };
 
 template <typename TRead = ReadHandle>
@@ -331,6 +378,11 @@ public:
         return keys;
     }
 
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override
+    {
+        return Read.OwnsOverlapped(OverlappedPtr) || Write.OwnsOverlapped(OverlappedPtr);
+    }
+
 private:
     void OnRead(const gsl::span<char>& Content)
     {
@@ -358,6 +410,7 @@ public:
     void Schedule() override;
     void Collect() override;
     std::vector<ULONG_PTR> Bind(HANDLE Iocp) override;
+    bool OwnsOverlapped(OVERLAPPED* OverlappedPtr) const override;
 
 #pragma pack(push, 1)
     struct MultiplexedHeader

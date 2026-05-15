@@ -47,6 +47,7 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
+    common::io::IOCPHandle m_iocpBinding;
 };
 
 } // namespace wsl::windows::service::wslc
