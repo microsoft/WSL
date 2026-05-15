@@ -444,7 +444,8 @@ try
 
         // Validate rw mounts.
         {
-            auto rwCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testFileName); });
+            auto rwCleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(std::wstring(testFolder) + testFileName); });
 
             {
                 std::ofstream file(std::wstring(testFolder) + testFileName);

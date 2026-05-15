@@ -129,7 +129,7 @@ try
     RETURN_HR_IF_MSG(
         E_INVALIDARG,
         nameLength == 0 ||
-            !std::ranges::all_of(Name, Name + nameLength, [&](auto c) { return c == '-' || c == '_' || iswalpha(c); }),
+            !std::ranges::all_of(Name, Name + nameLength, [&](auto c) { return c == '-' || c == '_' || iswalphanum(c); }),
         "Invalid mount name: %ls",
         Name);
 

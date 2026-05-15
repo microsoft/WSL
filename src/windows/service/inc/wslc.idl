@@ -791,7 +791,7 @@ interface IWSLCSession : IUnknown
     // Returns a handle to this COM server process (used to add to job object).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Initializes the session with a pre-created VM?
+    // Initializes the session with a pre-created VM.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
