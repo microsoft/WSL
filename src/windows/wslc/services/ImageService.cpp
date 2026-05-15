@@ -204,7 +204,7 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 
         info.Id = image.Hash;
         info.Created = image.Created;
-        info.Size = static_cast<uint64_t>(image.Size);
+        info.Size = image.Size;
         result.push_back(info);
     }
 

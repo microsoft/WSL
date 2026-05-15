@@ -1413,7 +1413,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.Ulimits = std::move(ulimits);
     }
 
-    request.HostConfig.ShmSize = static_cast<int64_t>(containerOptions.ShmSize);
+    request.HostConfig.ShmSize = containerOptions.ShmSize;
 
     if (containerOptions.VolumesCount > 0)
     {

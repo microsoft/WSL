@@ -129,7 +129,7 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
-void WSLCContainerLauncher::SetShmSize(ULONGLONG ShmSize)
+void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
 {
     m_shmSize = ShmSize;
 }

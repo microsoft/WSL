@@ -122,7 +122,7 @@ typedef struct _WSLCImageInformation
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
     char Digest[256];
-    ULONGLONG Size;
+    LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
 } WSLCImageInformation;
@@ -301,7 +301,7 @@ typedef struct _WSLCContainerOptions
     WSLCStringArray DnsSearchDomains;
     WSLCStringArray DnsOptions;
 
-    ULONGLONG ShmSize;
+    LONGLONG ShmSize; // Matches Docker's int64 ShmSize; consistent with MemoryBytes/NanoCpus
     WSLCContainerNetwork ContainerNetwork;
     [unique, size_is(TmpfsCount)] const WSLCTmpfsMount* Tmpfs;
     ULONG TmpfsCount;
