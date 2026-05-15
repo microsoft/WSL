@@ -2701,7 +2701,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filtrar saída com base nas condições fornecidas</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Argumento inválido "{}" para '-f, --filter' sinalizador: formato de filtro incorreto (nome esperado=valor)</value>

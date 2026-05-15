@@ -2694,10 +2694,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filtrer utdata basert på de angitte betingelsene</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>Ugyldig argument «{}» for '-f, --filter' flagg: feil format på filter (forventet navn=verdi)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Følg loggutdata</value>
@@ -2739,7 +2739,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis n sist opprettede beholdere (inkluderer alle tilstander)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Vis den sist opprettede beholderen (inkuderer alle tilstander)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Beholderens vertsnavn</value>
@@ -2955,7 +2955,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Volumnavn</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Angi volumdrivernavn, for eksempel «guest» eller «vhd» (standard: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

@@ -2312,7 +2312,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Verkon kaksoiskopio: {}</value>
+    <value>Monistunut verkko: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2694,10 +2694,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Suodata tulos annettujen ehtojen perusteella</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>Virheellinen argumentti "{}" merkinnälle '-f, --filter': virheellinen suodattimen muoto (odotettu nimi=arvo)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seuraa lokitulostetta</value>
@@ -2736,10 +2736,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Tunnisteen avain ei voi olla tyhjä</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>Show n last created containers (includes all states)</value>
+    <value>Näytä n viimeksi luotua säilöä (sisältää kaikki tilat)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Näytä viimeisin luotu säilö (sisältää kaikki tilat)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Säilön isäntänimi</value>
@@ -3038,7 +3038,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>VERKON I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>ESTON I/O</value>
+    <value>ESTÄ I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PID-tunnukset</value>

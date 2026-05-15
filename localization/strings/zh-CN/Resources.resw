@@ -2742,7 +2742,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>标签键不能为空</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>已显示上次创建的容器(包括所有状态)</value>
+    <value>显示最近创建的 n 个容器(包括所有状态)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>显示最新创建的容器 (包括所有状态)</value>

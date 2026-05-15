@@ -2431,7 +2431,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Démarre un conteneur.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Afficher les statistiques d’utilisation des ressources de conteneur.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
     <value>Affichez un instantané de l’utilisation des ressources d’un conteneur en cours d’exécution : processeur, mémoire, E/S réseau, E/S de bloc et PID.</value>
@@ -3015,28 +3015,28 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>ID DE CONTENEUR</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NOM</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>DATE DE CRÉATION</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
-    <value>STATUS</value>
+    <value>ÉTAT</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTS</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
-    <value>CPU %</value>
+    <value>Pourcentage UC</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>UTILISATION/LIMITE MEM</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
     <value>MEM %</value>
@@ -3045,7 +3045,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>BLOQUER LES E/S</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

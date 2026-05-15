@@ -2694,7 +2694,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filtruj wyniki na podstawie podanych warunków</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Nieprawidłowy argument "{}" dla "-f", --filter' flaga: nieprawidłowy format filtru (oczekiwano nazwa=wartość)</value>
@@ -2739,7 +2739,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Pokaż n ostatnio utworzonych kontenerów (obejmuje wszystkie stany)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Pokaż ostatnio utworzony kontener (zawiera wszystkie stany)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nazwa hosta kontenera</value>
@@ -2955,7 +2955,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nazwa woluminu</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Określ nazwę sterownika woluminu, np. „guest” lub „vhd” (domyślnie: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

@@ -2701,7 +2701,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Отфильтровать вывод по заданным условиям</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Недопустимый аргумент "{}" для '-f, флаг --filter': неправильный формат фильтра (ожидается имя=значение)</value>
@@ -2743,10 +2743,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Ключ метки не может быть пустым</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>Show n last created containers (includes all states)</value>
+    <value>Показать n последних созданных контейнеров (включая все состояния)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Показать последний созданный контейнер (включая все состояния)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Имя узла контейнера</value>

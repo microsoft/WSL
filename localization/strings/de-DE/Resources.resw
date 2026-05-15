@@ -2700,7 +2700,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filterausgabe basierend auf den bereitgestellten Bedingungen</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Ungültiges Argument "{}" für "-f", --filter' Flag: Ungültiges Filterformat (Name=Wert erwartet)</value>
@@ -2742,10 +2742,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Bezeichnungsschlüssel darf nicht leer sein</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>Show n last created containers (includes all states)</value>
+    <value>Die letzten n erstellten Container anzeigen (einschließlich aller Zustände)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Den zuletzt erstellten Container anzeigen (einschließlich aller Zustände)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Hostname des Containers</value>

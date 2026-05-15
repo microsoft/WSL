@@ -2694,10 +2694,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Çıktıyı sağlanan koşullara göre filtrele</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>'-f, --filter' bayrağı için "{}" argümanı geçersiz: filtre biçimi hatalı (beklenen biçim: name=değer)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Günlük çıktısını takip et</value>
@@ -2739,7 +2739,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Son oluşturulan n kapsayıcıyı göster (tüm durumları içerir)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>En son oluşturulan kapsayıcıyı göster (tüm durumları içerir)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Kapsayıcı ana bilgisayar adı</value>
@@ -2955,7 +2955,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Birim adı</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Birim sürücüsü adını belirtin, örneğin 'guest' veya 'vhd' (varsayılan: guest)</value>
+    <value>Birim sürücüsünün adını belirtin, örneğin 'guest' veya 'vhd' (varsayılan: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

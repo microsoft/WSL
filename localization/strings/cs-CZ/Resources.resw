@@ -2694,10 +2694,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filtrovat výstup na základě zadaných podmínek</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>Neplatný argument "{}" pro příznak '-f, --filter': chybný formát filtru (očekává se name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Sledovat výstup protokolu</value>
@@ -2736,7 +2736,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Klíč popisku nemůže být prázdný</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>Show n last created containers (includes all states)</value>
+    <value>Zobrazit n naposledy vytvořených kontejnerů (zahrnuje všechny stavy)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Zobrazit nejnovější vytvořený kontejner (včetně všech stavů)</value>

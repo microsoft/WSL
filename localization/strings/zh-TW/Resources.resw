@@ -2961,7 +2961,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>磁碟區名稱</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>指定磁碟區驅動程式名稱，例如 'guest' 或 'vhd' (預設值: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
