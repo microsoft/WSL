@@ -19,43 +19,52 @@ Abstract:
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
-Process::Process(WslcProcess process) : m_process(process)
+Process::Process(WslcProcess process, winrt::Microsoft::WSL::Containers::ProcessOutputMode mode) :
+    m_process(process), m_outputMode(mode)
 {
     StartExitThread();
 }
 
 Process::Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
-    m_container(container), m_settings(settings)
+    m_container(container), m_settings(settings),
+    m_outputMode(GetImplementation(settings)->OutputMode())
 {
 }
 
-bool Process::ApplyCallbacksToSettings(WslcProcessSettings* settings)
+Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode mode) : m_outputMode(mode)
 {
-    if (!m_outputReceivedEvent && !m_errorReceivedEvent)
+}
+
+bool Process::SetupCallbacksForStart(WslcProcessSettings* settings)
+{
+    if (m_outputMode != ProcessOutputMode::Event)
     {
         return false;
     }
 
     WslcProcessCallbacks callbacks{};
     callbacks.onExit = ExitCallback;
-
-    if (m_outputReceivedEvent)
-    {
-        callbacks.onStdOut = OutputCallback;
-    }
-
-    if (m_errorReceivedEvent)
-    {
-        callbacks.onStdErr = OutputCallback;
-    }
+    callbacks.onStdOut = OutputCallback;
+    callbacks.onStdErr = OutputCallback;
 
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settings, &callbacks, this));
+    return true;
+}
 
-    // This object needs to stay alive for as long as the callbacks may be invoked even if all other references to it are dropped.
-    // We increase its ref count here, and decrease it once the process exits.
+void Process::ActivateCallbackOwnership()
+{
     AddRef();
     m_hasExitCallback = true;
+}
 
+bool Process::ApplyCallbacksToSettings(WslcProcessSettings* settings)
+{
+    if (!SetupCallbacksForStart(settings))
+    {
+        return false;
+    }
+
+    ActivateCallbackOwnership();
     return true;
 }
 
@@ -142,7 +151,17 @@ Process::~Process()
 
     if (m_exitThread.joinable())
     {
-        m_exitThread.join();
+        // If the destructor is called from the exit thread itself (because it held the last
+        // reference and released it), joining would deadlock. Detach instead — the thread is
+        // about to return and has already captured all handles it needs by value.
+        if (m_exitThread.get_id() == std::this_thread::get_id())
+        {
+            m_exitThread.detach();
+        }
+        else
+        {
+            m_exitThread.join();
+        }
     }
 }
 
@@ -190,10 +209,9 @@ void Process::Signal(winrt::Microsoft::WSL::Containers::Signal const& signal)
 
 winrt::Windows::Storage::Streams::IInputStream Process::GetOutputStream(winrt::Microsoft::WSL::Containers::ProcessOutputHandle const& outputHandle)
 {
-    if (m_outputReceivedEvent || m_errorReceivedEvent)
+    if (m_outputMode != ProcessOutputMode::Stream)
     {
-        // Using callbacks and using streams for output are mutually exclusive.
-        throw winrt::hresult_illegal_method_call(L"Cannot get output stream when using output callbacks");
+        throw winrt::hresult_illegal_method_call(L"GetOutputStream requires OutputMode::Stream");
     }
 
     wil::unique_handle handle;
@@ -210,6 +228,11 @@ winrt::Windows::Storage::Streams::IOutputStream Process::GetInputStream()
 
 winrt::event_token Process::OutputReceived(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& handler)
 {
+    if (m_outputMode != ProcessOutputMode::Event)
+    {
+        throw winrt::hresult_illegal_method_call(L"OutputReceived requires OutputMode::Event");
+    }
+
     // Callbacks can only be registered before the process is started.
     EnsureNotStarted();
     if (!m_outputReceivedEvent)
@@ -230,6 +253,11 @@ void Process::OutputReceived(winrt::event_token const& token) noexcept
 
 winrt::event_token Process::ErrorReceived(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& handler)
 {
+    if (m_outputMode != ProcessOutputMode::Event)
+    {
+        throw winrt::hresult_illegal_method_call(L"ErrorReceived requires OutputMode::Event");
+    }
+
     // Callbacks can only be registered before the process is started.
     EnsureNotStarted();
     if (!m_errorReceivedEvent)

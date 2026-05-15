@@ -91,6 +91,21 @@ void ProcessSettings::EnvironmentVariables(winrt::Windows::Foundation::Collectio
     m_environmentVariables = value;
 }
 
+winrt::Microsoft::WSL::Containers::ProcessOutputMode ProcessSettings::OutputMode()
+{
+    return m_outputMode;
+}
+
+void ProcessSettings::OutputMode(winrt::Microsoft::WSL::Containers::ProcessOutputMode const& value)
+{
+    if (m_processSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change output mode after the options have been applied");
+    }
+
+    m_outputMode = value;
+}
+
 WslcProcessSettings* ProcessSettings::ToStructPointer()
 {
     if (m_processSettings)

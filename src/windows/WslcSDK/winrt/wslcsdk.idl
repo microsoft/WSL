@@ -123,13 +123,6 @@ namespace Microsoft.WSL.Containers
         Boolean ReadOnly;
     };
 
-    [flags]
-    enum ContainerStartFlags
-    {
-        None = 0x00000000,
-        Attach = 0x00000001,
-    };
-
     enum ContainerState
     {
         Invalid = 0,
@@ -175,7 +168,7 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass Container
     {
-        void Start(ContainerStartFlags flags);
+        void Start();
         void Stop(Signal signal, UInt32 timeoutSeconds);
         void Delete(DeleteContainerFlags flags);
 
@@ -194,6 +187,13 @@ namespace Microsoft.WSL.Containers
         StandardError = 2,
     };
 
+    enum ProcessOutputMode
+    {
+        Discard = 0,
+        Stream = 1,
+        Event = 2,
+    };
+
     runtimeclass ProcessSettings
     {
         ProcessSettings();
@@ -201,6 +201,7 @@ namespace Microsoft.WSL.Containers
         String WorkingDirectory;
         IVector<String> CmdLine;
         IMap<String, String> EnvironmentVariables;
+        ProcessOutputMode OutputMode;
     };
 
     enum ProcessState

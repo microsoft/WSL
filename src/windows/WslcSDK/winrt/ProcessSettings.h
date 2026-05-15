@@ -41,12 +41,16 @@ struct ProcessSettings : ProcessSettingsT<ProcessSettings>
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> EnvironmentVariables();
     void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
 
+    winrt::Microsoft::WSL::Containers::ProcessOutputMode OutputMode();
+    void OutputMode(winrt::Microsoft::WSL::Containers::ProcessOutputMode const& value);
+
     WslcProcessSettings* ToStructPointer();
 
 private:
     std::string m_workingDirectory;
     winrt::Windows::Foundation::Collections::IVector<hstring> m_cmdLine{winrt::single_threaded_vector<hstring>()};
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> m_environmentVariables{winrt::single_threaded_map<hstring, hstring>()};
+    winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
 
     std::unique_ptr<WslcProcessSettings> m_processSettings;
     StringArray m_cmdLineStrings;

@@ -20,8 +20,9 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Process : ProcessT<Process>
 {
     Process() = default;
-    Process(WslcProcess process);
+    Process(WslcProcess process, winrt::Microsoft::WSL::Containers::ProcessOutputMode mode = winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard);
     Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings);
+    Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode mode);
     ~Process();
 
     void Start();
@@ -39,6 +40,8 @@ struct Process : ProcessT<Process>
     void Exited(winrt::event_token const& token) noexcept;
 
     WslcProcess ToHandle();
+    bool SetupCallbacksForStart(WslcProcessSettings* settings);
+    void ActivateCallbackOwnership();
     bool ApplyCallbacksToSettings(WslcProcessSettings* settings);
     void AttachHandle(WslcProcess handle);
 
@@ -60,6 +63,7 @@ private:
 
     wil::unique_any<WslcProcess, decltype(&WslcReleaseProcess), &WslcReleaseProcess> m_process{nullptr};
     winrt::event<winrt::Microsoft::WSL::Containers::ProcessExitHandler> m_exitedEvent;
+    winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
 
     // For processes created with Start() (callback path):
     std::optional<winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler>> m_outputReceivedEvent{};

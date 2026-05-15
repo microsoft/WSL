@@ -21,35 +21,51 @@ Abstract:
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings) :
-    m_session(session), m_settings(settings)
+    m_session(session)
 {
+    auto initProcessSettings = GetImplementation(settings)->InitProcess();
+    if (initProcessSettings)
+    {
+        m_initProcessOutputMode = GetImplementation(initProcessSettings)->OutputMode();
+    }
+
+    if (m_initProcessOutputMode == ProcessOutputMode::Event)
+    {
+        m_initProcess = winrt::make_self<implementation::Process>(m_initProcessOutputMode);
+        m_initProcess->SetupCallbacksForStart(GetStructPointer(initProcessSettings));
+    }
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcCreateContainer(m_session, GetStructPointer(settings), m_container.put(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
-void Container::Start(winrt::Microsoft::WSL::Containers::ContainerStartFlags const& flags)
+void Container::Start()
 {
-    auto startFlags = static_cast<WslcContainerStartFlags>(flags);
+    auto startFlags = (m_initProcessOutputMode == ProcessOutputMode::Stream || m_initProcessOutputMode == ProcessOutputMode::Event)
+                          ? WSLC_CONTAINER_START_FLAG_ATTACH
+                          : WSLC_CONTAINER_START_FLAG_NONE;
 
-    // Apply callbacks BEFORE EnsureCreated: WslcCreateContainer copies the init process settings,
-    // so the callbacks must already be set on the ProcessSettings struct at that point.
-    bool callbacksApplied = false;
-    if (m_initProcess)
+    // Activate callback ownership just before starting: AddRef so the Process stays alive
+    // until the exit callback fires. Paired with Release() on the error path.
+    bool callbacksActivated = (m_initProcess != nullptr && m_initProcessOutputMode == ProcessOutputMode::Event);
+    if (callbacksActivated)
     {
-        callbacksApplied = m_initProcess->ApplyCallbacksToSettings(GetStructPointer(GetImplementation(m_settings)->InitProcess()));
-        THROW_HR_IF(E_INVALIDARG, callbacksApplied && !WI_IsFlagSet(startFlags, WSLC_CONTAINER_START_FLAG_ATTACH));
+        m_initProcess->ActivateCallbackOwnership();
     }
 
     auto releaseRef = wil::scope_exit([&] {
-        if (callbacksApplied)
+        if (callbacksActivated)
         {
             m_initProcess->Release();
         }
     });
 
-    EnsureCreated();
-
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcStartContainer(m_container.get(), startFlags, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    m_started = true;
 
     if (m_initProcess)
     {
@@ -98,15 +114,15 @@ winrt::Microsoft::WSL::Containers::Process Container::InitProcess()
 {
     if (!m_initProcess)
     {
-        if (m_container)
+        if (m_started)
         {
             WslcProcess initHandle;
             winrt::check_hresult(WslcGetContainerInitProcess(m_container.get(), &initHandle));
-            m_initProcess = winrt::make_self<implementation::Process>(initHandle);
+            m_initProcess = winrt::make_self<implementation::Process>(initHandle, m_initProcessOutputMode);
         }
         else
         {
-            m_initProcess = winrt::make_self<implementation::Process>();
+            m_initProcess = winrt::make_self<implementation::Process>(m_initProcessOutputMode);
         }
     }
 
@@ -122,18 +138,7 @@ winrt::Microsoft::WSL::Containers::ContainerState Container::State()
 
 WslcContainer Container::ToHandle()
 {
-    EnsureCreated();
     return m_container.get();
-}
-
-void Container::EnsureCreated()
-{
-    if (!m_container)
-    {
-        wil::unique_cotaskmem_string errorMessage;
-        auto hr = WslcCreateContainer(m_session, GetStructPointer(m_settings), m_container.put(), errorMessage.put());
-        THROW_MSG_IF_FAILED(hr, errorMessage);
-    }
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation
