@@ -63,6 +63,11 @@ void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<h
         throw hresult_illegal_state_change(L"Cannot change command line after the options have been applied");
     }
 
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"CmdLine cannot be null");
+    }
+
     m_cmdLine = value;
 }
 
@@ -76,6 +81,11 @@ void ProcessSettings::EnvironmentVariables(winrt::Windows::Foundation::Collectio
     if (m_processSettings)
     {
         throw hresult_illegal_state_change(L"Cannot change environment variables after the options have been applied");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"EnvironmentVariables cannot be null");
     }
 
     m_environmentVariables = value;

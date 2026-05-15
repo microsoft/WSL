@@ -34,7 +34,7 @@ hstring VhdOptions::Name()
 
 void VhdOptions::Name(hstring const& value)
 {
-    if (m_VhdOptions)
+    if (m_vhdOptions)
     {
         throw hresult_illegal_state_change(L"Cannot change VHD name after the options have been applied");
     }
@@ -49,7 +49,7 @@ uint64_t VhdOptions::SizeInBytes()
 
 void VhdOptions::SizeInBytes(uint64_t value)
 {
-    if (m_VhdOptions)
+    if (m_vhdOptions)
     {
         throw hresult_illegal_state_change(L"Cannot change VHD size after the options have been applied");
     }
@@ -69,7 +69,7 @@ VhdType VhdOptions::Type()
 
 void VhdOptions::Type(VhdType const& value)
 {
-    if (m_VhdOptions)
+    if (m_vhdOptions)
     {
         throw hresult_illegal_state_change(L"Cannot change VHD type after the options have been applied");
     }
@@ -84,15 +84,15 @@ void VhdOptions::SetOwner(uint32_t uid, uint32_t gid)
 
 WslcVhdRequirements* VhdOptions::ToStructPointer()
 {
-    if (!m_VhdOptions)
+    if (!m_vhdOptions)
     {
-        m_VhdOptions = std::make_unique<WslcVhdRequirements>();
-        m_VhdOptions->name = m_name.c_str();
-        m_VhdOptions->sizeBytes = m_sizeInBytes;
-        m_VhdOptions->type = static_cast<WslcVhdType>(m_type);
+        m_vhdOptions = std::make_unique<WslcVhdRequirements>();
+        m_vhdOptions->name = m_name.c_str();
+        m_vhdOptions->sizeBytes = m_sizeInBytes;
+        m_vhdOptions->type = static_cast<WslcVhdType>(m_type);
     }
 
-    return m_VhdOptions.get();
+    return m_vhdOptions.get();
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

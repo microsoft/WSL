@@ -45,7 +45,7 @@ private:
     void EnsureStarted() const;
     winrt::Microsoft::WSL::Containers::SessionSettings m_settings; // Only kept until Start() is called
 
-    static void CALLBACK TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
+    static void CALLBACK TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept;
 
     wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
     winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;

@@ -25,9 +25,13 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 namespace {
     void CALLBACK InstallProgressCallback(WslcComponentFlags component, uint32_t progressSteps, uint32_t totalSteps, PVOID context) noexcept
     {
-        auto installProgress = winrt::make<implementation::InstallProgress>(
-            static_cast<winrt::Microsoft::WSL::Containers::ComponentFlags>(component), progressSteps, totalSteps);
-        ProgressCallbackHelper<decltype(installProgress)>::ReportProgress(context, installProgress);
+        try
+        {
+            auto installProgress = winrt::make<implementation::InstallProgress>(
+                static_cast<winrt::Microsoft::WSL::Containers::ComponentFlags>(component), progressSteps, totalSteps);
+            ProgressCallbackHelper<decltype(installProgress)>::ReportProgress(context, installProgress);
+        }
+        CATCH_LOG();
     }
 } // namespace
 

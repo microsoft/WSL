@@ -211,9 +211,9 @@ winrt::Windows::Storage::Streams::IOutputStream Process::GetInputStream()
 winrt::event_token Process::OutputReceived(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& handler)
 {
     // Callbacks can only be registered before the process is started.
+    EnsureNotStarted();
     if (!m_outputReceivedEvent)
     {
-        EnsureNotStarted();
         m_outputReceivedEvent.emplace();
     }
 
@@ -231,9 +231,9 @@ void Process::OutputReceived(winrt::event_token const& token) noexcept
 winrt::event_token Process::ErrorReceived(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& handler)
 {
     // Callbacks can only be registered before the process is started.
+    EnsureNotStarted();
     if (!m_errorReceivedEvent)
     {
-        EnsureNotStarted();
         m_errorReceivedEvent.emplace();
     }
 
@@ -258,7 +258,7 @@ void Process::Exited(winrt::event_token const& token) noexcept
     m_exitedEvent.remove(token);
 }
 
-void CALLBACK Process::OutputCallback(WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context)
+void CALLBACK Process::OutputCallback(WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept
 {
     auto* self = static_cast<Process*>(context);
     if (!self->HasExternalReferences())
@@ -272,12 +272,16 @@ void CALLBACK Process::OutputCallback(WslcProcessIOHandle ioHandle, _In_reads_by
     auto& outputEvent = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? process->m_outputReceivedEvent : process->m_errorReceivedEvent;
     if (outputEvent)
     {
-        winrt::array_view<const uint8_t> buffer{data, dataBytes};
-        (*outputEvent)(*process, buffer);
+        try
+        {
+            winrt::array_view<const uint8_t> buffer{data, dataBytes};
+            (*outputEvent)(*process, buffer);
+        }
+        CATCH_LOG();
     }
 }
 
-void CALLBACK Process::ExitCallback(INT32 exitCode, _In_opt_ PVOID context)
+void CALLBACK Process::ExitCallback(INT32 exitCode, _In_opt_ PVOID context) noexcept
 {
     winrt::com_ptr<Process> process;
 
@@ -285,7 +289,11 @@ void CALLBACK Process::ExitCallback(INT32 exitCode, _In_opt_ PVOID context)
     // This takes ownership without increasing the ref count to account for the AddRef in ApplyCallbacksToSettings().
     process.attach(static_cast<Process*>(context));
 
-    process->m_exitedEvent(*process, exitCode);
+    try
+    {
+        process->m_exitedEvent(*process, exitCode);
+    }
+    CATCH_LOG();
 }
 
 bool Process::HasExternalReferences()

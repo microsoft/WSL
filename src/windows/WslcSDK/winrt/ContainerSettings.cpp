@@ -227,6 +227,10 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
             m_portMappingsStructs.reserve(m_portMappings.Size());
             for (auto const& portMapping : m_portMappings)
             {
+                if (!portMapping)
+                {
+                    throw winrt::hresult_error(E_POINTER, L"Port mappings collection contains a null element");
+                }
                 m_portMappingsStructs.push_back(GetStruct(portMapping));
             }
 
@@ -240,6 +244,10 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
             m_volumesStructs.reserve(m_volumes.Size());
             for (auto const& volume : m_volumes)
             {
+                if (!volume)
+                {
+                    throw winrt::hresult_error(E_POINTER, L"Volumes collection contains a null element");
+                }
                 m_volumesStructs.push_back(GetStruct(volume));
             }
 
@@ -253,6 +261,10 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
             m_namedVolumesStructs.reserve(m_namedVolumes.Size());
             for (auto const& namedVolume : m_namedVolumes)
             {
+                if (!namedVolume)
+                {
+                    throw winrt::hresult_error(E_POINTER, L"Named volumes collection contains a null element");
+                }
                 m_namedVolumesStructs.push_back(GetStruct(namedVolume));
             }
 

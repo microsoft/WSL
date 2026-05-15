@@ -654,6 +654,30 @@ class WslcSdkWinRtTests
 
             ExpectHttpResponse(L"http://127.0.0.1:12343", 200, true);
         }
+
+        // Functional: port mapping with explicit IPv6 WindowsAddress.
+        {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CmdLine(
+                winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"--bind", L"::", L"8000"}));
+            procSettings.EnvironmentVariables(
+                winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
+
+            auto portMapping = WSLCSDK::ContainerPortMapping(12344, 8000, WSLCSDK::PortProtocol::TCP);
+            portMapping.WindowsAddress(winrt::Windows::Networking::HostName(L"::1"));
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"python:3.12-alpine");
+            containerSettings.InitProcess(procSettings);
+            containerSettings.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
+            containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>({portMapping}));
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            container.Start(WSLCSDK::ContainerStartFlags::None);
+
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            ExpectHttpResponse(L"http://[::1]:12344", 200, true);
+        }
     }
 
     WSLC_TEST_METHOD(ContainerVolumeUnit)
@@ -852,6 +876,12 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ProcessSignal)
     {
+        // Negative: Signal() before Start() must throw.
+        {
+            auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+            VERIFY_THROWS_HR(container.InitProcess().Signal(WSLCSDK::Signal::SIGKILL), E_ILLEGAL_METHOD_CALL);
+        }
+
         auto procSettings = WSLCSDK::ProcessSettings();
         procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
@@ -879,6 +909,12 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ProcessGetPid)
     {
+        // Negative: Pid() before Start() must throw.
+        {
+            auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+            VERIFY_THROWS_HR(std::ignore = container.InitProcess().Pid(), E_ILLEGAL_METHOD_CALL);
+        }
+
         auto procSettings = WSLCSDK::ProcessSettings();
         procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
@@ -1043,6 +1079,24 @@ class WslcSdkWinRtTests
         {
             process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {});
             VERIFY_THROWS_HR(container.Start(WSLCSDK::ContainerStartFlags::None), E_INVALIDARG);
+        }
+
+        // Negative: registering a callback after the process has been started must throw.
+        {
+            auto procSettings2 = WSLCSDK::ProcessSettings();
+            procSettings2.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
+
+            auto containerSettings2 = WSLCSDK::ContainerSettings(L"debian:latest");
+            containerSettings2.InitProcess(procSettings2);
+
+            auto container2 = m_defaultSession.CreateContainer(containerSettings2);
+            auto cleanup2 = DELETE_CONTAINER_ON_SCOPE_EXIT(container2);
+
+            auto process2 = container2.InitProcess();
+            container2.Start(WSLCSDK::ContainerStartFlags::Attach);
+
+            VERIFY_THROWS_HR(process2.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(process2.ErrorReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
         }
     }
 
@@ -1462,7 +1516,7 @@ class WslcSdkWinRtTests
     // Negative / edge-case tests
     // -----------------------------------------------------------------------
 
-    WSLC_TEST_METHOD(StopContainerWithInvalidSignal)
+    WSLC_TEST_METHOD(ExecOnStoppedContainer)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
         procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));

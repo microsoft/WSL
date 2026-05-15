@@ -39,7 +39,7 @@ private:
     uint64_t m_sizeInBytes = s_DefaultStorageSize;
     winrt::Microsoft::WSL::Containers::VhdType m_type = winrt::Microsoft::WSL::Containers::VhdType::Dynamic;
 
-    std::unique_ptr<WslcVhdRequirements> m_VhdOptions;
+    std::unique_ptr<WslcVhdRequirements> m_vhdOptions;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

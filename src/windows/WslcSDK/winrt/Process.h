@@ -48,8 +48,8 @@ private:
     void StartExitThread();
 
     static void CALLBACK OutputCallback(
-        WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context);
-    static void CALLBACK ExitCallback(INT32 exitCode, _In_opt_ PVOID context);
+        WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept;
+    static void CALLBACK ExitCallback(INT32 exitCode, _In_opt_ PVOID context) noexcept;
 
     // Returns true if external references still exist (i.e. not only the callback AddRef).
     bool HasExternalReferences();

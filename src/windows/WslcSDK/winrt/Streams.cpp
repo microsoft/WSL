@@ -40,7 +40,15 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
     DWORD bytesRead = 0;
     if (!ReadFile(self->m_handle.get(), buffer.data(), count, &bytesRead, nullptr))
     {
-        THROW_LAST_ERROR_IF(GetLastError() != ERROR_BROKEN_PIPE);
+        const auto error = GetLastError();
+        if (error == ERROR_BROKEN_PIPE)
+        {
+            bytesRead = 0;
+        }
+        else
+        {
+            THROW_WIN32(error);
+        }
     }
 
     buffer.Length(bytesRead);

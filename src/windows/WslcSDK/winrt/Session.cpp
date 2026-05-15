@@ -26,8 +26,12 @@ namespace {
 
     HRESULT CALLBACK ImageProgressCallback(const WslcImageProgressMessage* progressMessage, PVOID context) noexcept
     {
-        auto progress = winrt::make<implementation::ImageProgress>(progressMessage);
-        ProgressCallbackHelper<decltype(progress)>::ReportProgress(context, progress);
+        try
+        {
+            auto progress = winrt::make<implementation::ImageProgress>(progressMessage);
+            ProgressCallbackHelper<decltype(progress)>::ReportProgress(context, progress);
+        }
+        CATCH_LOG();
         return S_OK;
     }
 
@@ -308,7 +312,7 @@ WslcSession Session::ToHandle()
     return m_session.get();
 }
 
-void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context)
+void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept
 {
     winrt::com_ptr<Session> session;
 
@@ -316,7 +320,11 @@ void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reas
     // This takes ownership without increasing the ref count to account for the AddRef in Start().
     session.attach(static_cast<Session*>(context));
 
-    session->m_terminatedEvent(*session, static_cast<SessionTerminationReason>(reason));
+    try
+    {
+        session->m_terminatedEvent(*session, static_cast<SessionTerminationReason>(reason));
+    }
+    CATCH_LOG();
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation
