@@ -18,8 +18,8 @@ typedef enum _InspectType
 {
     Container = 1,
     Image = 2,
-    Network = 4,
-    Volume = 8,
+    Volume = 4,
+    Network = 8,
 
     All = Container | Image | Network | Volume,
 } InspectType;

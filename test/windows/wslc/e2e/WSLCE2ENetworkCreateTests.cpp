@@ -129,9 +129,9 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"                        //
-                << L"  -d,--driver    Specify volume driver name (default guest)\r\n" //
+                << L"  -d,--driver    Specify network driver name (default bridge)\r\n" //
                 << L"  -o,--opt       Set driver specific options\r\n"                //
-                << L"  --label        Volume metadata setting\r\n"                    //
+                << L"  --label        Network metadata setting\r\n"                   //
                 << L"  --session      Specify the session to use\r\n"                 //
                 << L"  -?,--help      Shows help about the selected command\r\n"      //
                 << L"\r\n";
