@@ -1477,7 +1477,7 @@ try
                 memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLCImageInformation::Image))) !=
                     0);
             ConvertSHA256Hash(currentImage.Hash, currentResult.sha256);
-            currentResult.sizeBytes = currentImage.Size;
+            currentResult.sizeBytes = static_cast<uint64_t>(currentImage.Size);
             currentResult.createdUnixTime = currentImage.Created;
         }
 

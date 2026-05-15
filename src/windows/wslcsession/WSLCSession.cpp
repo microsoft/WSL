@@ -109,7 +109,7 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     wslcInspect.Author = dockerInspect.Author;
     wslcInspect.Architecture = dockerInspect.Architecture;
     wslcInspect.Os = dockerInspect.Os;
-    wslcInspect.Size = dockerInspect.Size;
+    wslcInspect.Size = static_cast<uint64_t>(dockerInspect.Size);
     wslcInspect.Metadata = dockerInspect.Metadata;
 
     // Convert Config from docker_schema to wslc_schema
@@ -1311,7 +1311,7 @@ try
             }
 
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
-            output[index].Size = e.Size;
+            output[index].Size = static_cast<ULONGLONG>(e.Size);
             output[index].Created = e.Created;
             index++;
         }
@@ -1337,7 +1337,7 @@ try
                 }
 
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
-                output[index].Size = e.Size;
+                output[index].Size = static_cast<ULONGLONG>(e.Size);
                 output[index].Created = e.Created;
                 index++;
             }
