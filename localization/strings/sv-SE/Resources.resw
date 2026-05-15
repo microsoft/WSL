@@ -2424,7 +2424,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Startar en container.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Visa användningsstatistik för containerresurser.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
     <value>Visa en ögonblicksbild av resursanvändningen för en container som körs: CPU, minne, nätverks-I/O, block-I/O och PID:er.</value>
@@ -2694,10 +2694,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Filtrera utdata baserat på angivna villkor</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>Ogiltigt argument {} för flaggan '-f, --filter': felaktigt filterformat (förväntat namn=värde)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Följ loggutdata</value>
@@ -2739,7 +2739,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Visa n senast skapade containrar (inkluderar alla tillstånd)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>Visa den senast skapade containern (innehåller alla tillstånd)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Containerns värdnamn</value>
@@ -2954,6 +2954,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volymnamn</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Ange drivrutinsspecifika alternativ</value>
   </data>
@@ -3004,28 +3008,28 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>CONTAINER-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NAMN</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>BILD</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>SKAPADES</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
     <value>STATUS</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTAR</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>MINNESANVÄNDNING / GRÄNS</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
     <value>MEM %</value>
@@ -3034,7 +3038,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>BLOCKERA I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

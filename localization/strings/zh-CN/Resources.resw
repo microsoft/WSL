@@ -2700,10 +2700,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>根据提供的条件筛选输出</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>'-f, --filter' 标志的参数 "{}" 无效: 筛选器格式错误(应为 name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>遵循日志输出</value>
@@ -2742,7 +2742,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>标签键不能为空</value>
   </data>
   <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
-    <value>Show n last created containers (includes all states)</value>
+    <value>已显示上次创建的容器(包括所有状态)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>显示最新创建的容器 (包括所有状态)</value>
@@ -2959,6 +2959,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>卷名称</value>
+  </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>指定卷驱动程序名称，例如 'guest' 或 'vhd'（默认：guest）</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>设置特定于驱动程序的选项</value>

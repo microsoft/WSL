@@ -5,84 +5,58 @@
   <description>Subsystém Windows pro Linux</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Subsystém Windows pro Linux</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Subsystém Windows pro Linux</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Povolit Subsystém Windows pro Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">Pokud je tato zásada zakázaná, zakáže všem uživatelům počítače přístup ke spuštěným distribucím Linux v Subsystém Windows pro Linux.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Povolit Subsystém Windows pro Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Pokud je tato zásada zakázaná, zakáže všem uživatelům počítače přístup ke spuštěným distribucím Linux v Subsystém Windows pro Linux.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Povolit integrovanou verzi Subsystému Windows pro Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">Když je tato zásada zakázaná, zakáže se integrovaná verze (volitelná součást) Subsystému Windows pro Linux. Pokud je tato zásada zakázaná, dá se používat jen verze WSL ze Storu.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Povolit integrovanou verzi Subsystému Windows pro Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Když je tato zásada zakázaná, zakáže se integrovaná verze (volitelná součást) Subsystému Windows pro Linux. Pokud je tato zásada zakázaná, dá se používat jen verze WSL ze Storu.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Povolit WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">Když je tato zásada zakázaná, zakáže se WSL1. Když je zakázaná, dají se používat jen distribuce WSL2.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Povolit WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->Když je tato zásada zakázaná, zakáže se WSL1. Když je zakázaná, dají se používat jen distribuce WSL2.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Povolit vlastní konfiguraci jádra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">Když je tato zásada zakázaná, zakáže se vlastní konfigurace jádra prostřednictvím .wslconfig (wsl2.kernel). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace jádra prostřednictvím .wslconfig (wsl2.kernel). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Povolit vlastní konfiguraci systémové distribuce</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">Když je tato zásada zakázaná, zakáže se vlastní konfigurace systémové distribuce prostřednictvím .wslconfig (wsl2.systemDistro). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace systémové distribuce prostřednictvím .wslconfig (wsl2.systemDistro). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Povolit konfiguraci příkazového řádku jádra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">Když je tato zásada zakázaná, zakáže se konfigurace příkazového řádku jádra prostřednictvím .wslconfig (wsl2.kernelCommandLine). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace příkazového řádku jádra prostřednictvím .wslconfig (wsl2.kernelCommandLine). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="AllowDebugShell">Povolit ladicí shell</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">Když je tato zásada zakázaná, zakáže se ladicí shell (wsl.exe --debug-shell). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se ladicí shell (wsl.exe --debug-shell). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Povolit vnořenou virtualizaci</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">Když je tato zásada zakázaná, zakáže se konfigurace vnořené virtualizace prostřednictvím .wslconfig (wsl2.nestedVirtualization). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace vnořené virtualizace prostřednictvím .wslconfig (wsl2.nestedVirtualization). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Povolit ladění jádra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">Když je tato zásada zakázaná, zakáže se konfigurace ladění jádra prostřednictvím .wslconfig (wsl2.kernelDebugPort). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace ladění jádra prostřednictvím .wslconfig (wsl2.kernelDebugPort). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Povolit vlastní konfiguraci sítě</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Když je tato zásada zakázaná, zakáže se vlastní konfigurace sítě prostřednictvím .wslconfig (wsl2.networkingMode). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace sítě prostřednictvím .wslconfig (wsl2.networkingMode). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="FirewallUserSettingConfigurable">Povolit uživatelskou konfiguraci brány firewall</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">Když je tato zásada zakázaná, zakáže se konfigurace brány firewall prostřednictvím .wslconfig (wsl2.firewall). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace brány firewall prostřednictvím .wslconfig (wsl2.firewall). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="AllowDiskMount">Povolit připojení předávaného disku</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">Když je tato zásada zakázaná, zakáže se připojování předávaných disků ve WSL2 (wsl.exe --mount). Tato zásada platí jen pro WSL ze Storu.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se připojování předávaných disků ve WSL2 (wsl.exe --mount). Tato zásada platí jen pro WSL ze Storu.</string>
 
         <string id="DefaultNetworkingMode">Nakonfigurovat výchozí síťový režim</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">Tato zásada určuje výchozí síťový režim, který se má používat pro WSL2.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">Žádné</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">Zrcadlený</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->Tato zásada určuje výchozí síťový režim, který se má používat pro WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">Kontejner WSL</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->Kontejner WSL</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Povolit kontejner WSL</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">Tato zásada určuje, jestli se na tomto počítači dá používat kontejner WSL. Když je tato zásada povolená nebo není nakonfigurovaná, uživatelé a aplikace pro Windows můžou spouštět kontejnery Linuxu přes WSL. Když je tato zásada zakázaná, kontejner WSL se zablokuje pro všechny uživatele a aplikace pro Windows nemůžou spouštět kontejnery Linuxu. Upozornění: Nastavení na Zakázáno může narušit aplikace pro Windows, které závisejí na kontejnerech Linuxu.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Povolit kontejner WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->Tato zásada určuje, jestli se na tomto počítači dá používat kontejner WSL. Když je tato zásada povolená nebo není nakonfigurovaná, uživatelé a aplikace pro Windows můžou spouštět kontejnery Linuxu přes WSL. Když je tato zásada zakázaná, kontejner WSL se zablokuje pro všechny uživatele a aplikace pro Windows nemůžou spouštět kontejnery Linuxu. Upozornění: Nastavení na Zakázáno může narušit aplikace pro Windows, které závisejí na kontejnerech Linuxu.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">Seznam povolených registrů pro kontejnery WSL</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">Když je tato zásada povolená, kontejner WSL bude moct stahovat image jen z registrů uvedených tady. Ovlivní to rozhraní CLI kontejneru WSL i všechny aplikace používající rozhraní API kontejneru WSL.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->Seznam povolených registrů pro kontejnery WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->Když je tato zásada povolená, kontejner WSL bude moct stahovat image jen z registrů uvedených tady. Ovlivní to rozhraní CLI kontejneru WSL i všechny aplikace používající rozhraní API kontejneru WSL.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

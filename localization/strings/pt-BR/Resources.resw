@@ -2961,6 +2961,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Nome do volume</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Especifique o nome do driver de volume, por exemplo, 'guest' ou 'vhd' (padrão: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Definir opções específicas do driver</value>
   </data>

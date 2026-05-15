@@ -2424,7 +2424,7 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Starter en objektbeholder.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Vis statistik over ressourceforbrug for objektbeholder.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
     <value>Vis et øjebliksbillede af en kørende objektbeholders ressourceforbrug: CPU, hukommelse, netværks-I/O, blok-I/O og PID'er.</value>
@@ -2954,6 +2954,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Navn på diskenhed</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Angiv diskenhedsdrivernavn, f.eks. 'guest' eller 'vhd' (standard: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Angiv driverspecifikke indstillinger</value>
   </data>
@@ -3004,37 +3008,37 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>OBJEKTBEHOLDER-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NAVN</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>BILLEDE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>OPRETTET</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
     <value>STATUS</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>HUK.FORBRUG/GRÆNSE</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
-    <value>MEM %</value>
+    <value>HUK %</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>BLOKER I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

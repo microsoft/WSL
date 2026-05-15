@@ -5,84 +5,58 @@
   <description>Linux 用 Windows サブシステム</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Linux 用 Windows サブシステム</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Linux 用 Windows サブシステム</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Linux 用 Windows サブシステムを許可する</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">無効に設定すると、このポリシーは、マシン上のすべてのユーザーについて、Linux 用 Windows サブシステムで実行中の Linux ディストリビューションへのアクセスを無効にします。</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Linux 用 Windows サブシステムを許可する</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->無効に設定すると、このポリシーは、マシン上のすべてのユーザーについて、Linux 用 Windows サブシステムで実行中の Linux ディストリビューションへのアクセスを無効にします。</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">受信トレイ バージョンの Linux 用 Windows サブシステムを許可する</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">無効に設定すると、このポリシーは Linux 用 Windows サブシステム の受信トレイ バージョン (オプション コンポーネント) を無効にします。このポリシーを無効にすると、WSL の Microsoft Store バージョンのみを使用できます。</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->受信トレイ バージョンの Linux 用 Windows サブシステムを許可する</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->無効に設定すると、このポリシーは Linux 用 Windows サブシステム の受信トレイ バージョン (オプション コンポーネント) を無効にします。このポリシーを無効にすると、WSL の Microsoft Store バージョンのみを使用できます。</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">WSL1 を許可する</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">無効に設定すると、このポリシーは WSL1 を無効にします。無効にすると、WSL2 ディストリビューションのみを使用できます。</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->WSL1 を許可する</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->無効に設定すると、このポリシーは WSL1 を無効にします。無効にすると、WSL2 ディストリビューションのみを使用できます。</string>
 
         <string id="CustomKernelUserSettingConfigurable">カスタム カーネル構成を許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.kernel) によるカスタム カーネル構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.kernel) によるカスタム カーネル構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">カスタム システム ディストリビューション構成を許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.systemDistro) によるカスタム システム ディストリビューション構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.systemDistro) によるカスタム システム ディストリビューション構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">カーネル コマンド ライン構成を許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.kernelCommandLine) によるカーネル コマンド ライン構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.kernelCommandLine) によるカーネル コマンド ライン構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="AllowDebugShell">デバッグ シェルを許可する</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">無効に設定すると、このポリシーはデバッグ シェル (wsl.exe --debug-shell) を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーはデバッグ シェル (wsl.exe --debug-shell) を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">ネスト型仮想化を許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.nestedVirtualization) によるネスト型仮想化構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.nestedVirtualization) によるネスト型仮想化構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="KernelDebugUserSettingConfigurable">カーネル デバッグを許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.kernelDebugPort) によるカーネル デバッグ構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.kernelDebugPort) によるカーネル デバッグ構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">カスタム ネットワーク構成を許可する</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.networkingMode) によるカスタム ネットワーク構成を無効にします。このポリシーはストア WSL にのみ適用されます。</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.networkingMode) によるカスタム ネットワーク構成を無効にします。このポリシーはストア WSL にのみ適用されます。</string>
 
         <string id="FirewallUserSettingConfigurable">ユーザーがファイアウォール構成を設定できるようにする</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">無効に設定すると、このポリシーは .wslconfig (wsl2.firewall) によるファイアウォール構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.firewall) によるファイアウォール構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="AllowDiskMount">パススルー ディスク マウントを許可する</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">無効に設定すると、このポリシーは WSL2 (wsl.exe --mount) のパススルー ディスク マウントを無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは WSL2 (wsl.exe --mount) のパススルー ディスク マウントを無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="DefaultNetworkingMode">既定のネットワーク モードを構成する</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">このポリシーは、WSL2 に使用される既定のネットワーク モードを指定します。</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">なし</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">ミラー化</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->このポリシーは、WSL2 に使用される既定のネットワーク モードを指定します。</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">WSL コンテナー</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL コンテナー</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">WSL コンテナーを許可する</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">このポリシーは、このマシンで WSL コンテナーを使用できるかどうかを制御します。有効にした場合、または構成しなかった場合、ユーザーと Windows アプリケーションは WSL 経由で Linux コンテナーを実行できます。無効に設定すると、WSL コンテナーはすべてのユーザーに対してブロックされ、Windows アプリは Linux コンテナーを実行できません。警告: これを [無効] に設定すると、Linux コンテナーに依存する Windows アプリが中断する可能性があります。</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL コンテナーを許可する</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->このポリシーは、このマシンで WSL コンテナーを使用できるかどうかを制御します。有効にした場合、または構成しなかった場合、ユーザーと Windows アプリケーションは WSL 経由で Linux コンテナーを実行できます。無効に設定すると、WSL コンテナーはすべてのユーザーに対してブロックされ、Windows アプリは Linux コンテナーを実行できません。警告: これを [無効] に設定すると、Linux コンテナーに依存する Windows アプリが中断する可能性があります。</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">WSL コンテナー レジストリの許可リスト</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">有効にすると、WSL コンテナーは、ここに一覧表示されているレジストリからのみイメージをプルできます。これは、WSL コンテナー CLI と、WSL コンテナー API を使用するすべてのアプリケーションの両方に影響します。</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->WSL コンテナー レジストリの許可リスト</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->有効にすると、WSL コンテナーは、ここに一覧表示されているレジストリからのみイメージをプルできます。これは、WSL コンテナー CLI と、WSL コンテナー API を使用するすべてのアプリケーションの両方に影響します。</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

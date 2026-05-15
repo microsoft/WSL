@@ -2954,6 +2954,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Birim adı</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Birim sürücüsü adını belirtin, örneğin 'guest' veya 'vhd' (varsayılan: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Sürücüye özgü seçenekleri ayarlayın</value>
   </data>

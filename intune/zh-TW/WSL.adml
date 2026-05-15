@@ -5,84 +5,58 @@
   <description>Windows 子系統 Linux 版</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Windows 子系統 Linux 版</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Windows 子系統 Linux 版</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">允許 Windows 子系統 Linux 版</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">設定為停用時，此原則會停用機器上所有使用者對Windows 子系統 Linux 版中執行Linux發佈的存取權。</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->允許 Windows 子系統 Linux 版</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->設定為停用時，此原則會停用機器上所有使用者對Windows 子系統 Linux 版中執行Linux發佈的存取權。</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">允許 Windows 子系統 Linux 版的收件匣版本</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">設定為停用時，此原則會停用 Windows 子系統 Linux 版的內建版本 (選用元件)。如果停用此原則，則只能使用 WSL 的市集版本。</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->允許 Windows 子系統 Linux 版的收件匣版本</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->設定為停用時，此原則會停用 Windows 子系統 Linux 版的內建版本 (選用元件)。如果停用此原則，則只能使用 WSL 的市集版本。</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">允許 WSL 1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">設定為停用時，此原則會停用 WSL1。停用時，只能使用 WSL2 發佈。</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->允許 WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->設定為停用時，此原則會停用 WSL1。停用時，只能使用 WSL2 發佈。</string>
 
         <string id="CustomKernelUserSettingConfigurable">允許自訂核心組態</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.kernel) 停用自訂核心設定。此原則僅適用於 Store WSL。</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernel) 停用自訂核心設定。此原則僅適用於 Store WSL。</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">允許自訂系統發行版組態</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.systemDistro) 停用自訂系統發行版設定。此原則僅適用於 Store WSL。</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.systemDistro) 停用自訂系統發行版設定。此原則僅適用於 Store WSL。</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">允許核心命令列設定</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.kernelCommandLine) 停用核心命令列設定。此原則僅適用於 Store WSL。</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernelCommandLine) 停用核心命令列設定。此原則僅適用於 Store WSL。</string>
 
         <string id="AllowDebugShell">允許偵錯殼層</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">設定為停用時，此原則會停用偵錯殼層 (wsl.exe --debug-shell)。此原則僅適用於 Store WSL。</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->設定為停用時，此原則會停用偵錯殼層 (wsl.exe --debug-shell)。此原則僅適用於 Store WSL。</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">允許巢狀虛擬化</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.nestedVirtualization) 停用巢狀虛擬化設定。此原則僅適用於 Store WSL。</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.nestedVirtualization) 停用巢狀虛擬化設定。此原則僅適用於 Store WSL。</string>
 
         <string id="KernelDebugUserSettingConfigurable">允許核心偵錯</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.kernelDebugPort) 停用核心偵錯設定。此原則僅適用於 Store WSL。</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernelDebugPort) 停用核心偵錯設定。此原則僅適用於 Store WSL。</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">允許自訂網路設定</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.networkingMode) 停用自訂網路設定。此原則僅適用於 Store WSL。</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.networkingMode) 停用自訂網路設定。此原則僅適用於 Store WSL。</string>
 
         <string id="FirewallUserSettingConfigurable">允許使用者設定防火牆設定</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">設定為停用時，此原則會透過 .wslconfig (wsl2.firewall) 停用防火牆設定。此原則僅適用於 Store WSL。</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.firewall) 停用防火牆設定。此原則僅適用於 Store WSL。</string>
 
         <string id="AllowDiskMount">允許直通磁碟掛載</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">設定為停用時，此原則會停用 WSL2 (wsl.exe --mount) 中的傳遞磁碟掛接。此原則僅適用於 Store WSL。</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->設定為停用時，此原則會停用 WSL2 (wsl.exe --mount) 中的傳遞磁碟掛接。此原則僅適用於 Store WSL。</string>
 
         <string id="DefaultNetworkingMode">設定預設網路模式</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">此原則指定要用於 WSL2 的預設網路模式。</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">無</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">鏡像</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->此原則指定要用於 WSL2 的預設網路模式。</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">WSL 容器</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL 容器</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">允許 WSL 容器</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">此原則控制是否可以在此機器上使用 WSL 容器。啟用或未設定時，使用者和 Windows 應用程式可以透過 WSL 執行 Linux 容器。設定為停用時，會封鎖所有使用者的 WSL 容器，且 Windows 應用程式無法執行 Linux 容器。警告： 將此設定為 [已停用] 可能會中斷依賴 Linux 容器的 Windows 應用程式。</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->允許 WSL 容器</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->此原則控制是否可以在此機器上使用 WSL 容器。啟用或未設定時，使用者和 Windows 應用程式可以透過 WSL 執行 Linux 容器。設定為停用時，會封鎖所有使用者的 WSL 容器，且 Windows 應用程式無法執行 Linux 容器。警告： 將此設定為 [已停用] 可能會中斷依賴 Linux 容器的 Windows 應用程式。</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">WSL 容器登錄的允許清單</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">啟用時，只允許 WSL 容器從此處列出的登錄提取映像。這會影響 WSL 容器 CLI 以及所有使用 WSL 容器 API 的應用程式。</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->WSL 容器登錄的允許清單</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->啟用時，只允許 WSL 容器從此處列出的登錄提取映像。這會影響 WSL 容器 CLI 以及所有使用 WSL 容器 API 的應用程式。</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

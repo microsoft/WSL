@@ -5,84 +5,58 @@
   <description>Podsystem Windows dla systemu Linux</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Podsystem Windows dla systemu Linux</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Podsystem Windows dla systemu Linux</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Zezwalaj na Podsystem Windows dla systemu Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">Po wyłączeniu te zasady wyłączają dostęp do uruchomionych dystrybucji Linux w Podsystem Windows dla systemu Linux dla wszystkich użytkowników na komputerze.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Zezwalaj na Podsystem Windows dla systemu Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Po wyłączeniu te zasady wyłączają dostęp do uruchomionych dystrybucji Linux w Podsystem Windows dla systemu Linux dla wszystkich użytkowników na komputerze.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Zezwalaj na wersję Podsystem Windows dla systemu Linux ze skrzynki odbiorczej</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza wersję ze skrzynki odbiorczej (opcjonalny składnik) Podsystemu Windows dla systemu Linux. Jeśli ta zasada jest wyłączona, można używać tylko wersji WSL ze sklepu.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Zezwalaj na wersję Podsystem Windows dla systemu Linux ze skrzynki odbiorczej</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza wersję ze skrzynki odbiorczej (opcjonalny składnik) Podsystemu Windows dla systemu Linux. Jeśli ta zasada jest wyłączona, można używać tylko wersji WSL ze sklepu.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Zezwalaj na WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza WSL1. Po wyłączeniu można używać tylko dystrybucji WSL2.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Zezwalaj na WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza WSL1. Po wyłączeniu można używać tylko dystrybucji WSL2.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Zezwalaj na niestandardową konfigurację jądra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza niestandardową konfigurację jądra za pomocą pliku .wslconfig (wsl2.kernel). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza niestandardową konfigurację jądra za pomocą pliku .wslconfig (wsl2.kernel). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Zezwalaj na niestandardową konfigurację dystrybucji systemu</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza niestandardową konfigurację dystrybucji systemowej za pomocą pliku .wslconfig (wsl2.systemDistro). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza niestandardową konfigurację dystrybucji systemowej za pomocą pliku .wslconfig (wsl2.systemDistro). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Zezwalaj na konfigurację wiersza polecenia jądra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">W przypadku ustawienia wartości wyłączonej te zasady wyłączają konfigurację wiersza polecenia jądra za pośrednictwem pliku wslconfig (wsl2.kernelCommandLine). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->W przypadku ustawienia wartości wyłączonej te zasady wyłączają konfigurację wiersza polecenia jądra za pośrednictwem pliku wslconfig (wsl2.kernelCommandLine). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="AllowDebugShell">Zezwalaj na powłokę debugowania</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza powłokę debugowania (wsl.exe --debug-shell). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza powłokę debugowania (wsl.exe --debug-shell). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Zezwalaj na wirtualizację zagnieżdżoną</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza konfigurację zagnieżdżonej wirtualizacji za pomocą pliku .wslconfig (wsl2.nestedVirtualization). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza konfigurację zagnieżdżonej wirtualizacji za pomocą pliku .wslconfig (wsl2.nestedVirtualization). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Zezwalaj na debugowanie jądra</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">W przypadku ustawienia wartości wyłączonej te zasady wyłączają konfigurację debugowania jądra za pośrednictwem pliku wslconfig (wsl2.kernelDebugPort). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->W przypadku ustawienia wartości wyłączonej te zasady wyłączają konfigurację debugowania jądra za pośrednictwem pliku wslconfig (wsl2.kernelDebugPort). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Zezwalaj na niestandardową konfigurację sieciową</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Gdy ta zasada jest wyłączona, blokuje ona niestandardową konfigurację sieci za pomocą pliku .wslconfig (wsl2.networkingMode). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Gdy ta zasada jest wyłączona, blokuje ona niestandardową konfigurację sieci za pomocą pliku .wslconfig (wsl2.networkingMode). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="FirewallUserSettingConfigurable">Zezwalaj użytkownikowi na konfigurowanie zapory</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">Jeśli ta zasada jest wyłączona, wyłącza konfigurację zapory za pośrednictwem pliku wslconfig (wsl2.firewall). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Jeśli ta zasada jest wyłączona, wyłącza konfigurację zapory za pośrednictwem pliku wslconfig (wsl2.firewall). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="AllowDiskMount">Zezwalaj na instalowanie dysków pass-through</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">Gdy to ustawienie jest wyłączone, zasada ta wyłącza podłączanie dysków z użyciem trybu passthrough w WSL2 (wsl.exe --mount). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->Gdy to ustawienie jest wyłączone, zasada ta wyłącza podłączanie dysków z użyciem trybu passthrough w WSL2 (wsl.exe --mount). Ta zasada dotyczy tylko wersji WSL ze sklepu.</string>
 
         <string id="DefaultNetworkingMode">Konfiguruj domyślny tryb sieciowy</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">Te zasady określają domyślny tryb sieciowy, który ma być używany dla protokołu WSL2.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">Brak</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">Dublowany</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->Te zasady określają domyślny tryb sieciowy, który ma być używany dla protokołu WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">Kontener WSL</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->Kontener WSL</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Zezwalaj na kontener WSL</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">Ta zasada kontroluje, czy kontener WSL może być używany na tym urządzeniu. Po włączeniu lub gdy nie jest skonfigurowana, użytkownicy i aplikacje Windows mogą uruchamiać kontenery Linux za pośrednictwem WSL. Po ustawieniu na wyłączoną, kontener WSL jest blokowany dla wszystkich użytkowników, a aplikacje Windows nie mogą uruchamiać kontenerów Linux. Ostrzeżenie: ustawienie tej opcji na „Wyłączone” może spowodować problemy z aplikacjami Windows, które zależą od kontenerów Linux.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Zezwalaj na kontener WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->Ta zasada kontroluje, czy kontener WSL może być używany na tym urządzeniu. Po włączeniu lub gdy nie jest skonfigurowana, użytkownicy i aplikacje Windows mogą uruchamiać kontenery Linux za pośrednictwem WSL. Po ustawieniu na wyłączoną, kontener WSL jest blokowany dla wszystkich użytkowników, a aplikacje Windows nie mogą uruchamiać kontenerów Linux. Ostrzeżenie: ustawienie tej opcji na „Wyłączone” może spowodować problemy z aplikacjami Windows, które zależą od kontenerów Linux.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">Lista dozwolonych dla rejestrów kontenerów WSL</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">Po włączeniu kontener WSL będzie mógł ściągać obrazy tylko z rejestrów wymienionych w tym miejscu. Ma to wpływ zarówno na interfejs wiersza polecenia kontenera WSL, jak i na wszystkie aplikacje korzystające z interfejsu API kontenera WSL.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->Lista dozwolonych dla rejestrów kontenerów WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->Po włączeniu kontener WSL będzie mógł ściągać obrazy tylko z rejestrów wymienionych w tym miejscu. Ma to wpływ zarówno na interfejs wiersza polecenia kontenera WSL, jak i na wszystkie aplikacje korzystające z interfejsu API kontenera WSL.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

@@ -5,84 +5,58 @@
   <description>Подсистема Windows для Linux</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Подсистема Windows для Linux</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Подсистема Windows для Linux</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Разрешить подсистему Windows для Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">Если задано значение "Отключено", эта политика отключает доступ для запуска дистрибутивов Linux в подсистеме Windows для Linux для всех пользователей компьютера.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Разрешить подсистему Windows для Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Если задано значение "Отключено", эта политика отключает доступ для запуска дистрибутивов Linux в подсистеме Windows для Linux для всех пользователей компьютера.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Разрешить встроенную версию подсистемы Windows для Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">Если задано значение "Отключено", эта политика отключает встроенную версию (необязательный компонент) подсистемы Windows для Linux. Если эта политика отключена, можно использовать только версию WSL из Microsoft Store.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Разрешить встроенную версию подсистемы Windows для Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Если задано значение "Отключено", эта политика отключает встроенную версию (необязательный компонент) подсистемы Windows для Linux. Если эта политика отключена, можно использовать только версию WSL из Microsoft Store.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Разрешить WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">Если эта политика отключена, WSL1 отключается. Если этот параметр отключен, можно использовать только дистрибутивы WSL2.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Разрешить WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->Если эта политика отключена, WSL1 отключается. Если этот параметр отключен, можно использовать только дистрибутивы WSL2.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Разрешить настройку пользовательского ядра</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">Если задано значение "Отключено", эта политика отключает настройку пользовательского ядра с помощью .wslconfig (wsl2.kernel). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку пользовательского ядра с помощью .wslconfig (wsl2.kernel). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Разрешить настройку пользовательского дистрибутива системы</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">Если задано значение "Отключено", эта политика отключает настройку пользовательского дистрибутива системы с помощью .wslconfig (wsl2.systemDistro). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку пользовательского дистрибутива системы с помощью .wslconfig (wsl2.systemDistro). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Разрешить настройку командной строки ядра</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">Если задано значение "Отключено", эта политика отключает настройку командной строки ядра с помощью .wslconfig (wsl2.kernelCommandLine). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку командной строки ядра с помощью .wslconfig (wsl2.kernelCommandLine). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="AllowDebugShell">Разрешить оболочку отладки</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">Если задано значение "Отключено", эта политика отключает оболочку отладки (wsl.exe --debug-shell). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает оболочку отладки (wsl.exe --debug-shell). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Разрешить вложенную виртуализацию</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">Если задано значение "Отключено", эта политика отключает настройку вложенной виртуализации с помощью .wslconfig (wsl2.nestedVirtualization). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку вложенной виртуализации с помощью .wslconfig (wsl2.nestedVirtualization). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Разрешить отладку ядра</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">Если задано значение "Отключено", эта политика отключает настройку отладки ядра с помощью .wslconfig (wsl2.kernelDebugPort). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку отладки ядра с помощью .wslconfig (wsl2.kernelDebugPort). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Разрешить пользовательскую настройку сети</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Если задано значение "Отключено", эта политика отключает пользовательскую настройку сети с помощью .wslconfig (wsl2.networkingMode). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает пользовательскую настройку сети с помощью .wslconfig (wsl2.networkingMode). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="FirewallUserSettingConfigurable">Разрешить пользователю настраивать конфигурацию брандмауэра</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">Если задано значение "Отключено", эта политика отключает настройку брандмауэра с помощью .wslconfig (wsl2.firewall). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает настройку брандмауэра с помощью .wslconfig (wsl2.firewall). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="AllowDiskMount">Разрешить сквозное подключение дисков</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">Если задано значение "Отключено", эта политика отключает сквозное подключение дисков в WSL2 (wsl.exe --mount). Эта политика применяется только к WSL из Microsoft Store.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->Если задано значение "Отключено", эта политика отключает сквозное подключение дисков в WSL2 (wsl.exe --mount). Эта политика применяется только к WSL из Microsoft Store.</string>
 
         <string id="DefaultNetworkingMode">Настроить сетевой режим по умолчанию</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">Эта политика указывает сетевой режим по умолчанию, используемый для WSL2.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">Нет</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">Зеркальный</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->Эта политика указывает сетевой режим по умолчанию, используемый для WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">WSL-контейнер</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL-контейнер</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Разрешить WSL-контейнер</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">Эта политика определяет, можно ли использовать WSL-контейнер на этом компьютере. Если эта политика включена или не настроена, пользователи и приложения Windows могут запускать контейнеры Linux с помощью WSL. Если задано значение "Отключено", контейнер WSL блокируется для всех пользователей, а приложения Windows не могут запускать контейнеры Linux. Предупреждение. Если задать значение "Отключено", может быть нарушена работа приложений Windows, которые зависят от контейнеров Linux.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Разрешить WSL-контейнер</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->Эта политика определяет, можно ли использовать WSL-контейнер на этом компьютере. Если эта политика включена или не настроена, пользователи и приложения Windows могут запускать контейнеры Linux с помощью WSL. Если задано значение "Отключено", контейнер WSL блокируется для всех пользователей, а приложения Windows не могут запускать контейнеры Linux. Предупреждение. Если задать значение "Отключено", может быть нарушена работа приложений Windows, которые зависят от контейнеров Linux.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">Список разрешений для реестров WSL-контейнеров</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">Если этот параметр включен, WSL-контейнеру будет разрешено получать образы только из перечисленных здесь реестров. Этот параметр влияет как на интерфейс командной строки WSL-контейнеров, так и на все приложения, использующие API WSL-контейнеров.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->Список разрешений для реестров WSL-контейнеров</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->Если этот параметр включен, WSL-контейнеру будет разрешено получать образы только из перечисленных здесь реестров. Этот параметр влияет как на интерфейс командной строки WSL-контейнеров, так и на все приложения, использующие API WSL-контейнеров.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">

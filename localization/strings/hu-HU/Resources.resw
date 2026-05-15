@@ -2954,6 +2954,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Kötet neve</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Adja meg a kötetillesztő nevét, például 'guest' vagy 'vhd' (alapértelmezés: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Illesztőprogram-specifikus beállítások beállítása</value>
   </data>

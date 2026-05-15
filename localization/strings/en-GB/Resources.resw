@@ -2954,6 +2954,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volume name</value>
   </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Set driver specific options</value>
   </data>

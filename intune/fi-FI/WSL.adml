@@ -5,84 +5,58 @@
   <description>Windows-alijärjestelmä Linuxille</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Windows-alijärjestelmä Linuxille</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Windows-alijärjestelmä Linuxille</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Salli Windows-alijärjestelmä Linuxille</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">Kun tämä käytäntö on poissa käytöstä, se estää kaikkia koneen käyttäjiä käyttämästä Windows-alijärjestelmä Linuxille -ympäristössä käynnissä olevia Linux-jakeluita.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Salli Windows-alijärjestelmä Linuxille</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Kun tämä käytäntö on poissa käytöstä, se estää kaikkia koneen käyttäjiä käyttämästä Windows-alijärjestelmä Linuxille -ympäristössä käynnissä olevia Linux-jakeluita.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Salli Windows-alijärjestelmä Linuxille sisäänrakennettu versio</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">Kun tämä käytäntö on poissa käytöstä, se poistaa käytöstä asennetun Windows-alijärjestelmä Linuxille -version (valinnainen komponentti). Jos tämä käytäntö on poistettu käytöstä, vain WSL:n säilöversiota voidaan käyttää.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Salli Windows-alijärjestelmä Linuxille sisäänrakennettu versio</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Kun tämä käytäntö on poissa käytöstä, se poistaa käytöstä asennetun Windows-alijärjestelmä Linuxille -version (valinnainen komponentti). Jos tämä käytäntö on poistettu käytöstä, vain WSL:n säilöversiota voidaan käyttää.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Salli WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">Kun tämä käytäntöasetus on poistettu käytöstä, WSL1 poistetaan käytöstä. Kun tämä on poistettu käytöstä, vain WSL2-jakeluja voidaan käyttää.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Salli WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->Kun tämä käytäntöasetus on poistettu käytöstä, WSL1 poistetaan käytöstä. Kun tämä on poistettu käytöstä, vain WSL2-jakeluja voidaan käyttää.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Salli mukautettu ytimen määritys</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">Kun tämä käytäntö on poissa käytöstä, mukautettu ytimen määritys .wslconfig (wsl2.kernel) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, mukautettu ytimen määritys .wslconfig (wsl2.kernel) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Salli mukautettu järjestelmäjakelun määritys</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">Kun tämä käytäntö on poissa käytöstä, mukautettu järjestelmäjakelun määritys .wslconfig (wsl2.systemDistro) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, mukautettu järjestelmäjakelun määritys .wslconfig (wsl2.systemDistro) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Salli ytimen komentorivimääritys</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">Kun tämä käytäntö on poissa käytöstä, ytimen komentorivimääritys .wslconfig (wsl2.kernelCommandLine) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, ytimen komentorivimääritys .wslconfig (wsl2.kernelCommandLine) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="AllowDebugShell">Salli virheenkorjausliittymä</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">Kun tämä käytäntö on poissa käytöstä, virheenkorjausliittymä (wsl.exe --debug-shell) poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, virheenkorjausliittymä (wsl.exe --debug-shell) poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Salli sisäkkäinen virtualisointi</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">Kun tämä käytäntö on poissa käytöstä, sisäkkäisen virtualisoinnin määritys .wslconfig (wsl2.nestedVirtualization) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, sisäkkäisen virtualisoinnin määritys .wslconfig (wsl2.nestedVirtualization) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Salli ytimen virheenkorjaus</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">Kun tämä käytäntö on poissa käytöstä, ytimen virheenkorjausmääritys .wslconfig (wsl2.kernelDebugPort) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, ytimen virheenkorjausmääritys .wslconfig (wsl2.kernelDebugPort) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Salli mukautettu verkkomääritys</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">Kun tämä käytäntö on poissa käytöstä, se poistaa mukautetun verkkomäärityksen käytöstä .wslconfig-tiedoston kautta (wsl2.networkingMode). Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, se poistaa mukautetun verkkomäärityksen käytöstä .wslconfig-tiedoston kautta (wsl2.networkingMode). Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="FirewallUserSettingConfigurable">Salli käyttäjän määrittää palomuuriasetukset</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">Kun tämä käytäntö on poissa käytöstä, palomuurin määritys .wslconfig (wsl2.firewall) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, palomuurin määritys .wslconfig (wsl2.firewall) -tiedoston kautta poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="AllowDiskMount">Salli läpivientilevyn käyttöönotto</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">Kun tämä käytäntö on poissa käytöstä, läpivientilevyn käyttöönotto WSL2:ssa (wsl.exe --mount) poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->Kun tämä käytäntö on poissa käytöstä, läpivientilevyn käyttöönotto WSL2:ssa (wsl.exe --mount) poistetaan käytöstä. Tämä käytäntö koskee vain säilön WSL:ää.</string>
 
         <string id="DefaultNetworkingMode">Määritä oletusverkkotila</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">Tämä käytäntö määrittää WSL2:ssa käytettävän oletusverkkotilan.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">Ei mitään</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">Peilattu</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->Tämä käytäntö määrittää WSL2:ssa käytettävän oletusverkkotilan.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">WSL-säilö</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL-säilö</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Salli WSL-säilö</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">Tämä käytäntö määrittää, voiko WSL-säilöä käyttää tässä laitteessa. Kun se on käytössä tai sitä ei ole määritetty, käyttäjät ja Windows-sovellukset voivat suorittaa Linux-säilöjä WSL:n kautta. Kun se on poissa käytöstä, WSL-säilö on estetty kaikilta käyttäjiltä, eivätkä Windows-sovellukset voi suorittaa Linux-säilöjä. Varoitus: Jos asetat käytännön tilaan Poissa käytöstä, se voi rikkoa Windows-sovelluksia, jotka ovat riippuvaisia Linux-säilöistä.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Salli WSL-säilö</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->Tämä käytäntö määrittää, voiko WSL-säilöä käyttää tässä laitteessa. Kun se on käytössä tai sitä ei ole määritetty, käyttäjät ja Windows-sovellukset voivat suorittaa Linux-säilöjä WSL:n kautta. Kun se on poissa käytöstä, WSL-säilö on estetty kaikilta käyttäjiltä, eivätkä Windows-sovellukset voi suorittaa Linux-säilöjä. Varoitus: Jos asetat käytännön tilaan Poissa käytöstä, se voi rikkoa Windows-sovelluksia, jotka ovat riippuvaisia Linux-säilöistä.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">WSL-säilörekisterien sallittujen luettelo</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">Kun tämä asetus on käytössä, WSL-säilö voi noutaa kuvia vain täällä luetelluista rekistereistä. Tämä vaikuttaa sekä WSL-säilön CLI:hin että kaikkiin sovelluksiin, jotka käyttävät WSL-säilön ohjelmointirajapintaa.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->WSL-säilörekisterien sallittujen luettelo</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->Kun tämä asetus on käytössä, WSL-säilö voi noutaa kuvia vain täällä luetelluista rekistereistä. Tämä vaikuttaa sekä WSL-säilön CLI:hin että kaikkiin sovelluksiin, jotka käyttävät WSL-säilön ohjelmointirajapintaa.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
