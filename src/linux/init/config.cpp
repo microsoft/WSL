@@ -1120,15 +1120,6 @@ Return Value:
     }
     CATCH_LOG()
 
-    //
-    // Move the kernel headers temporary mount into its final location and create the symlinks
-    // expected by Debian/Ubuntu tooling. The target path is supplied by mini_init as
-    // /usr/src/linux-headers-<uname -r>/include.
-    //
-    // N.B. Failure to install the headers is non-fatal; the distro will simply boot without
-    //      them, mirroring the kernel modules behavior above.
-    //
-
     try
     {
         auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV);
@@ -1142,38 +1133,27 @@ Return Value:
 
                 if (tempMount.MoveMount(targetPath.c_str()))
                 {
-                    // Derive the headers root directory by stripping the trailing "/include".
                     constexpr std::string_view c_includeSuffix = "/include";
                     if (targetPath.ends_with(c_includeSuffix))
                     {
                         const std::string headersRoot = targetPath.substr(0, targetPath.size() - c_includeSuffix.size());
 
                         utsname unameBuffer{};
-                        if (uname(&unameBuffer) == 0)
+                        THROW_LAST_ERROR_IF(uname(&unameBuffer) < 0);
+
+                        const std::string release{unameBuffer.release};
+                        const std::string modulesDir = std::format("/lib/modules/{}", release);
+                        if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
                         {
-                            // See main.cpp; convert release to std::string so subsequent appends
-                            // don't follow embedded NUL bytes from the char[65] buffer.
-                            const std::string release{unameBuffer.release};
-                            const std::string modulesDir = std::format("/lib/modules/{}", release);
-                            if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
+                            const std::string linkPath = modulesDir + "/build";
+                            if ((symlink(headersRoot.c_str(), linkPath.c_str()) < 0) && (errno != EEXIST))
                             {
-                                for (const auto* linkName : {"build", "source"})
-                                {
-                                    const std::string linkPath = modulesDir + "/" + linkName;
-                                    if ((symlink(headersRoot.c_str(), linkPath.c_str()) < 0) && (errno != EEXIST))
-                                    {
-                                        LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                LOG_ERROR("UtilMkdirPath({}) failed {}", modulesDir, errno);
+                                LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
                             }
                         }
                         else
                         {
-                            LOG_ERROR("uname failed {}", errno);
+                            LOG_ERROR("UtilMkdirPath({}) failed {}", modulesDir, errno);
                         }
                     }
                 }

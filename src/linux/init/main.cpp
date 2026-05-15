@@ -3225,30 +3225,11 @@ try
 
         if (ConfigMessage->MountKernelHeaders)
         {
-            // Mount the kernel headers 9p share at a temporary path. The headers will be moved
-            // to /usr/src/linux-headers-<uname -r>/include by the distro init process. Failure
-            // here is non-fatal; if the headers cannot be mounted the distro will simply boot
-            // without them.
-            //
-            // N.B. uname() is called first so a (highly unlikely) failure does not leave behind
-            //      an orphaned mount at KERNEL_HEADERS_TEMP_PATH that the distro init wouldn't
-            //      know to clean up.
             utsname UnameBuffer{};
-            if (uname(&UnameBuffer) < 0)
+            THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+
+            if (MountPlan9(LXSS_KERNEL_HEADERS_SHARE, KERNEL_HEADERS_TEMP_PATH, true) == 0)
             {
-                LOG_ERROR("uname failed, {}", errno);
-            }
-            else if (MountPlan9(LXSS_KERNEL_HEADERS_SHARE, KERNEL_HEADERS_TEMP_PATH, true) < 0)
-            {
-                LOG_ERROR("Failed to mount kernel headers 9p share, {}", errno);
-            }
-            else
-            {
-                // N.B. Convert UnameBuffer.release (a char[65] array) to std::string first so
-                //      std::format treats it as a null-terminated C-string. Otherwise the format
-                //      will splice the entire 65-byte array (including trailing NULs) into the
-                //      result, hiding any literal characters appended after the {} placeholder
-                //      when the resulting std::string is later used as a C-string.
                 const std::string release{UnameBuffer.release};
                 Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, release);
             }
