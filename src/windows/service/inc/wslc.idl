@@ -790,6 +790,8 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+    HRESULT AttachContainerToNetwork([in] LPCSTR ContainerId, [in] const WSLCNetworkAttachment* Attachment);
+    HRESULT DetachContainerFromNetwork([in] LPCSTR ContainerId, [in] LPCSTR NetworkName);
 }
 
 //

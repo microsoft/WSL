@@ -2295,6 +2295,115 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::AttachContainerToNetwork(LPCSTR ContainerId, const WSLCNetworkAttachment* Attachment)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ContainerId);
+    RETURN_HR_IF_NULL(E_POINTER, Attachment);
+
+    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Attachment->ContainerIpAddress != nullptr);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Attachment->NetworkName || strlen(Attachment->NetworkName) == 0);
+
+    std::string containerId = ContainerId;
+    std::string networkName = Attachment->NetworkName;
+    ValidateName(containerId.c_str(), WSLC_MAX_CONTAINER_NAME_LENGTH);
+    ValidateName(networkName.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::scoped_lock locks(m_containersLock, m_networksLock);
+    std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
+
+    auto containerIt = m_containers.find(containerId);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(containerId), containerIt == m_containers.end());
+
+    auto networkIt = m_networks.find(networkName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), networkIt == m_networks.end());
+
+    const auto networkMode = containerIt->second->NetworkMode();
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        networkMode == WSLCContainerNetworkTypeHost || networkMode == WSLCContainerNetworkTypeNone);
+
+    docker_schema::ConnectNetworkRequest request{};
+    request.Container = containerId;
+
+    try
+    {
+        m_dockerClient->ConnectContainerToNetwork(networkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach container '%hs' to network '%hs'", containerId.c_str(), networkName.c_str());
+    }
+
+    WSL_LOG(
+        "ContainerAttachedToNetwork",
+        TraceLoggingValue(containerId.c_str(), "ContainerId"),
+        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::DetachContainerFromNetwork(LPCSTR ContainerId, LPCSTR NetworkName)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ContainerId);
+    RETURN_HR_IF_NULL(E_POINTER, NetworkName);
+
+    std::string containerId = ContainerId;
+    std::string networkName = NetworkName;
+    ValidateName(containerId.c_str(), WSLC_MAX_CONTAINER_NAME_LENGTH);
+    ValidateName(networkName.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::scoped_lock locks(m_containersLock, m_networksLock);
+    std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
+
+    auto containerIt = m_containers.find(containerId);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(containerId), containerIt == m_containers.end());
+
+    auto networkIt = m_networks.find(networkName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), networkIt == m_networks.end());
+
+    docker_schema::DisconnectNetworkRequest request{};
+    request.Container = containerId;
+
+    try
+    {
+        m_dockerClient->DisconnectContainerFromNetwork(networkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to detach container '%hs' from network '%hs'", containerId.c_str(), networkName.c_str());
+    }
+
+    WSL_LOG(
+        "ContainerDetachedFromNetwork",
+        TraceLoggingValue(containerId.c_str(), "ContainerId"),
+        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {

@@ -138,6 +138,8 @@ public:
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(AttachContainerToNetwork)(_In_ LPCSTR ContainerId, _In_ const WSLCNetworkAttachment* Attachment) override;
+    IFACEMETHOD(DetachContainerFromNetwork)(_In_ LPCSTR ContainerId, _In_ LPCSTR NetworkName) override;
 
     IFACEMETHOD(Terminate()) override;
 

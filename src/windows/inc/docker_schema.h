@@ -158,6 +158,22 @@ struct Network
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
+struct ConnectNetworkRequest
+{
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ConnectNetworkRequest, Container);
+};
+
+struct DisconnectNetworkRequest
+{
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(DisconnectNetworkRequest, Container);
+};
+
 struct EmptyObject
 {
 };

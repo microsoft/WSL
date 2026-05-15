@@ -6248,6 +6248,185 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Container network name is required for custom network type.");
     }
 
+    WSLC_TEST_METHOD(AttachDetachContainerNetworkRoundTripTest)
+    {
+        const std::string networkName = "test-attach-detach-net";
+        const std::string containerName = "test-attach-detach-ctr";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.50.0.0/16"}};
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.DriverOpts = opts;
+        netOpts.DriverOptsCount = ARRAYSIZE(opts);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeBridged);
+        auto container = launcher.Launch(*m_defaultSession);
+        auto containerId = container.Id();
+
+        WSLCNetworkAttachment attachment{};
+        attachment.NetworkName = networkName.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+
+        auto inspect = container.Inspect();
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.at(networkName).IPAddress.empty());
+
+        VERIFY_SUCCEEDED(m_defaultSession->DetachContainerFromNetwork(containerId.c_str(), networkName.c_str()));
+
+        auto inspectAfter = container.Inspect();
+        VERIFY_IS_FALSE(inspectAfter.NetworkSettings.Networks.contains(networkName));
+    }
+
+    WSLC_TEST_METHOD(AttachContainerEmptyNetworkNameTest)
+    {
+        const std::string containerName = "test-attach-empty-net";
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto containerId = container.Id();
+
+        WSLCNetworkAttachment attachment{};
+        attachment.NetworkName = "";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+        ValidateCOMErrorMessage(L"Network name cannot be empty.");
+    }
+
+    WSLC_TEST_METHOD(AttachContainerNonexistentNetworkTest)
+    {
+        const std::string networkName = "nonexistent-attach-net";
+        const std::string containerName = "test-attach-nonet";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto containerId = container.Id();
+
+        WSLCNetworkAttachment attachment{};
+        attachment.NetworkName = networkName.c_str();
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+        ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(networkName.begin(), networkName.end())).c_str());
+    }
+
+    WSLC_TEST_METHOD(AttachHostOrNoneModeContainerRejectedTest)
+    {
+        const std::string networkName = "test-attach-mode-net";
+        const std::string hostContainerName = "test-attach-host-ctr";
+        const std::string noneContainerName = "test-attach-none-ctr";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.52.0.0/16"}};
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.DriverOpts = opts;
+        netOpts.DriverOptsCount = ARRAYSIZE(opts);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", hostContainerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto containerId = container.Id();
+
+            WSLCNetworkAttachment attachment{};
+            attachment.NetworkName = networkName.c_str();
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+        }
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", noneContainerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto containerId = container.Id();
+
+            WSLCNetworkAttachment attachment{};
+            attachment.NetworkName = networkName.c_str();
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+        }
+    }
+
+    WSLC_TEST_METHOD(AttachContainerWithIpAddressRejectedTest)
+    {
+        const std::string containerName = "test-attach-ip-ctr";
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto containerId = container.Id();
+
+        WSLCNetworkAttachment attachment{};
+        attachment.NetworkName = "bridge";
+        attachment.ContainerIpAddress = "10.0.0.5";
+        VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+        ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
+    }
+
+    WSLC_TEST_METHOD(AttachNonexistentContainerToNetworkTest)
+    {
+        const std::string networkName = "test-attach-noctr-net";
+        const std::string containerId = "nonexistent-container-id";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.56.0.0/16"}};
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.DriverOpts = opts;
+        netOpts.DriverOptsCount = ARRAYSIZE(opts);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkAttachment attachment{};
+        attachment.NetworkName = networkName.c_str();
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->AttachContainerToNetwork(containerId.c_str(), &attachment));
+        ValidateCOMErrorMessage(std::format(L"Container '{}' not found.", std::wstring(containerId.begin(), containerId.end())).c_str());
+    }
+
+    WSLC_TEST_METHOD(DetachContainerNonexistentNetworkTest)
+    {
+        const std::string networkName = "nonexistent-detach-net";
+        const std::string containerName = "test-detach-nonet";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto containerId = container.Id();
+
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DetachContainerFromNetwork(containerId.c_str(), networkName.c_str()));
+        ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(networkName.begin(), networkName.end())).c_str());
+    }
+
+    WSLC_TEST_METHOD(DetachNonexistentContainerFromNetworkTest)
+    {
+        const std::string networkName = "test-detach-noctr-net";
+        const std::string containerId = "nonexistent-container-id";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.55.0.0/16"}};
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.DriverOpts = opts;
+        netOpts.DriverOptsCount = ARRAYSIZE(opts);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->DetachContainerFromNetwork(containerId.c_str(), networkName.c_str()));
+        ValidateCOMErrorMessage(std::format(L"Container '{}' not found.", std::wstring(containerId.begin(), containerId.end())).c_str());
+    }
+
     WSLC_TEST_METHOD(ContainerInspect)
     {
         // Helper to verify port mappings.
