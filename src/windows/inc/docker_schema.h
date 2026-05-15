@@ -336,7 +336,9 @@ struct InspectContainer
 
 struct InspectExec
 {
-    std::optional<int> Pid{};
+    // N.B. Pid is a non-nullable int in moby's schema; it is 0 until runc forks the user process. ExitCode is a *int and
+    // is null until the exec exits.
+    int Pid{};
     std::optional<int> ExitCode{};
     bool Running{};
 

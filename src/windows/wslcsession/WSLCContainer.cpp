@@ -1157,6 +1157,9 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         // Poll for the exec'd process to either be running, or failed.
         // This is required because StartExec() returns before the process is actually created, and if exec() fails, we'll never
         // get an exec_die notification, so this case needs to be caught before returning the process to the caller.
+        //
+        // N.B. Pid is 0 until runc forks the user process, so a transient {Running=true, Pid=0} response (seen e.g. on a
+        // fast failure such as an invalid user/group) must not be treated as "running" or we'd wait forever.
 
         // TODO: Configurable timeout.
         auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
@@ -1164,9 +1167,9 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         do
         {
             auto state = m_dockerClient.InspectExec(result.Id);
-            if (state.Running && state.Pid.has_value())
+            if (state.Running && state.Pid > 0)
             {
-                control->SetPid(state.Pid.value());
+                control->SetPid(state.Pid);
                 break; // Exec is running, exit.
             }
             else if (state.ExitCode.has_value())
