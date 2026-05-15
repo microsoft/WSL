@@ -645,8 +645,6 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    m_vmExitEvent.SetEvent();
-
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
     auto reason = WSLCVirtualMachineTerminationReasonUnknown;
@@ -672,6 +670,8 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
     {
         LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
     }
+
+    m_vmExitEvent.SetEvent();
 }
 
 void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
