@@ -14,30 +14,34 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.Session.g.h"
-#include "SessionSettings.h"
-#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Session : SessionT<Session>
 {
     Session() = default;
-    ~Session();
+    Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings);
 
-    static winrt::Microsoft::WSL::Containers::Session Create(winrt::Microsoft::WSL::Containers::SessionSettings const& settings);
+    void Start();
     void Terminate();
-
-    WslcSession ToHandle();
-    WslcSession* ToHandlePointer();
-
-private:
-    WslcSession m_session{nullptr};
+    winrt::Microsoft::WSL::Containers::Container CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings);
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PullImageAsync(
+        winrt::Microsoft::WSL::Containers::PullImageOptions options);
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> ImportImageAsync(hstring path, hstring imageName);
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> LoadImageAsync(hstring path);
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PushImageAsync(
+        winrt::Microsoft::WSL::Containers::PushImageOptions options);
+    void DeleteImage(hstring const& nameOrId);
+    void TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const& options);
+    void CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options);
+    void DeleteVhdVolume(hstring const& name);
+    hstring Authenticate(winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();
+    winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
+    void Terminated(winrt::event_token const& token) noexcept;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
-
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
 struct Session : SessionT<Session, implementation::Session>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
-
-DEFINE_TYPE_HELPERS(Session);

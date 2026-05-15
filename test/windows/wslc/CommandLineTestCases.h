@@ -147,6 +147,13 @@ COMMAND_LINE_TEST_CASE(L"rm cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container rm cont1 cont2", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container attach cont", L"attach", true)
 COMMAND_LINE_TEST_CASE(L"container attach", L"attach", false)
+// Stats command tests
+COMMAND_LINE_TEST_CASE(L"stats", L"stats", true)
+COMMAND_LINE_TEST_CASE(L"container stats", L"stats", true)
+COMMAND_LINE_TEST_CASE(L"container stats cont1", L"stats", true)
+COMMAND_LINE_TEST_CASE(L"container stats cont1 cont2", L"stats", true)
+COMMAND_LINE_TEST_CASE(L"container stats --no-trunc cont1", L"stats", true)
+COMMAND_LINE_TEST_CASE(L"container stats --all", L"stats", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)

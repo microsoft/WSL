@@ -46,8 +46,7 @@ class WSLCCLIParserUnitTests
         return true;
     }
 
-    // Test: Verify command line to argv mapping and GetRemainingRawCommandLineFromIndex
-    TEST_METHOD(ParserTest_StateMachine_PositionalForward)
+    TEST_METHOD(ParserTest_ParserCases)
     {
         // Build test cases from x-macro
         std::vector<ParserTestCase> testCases = {

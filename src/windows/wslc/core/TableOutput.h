@@ -96,6 +96,10 @@ struct TableOutput
 
     static constexpr size_t DefaultColumnPadding = 3; // Docker-like spacing between columns
 
+    // For redirected console the receiver controls the width. This should be a large value but not
+    // too large. A few thousand should be reasonable and prevents potential arithmetic issues later.
+    static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
+
     // Constructor with default behavior (no column limits)
     TableOutput(header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
         m_sizingBuffer(sizingBuffer), m_limitColumnWidths(false), m_columnPadding(columnPadding), m_outputFn(DefaultOutputFn())
@@ -223,6 +227,7 @@ private:
     bool m_limitColumnWidths = false;
     bool m_alwaysShowHeader = true;
     bool m_showHeader = true;
+    bool m_dropEmptyColumns = false;
     std::wstringstream m_stream;
     OutputFn m_outputFn;
     size_t m_consoleWidthOverride = 0;
@@ -269,8 +274,9 @@ private:
             return static_cast<size_t>(consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
         }
 
-        // Default to 80 columns if console info is unavailable
-        return 80;
+        // stdout is not a real console (e.g. redirected/piped). Return a large value
+        // so column shrinking is not applied — the receiver controls its own display width.
+        return DefaultRedirectedConsoleWidth;
     }
 
     void OutputHeaderOnly()
@@ -319,10 +325,12 @@ private:
             }
         }
 
-        // If there are actually columns with data, then also bring in the minimum size
+        // If there are actually columns with data, then also bring in the minimum size.
+        // When m_dropEmptyColumns is false, always apply MinLength so empty columns
+        // still render at least as wide as their header.
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            if (m_columns[i].MaxLength)
+            if (m_columns[i].MaxLength || !m_dropEmptyColumns)
             {
                 m_columns[i].MaxLength = std::max(m_columns[i].MaxLength, m_columns[i].MinLength);
             }

@@ -479,10 +479,25 @@ std::pair<ULONG, std::string> WSLCVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
-void WSLCVirtualMachine::Ext4Format(const std::string& Device)
+void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uint32_t> Uid, std::optional<uint32_t> Gid)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+
+    // Uid/Gid must be paired; the named-volume parser enforces this for user
+    // input — this guards future internal callers that bypass it.
+    THROW_HR_IF(E_UNEXPECTED, Uid.has_value() != Gid.has_value());
+
+    std::vector<std::string> args = {mkfsPath};
+    std::string rootOwner;
+    if (Uid.has_value() && Gid.has_value())
+    {
+        rootOwner = std::format("root_owner={}:{}", *Uid, *Gid);
+        args.push_back("-E");
+        args.push_back(rootOwner);
+    }
+    args.push_back(Device);
+
+    ServiceProcessLauncher launcher(mkfsPath, args);
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());

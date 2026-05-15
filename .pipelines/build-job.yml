@@ -70,8 +70,7 @@ jobs:
       ob_artifactBaseName: 'drop_wsl'
       ob_artifactSuffix: '${{ parameters.artifactSuffix }}'
       packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
-      ${{ if parameters.includeTestArtifacts }}:
-        ob_sdl_codeSignValidation_excludes: -|**testbin\**
+      ob_sdl_codeSignValidation_excludes: -|**\*.ps1;-|**\testbin\**
       ${{ if parameters.includeCodeQL }}:
         Codeql.PublishDatabaseLog: true
         Codeql.SourceRoot: src

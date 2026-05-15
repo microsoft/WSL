@@ -111,8 +111,13 @@ public:
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
-    IFACEMETHOD(ListContainers)(_Out_ WSLCContainerEntry** Containers, _Out_ ULONG* Count, _Out_ WSLCContainerPortMapping** Ports, _Out_ ULONG* PortsCount) override;
-    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
+    IFACEMETHOD(ListContainers)(
+        _In_opt_ const WSLCListContainersOptions* Options,
+        _Out_ WSLCContainerEntry** Containers,
+        _Out_ ULONG* Count,
+        _Out_ WSLCContainerPortMapping** Ports,
+        _Out_ ULONG* PortsCount) override;
+    IFACEMETHOD(PruneContainers)(_In_opt_ const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCPruneContainersResults* Result) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -145,7 +150,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
 
-    common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
+    common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
@@ -202,7 +207,7 @@ private:
     // This allows independent operations to proceed while container bookkeeping remains synchronized.
     // WSLCVolumes has its own internal srwlock and does not require m_lock.
     std::mutex m_containersLock;
-    std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
+    std::unordered_map<std::string, std::unique_ptr<WSLCContainerImpl>> m_containers;
     std::optional<WSLCVolumes> m_volumes;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
