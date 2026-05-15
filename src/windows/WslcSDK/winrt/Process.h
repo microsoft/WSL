@@ -20,10 +20,8 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Process : ProcessT<Process>
 {
     Process() = default;
-    Process(WslcProcess process, winrt::Microsoft::WSL::Containers::ProcessOutputMode mode = winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard);
+    Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings); // For the init process
     Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings);
-    Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode mode);
-    ~Process();
 
     void Start();
     uint32_t Pid();
@@ -40,40 +38,39 @@ struct Process : ProcessT<Process>
     void Exited(winrt::event_token const& token) noexcept;
 
     WslcProcess ToHandle();
-    bool SetupCallbacksForStart(WslcProcessSettings* settings);
-    void ActivateCallbackOwnership();
-    bool ApplyCallbacksToSettings(WslcProcessSettings* settings);
+    ProcessOutputMode OutputMode();
     void AttachHandle(WslcProcess handle);
+
+    static void final_release(std::unique_ptr<Process> self)
+    {
+        self->m_process.reset();
+    }
 
 private:
     void EnsureStarted() const;
     void EnsureNotStarted() const;
-    void StartExitThread();
+
+    void ApplyCallbacksToSettings();
+    winrt::fire_and_forget StartWaitingForExit();
 
     static void CALLBACK OutputCallback(
         WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept;
     static void CALLBACK ExitCallback(INT32 exitCode, _In_opt_ PVOID context) noexcept;
 
-    // Returns true if external references still exist (i.e. not only the callback AddRef).
-    bool HasExternalReferences();
-
     // Only kept until Start() is called
     winrt::Microsoft::WSL::Containers::Container m_container{nullptr};
     winrt::Microsoft::WSL::Containers::ProcessSettings m_settings{nullptr};
 
-    wil::unique_any<WslcProcess, decltype(&WslcReleaseProcess), &WslcReleaseProcess> m_process{nullptr};
-    winrt::event<winrt::Microsoft::WSL::Containers::ProcessExitHandler> m_exitedEvent;
     winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
 
-    // For processes created with Start() (callback path):
-    std::optional<winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler>> m_outputReceivedEvent{};
-    std::optional<winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler>> m_errorReceivedEvent{};
-    bool m_hasExitCallback{false};
+    // For output mode Event
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler> m_outputReceivedEvent;
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler> m_errorReceivedEvent;
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessExitHandler> m_exitedEvent;
 
-    // For processes created from a WslcProcess handle (exit thread path):
-    wil::unique_handle m_exitEventHandle;
-    wil::unique_event m_destructedEvent;
-    std::thread m_exitThread;
+    // Releasing the process handle will disconnect the callbacks.
+    // Keep this at the end so that it is released first, ensuring the events aren't destroyed while they may still be signaled.
+    wil::unique_any<WslcProcess, decltype(&WslcReleaseProcess), &WslcReleaseProcess> m_process{nullptr};
 };
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

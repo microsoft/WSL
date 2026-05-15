@@ -28,7 +28,7 @@ namespace Microsoft.WSL.Containers
         Crashed = 2,
     };
 
-    delegate void SessionTerminationHandler(Session session, SessionTerminationReason reason);
+    delegate void SessionTerminationHandler(SessionTerminationReason reason);
 
     runtimeclass SessionSettings
     {
@@ -212,8 +212,8 @@ namespace Microsoft.WSL.Containers
         Signalled = 3,
     };
 
-    delegate void ProcessOutputHandler(Process process, UInt8[] data);
-    delegate void ProcessExitHandler(Process process, Int32 exitCode);
+    delegate void ProcessOutputHandler(UInt8[] data);
+    delegate void ProcessExitHandler(Int32 exitCode);
 
     runtimeclass Process
     {

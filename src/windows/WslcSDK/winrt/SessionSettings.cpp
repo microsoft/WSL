@@ -125,9 +125,24 @@ void SessionSettings::Timeout(IReference<TimeSpan> const& value)
         throw hresult_illegal_state_change(L"Cannot change timeout after session has been initialized");
     }
 
-    if (value && value.Value() == TimeSpan::zero())
+    if (value)
     {
-        throw hresult_invalid_argument(L"Timeout cannot be 0");
+        if (value.Value() == TimeSpan::zero())
+        {
+            throw hresult_invalid_argument(L"Timeout cannot be 0");
+        }
+
+        // The C API takes the timeout in milliseconds as a uint32_t, so we need to validate that the value is within range.
+        auto timeoutMS = std::chrono::duration_cast<std::chrono::milliseconds>(value.Value()).count();
+        if (timeoutMS > std::numeric_limits<uint32_t>::max())
+        {
+            throw hresult_invalid_argument(L"Timeout exceeds the allowed limit");
+        }
+
+        if (timeoutMS < 0)
+        {
+            throw hresult_invalid_argument(L"Timeout cannot be negative");
+        }
     }
 
     m_timeout = value;
@@ -191,8 +206,7 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
     if (m_timeout)
     {
         auto timeoutMS = std::chrono::duration_cast<std::chrono::milliseconds>(m_timeout.Value()).count();
-        winrt::check_hresult(WslcSetSessionSettingsTimeout(
-            m_sessionSettings.get(), static_cast<uint32_t>(timeoutMS)));
+        winrt::check_hresult(WslcSetSessionSettingsTimeout(m_sessionSettings.get(), static_cast<uint32_t>(timeoutMS)));
     }
 
     if (m_vhdRequirements)

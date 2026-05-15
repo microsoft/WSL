@@ -40,7 +40,6 @@ struct ProcessSettings : ProcessSettingsT<ProcessSettings>
     void CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> EnvironmentVariables();
     void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
-
     winrt::Microsoft::WSL::Containers::ProcessOutputMode OutputMode();
     void OutputMode(winrt::Microsoft::WSL::Containers::ProcessOutputMode const& value);
 

@@ -49,7 +49,7 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
 private:
     std::string m_imageName;
     std::string m_name;
-    winrt::Microsoft::WSL::Containers::ProcessSettings m_initProcess{nullptr};
+    winrt::Microsoft::WSL::Containers::ProcessSettings m_initProcess{};
     winrt::Windows::Foundation::IReference<winrt::Microsoft::WSL::Containers::ContainerNetworkingMode> m_networkingMode{nullptr};
     std::string m_hostName;
     std::string m_domainName;

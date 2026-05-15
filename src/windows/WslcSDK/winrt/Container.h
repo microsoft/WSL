@@ -35,12 +35,11 @@ struct Container : ContainerT<Container>
     WslcContainer ToHandle();
 
 private:
-    WslcSession m_session{};
-    wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> m_container;
     winrt::com_ptr<implementation::Process> m_initProcess;
-    winrt::Microsoft::WSL::Containers::ProcessOutputMode m_initProcessOutputMode{
-        winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
-    bool m_started{false};
+
+    // Releasing the container handle will end the processes and disconnect the callbacks.
+    // Keep this at the end so that it is released first, ensuring the init process' events aren't destroyed while they may still be signaled.
+    wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> m_container;
 };
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

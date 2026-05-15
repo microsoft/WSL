@@ -19,53 +19,59 @@ Abstract:
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
-Process::Process(WslcProcess process, winrt::Microsoft::WSL::Containers::ProcessOutputMode mode) :
-    m_process(process), m_outputMode(mode)
-{
-    StartExitThread();
-}
-
 Process::Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
-    m_container(container), m_settings(settings),
-    m_outputMode(GetImplementation(settings)->OutputMode())
+    m_container(container), m_settings(settings), m_outputMode(GetImplementation(settings)->OutputMode())
 {
+    ApplyCallbacksToSettings();
 }
 
-Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode mode) : m_outputMode(mode)
+Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
+    m_settings(settings), m_outputMode(GetImplementation(settings)->OutputMode())
 {
+    ApplyCallbacksToSettings();
 }
 
-bool Process::SetupCallbacksForStart(WslcProcessSettings* settings)
+void Process::ApplyCallbacksToSettings()
 {
+    // Callbacks are only used with OutputMode::Event.
+    // Stream and Discard modes use the exit event path (StartWaitingForExit).
     if (m_outputMode != ProcessOutputMode::Event)
     {
-        return false;
+        return;
     }
+
+    auto settingsPtr = GetStructPointer(m_settings);
 
     WslcProcessCallbacks callbacks{};
     callbacks.onExit = ExitCallback;
     callbacks.onStdOut = OutputCallback;
     callbacks.onStdErr = OutputCallback;
 
-    winrt::check_hresult(WslcSetProcessSettingsCallbacks(settings, &callbacks, this));
-    return true;
+    winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
-void Process::ActivateCallbackOwnership()
+winrt::fire_and_forget Process::StartWaitingForExit()
 {
-    AddRef();
-    m_hasExitCallback = true;
-}
-
-bool Process::ApplyCallbacksToSettings(WslcProcessSettings* settings)
-{
-    if (!SetupCallbacksForStart(settings))
+    // Event mode uses the exit callback set in ApplyCallbacksToSettings; no need to wait here.
+    if (m_outputMode == ProcessOutputMode::Event)
     {
-        return false;
+        co_return;
     }
 
-    ActivateCallbackOwnership();
-    return true;
+    HANDLE exitEventHandle;
+    winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), &exitEventHandle));
+
+    auto weak_this = get_weak();
+    co_await winrt::resume_on_signal(exitEventHandle);
+
+    try
+    {
+        if (auto strong_this = weak_this.get())
+        {
+            strong_this->m_exitedEvent(strong_this->ExitCode());
+        }
+    }
+    CATCH_LOG();
 }
 
 void Process::AttachHandle(WslcProcess handle)
@@ -76,93 +82,31 @@ void Process::AttachHandle(WslcProcess handle)
     }
 
     m_process.reset(handle);
-
-    // If no exit callback is registered (callback path), start the exit thread
-    // so the Exited WinRT event still works.
-    if (!m_hasExitCallback)
-    {
-        StartExitThread();
-    }
+    StartWaitingForExit();
 }
 
-void Process::StartExitThread()
+ProcessOutputMode Process::OutputMode()
 {
-    winrt::check_hresult(WslcGetProcessExitEvent(m_process.get(), m_exitEventHandle.put()));
-
-    // Start a background thread that waits for exit and fires the WinRT event.
-    m_destructedEvent.create(wil::EventOptions::ManualReset);
-    m_exitThread = std::thread(
-        [weak_this = get_weak(), exitEventHandle = m_exitEventHandle.get(), destructedEventHandle = m_destructedEvent.get()]() {
-            try
-            {
-                HANDLE handles[] = {exitEventHandle, destructedEventHandle};
-                auto waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-                if (waitResult != WAIT_OBJECT_0)
-                {
-                    return;
-                }
-
-                // After this point, we ensure that the Process object is not destructed until we're done.
-                if (auto strong_this = weak_this.get())
-                {
-                    int32_t exitCode = 0;
-                    if (FAILED(WslcGetProcessExitCode(strong_this->ToHandle(), &exitCode)))
-                    {
-                        return;
-                    }
-
-                    strong_this->m_exitedEvent(*strong_this, exitCode);
-                }
-            }
-            CATCH_LOG()
-        });
+    return m_outputMode;
 }
 
 void Process::Start()
 {
     EnsureNotStarted();
 
-    if (ApplyCallbacksToSettings(GetStructPointer(m_settings)))
+    if (!m_container)
     {
-        auto releaseRef = wil::scope_exit([this] { Release(); });
-
-        wil::unique_cotaskmem_string errorMessage;
-        auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
-        THROW_MSG_IF_FAILED(hr, errorMessage);
-
-        releaseRef.release();
+        throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
     }
-    else
-    {
-        wil::unique_cotaskmem_string errorMessage;
-        auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
-        THROW_MSG_IF_FAILED(hr, errorMessage);
-        StartExitThread();
-    }
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    m_container = nullptr;
     m_settings = nullptr;
-}
 
-Process::~Process()
-{
-    if (m_destructedEvent)
-    {
-        m_destructedEvent.SetEvent();
-    }
-
-    if (m_exitThread.joinable())
-    {
-        // If the destructor is called from the exit thread itself (because it held the last
-        // reference and released it), joining would deadlock. Detach instead — the thread is
-        // about to return and has already captured all handles it needs by value.
-        if (m_exitThread.get_id() == std::this_thread::get_id())
-        {
-            m_exitThread.detach();
-        }
-        else
-        {
-            m_exitThread.join();
-        }
-    }
+    StartWaitingForExit();
 }
 
 void Process::EnsureStarted() const
@@ -233,22 +177,12 @@ winrt::event_token Process::OutputReceived(winrt::Microsoft::WSL::Containers::Pr
         throw winrt::hresult_illegal_method_call(L"OutputReceived requires OutputMode::Event");
     }
 
-    // Callbacks can only be registered before the process is started.
-    EnsureNotStarted();
-    if (!m_outputReceivedEvent)
-    {
-        m_outputReceivedEvent.emplace();
-    }
-
-    return m_outputReceivedEvent->add(handler);
+    return m_outputReceivedEvent.add(handler);
 }
 
 void Process::OutputReceived(winrt::event_token const& token) noexcept
 {
-    if (m_outputReceivedEvent)
-    {
-        m_outputReceivedEvent->remove(token);
-    }
+    m_outputReceivedEvent.remove(token);
 }
 
 winrt::event_token Process::ErrorReceived(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& handler)
@@ -258,22 +192,12 @@ winrt::event_token Process::ErrorReceived(winrt::Microsoft::WSL::Containers::Pro
         throw winrt::hresult_illegal_method_call(L"ErrorReceived requires OutputMode::Event");
     }
 
-    // Callbacks can only be registered before the process is started.
-    EnsureNotStarted();
-    if (!m_errorReceivedEvent)
-    {
-        m_errorReceivedEvent.emplace();
-    }
-
-    return m_errorReceivedEvent->add(handler);
+    return m_errorReceivedEvent.add(handler);
 }
 
 void Process::ErrorReceived(winrt::event_token const& token) noexcept
 {
-    if (m_errorReceivedEvent)
-    {
-        m_errorReceivedEvent->remove(token);
-    }
+    m_errorReceivedEvent.remove(token);
 }
 
 winrt::event_token Process::Exited(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& handler)
@@ -288,48 +212,25 @@ void Process::Exited(winrt::event_token const& token) noexcept
 
 void CALLBACK Process::OutputCallback(WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept
 {
-    auto* self = static_cast<Process*>(context);
-    if (!self->HasExternalReferences())
-    {
-        return;
-    }
-
-    winrt::com_ptr<Process> process;
-    process.copy_from(self);
-
-    auto& outputEvent = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? process->m_outputReceivedEvent : process->m_errorReceivedEvent;
-    if (outputEvent)
-    {
-        try
-        {
-            winrt::array_view<const uint8_t> buffer{data, dataBytes};
-            (*outputEvent)(*process, buffer);
-        }
-        CATCH_LOG();
-    }
-}
-
-void CALLBACK Process::ExitCallback(INT32 exitCode, _In_opt_ PVOID context) noexcept
-{
-    winrt::com_ptr<Process> process;
-
-    // No other callback should be called after this event, so we no longer need to keep the object alive.
-    // This takes ownership without increasing the ref count to account for the AddRef in ApplyCallbacksToSettings().
-    process.attach(static_cast<Process*>(context));
-
     try
     {
-        process->m_exitedEvent(*process, exitCode);
+        auto process = static_cast<Process*>(context);
+
+        auto& outputEvent = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? process->m_outputReceivedEvent : process->m_errorReceivedEvent;
+        winrt::array_view<const uint8_t> buffer{data, dataBytes};
+        outputEvent(buffer);
     }
     CATCH_LOG();
 }
 
-bool Process::HasExternalReferences()
+void CALLBACK Process::ExitCallback(INT32 exitCode, _In_opt_ PVOID context) noexcept
 {
-    // Check whether any references exist beyond the one held by the callback mechanism.
-    AddRef();
-    auto count = Release();
-    return count > 1;
+    try
+    {
+        auto process = static_cast<Process*>(context);
+        process->m_exitedEvent(exitCode);
+    }
+    CATCH_LOG();
 }
 
 WslcProcess Process::ToHandle()

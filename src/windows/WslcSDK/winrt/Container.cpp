@@ -23,66 +23,39 @@ using namespace winrt::Windows::Foundation;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings) :
-    m_session(session)
+    m_initProcess(winrt::make_self<implementation::Process>(settings.InitProcess()))
 {
-    auto initProcessSettings = GetImplementation(settings)->InitProcess();
-    if (initProcessSettings)
-    {
-        m_initProcessOutputMode = GetImplementation(initProcessSettings)->OutputMode();
-    }
-
-    if (m_initProcessOutputMode == ProcessOutputMode::Event)
-    {
-        m_initProcess = winrt::make_self<implementation::Process>(m_initProcessOutputMode);
-        m_initProcess->SetupCallbacksForStart(GetStructPointer(initProcessSettings));
-    }
-
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcCreateContainer(m_session, GetStructPointer(settings), m_container.put(), errorMessage.put());
+    auto hr = WslcCreateContainer(session, GetStructPointer(settings), m_container.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
 void Container::Start()
 {
-    auto startFlags = (m_initProcessOutputMode == ProcessOutputMode::Stream || m_initProcessOutputMode == ProcessOutputMode::Event)
-                          ? WSLC_CONTAINER_START_FLAG_ATTACH
-                          : WSLC_CONTAINER_START_FLAG_NONE;
-
-    // Activate callback ownership just before starting: AddRef so the Process stays alive
-    // until the exit callback fires. Paired with Release() on the error path.
-    bool callbacksActivated = (m_initProcess != nullptr && m_initProcessOutputMode == ProcessOutputMode::Event);
-    if (callbacksActivated)
-    {
-        m_initProcess->ActivateCallbackOwnership();
-    }
-
-    auto releaseRef = wil::scope_exit([&] {
-        if (callbacksActivated)
-        {
-            m_initProcess->Release();
-        }
-    });
+    auto startFlags = WSLC_CONTAINER_START_FLAG_NONE;
+    WI_SetFlagIf(
+        startFlags,
+        WSLC_CONTAINER_START_FLAG_ATTACH,
+        m_initProcess->OutputMode() == ProcessOutputMode::Event || m_initProcess->OutputMode() == ProcessOutputMode::Stream);
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcStartContainer(m_container.get(), startFlags, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 
-    m_started = true;
-
-    if (m_initProcess)
-    {
-        WslcProcess initHandle;
-        winrt::check_hresult(WslcGetContainerInitProcess(m_container.get(), &initHandle));
-        m_initProcess->AttachHandle(initHandle);
-    }
-
-    releaseRef.release();
+    WslcProcess initHandle;
+    winrt::check_hresult(WslcGetContainerInitProcess(m_container.get(), &initHandle));
+    m_initProcess->AttachHandle(initHandle);
 }
 
 void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, TimeSpan timeout)
 {
     wil::unique_cotaskmem_string errorMessage;
     auto timeoutSeconds = std::chrono::duration_cast<std::chrono::seconds>(timeout).count();
+    if (timeoutSeconds < 0)
+    {
+        throw winrt::hresult_invalid_argument(L"Timeout must be non-negative");
+    }
+
     auto hr = WslcStopContainer(ToHandle(), static_cast<WslcSignal>(signal), static_cast<uint32_t>(timeoutSeconds), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
@@ -115,20 +88,6 @@ hstring Container::Id()
 
 winrt::Microsoft::WSL::Containers::Process Container::InitProcess()
 {
-    if (!m_initProcess)
-    {
-        if (m_started)
-        {
-            WslcProcess initHandle;
-            winrt::check_hresult(WslcGetContainerInitProcess(m_container.get(), &initHandle));
-            m_initProcess = winrt::make_self<implementation::Process>(initHandle, m_initProcessOutputMode);
-        }
-        else
-        {
-            m_initProcess = winrt::make_self<implementation::Process>(m_initProcessOutputMode);
-        }
-    }
-
     return *m_initProcess;
 }
 

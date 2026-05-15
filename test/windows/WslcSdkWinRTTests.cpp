@@ -89,18 +89,16 @@ class WslcSdkWinRtTests
     void StartProcessAndWaitForExit(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
     {
         std::promise<void> promise;
-        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
         process.Start();
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
 
-    void StartContainerAndWaitForInitProcessExit(
-        WSLCSDK::Container const& container,
-        std::chrono::milliseconds timeout = 2min)
+    void StartContainerAndWaitForInitProcessExit(WSLCSDK::Container const& container, std::chrono::milliseconds timeout = 2min)
     {
         auto initProcess = container.InitProcess();
         std::promise<void> promise;
-        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
         container.Start();
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
@@ -138,6 +136,7 @@ class WslcSdkWinRtTests
 
         auto containerSettings = WSLCSDK::ContainerSettings(imageName);
         containerSettings.InitProcess(procSettings);
+        containerSettings.Flags(options.flags);
 
         if (options.name)
         {
@@ -316,7 +315,7 @@ class WslcSdkWinRtTests
         settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
 
         auto session = WSLCSDK::Session(settings);
-        session.Terminated([&](WSLCSDK::Session, WSLCSDK::SessionTerminationReason reason) { promise.set_value(reason); });
+        session.Terminated([&](WSLCSDK::SessionTerminationReason reason) { promise.set_value(reason); });
 
         session.Start();
 
@@ -549,7 +548,7 @@ class WslcSdkWinRtTests
         auto initProcess = container.InitProcess();
 
         std::promise<void> promise;
-        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+        auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
 
         container.Start();
 
@@ -608,8 +607,7 @@ class WslcSdkWinRtTests
             containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
                 {WSLCSDK::ContainerPortMapping(12342, 8000, WSLCSDK::PortProtocol::TCP)}));
 
-            auto container = m_defaultSession.CreateContainer(containerSettings);
-            VERIFY_THROWS_HR(container.Start(), E_INVALIDARG);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), E_INVALIDARG);
         }
 
         // Functional: BRIDGED networking with port mapping; HTTP server must be reachable.
@@ -891,7 +889,7 @@ class WslcSdkWinRtTests
         auto process = container.InitProcess();
 
         std::promise<void> promise;
-        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](WSLCSDK::Process, int32_t) { promise.set_value(); });
+        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
 
         container.Start();
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
@@ -993,7 +991,7 @@ class WslcSdkWinRtTests
 
         // Register the Exited event.
         std::promise<int32_t> exitPromise;
-        auto token = process.Exited([&](WSLCSDK::Process, int32_t code) { exitPromise.set_value(code); });
+        auto token = process.Exited([&](int32_t code) { exitPromise.set_value(code); });
         auto cleanupToken = wil::scope_exit([&]() { process.Exited(token); });
 
         process.Signal(WSLCSDK::Signal::SIGKILL);
@@ -1062,8 +1060,8 @@ class WslcSdkWinRtTests
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             auto process = container.InitProcess();
-            VERIFY_THROWS_HR(process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
-            VERIFY_THROWS_HR(process.ErrorReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(process.OutputReceived([](winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(process.ErrorReceived([](winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
 
             // GetOutputStream requires OutputMode::Stream — must throw with Discard mode (even after Start).
             container.Start();
@@ -1084,9 +1082,9 @@ class WslcSdkWinRtTests
 
             auto process = container.InitProcess();
 
-            auto stdoutToken = process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {});
-            auto stderrToken = process.ErrorReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {});
-            auto exitToken = process.Exited([](WSLCSDK::Process, int32_t) {});
+            auto stdoutToken = process.OutputReceived([](winrt::array_view<uint8_t const>) {});
+            auto stderrToken = process.ErrorReceived([](winrt::array_view<uint8_t const>) {});
+            auto exitToken = process.Exited([](int32_t) {});
 
             process.OutputReceived(stdoutToken);
             process.ErrorReceived(stderrToken);
@@ -1110,27 +1108,8 @@ class WslcSdkWinRtTests
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             auto process = container.InitProcess();
-            VERIFY_THROWS_HR(process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
-            VERIFY_THROWS_HR(process.ErrorReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
-        }
-
-        // Negative: registering a callback after the container has been started must throw.
-        {
-            auto procSettings2 = WSLCSDK::ProcessSettings();
-            procSettings2.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
-            procSettings2.OutputMode(WSLCSDK::ProcessOutputMode::Event);
-
-            auto containerSettings2 = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings2.InitProcess(procSettings2);
-
-            auto container2 = m_defaultSession.CreateContainer(containerSettings2);
-            auto cleanup2 = DELETE_CONTAINER_ON_SCOPE_EXIT(container2);
-
-            auto process2 = container2.InitProcess();
-            container2.Start();
-
-            VERIFY_THROWS_HR(process2.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
-            VERIFY_THROWS_HR(process2.ErrorReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(process.OutputReceived([](winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(process.ErrorReceived([](winrt::array_view<uint8_t const>) {}), E_ILLEGAL_METHOD_CALL);
         }
     }
 
@@ -1149,10 +1128,10 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         auto process = container.InitProcess();
 
-        process.OutputReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+        process.OutputReceived([&](winrt::array_view<uint8_t const> data) {
             stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
-        process.ErrorReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+        process.ErrorReceived([&](winrt::array_view<uint8_t const> data) {
             stderrData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
 
@@ -1186,10 +1165,10 @@ class WslcSdkWinRtTests
 
         auto execProcess = container.CreateProcess(execProcSettings);
 
-        execProcess.OutputReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+        execProcess.OutputReceived([&](winrt::array_view<uint8_t const> data) {
             stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
-        execProcess.ErrorReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+        execProcess.ErrorReceived([&](winrt::array_view<uint8_t const> data) {
             stderrData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
 
@@ -1215,7 +1194,7 @@ class WslcSdkWinRtTests
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         auto process = container.InitProcess();
-        process.OutputReceived([](WSLCSDK::Process, winrt::array_view<uint8_t const>) {});
+        process.OutputReceived([](winrt::array_view<uint8_t const>) {});
 
         container.Start();
 
@@ -1244,10 +1223,10 @@ class WslcSdkWinRtTests
             auto container = m_defaultSession.CreateContainer(containerSettings);
             auto process = container.InitProcess();
 
-            process.OutputReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+            process.OutputReceived([&](winrt::array_view<uint8_t const> data) {
                 stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
             });
-            process.Exited([&](WSLCSDK::Process, int32_t code) { exitPromise.set_value(code); });
+            process.Exited([&](int32_t code) { exitPromise.set_value(code); });
 
             container.Start();
 
@@ -1301,8 +1280,8 @@ class WslcSdkWinRtTests
 
         auto execProcess = container.CreateProcess(execProcSettings);
 
-        execProcess.OutputReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const>) { callbackCount.fetch_add(1); });
-        execProcess.Exited([&](WSLCSDK::Process, int32_t) { exitFired.store(true); });
+        execProcess.OutputReceived([&](winrt::array_view<uint8_t const>) { callbackCount.fetch_add(1); });
+        execProcess.Exited([&](int32_t) { exitFired.store(true); });
 
         execProcess.Start();
 
@@ -1344,7 +1323,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         auto process = container.InitProcess();
 
-        process.OutputReceived([&](WSLCSDK::Process, winrt::array_view<uint8_t const> data) {
+        process.OutputReceived([&](winrt::array_view<uint8_t const> data) {
             stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
 
@@ -1591,8 +1570,7 @@ class WslcSdkWinRtTests
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container1);
 
         // Creating a second container with the same name must fail.
-        auto container2 = m_defaultSession.CreateContainer(containerSettings);
-        VERIFY_THROWS_HR(container2.Start(), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
     }
 
     WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
@@ -1629,9 +1607,7 @@ class WslcSdkWinRtTests
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
 
-            VERIFY_THROWS_HR(
-                m_defaultSession.CreateContainer(containerSettings).Start(),
-                HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings).Start(), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
         }
 
         // Create a GPU-enabled session.

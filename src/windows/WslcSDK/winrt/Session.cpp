@@ -58,10 +58,6 @@ void Session::Start()
     auto hr = WslcCreateSession(GetStructPointer(m_settings), m_session.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
     m_settings = nullptr;
-
-    // This object needs to stay alive for as long as the callbacks may be invoked even if all other references to it are dropped.
-    // We increase its ref count here, and decrease it once the session terminates.
-    AddRef();
 }
 
 void Session::EnsureStarted() const
@@ -297,13 +293,14 @@ IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
     // We can't pass this directly to WslcListSessionImages because the field for size is of a different type.
     wil::unique_cotaskmem_array_ptr<WslcImageInfo> imagesArray{imagesArrayPtr, count};
 
-    auto images = winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ImageInfo>();
+    auto images = std::vector<winrt::Microsoft::WSL::Containers::ImageInfo>();
+    images.reserve(imagesArray.size());
     for (uint32_t i = 0; i < count; i++)
     {
-        images.Append(winrt::make<implementation::ImageInfo>(imagesArray[i]));
+        images.push_back(winrt::make<implementation::ImageInfo>(imagesArray[i]));
     }
 
-    return images.GetView();
+    return winrt::single_threaded_vector(std::move(images)).GetView();
 }
 
 WslcSession Session::ToHandle()
@@ -314,15 +311,10 @@ WslcSession Session::ToHandle()
 
 void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept
 {
-    winrt::com_ptr<Session> session;
-
-    // No other callback should be called after this event, so we no longer need to keep the object alive.
-    // This takes ownership without increasing the ref count to account for the AddRef in Start().
-    session.attach(static_cast<Session*>(context));
-
     try
     {
-        session->m_terminatedEvent(*session, static_cast<SessionTerminationReason>(reason));
+        auto session = static_cast<Session*>(context);
+        session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
     }
     CATCH_LOG();
 }
