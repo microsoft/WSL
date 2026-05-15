@@ -162,7 +162,7 @@ typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mou
 typedef HRESULT (*WSLCPluginAPI_CreateProcess)(
     WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno);
 
-// Get a stdio handle from a WSLC process The caller takes ownership and must close it with CloseHandle().
+// Get a stdio handle from a WSLC process. The caller takes ownership and must close it with CloseHandle().
 typedef HRESULT (*WSLCPluginAPI_ProcessGetFd)(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle);
 
 // Get the exit event for a WSLC process. Signaled when the process exits.
