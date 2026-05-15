@@ -444,9 +444,8 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
     THROW_IF_FAILED(session.ListImages(nullptr, &images, images.size_address<ULONG>()));
 
-    bool found = std::ranges::any_of(std::span{images.get(), images.size()}, [](const auto& e) {
-        return std::strcmp(e.Image, "wslc-registry:latest") == 0;
-    });
+    bool found = std::ranges::any_of(
+        std::span{images.get(), images.size()}, [](const auto& e) { return std::strcmp(e.Image, "wslc-registry:latest") == 0; });
 
     if (!found)
     {
