@@ -218,13 +218,15 @@ public:
 
     // Set a process-wide warnings pipe for streaming warnings to the CLI.
     // The pipe is owned by the caller and must outlive all COMServiceExecutionContext instances.
+    // Must be called before any COM methods are serviced (e.g., during Initialize).
     static void SetWarningsPipe(HANDLE pipe);
 
 protected:
     bool CollectUserWarning(const std::wstring& warning) override;
 
 private:
-    static HANDLE s_warningsPipe;
+    static std::atomic<HANDLE> s_warningsPipe;
+    static wil::srwlock s_warningsPipeLock;
 };
 
 void EnableContextualizedErrors(bool service, bool useComErrors = false);

@@ -422,19 +422,23 @@ bool COMServiceExecutionContext::CanCollectUserErrorMessage()
     return true;
 }
 
-HANDLE COMServiceExecutionContext::s_warningsPipe = nullptr;
+std::atomic<HANDLE> COMServiceExecutionContext::s_warningsPipe{nullptr};
+wil::srwlock COMServiceExecutionContext::s_warningsPipeLock;
 
 void COMServiceExecutionContext::SetWarningsPipe(HANDLE pipe)
 {
-    s_warningsPipe = pipe;
+    s_warningsPipe.store(pipe, std::memory_order_release);
 }
 
 bool COMServiceExecutionContext::CollectUserWarning(const std::wstring& warning)
 {
-    if (s_warningsPipe != nullptr)
+    auto pipe = s_warningsPipe.load(std::memory_order_acquire);
+    if (pipe != nullptr)
     {
+        // Serialize writes so concurrent warnings don't interleave.
+        auto lock = s_warningsPipeLock.lock_exclusive();
         LOG_IF_WIN32_BOOL_FALSE(WriteFile(
-            s_warningsPipe, warning.c_str(), gsl::narrow_cast<DWORD>(warning.size() * sizeof(wchar_t)), nullptr, nullptr));
+            pipe, warning.c_str(), gsl::narrow_cast<DWORD>(warning.size() * sizeof(wchar_t)), nullptr, nullptr));
         return true;
     }
 
