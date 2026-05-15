@@ -240,6 +240,9 @@ private:
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
+    // Pipe handle for streaming user warnings to the CLI in real-time.
+    wil::unique_handle m_warningsPipe;
+
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;

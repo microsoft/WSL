@@ -21,7 +21,7 @@ namespace wsl::windows::wslc::execution {
 // Contains arguments via Args.
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
-    CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
+    CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC, stderr)
     {
     }
     ~CLIExecutionContext() override = default;

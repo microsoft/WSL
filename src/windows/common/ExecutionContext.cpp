@@ -422,6 +422,25 @@ bool COMServiceExecutionContext::CanCollectUserErrorMessage()
     return true;
 }
 
+HANDLE COMServiceExecutionContext::s_warningsPipe = nullptr;
+
+void COMServiceExecutionContext::SetWarningsPipe(HANDLE pipe)
+{
+    s_warningsPipe = pipe;
+}
+
+bool COMServiceExecutionContext::CollectUserWarning(const std::wstring& warning)
+{
+    if (s_warningsPipe != nullptr)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(WriteFile(
+            s_warningsPipe, warning.c_str(), gsl::narrow_cast<DWORD>(warning.size() * sizeof(wchar_t)), nullptr, nullptr));
+        return true;
+    }
+
+    return ExecutionContext::CollectUserWarning(warning);
+}
+
 LXSS_ERROR_INFO* ClientExecutionContext::OutError() noexcept
 {
     return &m_outError;

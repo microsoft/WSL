@@ -269,6 +269,15 @@ try
     m_featureFlags = Settings->FeatureFlags;
     m_pluginNotifier = PluginNotifier;
 
+    // Set up the warnings pipe for streaming warnings to the CLI.
+    // The handle is duplicated because COM closes the original when the call completes.
+    if (Settings->WarningsPipe.Type != WSLCHandleTypeUnknown)
+    {
+        const auto warningsPipeHandle = wslutil::FromCOMInputHandle(Settings->WarningsPipe);
+        m_warningsPipe.reset(wslutil::DuplicateHandle(warningsPipeHandle, GENERIC_WRITE | SYNCHRONIZE));
+        wsl::windows::common::COMServiceExecutionContext::SetWarningsPipe(m_warningsPipe.get());
+    }
+
     // Get user token for the current process
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
 

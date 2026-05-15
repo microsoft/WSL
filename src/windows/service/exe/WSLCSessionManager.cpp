@@ -169,17 +169,25 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
+    // Save the warnings pipe before resolving settings (it may be present even with default sessions).
+    WSLCHandle warningsPipe{};
+    if (Settings != nullptr)
+    {
+        warningsPipe = Settings->WarningsPipe;
+    }
+
     // Resolve display name upfront (for both default and custom sessions).
     std::wstring resolvedDisplayName;
-    if (Settings == nullptr)
+    const bool isDefaultSession = (Settings == nullptr || Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
+    if (isDefaultSession)
     {
         // Default session: name determined from token, qualified with username.
         resolvedDisplayName = ResolveDefaultSessionName(tokenInfo);
         Flags = WSLCSessionFlagsOpenExisting | WSLCSessionFlagsPersistent;
+        Settings = nullptr; // Use server-side defaults for all other settings.
     }
     else
     {
-        THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionListEntry{}.DisplayName));
         THROW_HR_IF_MSG(
@@ -270,6 +278,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         AddSessionProcessToJobObject(factory.get());
 
         auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        sessionSettings.WarningsPipe = warningsPipe;
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef));

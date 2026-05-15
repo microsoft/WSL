@@ -111,11 +111,18 @@ Session SessionService::CreateDefaultSession()
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    // Null Settings = default session with server-determined name and settings.
+    // Create a pipe for streaming warnings from the service to the CLI in real-time.
+    wil::unique_handle pipeRead;
+    wil::unique_handle pipeWrite;
+    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&pipeRead, &pipeWrite, nullptr, 0));
+
+    WSLCSessionSettings settings{};
+    settings.WarningsPipe = wslutil::ToCOMInputHandle(pipeWrite.get());
+
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(nullptr, WSLCSessionFlagsNone, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-    return Session(std::move(session));
+    return Session(std::move(session), std::move(pipeRead), std::move(pipeWrite));
 }
 
 int SessionService::Enter(const std::wstring& storagePath, const std::wstring& displayName)
