@@ -39,7 +39,7 @@ namespace Microsoft.WSL.Containers
 
         Windows.Foundation.IReference<UInt32> CpuCount;
         Windows.Foundation.IReference<UInt32> MemoryMB;
-        Windows.Foundation.IReference<UInt32> TimeoutMS;
+        Windows.Foundation.IReference<Windows.Foundation.TimeSpan> Timeout;
         VhdOptions VhdRequirements;
         SessionFeatureFlags FeatureFlags;
     };
@@ -169,7 +169,7 @@ namespace Microsoft.WSL.Containers
     runtimeclass Container
     {
         void Start();
-        void Stop(Signal signal, UInt32 timeoutSeconds);
+        void Stop(Signal signal, Windows.Foundation.TimeSpan timeout);
         void Delete(DeleteContainerFlags flags);
 
         Process CreateProcess(ProcessSettings newProcessSettings);

@@ -229,7 +229,7 @@ class WslcSdkWinRtTests
         auto settings = WSLCSDK::SessionSettings(c_testSessionName, m_storagePath.wstring());
         settings.CpuCount(4);
         settings.MemoryMB(2048);
-        settings.TimeoutMS(30 * 1000);
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
         m_defaultSession = WSLCSDK::Session(settings);
@@ -278,7 +278,7 @@ class WslcSdkWinRtTests
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-extra-session", extraStorage.wstring());
         settings.CpuCount(2);
         settings.MemoryMB(1024);
-        settings.TimeoutMS(30 * 1000);
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 1024ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
         // Positive: Creation must succeed with valid settings.
@@ -313,7 +313,7 @@ class WslcSdkWinRtTests
         const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-storage";
 
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh", extraStorage.wstring());
-        settings.TimeoutMS(30 * 1000);
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
 
         auto session = WSLCSDK::Session(settings);
         session.Terminated([&](WSLCSDK::Session, WSLCSDK::SessionTerminationReason reason) { promise.set_value(reason); });
@@ -507,7 +507,7 @@ class WslcSdkWinRtTests
         // State while running: Running.
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Running);
 
-        container.Stop(WSLCSDK::Signal::SIGKILL, 0);
+        container.Stop(WSLCSDK::Signal::SIGKILL, TimeSpan::zero());
 
         // State after stop: Exited.
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Exited);
@@ -526,7 +526,7 @@ class WslcSdkWinRtTests
 
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Running);
 
-        VERIFY_NO_THROW(container.Stop(WSLCSDK::Signal::SIGKILL, 0));
+        VERIFY_NO_THROW(container.Stop(WSLCSDK::Signal::SIGKILL, TimeSpan::zero()));
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Exited);
 
         VERIFY_NO_THROW(container.Delete(WSLCSDK::DeleteContainerFlags::None));
@@ -1368,7 +1368,7 @@ class WslcSdkWinRtTests
 
         // Create a dedicated session so that volume creation does not affect the shared default session.
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-vhd-test", vhdSessionStorage.wstring());
-        settings.TimeoutMS(30 * 1000u);
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
         auto session = WSLCSDK::Session(settings);

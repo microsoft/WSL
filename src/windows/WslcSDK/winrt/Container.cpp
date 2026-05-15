@@ -19,6 +19,8 @@ Abstract:
 #include "Process.h"
 #include "ProcessSettings.h"
 
+using namespace winrt::Windows::Foundation;
+
 namespace winrt::Microsoft::WSL::Containers::implementation {
 Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings) :
     m_session(session)
@@ -77,10 +79,11 @@ void Container::Start()
     releaseRef.release();
 }
 
-void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, uint32_t timeoutSeconds)
+void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, TimeSpan timeout)
 {
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcStopContainer(ToHandle(), static_cast<WslcSignal>(signal), timeoutSeconds, errorMessage.put());
+    auto timeoutSeconds = std::chrono::duration_cast<std::chrono::seconds>(timeout).count();
+    auto hr = WslcStopContainer(ToHandle(), static_cast<WslcSignal>(signal), static_cast<uint32_t>(timeoutSeconds), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 

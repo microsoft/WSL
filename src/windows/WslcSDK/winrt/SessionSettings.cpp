@@ -17,6 +17,8 @@ Abstract:
 #include "Microsoft.WSL.Containers.SessionSettings.g.cpp"
 #include "Session.h"
 
+using namespace winrt::Windows::Foundation;
+
 namespace winrt::Microsoft::WSL::Containers::implementation {
 SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) : m_name(name), m_storagePath(storagePath)
 {
@@ -71,12 +73,12 @@ void SessionSettings::StoragePath(hstring const& value)
     m_storagePath = value;
 }
 
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::CpuCount()
+IReference<uint32_t> SessionSettings::CpuCount()
 {
     return m_cpuCount;
 }
 
-void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+void SessionSettings::CpuCount(IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
@@ -91,12 +93,12 @@ void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> 
     m_cpuCount = value;
 }
 
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::MemoryMB()
+IReference<uint32_t> SessionSettings::MemoryMB()
 {
     return m_memoryMB;
 }
 
-void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+void SessionSettings::MemoryMB(IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
@@ -111,24 +113,24 @@ void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> 
     m_memoryMB = value;
 }
 
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::TimeoutMS()
+IReference<TimeSpan> SessionSettings::Timeout()
 {
-    return m_timeoutMS;
+    return m_timeout;
 }
 
-void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+void SessionSettings::Timeout(IReference<TimeSpan> const& value)
 {
     if (m_sessionSettings)
     {
         throw hresult_illegal_state_change(L"Cannot change timeout after session has been initialized");
     }
 
-    if (value && value.Value() == 0)
+    if (value && value.Value() == TimeSpan::zero())
     {
         throw hresult_invalid_argument(L"Timeout cannot be 0");
     }
 
-    m_timeoutMS = value;
+    m_timeout = value;
 }
 
 winrt::Microsoft::WSL::Containers::VhdOptions SessionSettings::VhdRequirements()
@@ -186,9 +188,11 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
         winrt::check_hresult(WslcSetSessionSettingsMemory(m_sessionSettings.get(), m_memoryMB.Value()));
     }
 
-    if (m_timeoutMS)
+    if (m_timeout)
     {
-        winrt::check_hresult(WslcSetSessionSettingsTimeout(m_sessionSettings.get(), m_timeoutMS.Value()));
+        auto timeoutMS = std::chrono::duration_cast<std::chrono::milliseconds>(m_timeout.Value()).count();
+        winrt::check_hresult(WslcSetSessionSettingsTimeout(
+            m_sessionSettings.get(), static_cast<uint32_t>(timeoutMS)));
     }
 
     if (m_vhdRequirements)

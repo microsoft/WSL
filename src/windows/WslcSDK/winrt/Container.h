@@ -24,7 +24,7 @@ struct Container : ContainerT<Container>
     Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings);
 
     void Start();
-    void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, uint32_t timeoutSeconds);
+    void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, winrt::Windows::Foundation::TimeSpan timeout);
     void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerFlags const& flags);
     winrt::Microsoft::WSL::Containers::Process CreateProcess(winrt::Microsoft::WSL::Containers::ProcessSettings const& newProcessSettings);
     hstring Inspect();
