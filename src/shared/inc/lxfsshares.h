@@ -28,6 +28,7 @@ typedef struct _LXSS_SHARED_DIRECTORY
 #define LXSS_GPU_LIB_SHARE "lib"
 #define LXSS_GPU_INBOX_LIB_SHARE LXSS_GPU_LIB_SHARE "_inbox"
 #define LXSS_GPU_PACKAGED_LIB_SHARE LXSS_GPU_LIB_SHARE "_packaged"
+#define LXSS_KERNEL_HEADERS_SHARE "kernel_headers"
 
 //
 // Shared directories for GPU compute support.

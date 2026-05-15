@@ -85,6 +85,8 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
+#define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -112,6 +114,7 @@ struct VmConfiguration
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
+    std::string KernelHeadersTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
@@ -1608,6 +1611,19 @@ try
     {
         AddTemporaryMount(LX_WSL2_KERNEL_MODULES_MOUNT_ENV, Config.KernelModulesPath.c_str(), (MS_MOVE | MS_REC));
         AddEnvironmentVariable(LX_WSL2_KERNEL_MODULES_PATH_ENV, Config.KernelModulesPath.c_str());
+    }
+
+    //
+    // If kernel headers were mounted, move them to a temporary location and pass the desired
+    // target path to the distro init via an environment variable. Distro init will move the
+    // mount to /usr/src/linux-headers-<uname -r>/include and create the
+    // /lib/modules/<release>/{build,source} symlinks.
+    //
+
+    if (!Config.KernelHeadersTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, Config.KernelHeadersTarget.c_str());
     }
 
     //
@@ -3204,6 +3220,37 @@ try
                 {
                     return -1;
                 }
+            }
+        }
+
+        if (ConfigMessage->MountKernelHeaders)
+        {
+            // Mount the kernel headers 9p share at a temporary path. The headers will be moved
+            // to /usr/src/linux-headers-<uname -r>/include by the distro init process. Failure
+            // here is non-fatal; if the headers cannot be mounted the distro will simply boot
+            // without them.
+            //
+            // N.B. uname() is called first so a (highly unlikely) failure does not leave behind
+            //      an orphaned mount at KERNEL_HEADERS_TEMP_PATH that the distro init wouldn't
+            //      know to clean up.
+            utsname UnameBuffer{};
+            if (uname(&UnameBuffer) < 0)
+            {
+                LOG_ERROR("uname failed, {}", errno);
+            }
+            else if (MountPlan9(LXSS_KERNEL_HEADERS_SHARE, KERNEL_HEADERS_TEMP_PATH, true) < 0)
+            {
+                LOG_ERROR("Failed to mount kernel headers 9p share, {}", errno);
+            }
+            else
+            {
+                // N.B. Convert UnameBuffer.release (a char[65] array) to std::string first so
+                //      std::format treats it as a null-terminated C-string. Otherwise the format
+                //      will splice the entire 65-byte array (including trailing NULs) into the
+                //      result, hiding any literal characters appended after the {} placeholder
+                //      when the resulting std::string is later used as a C-string.
+                const std::string release{UnameBuffer.release};
+                Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, release);
             }
         }
 

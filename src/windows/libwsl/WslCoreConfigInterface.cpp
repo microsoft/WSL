@@ -195,6 +195,10 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         static_assert(std::is_same<decltype(wslConfigSetting.StringValue), decltype(wslConfig->Config.KernelModulesPath.c_str())>::value);
         wslConfigSetting.StringValue = wslConfig->Config.KernelModulesPath.c_str();
         break;
+    case KernelHeadersPath:
+        static_assert(std::is_same<decltype(wslConfigSetting.StringValue), decltype(wslConfig->Config.KernelHeadersPath.c_str())>::value);
+        wslConfigSetting.StringValue = wslConfig->Config.KernelHeadersPath.c_str();
+        break;
     default:
         FAIL_FAST();
     }
@@ -559,6 +563,20 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             defaultConfig.KernelModulesPath,
             wslConfigSetting.StringValue,
             wslConfig->Config.KernelModulesPath);
+    }
+    case KernelHeadersPath:
+    {
+        if (wslConfigSetting.StringValue == nullptr)
+        {
+            return ERROR_INVALID_PARAMETER;
+        }
+
+        return SetWslConfigSetting(
+            wslConfig,
+            ConfigSetting::KernelHeaders,
+            defaultConfig.KernelHeadersPath,
+            wslConfigSetting.StringValue,
+            wslConfig->Config.KernelHeadersPath);
     }
     default:
         FAIL_FAST();

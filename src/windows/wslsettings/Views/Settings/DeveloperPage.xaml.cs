@@ -36,6 +36,7 @@ public sealed partial class DeveloperPage : Page
         DeveloperPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelPathExpander", "CustomKernelPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelModulesPathExpander", "CustomKernelModulesPathTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelHeadersPathExpander", "CustomKernelHeadersPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomSystemDistroPathExpander", "CustomSystemDistroPathTextBox");
     }
 
@@ -61,6 +62,16 @@ public sealed partial class DeveloperPage : Page
         if (file != null)
         {
             ViewModel.CustomKernelModulesPath = file.Path;
+        }
+    }
+
+    public async void CustomKernelHeadersPath_Click(object sender, RoutedEventArgs e)
+    {
+        // Headers ship as a directory tree of loose .h files, so prompt for a folder.
+        Windows.Storage.StorageFolder folder = await RuntimeHelper.PickSingleFolderAsync();
+        if (folder != null)
+        {
+            ViewModel.CustomKernelHeadersPath = folder.Path;
         }
     }
 

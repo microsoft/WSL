@@ -2886,6 +2886,99 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         ValidateOutput(L"dmesg | grep -iF \"failed to load module 'not-found'\" | wc -l", L"1\n", L"", 0);
     }
 
+    WSL2_TEST_METHOD(KernelHeaders)
+    {
+        // The headers are mounted at /usr/src/linux-headers-$(uname -r)/include and
+        // /lib/modules/$(uname -r)/build is symlinked to the parent directory.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/source", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
+
+        // Compile a tiny C program against the mounted headers and run it. This proves the
+        // headers are usable and that recent uapi symbols added after the test distro's
+        // bundled linux-libc-dev snapshot are present (BPF_PROG_TYPE_NETFILTER added in 6.4,
+        // IORING_OP_FUTEX_WAKE added in 6.7). The compiled program prints
+        // <MAJOR>.<PATCHLEVEL>.<SUBLEVEL> from <linux/version.h>; the script verifies that
+        // string is a prefix of the running kernel's `uname -r`.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                LR"BASH(bash -ec '
+                    d=$(mktemp -d)
+                    trap "rm -rf $d" EXIT
+                    cat > "$d/t.c" <<EOF
+#include <stdio.h>
+#include <linux/version.h>
+#include <linux/bpf.h>
+#include <linux/io_uring.h>
+int main(void){
+    printf("%u.%u.%u\n",
+        LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL, LINUX_VERSION_SUBLEVEL);
+    return (BPF_PROG_TYPE_NETFILTER >= 32 && IORING_OP_FUTEX_WAKE >= 50) ? 0 : 7;
+}
+EOF
+                    cc -isystem /lib/modules/$(uname -r)/build/include -o "$d/t" "$d/t.c"
+                    v=$("$d/t")
+                    case "$(uname -r)" in "$v"*) exit 0 ;; *) exit 8 ;; esac
+                ')BASH",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+
+        // Resolve the bundled kernel + headers paths up front so they can be paired with the
+        // negative-test inputs below.
+#ifdef WSL_DEV_INSTALL_PATH
+
+        std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
+        std::wstring kernelHeadersPath = WSL_DEV_INSTALL_PATH L"/linux-headers";
+
+#else
+
+        auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        VERIFY_IS_TRUE(installPath.has_value());
+
+        std::filesystem::path wslInstallPath(installPath.value());
+
+        std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
+        std::wstring kernelHeadersPath = wslInstallPath / "tools" / "linux-headers";
+
+#endif
+
+        kernelPath = std::regex_replace(kernelPath, std::wregex(L"\\\\"), L"\\\\");
+        kernelHeadersPath = std::regex_replace(kernelHeadersPath, std::wregex(L"\\\\"), L"\\\\");
+
+        // Verify the error message if a non-existent custom kernel headers path is specified.
+        // A valid custom kernel must also be set; otherwise the "kernelHeaders requires kernel"
+        // guard fires first (covered by the next case).
+        const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
+        const std::wstring nonExistentFile = L"DoesNotExist";
+        WslConfigChange configChange(LxssGenerateTestConfig({.kernel = kernelPath.c_str(), .kernelHeaders = nonExistentFile.c_str()}));
+        ValidateOutput(
+            L"echo ok",
+            std::format(
+                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
+                wsl::shared::Localization::MessageCustomKernelHeadersNotFound(wslConfigPath, nonExistentFile)),
+            L"");
+
+        // Verify the error message if custom kernel headers are used with the default kernel.
+        configChange.Update(LxssGenerateTestConfig({.kernelHeaders = kernelHeadersPath.c_str()}));
+        ValidateOutput(
+            L"echo ok",
+            std::format(
+                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
+                wsl::shared::Localization::MessageMismatchedKernelHeadersError()),
+            L"");
+
+        // Custom kernel + custom headers: validate the headers are mounted and discoverable.
+        configChange.Update(LxssGenerateTestConfig({.kernel = kernelPath.c_str(), .kernelHeaders = kernelHeadersPath.c_str()}));
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
+
+        configChange.Update(LxssGenerateTestConfig());
+    }
+
     WSL2_TEST_METHOD(CrashCollection)
     {
         const auto folder = std::filesystem::absolute(L"test-crash-dumps");

@@ -39,6 +39,19 @@ public class RuntimeHelper
         return openPicker.PickSingleFileAsync();
     }
 
+    public static Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder> PickSingleFolderAsync()
+    {
+        var folderPicker = new FolderPicker();
+        var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+
+        WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, hWnd);
+
+        folderPicker.ViewMode = PickerViewMode.List;
+        folderPicker.FileTypeFilter.Add("*");
+
+        return folderPicker.PickSingleFolderAsync();
+    }
+
     public static void TryMoveFocusPreviousControl(Button? button)
     {
         if (button == null)

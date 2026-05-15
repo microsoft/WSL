@@ -1121,6 +1121,68 @@ Return Value:
     CATCH_LOG()
 
     //
+    // Move the kernel headers temporary mount into its final location and create the symlinks
+    // expected by Debian/Ubuntu tooling. The target path is supplied by mini_init as
+    // /usr/src/linux-headers-<uname -r>/include.
+    //
+    // N.B. Failure to install the headers is non-fatal; the distro will simply boot without
+    //      them, mirroring the kernel modules behavior above.
+    //
+
+    try
+    {
+        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV);
+        if (tempMount)
+        {
+            const char* target = getenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+            if (target)
+            {
+                std::string targetPath{target};
+                unsetenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+
+                if (tempMount.MoveMount(targetPath.c_str()))
+                {
+                    // Derive the headers root directory by stripping the trailing "/include".
+                    constexpr std::string_view c_includeSuffix = "/include";
+                    if (targetPath.ends_with(c_includeSuffix))
+                    {
+                        const std::string headersRoot = targetPath.substr(0, targetPath.size() - c_includeSuffix.size());
+
+                        utsname unameBuffer{};
+                        if (uname(&unameBuffer) == 0)
+                        {
+                            // See main.cpp; convert release to std::string so subsequent appends
+                            // don't follow embedded NUL bytes from the char[65] buffer.
+                            const std::string release{unameBuffer.release};
+                            const std::string modulesDir = std::format("/lib/modules/{}", release);
+                            if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
+                            {
+                                for (const auto* linkName : {"build", "source"})
+                                {
+                                    const std::string linkPath = modulesDir + "/" + linkName;
+                                    if ((symlink(headersRoot.c_str(), linkPath.c_str()) < 0) && (errno != EEXIST))
+                                    {
+                                        LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                LOG_ERROR("UtilMkdirPath({}) failed {}", modulesDir, errno);
+                            }
+                        }
+                        else
+                        {
+                            LOG_ERROR("uname failed {}", errno);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    CATCH_LOG()
+
+    //
     // Change the permission of some devtmpfs devices to be more permissive.
     //
     // N.B. These devices may not be present with a custom kernel config.
