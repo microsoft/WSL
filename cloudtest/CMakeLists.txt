@@ -7,12 +7,19 @@ if (${TARGET_PLATFORM} STREQUAL x64)
         "wsl-test-image-win11-23h2-ent-2024-11-18"
         "wsl-test-image-2022-datacenter-g2-2024-09-10"
         "wsl-test-image-win10-22h2-ent-g2-2024-09-10")
-      
+
+    # WSLC tests trigger a Hyper-V VMBus PowerOff hang during VM teardown
+    # on Windows Server SKUs, which causes the WSLC TAEF job to time out.
+    # Skip the WSLC test suite on Server images until the host issue is
+    # resolved.
+    set(CLOUDTEST_SERVER_IMAGES
+        "wsl-test-image-2022-datacenter-g2-2024-09-10")
 
     set(CLOUDTEST_TEST_PACKAGES "Test_Packages_2025_07_28")
     set(DUMPTOOL_DROP "DumpTool_X64_2025-01-27")
 elseif (${TARGET_PLATFORM} STREQUAL arm64)
     set(CLOUDTEST_IMAGES)
+    set(CLOUDTEST_SERVER_IMAGES)
 else()
     message(FATAL_ERROR "Unsupported target platform: ${TARGET_PLATFORM}")
 endif()
@@ -47,5 +54,7 @@ endfunction()
 foreach(image ${CLOUDTEST_IMAGES})
     add_test_group("${image}" "1" "wsl1" "not (@TestCategory='WSLC')")
     add_test_group("${image}" "2" "wsl2" "not (@TestCategory='WSLC')")
-    add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'")
+    if (NOT image IN_LIST CLOUDTEST_SERVER_IMAGES)
+        add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'")
+    endif()
 endforeach()
