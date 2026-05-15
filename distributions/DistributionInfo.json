@@ -110,8 +110,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 16.0",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260218.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.29-Build1.29.wsl",
-                    "Sha256": "0xe0bd5e676a30164f43bbe9a7a0e0999ba9cfa396d030abf9c95122a656ed5c49"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260515.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.74-Build1.74.wsl",
+                    "Sha256": "0xd98c6790a11ce149e37fe7ee276f8093f927a5882a674b1f1912a7f015311650"
                 }
             }
         ],
@@ -311,16 +311,6 @@
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.5-250708.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux9.5_dm28ctvqnhe9g"
-        },
-        {
-            "Name": "openSUSE-Leap-15.6",
-            "FriendlyName": "openSUSE Leap 15.6",
-            "StoreAppId": "9PDTJHBQRQPF",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_x64.Appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_ARM64.Appx",
-            "PackageFamilyName": "46932SUSE.openSUSELeap15.6_022rs5jcyhyac"
         },
         {
             "Name": "SUSE-Linux-Enterprise-15-SP6",
