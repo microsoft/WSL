@@ -136,12 +136,12 @@
                 "FriendlyName": "Debian GNU/Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9600035/artifacts/raw/Debian_WSL_AMD64_v1.25.0.0.wsl",
-                    "Sha256": "ee39a35d9f655ec8bafd5125918cbe4c125d604197cdb9c723ce600296b9d319"
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9606244/artifacts/raw/Debian_WSL_AMD64_v1.26.0.0.wsl",
+                    "Sha256": "5ec7dc68216e75d1d4d4761474e99d8461a98d316537110314b137122a879e0f"
                 },
                 "Arm64Url": {
-                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9600035/artifacts/raw/Debian_WSL_ARM64_v1.25.0.0.wsl",
-                    "Sha256": "c748fb8c69168690611c4934e6dd310bdd7a75863680fa083d3c547dc0a0c702"
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9606244/artifacts/raw/Debian_WSL_ARM64_v1.26.0.0.wsl",
+                    "Sha256": "09120df4fadc36fb2a0f7298e197785e6f599f12aaf95d43cba07a8ac7fb316b"
                 }
             }
         ],
