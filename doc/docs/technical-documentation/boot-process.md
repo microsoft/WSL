@@ -83,7 +83,7 @@ When started, the virtual machine will boot into the provided kernel, and then e
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
 - Whether [wslg](https://github.com/microsoft/wslg) is enabled
-- Whether to mount the bundled Linux kernel headers (mounted from a read-only plan9 share into `/usr/src/linux-headers-$(uname -r)/include` in each distribution, with `/lib/modules/$(uname -r)/{build,source}` symlinked to the headers root)
+- Whether to mount the bundled Linux kernel headers (mounted from a read-only plan9 share into `/usr/src/linux-headers-$(uname -r)/include` in each distribution, with `/lib/modules/$(uname -r)/build` symlinked to the headers root)
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

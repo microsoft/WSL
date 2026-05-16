@@ -2891,7 +2891,6 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // The headers are mounted at /usr/src/linux-headers-$(uname -r)/include and
         // /lib/modules/$(uname -r)/build is symlinked to the parent directory.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/source", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
 

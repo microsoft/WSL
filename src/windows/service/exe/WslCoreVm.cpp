@@ -462,7 +462,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Add a read-only 9p share for the kernel headers directory. Mini-init mounts this share at a
     // temporary path and hands it off to distro init, which moves it under
     // /usr/src/linux-headers-$(uname -r)/include and creates the /lib/modules/$(uname -r)/build
-    // and /source symlinks expected by Debian/Ubuntu tooling.
+    // symlink expected by out-of-tree module tooling.
     if (m_mountKernelHeaders)
     {
         constexpr auto flags = (hcs::Plan9ShareFlags::ReadOnly | hcs::Plan9ShareFlags::AllowOptions);
