@@ -2117,6 +2117,19 @@ Utilizzo:
     <value>Il contenitore '{}' è in esecuzione.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Le reti aggiuntive non sono consentite con la modalità di rete contenitori.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>I mapping delle porte non sono supportati con la modalità di rete dei contenitori; Le porte sono di proprietà del contenitore di destinazione.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Il nome del contenitore di destinazione è obbligatorio per la modalità di rete del contenitore.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Target container '{}' not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Contenitore "{}" non trovato.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

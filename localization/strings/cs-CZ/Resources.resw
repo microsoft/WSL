@@ -2111,6 +2111,19 @@ Využití:
     <value>Kontejner {} je spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Další sítě se v režimu kontejnerové sítě nepovolují.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Target container name is required for container network mode.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Target container '{}' not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Kontejner {} se nenašel.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2955,7 +2968,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Název svazku</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Zadejte název ovladače svazku, např. 'guest' nebo 'vhd' (výchozí: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

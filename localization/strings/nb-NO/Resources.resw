@@ -2111,6 +2111,19 @@ Bruk:
     <value>Beholderen «{}» kjører.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Flere nettverk er ikke tillatt med beholdernettverksmodus.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Porttilordninger støttes ikke med beholdernettverksmodus. porter eies av målbeholderen.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Målbeholdernavn kreves for beholdernettverksmodus.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Target container '{}' not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Beholder {} ikke funnet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2739,7 +2752,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis n sist opprettede beholdere (inkluderer alle tilstander)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Vis den sist opprettede beholderen (inkuderer alle tilstander)</value>
+    <value>Vis den sist opprettede beholderen (inkluderer alle tilstander)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Beholderens vertsnavn</value>

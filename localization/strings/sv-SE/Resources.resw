@@ -2111,6 +2111,19 @@ Användning:
     <value>Containern {} körs.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Ytterligare nätverk tillåts inte i containernätverksläge.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Portmappningar stöds inte med containernätverksläge. portar ägs av målcontainern.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Target container name is required for container network mode.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Target container '{}' not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Containern '{}' hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2955,7 +2968,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Volymnamn</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Ange namn på volymdrivrutin, t.ex. 'guest' eller 'vhd' (standard: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
@@ -3038,7 +3051,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCKERA I/O</value>
+    <value>BLOCK I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
