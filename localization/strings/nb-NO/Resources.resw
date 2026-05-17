@@ -2112,7 +2112,7 @@ Bruk:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Flere nettverk er ikke tillatt med beholdernettverksmodus.</value>
+    <value>Tilleggsnettverk er ikke tillatt med beholdernettverksmodus.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttilordninger støttes ikke med beholdernettverksmodus. porter eies av målbeholderen.</value>
@@ -2121,7 +2121,7 @@ Bruk:
     <value>Målbeholdernavn kreves for beholdernettverksmodus.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>Målbeholderen {} ble ikke funnet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
