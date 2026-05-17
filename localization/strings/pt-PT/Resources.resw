@@ -2121,7 +2121,7 @@ Utilização:
     <value>O nome do contentor de destino é necessário para o modo de rede de contentor.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>Contentor de destino '{}' não encontrado.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
@@ -2968,7 +2968,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Nome do volume</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Especifique o nome do controlador de volume, por exemplo, "guest" ou "vhd" (predefinição: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">

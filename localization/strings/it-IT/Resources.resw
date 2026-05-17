@@ -2127,7 +2127,7 @@ Utilizzo:
     <value>Il nome del contenitore di destinazione è obbligatorio per la modalità di rete del contenitore.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>Contenitore radice '{}' non trovato.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">

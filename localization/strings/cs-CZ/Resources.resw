@@ -2115,13 +2115,13 @@ Využití:
     <value>Další sítě se v režimu kontejnerové sítě nepovolují.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
-    <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
+    <value>Mapování portů režim sítě kontejneru nepodporuje; porty patří cílovému kontejneru.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
-    <value>Target container name is required for container network mode.</value>
+    <value>Název cílového kontejneru je pro režim sítě kontejneru povinný.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>Cílový kontejner {} se nenašel.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">

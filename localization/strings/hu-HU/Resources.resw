@@ -2112,16 +2112,16 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Additional networks are not allowed with container network mode.</value>
+    <value>Tárolóhálózati módban nem engedélyezettek további hálózatok.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
-    <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
+    <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
-    <value>Target container name is required for container network mode.</value>
+    <value>A tárolóhálózati módhoz meg kell adni a céltároló nevét.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>A(z) {} céltároló nem található.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">

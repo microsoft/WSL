@@ -2118,10 +2118,10 @@ Användning:
     <value>Portmappningar stöds inte med containernätverksläge. portar ägs av målcontainern.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
-    <value>Target container name is required for container network mode.</value>
+    <value>Målcontainernamn krävs för containernätverksläge.</value>
   </data>
   <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
-    <value>Target container '{}' not found.</value>
+    <value>Målcontainern {} hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
