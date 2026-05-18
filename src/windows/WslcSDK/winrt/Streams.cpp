@@ -63,6 +63,11 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
     co_return buffer;
 }
 
+void IOHandleInputStream::Close()
+{
+    m_handle.reset();
+}
+
 IOHandleOutputStream::IOHandleOutputStream(wil::unique_handle&& handle) : m_handle(std::move(handle))
 {
 }
@@ -87,6 +92,11 @@ winrt::Windows::Foundation::IAsyncOperation<bool> IOHandleOutputStream::FlushAsy
 
     THROW_IF_WIN32_BOOL_FALSE(FlushFileBuffers(self->m_handle.get()));
     co_return true;
+}
+
+void IOHandleOutputStream::Close()
+{
+    m_handle.reset();
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation
