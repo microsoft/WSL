@@ -195,7 +195,11 @@ private:
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void StartPodmanSystemService();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
+    void ImportImageImpl(
+        DockerHTTPClient::HTTPRequestContext& Request,
+        const WSLCHandle ImageHandle,
+        std::function<void(const gsl::span<char>&)>&& OnResponseChunk,
+        std::function<void()>&& OnResponseComplete);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 

@@ -56,29 +56,6 @@ void EnforceRegistryAllowlist(const std::string& Repo)
     THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
-std::string IndentLines(const std::string& input, const std::string& prefix)
-{
-    if (input.empty())
-    {
-        return {};
-    }
-
-    std::string result = prefix;
-    for (size_t i = 0; i < input.size(); i++)
-    {
-        result.push_back(input[i]);
-        if (i + 1 < input.size())
-        {
-            if (input[i] == '\n' || (input[i] == '\r' && input[i + 1] != '\n'))
-            {
-                result.append(prefix);
-            }
-        }
-    }
-
-    return result;
-}
-
 void ValidateName(LPCSTR Name, size_t maxLength)
 {
     const auto& locale = std::locale::classic();
@@ -567,7 +544,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 
         auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
 
-        if (parsed.errorDetail.has_value())
+        if (parsed.error.has_value())
         {
             if (reportedError.has_value())
             {
@@ -576,10 +553,10 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
                     "Received multiple error messages during image %hs. Previous: %hs, New: %hs",
                     OperationName,
                     reportedError->c_str(),
-                    parsed.errorDetail->message.c_str());
+                    parsed.error->c_str());
             }
 
-            reportedError = parsed.errorDetail->message;
+            reportedError = std::move(parsed.error);
             return;
         }
 
@@ -725,9 +702,11 @@ try
     auto unmountFolder =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
-    // std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
-    // This will likely break.
     std::vector<std::string> buildArgs{"/usr/bin/podman", "build"};
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose))
+    {
+        buildArgs.push_back("--log-level=debug");
+    }
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -770,164 +749,21 @@ try
     io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
         buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
-    bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
-    std::string allOutput;
-    std::string pendingJson;
-    std::set<std::string> reportedSteps;
-    std::set<std::string> reportedErrors;
-    std::map<std::string, std::string> digestToStageName;
-    bool needsNewline = false; // true when the last log chunk didn't end with \n
-    std::string lastLogVertex; // digest of the vertex that produced the last log output
-
-    // Extract the named build stage from a BuildKit vertex name. Vertices within the same named stage
-    // (e.g. "[builder 1/3]" and "[builder 2/3]") share a key. Returns empty for unnamed stages.
-    auto getStageName = [](const std::string& name) -> std::string {
-        if (name.size() < 2 || name[0] != '[')
-        {
-            return {};
-        }
-
-        auto close = name.find(']');
-        if (close == std::string::npos)
-        {
-            return {};
-        }
-
-        // Pattern: "[name N/M]" or "[N/M]". The stage name is the part before "N/M".
-        std::string content = name.substr(1, close - 1);
-        auto slash = content.find('/');
-        if (slash != std::string::npos)
-        {
-            auto space = content.rfind(' ', slash);
-            if (space != std::string::npos)
-            {
-                return content.substr(0, space);
-            }
-        }
-
-        return {};
-    };
-
-    auto logPrefix = [](const std::string& name) -> std::string {
-        if (name.empty())
-        {
-            return "  | ";
-        }
-        return "  [" + name + "] ";
-    };
-
-    auto reportProgress = [&](const std::string& message, const char* id = "") {
+    // Podman emits human-readable build output on stderr (e.g. "STEP 1/3: FROM ...", "--> abcd...", per-step logs,
+    // including the final "Error: ..." line on failure). Echo each line straight to the client so the user sees both
+    // progress and any error message in real time.
+    auto captureOutput = [&](const gsl::span<char>& content) {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
+            std::string line{content.begin(), content.end()};
+            THROW_IF_FAILED(ProgressCallback->OnProgress(line.c_str(), "log", 0, 0));
         }
     };
 
-    static constexpr char c_logId[] = "log";
-
-    auto flushLine = [&]() {
-        if (needsNewline)
-        {
-            reportProgress("\n", c_logId);
-            needsNewline = false;
-        }
-    };
-
-    // Accumulate lines and use accept() to detect complete JSON objects. Check for non-JSON lines between JSON objects and add
-    // them to the output in case they contain helpful information about the build.
-    auto captureOutput = [&](const gsl::span<char>& content) {
-        std::string line{content.begin(), content.end()};
-
-        pendingJson.append(line);
-
-        if (!nlohmann::json::accept(pendingJson))
-        {
-            if (pendingJson.empty() || pendingJson[0] != '{')
-            {
-                allOutput.append(pendingJson).append("\n");
-                pendingJson.clear();
-            }
-
-            return;
-        }
-
-        auto json = nlohmann::json::parse(pendingJson);
-        pendingJson.clear();
-
-        docker_schema::BuildKitSolveStatus status{};
-        from_json(json, status);
-
-        // Process vertices before logs so digestToStageName is populated for log correlation.
-        for (const auto& vertex : status.vertexes)
-        {
-            if (!verbose && vertex.name.find("[internal]") != std::string::npos)
-            {
-                continue;
-            }
-
-            digestToStageName.try_emplace(vertex.digest, getStageName(vertex.name));
-
-            if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
-            {
-                flushLine();
-                reportProgress(vertex.name + "\n");
-            }
-
-            if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
-            {
-                flushLine();
-                reportProgress(vertex.error + "\n");
-            }
-        }
-
-        for (const auto& log : status.logs)
-        {
-            if (auto it = digestToStageName.find(log.vertex); it != digestToStageName.end() && !log.data.empty())
-            {
-                std::string decoded = wslutil::Base64Decode(log.data);
-                if (!decoded.empty())
-                {
-                    if (log.vertex != lastLogVertex && decoded[0] != '\n')
-                    {
-                        flushLine();
-                    }
-
-                    // When continuing an unterminated line, emit the leading \n or \r directly
-                    // so it terminates/overwrites cleanly without a spurious prefix.
-                    if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
-                    {
-                        reportProgress(decoded.substr(0, 1), c_logId);
-                        decoded.erase(0, 1);
-                    }
-
-                    if (!decoded.empty())
-                    {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
-                    }
-
-                    needsNewline = !decoded.empty() && decoded.back() != '\n';
-                    lastLogVertex = log.vertex;
-                }
-            }
-        }
-
-        for (const auto& entry : status.statuses)
-        {
-            if (auto it = digestToStageName.find(entry.vertex);
-                it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
-            {
-                flushLine();
-                reportProgress(logPrefix(it->second) + entry.id + "\n");
-            }
-        }
-    };
-
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
+    // Podman writes the final image ID to stdout on success and leaves stdout empty on failure. We don't surface this to
+    // the client, but draining the handle is what signals build completion (EOF on stdout cancels the IO loop).
     io.AddHandle(
-        std::make_unique<io::ReadHandle>(
-            buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }),
-        io::MultiHandleWait::CancelOnCompleted);
+        std::make_unique<io::ReadHandle>(buildProcess.GetStdHandle(1), [](const auto&) {}), io::MultiHandleWait::CancelOnCompleted);
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -962,7 +798,6 @@ try
     }
     catch (...)
     {
-        flushLine();
         LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
         try
         {
@@ -986,21 +821,13 @@ try
         throw;
     }
 
-    flushLine();
-
     THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
-    // Strip \r from the error output. The captured docker output sometimes contains
-    // \r\n line endings (e.g., in the Dockerfile context BuildKit prints on failure).
-    // When the CRT writes stderr in text mode it translates each \n to \r\n, turning
-    // \r\n into \r\r\n. cmd.exe's 2> writes that as-is (one line break), but
-    // PowerShell's 2> treats it as two line breaks and double-spaces the output.
-    // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
-    // translation.
-    std::erase(allOutput, '\r');
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
+    // Podman has already streamed any error message to the client via ProgressCallback above, so just signal failure
+    // here without re-surfacing the build log.
+    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "podman build exited with code %i", exitCode);
 
     return S_OK;
 }
@@ -1019,7 +846,11 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    // No progress for LoadImage.
+    auto onResponseChunk = [](const gsl::span<char>&) {};
+    auto onResponseComplete = [] {};
+
+    ImportImageImpl(*requestContext, ImageHandle, std::move(onResponseChunk), std::move(onResponseComplete));
 
     return S_OK;
 }
@@ -1045,14 +876,51 @@ try
 
     auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    auto errorMessage = std::make_shared<std::optional<std::string>>();
+
+    auto onResponseChunk = [errorMessage](const gsl::span<char>& buffer) {
+        auto parsed = shared::FromJson<docker_schema::CreateImageProgress>(std::string(buffer.begin(), buffer.end()).c_str());
+
+        if (parsed.error.has_value())
+        {
+            if (errorMessage->has_value())
+            {
+                LOG_HR_MSG(
+                    E_UNEXPECTED,
+                    "Overriding previous error message '%hs' with new message '%hs'",
+                    (*errorMessage)->c_str(),
+                    parsed.error->c_str());
+            }
+
+            *errorMessage = std::move(parsed.error);
+        }
+        else if (!parsed.status.empty())
+        {
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.status.c_str(), "Status"));
+        }
+        else
+        {
+            LOG_HR_MSG(E_UNEXPECTED, "Failed to parse import progress: %.*hs", static_cast<int>(buffer.size()), buffer.data());
+        }
+    };
+
+    auto onResponseComplete = [errorMessage] {
+        // Surface stream-reported errors (HTTP 200 followed by an error JSON line) after the transfer completes.
+        THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage->value(), errorMessage->has_value());
+    };
+
+    ImportImageImpl(*requestContext, ImageHandle, std::move(onResponseChunk), std::move(onResponseComplete));
 
     OnImageCreated(ImageName);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+void WSLCSession::ImportImageImpl(
+    DockerHTTPClient::HTTPRequestContext& Request,
+    const WSLCHandle ImageHandle,
+    std::function<void(const gsl::span<char>&)>&& OnResponseChunk,
+    std::function<void()>&& OnResponseComplete)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1078,7 +946,6 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
     };
 
-    std::optional<std::string> errorMessage;
     auto onProgress = [&](const gsl::span<char>& buffer) {
         if (pendingErrorJson.has_value())
         {
@@ -1087,29 +954,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
             return;
         }
 
-        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
-
-        if (parsed.errorDetail.has_value())
-        {
-            if (errorMessage.has_value())
-            {
-                LOG_HR_MSG(
-                    E_UNEXPECTED,
-                    "Overriding previous error message '%hs' with new message '%hs'",
-                    errorMessage->c_str(),
-                    parsed.errorDetail->message.c_str());
-            }
-
-            errorMessage = std::move(parsed.errorDetail->message);
-        }
-        else if (parsed.stream.has_value())
-        {
-            WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
-        }
-        else
-        {
-            LOG_HR_MSG(E_UNEXPECTED, "Failed to parse import progress: %.*hs", static_cast<int>(buffer.size()), buffer.data());
-        }
+        OnResponseChunk(buffer);
     };
 
     // Shutdown the Docker stream's write side when the user pipe is closed.
@@ -1135,8 +980,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 
-    // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
+    OnResponseComplete();
 }
 
 HRESULT WSLCSession::SaveImage(WSLCHandle OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)

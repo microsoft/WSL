@@ -1215,9 +1215,16 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
 
         wil::unique_handle stream{
-            (HANDLE)m_dockerClient
-                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize})
-                .release()};
+            (HANDLE)m_dockerClient.StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty}).release()};
+
+        if (request.Tty && Options->TtyRows != 0 && Options->TtyColumns != 0)
+        {
+            try
+            {
+                m_dockerClient.ResizeExecTty(result.Id, Options->TtyRows, Options->TtyColumns);
+            }
+            CATCH_LOG()
+        }
 
         std::unique_ptr<WSLCProcessIO> io;
         if (request.Tty)
@@ -1256,7 +1263,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
                 control->SetPid(state.Pid);
                 break; // Exec is running, exit.
             }
-            else if (state.ExitCode.has_value())
+            else if (!state.Running && state.ExitCode.has_value())
             {
                 control->SetExitCode(state.ExitCode.value());
                 break; // Exec has exited, exit.

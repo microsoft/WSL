@@ -35,14 +35,6 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
-struct ImageLoadResult
-{
-    std::optional<std::string> stream;
-    std::optional<ErrorResponse> errorDetail;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
-};
-
 struct EmptyRequest
 {
     using TResponse = void;
@@ -457,14 +449,13 @@ struct CreateExec
     bool AttachStdout{};
     bool AttachStderr{};
     bool Tty{};
-    std::vector<ULONG> ConsoleSize;
     std::vector<std::string> Cmd;
     std::vector<std::string> Env;
     std::optional<std::string> User;
     std::string WorkingDir;
     std::optional<std::string> DetachKeys;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User, DetachKeys);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, Cmd, Env, WorkingDir, User, DetachKeys);
 };
 
 struct StartExec
@@ -472,9 +463,8 @@ struct StartExec
     using TResponse = void;
     bool Tty{};
     bool Detach{};
-    std::vector<ULONG> ConsoleSize;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach);
 };
 
 enum class ContainerState
@@ -525,42 +515,6 @@ struct ContainerInfo
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
 };
 
-struct BuildKitVertex
-{
-    std::string digest;
-    std::string name;
-    std::string started;
-    std::string error;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
-};
-
-struct BuildKitStatus
-{
-    std::string id;
-    std::string vertex;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
-};
-
-struct BuildKitLog
-{
-    std::string vertex;
-    std::string data; // base64-encoded output
-    int stream{};     // 1 = stdout, 2 = stderr
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitLog, vertex, data, stream);
-};
-
-struct BuildKitSolveStatus
-{
-    std::vector<BuildKitVertex> vertexes;
-    std::vector<BuildKitStatus> statuses;
-    std::vector<BuildKitLog> logs;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses, logs);
-};
-
 struct CreateImageProgressDetails
 {
     uint64_t current{};
@@ -574,11 +528,11 @@ struct CreateImageProgress
 {
     std::string status;
     std::string id;
-    std::optional<ErrorResponse> errorDetail;
+    std::optional<std::string> error;
 
     CreateImageProgressDetails progressDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, errorDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, error);
 };
 
 // Container stats (GET /containers/{id}/stats?stream=false)
