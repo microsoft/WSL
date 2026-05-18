@@ -44,6 +44,10 @@ struct Process : ProcessT<Process>
     static void final_release(std::unique_ptr<Process> self)
     {
         self->m_process.reset();
+        if (self->m_waitForExitAction)
+        {
+            self->m_waitForExitAction.Cancel();
+        }
     }
 
 private:
@@ -51,7 +55,7 @@ private:
     void EnsureNotStarted() const;
 
     void ApplyCallbacksToSettings();
-    winrt::fire_and_forget StartWaitingForExit();
+    winrt::Windows::Foundation::IAsyncAction StartWaitingForExit();
 
     static void CALLBACK OutputCallback(
         WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept;
@@ -62,6 +66,8 @@ private:
     winrt::Microsoft::WSL::Containers::ProcessSettings m_settings{nullptr};
 
     winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
+
+    winrt::Windows::Foundation::IAsyncAction m_waitForExitAction{nullptr};
 
     // For output mode Event
     winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler> m_outputReceivedEvent;

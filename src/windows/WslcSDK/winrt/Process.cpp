@@ -50,7 +50,7 @@ void Process::ApplyCallbacksToSettings()
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
-winrt::fire_and_forget Process::StartWaitingForExit()
+winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExit()
 {
     // Event mode uses the exit callback set in ApplyCallbacksToSettings; no need to wait here.
     if (m_outputMode == ProcessOutputMode::Event)
@@ -60,6 +60,10 @@ winrt::fire_and_forget Process::StartWaitingForExit()
 
     wil::unique_handle exitEventHandle;
     winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), exitEventHandle.put()));
+
+    // Allow the wait to be cancelled even if suspended for resume_on_signal.
+    auto cancellation = co_await winrt::get_cancellation_token();
+    cancellation.enable_propagation();
 
     auto weak_this = get_weak();
     co_await winrt::resume_on_signal(exitEventHandle.get());
