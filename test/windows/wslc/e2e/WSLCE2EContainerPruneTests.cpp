@@ -48,7 +48,7 @@ class WSLCE2EContainerPruneTests
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VerifyStdoutContains(result, L"Total reclaimed space:");
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(0.0)));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_StoppedContainer)
@@ -64,17 +64,10 @@ class WSLCE2EContainerPruneTests
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VerifyStdoutContains(result, L"Total reclaimed space:");
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
 
         // Verify the container is actually removed
-        auto listResult = RunWslc(L"container list --all");
-        listResult.Verify({.Stderr = L"", .ExitCode = 0});
-        for (const auto& line : listResult.GetStdoutLines())
-        {
-            VERIFY_IS_FALSE(
-                line.find(L"prune-test-container") != std::wstring::npos,
-                L"Container 'prune-test-container' should have been pruned");
-        }
+        VerifyContainerIsNotListed(L"prune-test-container");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_RunningContainerNotPruned)
@@ -94,19 +87,7 @@ class WSLCE2EContainerPruneTests
         pruneResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify the running container is still present
-        auto listResult = RunWslc(L"container list");
-        listResult.Verify({.Stderr = L"", .ExitCode = 0});
-        bool found = false;
-        for (const auto& line : listResult.GetStdoutLines())
-        {
-            if (line.find(L"prune-running-test") != std::wstring::npos)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        VERIFY_IS_TRUE(found, L"Running container 'prune-running-test' should still be present after prune");
+        VerifyContainerIsListed(L"prune-running-test", L"running");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_MultipleStopped)
@@ -122,35 +103,15 @@ class WSLCE2EContainerPruneTests
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VerifyStdoutContains(result, L"Total reclaimed space:");
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
 
         // Verify both containers are removed
-        auto listResult = RunWslc(L"container list --all");
-        listResult.Verify({.Stderr = L"", .ExitCode = 0});
-        for (const auto& line : listResult.GetStdoutLines())
-        {
-            VERIFY_IS_FALSE(
-                line.find(L"prune-multi-1") != std::wstring::npos, L"Container 'prune-multi-1' should have been pruned");
-            VERIFY_IS_FALSE(
-                line.find(L"prune-multi-2") != std::wstring::npos, L"Container 'prune-multi-2' should have been pruned");
-        }
+        VerifyContainerIsNotListed(L"prune-multi-1");
+        VerifyContainerIsNotListed(L"prune-multi-2");
     }
 
 private:
     const TestImage& DebianImage = DebianTestImage();
-
-    static void VerifyStdoutContains(const WSLCExecutionResult& result, const std::wstring& substring)
-    {
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line.find(substring) != std::wstring::npos)
-            {
-                return;
-            }
-        }
-
-        VERIFY_FAIL(std::format(L"Expected stdout to contain '{}'", substring).c_str());
-    }
 
     std::wstring GetHelpMessage() const
     {

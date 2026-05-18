@@ -141,6 +141,20 @@ bool WSLCExecutionResult::StdoutContainsLine(const std::wstring& expectedLine) c
     return false;
 }
 
+bool WSLCExecutionResult::StdoutContainsSubstring(const std::wstring& substring) const
+{
+    VERIFY_IS_TRUE(Stdout.has_value());
+    for (const auto& line : GetStdoutLines())
+    {
+        if (line.find(substring) != std::wstring::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
