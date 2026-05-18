@@ -32,6 +32,8 @@ Abstract:
 #include <pty.h>
 #include "mountutilcpp.h"
 #include <filesystem>
+#include "JsonUtils.h"
+#include "cdi_schema.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -56,6 +58,9 @@ extern int g_LogFd;
 
 extern void WSLCEnableCrashDumpCollection();
 
+#define WSLC_GPU_LIB_PATH "/usr/lib/wsl/lib"
+#define WSLC_GPU_DRIVERS_PATH "/usr/lib/wsl/drivers"
+
 struct WSLCState
 {
     std::optional<std::filesystem::path> ModulesMountPoint;
@@ -63,10 +68,99 @@ struct WSLCState
 
 static WSLCState g_state;
 
-int CreateCaptureCrashSymlink()
+int CreateSymlink(PCSTR LinkName)
 try
 {
-    THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0);
+    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0);
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+void WriteWslcCdiSpec()
+try
+{
+    wsl::shared::cdi::DeviceNode dxg;
+    dxg.path = "/dev/dxg";
+    dxg.permissions = "rwm";
+
+    wsl::shared::cdi::Mount libs;
+    libs.hostPath = WSLC_GPU_LIB_PATH;
+    libs.containerPath = WSLC_GPU_LIB_PATH;
+    libs.options = {"ro", "rbind"};
+
+    wsl::shared::cdi::Mount drivers;
+    drivers.hostPath = WSLC_GPU_DRIVERS_PATH;
+    drivers.containerPath = WSLC_GPU_DRIVERS_PATH;
+    drivers.options = {"ro", "rbind"};
+
+    wsl::shared::cdi::Hook hook;
+    hook.hookName = "createContainer";
+    hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
+    hook.args = {LX_INIT_WSLC_GPU_HOOK};
+
+    wsl::shared::cdi::Device gpu;
+    gpu.name = "gpu";
+    gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.mounts.push_back(std::move(libs));
+    gpu.containerEdits.mounts.push_back(std::move(drivers));
+    gpu.containerEdits.hooks.push_back(std::move(hook));
+
+    wsl::shared::cdi::Spec spec;
+    spec.cdiVersion = "0.6.0";
+    spec.kind = LX_WSLC_CDI_KIND;
+    spec.devices.push_back(std::move(gpu));
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/cdi", 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile("/etc/cdi/microsoft.com-wslc.json", nlohmann::json(spec).dump().c_str()) < 0);
+}
+CATCH_LOG()
+
+void WriteDockerDaemonConfig()
+try
+{
+    nlohmann::json config;
+    config["features"]["cdi"] = true;
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile("/etc/docker/daemon.json", config.dump().c_str()) < 0);
+}
+CATCH_LOG()
+
+int WslcGpuHookEntry(int Argc, char* Argv[])
+try
+{
+    // OCI runtime hooks receive the container state as JSON on stdin.
+    std::string stateJson;
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(STDIN_FILENO, buf, sizeof(buf))) > 0)
+    {
+        stateJson.append(buf, n);
+    }
+    THROW_LAST_ERROR_IF(n < 0);
+
+    const auto state = nlohmann::json::parse(stateJson);
+    const std::string bundle = state.at("bundle").get<std::string>();
+
+    // Read the OCI spec's root.path from <bundle>/config.json. For Docker/containerd this is an
+    // absolute path to the overlay-merged rootfs accessible from the runtime namespace.
+    const auto spec = nlohmann::json::parse(UtilReadFileContent(bundle + "/config.json"));
+    std::string rootfs = spec.at("root").at("path").get<std::string>();
+    if (!rootfs.empty() && rootfs.front() != '/')
+    {
+        rootfs = bundle + "/" + rootfs;
+    }
+
+    const std::string confDir = rootfs + "/etc/ld.so.conf.d";
+    const std::string confPath = confDir + "/ld.wsl.conf";
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath(confDir.c_str(), 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), WSLC_GPU_LIB_PATH "\n") < 0);
+
+    // chroots into the rootfs and uses the container's own /etc/ld.so.conf chain,
+    // writing /etc/ld.so.cache inside the container.
+    const char* const ldArgv[] = {"/sbin/ldconfig", "-r", rootfs.c_str(), nullptr};
+    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
     return 0;
 }
@@ -74,7 +168,7 @@ CATCH_RETURN_ERRNO()
 
 void WSLCEnableCrashDumpCollection()
 {
-    if (CreateCaptureCrashSymlink() < 0)
+    if (CreateSymlink("/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
     {
         return;
     }
@@ -620,7 +714,12 @@ void HandleMessageImpl(
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
             // Recreate the crash dump symlink inside the new root.
-            CreateCaptureCrashSymlink();
+            CreateSymlink("/" LX_INIT_WSL_CAPTURE_CRASH);
+
+            CreateSymlink("/" LX_INIT_WSLC_GPU_HOOK);
+
+            WriteWslcCdiSpec();
+            WriteDockerDaemonConfig();
         }
 
         response.Result = 0;

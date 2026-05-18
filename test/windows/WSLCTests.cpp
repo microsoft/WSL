@@ -3446,17 +3446,6 @@ class WSLCTests
 
         auto session = CreateSession(settings);
 
-        // Validate that the GPU is correctly configured for containers init process.
-        {
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-container-init-gpu", {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"});
-            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
-
-            auto container = launcher.Launch(*session);
-
-            ValidateContainerOutput(container, {{1, "/usr/lib/wsl/lib\n"}}, 0);
-        }
-
         // Validate that GPU resources are available inside a container when WSLCContainerFlagsGpu is set.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-gpu", {"sleep", "99999"});
@@ -3485,15 +3474,10 @@ class WSLCTests
             expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
             expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
 
-            // Validate that LD_LIBRARY_PATH is set to include the GPU library path.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
-
-            // Validate that exec with a pre-existing LD_LIBRARY_PATH appends the GPU path.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path"});
-
-            // Validate that exec with a trailing colon in LD_LIBRARY_PATH doesn't produce a double colon.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path:"});
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH="});
+            // Validate that the wsl-gpu runtime dropped the ld.so.conf fragment and pre-populated the
+            // ld.so.cache so that /usr/lib/wsl/lib is resolvable via the dynamic linker.
+            expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
+            expect({"/bin/sh", "-c", "ldconfig -p | grep -q ' => /usr/lib/wsl/lib/'"}, 0);
         }
 
         // Validate that containers without the GPU flag do not have GPU resources.
