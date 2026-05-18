@@ -17,7 +17,8 @@ Abstract:
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
 // WinRT IInputStream wrapper around a Windows HANDLE (read end).
-struct IOHandleInputStream : winrt::implements<IOHandleInputStream, winrt::Windows::Storage::Streams::IInputStream, winrt::Windows::Foundation::IClosable>
+struct IOHandleInputStream
+    : winrt::implements<IOHandleInputStream, winrt::Windows::Storage::Streams::IInputStream, winrt::Windows::Foundation::IClosable>
 {
     explicit IOHandleInputStream(wil::unique_handle&& handle);
 
@@ -31,7 +32,8 @@ private:
 };
 
 // WinRT IOutputStream wrapper around a Windows HANDLE (write end).
-struct IOHandleOutputStream : winrt::implements<IOHandleOutputStream, winrt::Windows::Storage::Streams::IOutputStream, winrt::Windows::Foundation::IClosable>
+struct IOHandleOutputStream
+    : winrt::implements<IOHandleOutputStream, winrt::Windows::Storage::Streams::IOutputStream, winrt::Windows::Foundation::IClosable>
 {
     explicit IOHandleOutputStream(wil::unique_handle&& handle);
 
