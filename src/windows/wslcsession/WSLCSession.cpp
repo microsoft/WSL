@@ -1189,7 +1189,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-HRESULT WSLCSession::ListImages(const WSLCListImageOptions* Options, WSLCImageInformation** Images, ULONG* Count)
+HRESULT WSLCSession::ListImages(const WSLCListImagesOptions* Options, WSLCImageInformation** Images, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -1200,71 +1200,27 @@ try
     *Count = 0;
     *Images = nullptr;
 
+    bool all = false;
+    bool digests = false;
+    std::map<std::string, std::vector<std::string>> filters;
+
     if (Options != nullptr)
     {
-        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingFalse));
-        RETURN_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
-        RETURN_HR_IF(E_INVALIDARG, Options->Reference != nullptr && strlen(Options->Reference) > WSLC_MAX_IMAGE_NAME_LENGTH);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsAnyFlagSet(static_cast<WSLCListImagesFlags>(Options->Flags), ~WSLCListImagesFlagsValid),
+            "Invalid flags: 0x%x",
+            Options->Flags);
+
+        all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
+        digests = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDigests);
+
+        filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    // Extract options for Docker API
-    bool all = false;
-    bool digests = false;
-    DockerHTTPClient::ListImagesFilters filters;
-
-    if (Options != nullptr)
-    {
-        all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
-        digests = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDigests);
-
-        if (Options->Reference != nullptr)
-        {
-            filters.reference = Options->Reference;
-        }
-
-        if (Options->Before != nullptr)
-        {
-            filters.before = Options->Before;
-        }
-
-        if (Options->Since != nullptr)
-        {
-            filters.since = Options->Since;
-        }
-
-        // Check dangling flags (mutually exclusive in practice)
-        if (WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingTrue))
-        {
-            filters.dangling = true;
-        }
-        else if (WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingFalse))
-        {
-            filters.dangling = false;
-        }
-        // If neither flag is set, filters.dangling remains std::nullopt (show all)
-
-        // Construct labels
-        if (Options->Labels != nullptr && Options->LabelsCount > 0)
-        {
-            for (ULONG i = 0; i < Options->LabelsCount; ++i)
-            {
-                const auto& label = Options->Labels[i];
-                RETURN_HR_IF_NULL(E_POINTER, label.Key);
-
-                std::string labelFilter = label.Key;
-                if (label.Value != nullptr)
-                {
-                    labelFilter += "=";
-                    labelFilter += label.Value;
-                }
-                filters.labels.push_back(labelFilter);
-            }
-        }
-    }
 
     std::vector<docker_schema::Image> images;
     try
@@ -1555,7 +1511,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneImages(const WSLCPruneImagesOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* DeletedImagesCount, ULONGLONG* SpaceReclaimed)
+HRESULT WSLCSession::PruneImages(
+    const WSLCFilter* Filters, ULONG FiltersCount, WSLCDeletedImageInformation** DeletedImages, ULONG* DeletedImagesCount, ULONGLONG* SpaceReclaimed)
 try
 {
     COMServiceExecutionContext context;
@@ -1567,58 +1524,10 @@ try
     *DeletedImagesCount = 0;
     *SpaceReclaimed = 0;
 
-    if (Options != nullptr)
-    {
-        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse));
-        RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(static_cast<WSLCPruneImagesFlags>(Options->Flags), ~WSLCPruneImagesFlagsValid));
-    }
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
     auto lock = m_lock.lock_shared();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    DockerHTTPClient::PruneImagesFilters filters;
-
-    if (Options != nullptr)
-    {
-        if (WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue))
-        {
-            filters.dangling = true;
-        }
-        else if (WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse))
-        {
-            filters.dangling = false;
-        }
-
-        if (Options->Until > 0)
-        {
-            filters.until = Options->Until;
-        }
-
-        if (Options->Labels != nullptr && Options->LabelsCount > 0)
-        {
-            for (ULONG i = 0; i < Options->LabelsCount; ++i)
-            {
-                const auto& filter = Options->Labels[i];
-                RETURN_HR_IF_NULL(E_POINTER, filter.Key);
-
-                std::string labelFilter = filter.Key;
-                if (filter.Value != nullptr)
-                {
-                    labelFilter += "=";
-                    labelFilter += filter.Value;
-                }
-
-                if (filter.Present)
-                {
-                    filters.presentLabels.emplace_back(std::move(labelFilter));
-                }
-                else
-                {
-                    filters.absentLabels.emplace_back(std::move(labelFilter));
-                }
-            }
-        }
-    }
 
     docker_schema::PruneImageResult pruneResult;
     try

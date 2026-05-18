@@ -130,14 +130,11 @@ typedef struct _WSLCImageInformation
 typedef enum _WSLCListImagesFlags
 {
     WSLCListImagesFlagsNone = 0,
-    WSLCListImagesFlagsAll = 1,           // Show all images (default hides intermediate images)
-    WSLCListImagesFlagsDigests = 2,       // Include digest information
-    WSLCListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
-    WSLCListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
-    // Note: If neither dangling flag is set, no dangling filter is passed (default: both).
+    WSLCListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
+    WSLCListImagesFlagsDigests = 2, // Include digest information
 } WSLCListImagesFlags;
 
-cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests | WSLCListImagesFlagsDanglingTrue | WSLCListImagesFlagsDanglingFalse)")
+cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
 
@@ -160,15 +157,12 @@ typedef KeyValuePair WSLCFilter;
 typedef KeyValuePairInformation WSLCLabelInformation;
 typedef KeyValuePairInformation WSLCDriverOptionInformation;
 
-typedef struct _WSLCListImageOptions
+typedef struct _WSLCListImagesOptions
 {
     DWORD Flags; // WSLCListImagesFlags (can combine with bitwise OR)
-    [unique] LPCSTR Reference; // Filter by reference (name[:tag])
-    [unique] LPCSTR Before; // Filter: show images created before this image
-    [unique] LPCSTR Since; // Filter: show images created since this image
-    [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
-    ULONG LabelsCount;
-} WSLCListImageOptions;
+    [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
+    ULONG FiltersCount;
+} WSLCListImagesOptions;
 
 typedef enum _WSLCProcessFlags
 {
@@ -660,26 +654,6 @@ typedef struct _WSLCPruneContainersResults
     ULONGLONG SpaceReclaimed;
 } WSLCPruneContainersResults;
 
-typedef enum _WSLCPruneImagesFlags
-{
-    WSLCPruneImagesFlagsNone = 0,
-    WSLCPruneImagesFlagsDanglingTrue = 1,  // Only prune dangling (untagged) images.
-    WSLCPruneImagesFlagsDanglingFalse = 2, // Prune all images not used by any container.
-    // Note: If neither dangling flag is set, no dangling filter is passed (Docker defaults to dangling-only).
-} WSLCPruneImagesFlags;
-
-cpp_quote("#define WSLCPruneImagesFlagsValid (WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCPruneImagesFlags);")
-
-typedef struct _WSLCPruneImagesOptions
-{
-    DWORD Flags; // WSLCPruneImagesFlags
-    ULONGLONG Until;
-    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
-    ULONG LabelsCount;
-} WSLCPruneImagesOptions;
-
 typedef enum _WSLCListContainersFlags
 {
     WSLCListContainersFlagsNone = 0,
@@ -737,11 +711,11 @@ interface IWSLCSession : IUnknown
     HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
+    HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
-    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
+    HRESULT PruneImages([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
