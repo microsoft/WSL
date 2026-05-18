@@ -1501,10 +1501,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.Ulimits = std::move(ulimits);
     }
 
-    if (containerOptions.ShmSize > 0)
-    {
-        request.HostConfig.ShmSize = containerOptions.ShmSize;
-    }
+    request.HostConfig.ShmSize = containerOptions.ShmSize;
 
     if (containerOptions.VolumesCount > 0)
     {
