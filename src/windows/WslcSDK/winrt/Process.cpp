@@ -20,15 +20,19 @@ Abstract:
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
 Process::Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
-    m_container(container), m_settings(settings), m_outputMode(GetImplementation(settings)->OutputMode())
+    Process(settings)
 {
-    ApplyCallbacksToSettings();
+    m_container = container;
 }
 
 Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
-    m_settings(settings), m_outputMode(GetImplementation(settings)->OutputMode())
+    m_settings(settings)
 {
-    ApplyCallbacksToSettings();
+    if (m_settings)
+    {
+        m_outputMode = GetImplementation(m_settings)->OutputMode();
+        ApplyCallbacksToSettings();
+    }
 }
 
 void Process::ApplyCallbacksToSettings()
