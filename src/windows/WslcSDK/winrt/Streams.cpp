@@ -26,6 +26,11 @@ IOHandleInputStream::IOHandleInputStream(wil::unique_handle&& handle) : m_handle
 
 IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IBuffer buffer, uint32_t count, InputStreamOptions options)
 {
+    if (!m_handle)
+    {
+        throw winrt::hresult_illegal_method_call(L"Stream is closed");
+    }
+
     if (options != InputStreamOptions::None)
     {
         throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), L"Only InputStreamOptions::None is supported");
@@ -74,6 +79,11 @@ IOHandleOutputStream::IOHandleOutputStream(wil::unique_handle&& handle) : m_hand
 
 IAsyncOperationWithProgress<uint32_t, uint32_t> IOHandleOutputStream::WriteAsync(IBuffer const& buffer)
 {
+    if (!m_handle)
+    {
+        throw winrt::hresult_illegal_method_call(L"Stream is closed");
+    }
+
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.
     auto self = get_strong();
     co_await winrt::resume_background();
@@ -86,6 +96,11 @@ IAsyncOperationWithProgress<uint32_t, uint32_t> IOHandleOutputStream::WriteAsync
 
 winrt::Windows::Foundation::IAsyncOperation<bool> IOHandleOutputStream::FlushAsync()
 {
+    if (!m_handle)
+    {
+        throw winrt::hresult_illegal_method_call(L"Stream is closed");
+    }
+
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.
     auto self = get_strong();
     co_await winrt::resume_background();

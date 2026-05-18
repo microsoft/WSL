@@ -53,6 +53,11 @@ void Process::ApplyCallbacksToSettings()
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
+void Process::StartWaitingForExit()
+{
+    m_waitForExitAction = StartWaitingForExitAsync();
+}
+
 winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExitAsync()
 {
     // Event mode uses the exit callback set in ApplyCallbacksToSettings; no need to wait here.
@@ -89,7 +94,7 @@ void Process::AttachHandle(WslcProcess handle)
     }
 
     m_process.reset(handle);
-    m_waitForExitAction = StartWaitingForExitAsync();
+    StartWaitingForExit();
 }
 
 ProcessOutputMode Process::OutputMode()
@@ -99,18 +104,7 @@ ProcessOutputMode Process::OutputMode()
 
 void Process::Start()
 {
-    EnsureNotStarted();
-
-    if (!m_container)
-    {
-        throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
-    }
-
-    auto cmdLine = GetImplementation(m_settings)->CmdLine();
-    if (!cmdLine || cmdLine.Size() == 0)
-    {
-        throw winrt::hresult_invalid_argument(L"Process settings require a non-empty CmdLine");
-    }
+    EnsureCanStart();
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
@@ -119,7 +113,7 @@ void Process::Start()
     m_container = nullptr;
     m_settings = nullptr;
 
-    m_waitForExitAction = StartWaitingForExitAsync();
+    StartWaitingForExit();
 }
 
 void Process::EnsureStarted() const
@@ -135,6 +129,22 @@ void Process::EnsureNotStarted() const
     if (m_process)
     {
         throw winrt::hresult_illegal_method_call(L"Process has already been started");
+    }
+}
+
+void Process::EnsureCanStart() const
+{
+    EnsureNotStarted();
+
+    if (!m_container)
+    {
+        throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
+    }
+
+    auto cmdLine = GetImplementation(m_settings)->CmdLine();
+    if (!cmdLine || cmdLine.Size() == 0)
+    {
+        throw winrt::hresult_invalid_argument(L"Process requires a non-empty CmdLine to start");
     }
 }
 

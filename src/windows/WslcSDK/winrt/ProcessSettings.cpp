@@ -68,11 +68,6 @@ void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<h
         throw winrt::hresult_error(E_POINTER, L"CmdLine cannot be null");
     }
 
-    if (value.Size() == 0)
-    {
-        throw winrt::hresult_invalid_argument(L"CmdLine cannot be empty");
-    }
-
     m_cmdLine = value;
 }
 

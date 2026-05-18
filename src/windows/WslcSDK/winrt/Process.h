@@ -53,8 +53,10 @@ struct Process : ProcessT<Process>
 private:
     void EnsureStarted() const;
     void EnsureNotStarted() const;
+    void EnsureCanStart() const;
 
     void ApplyCallbacksToSettings();
+    void StartWaitingForExit();
     winrt::Windows::Foundation::IAsyncAction StartWaitingForExitAsync();
 
     static void CALLBACK OutputCallback(
