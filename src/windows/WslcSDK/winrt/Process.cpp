@@ -58,11 +58,11 @@ winrt::fire_and_forget Process::StartWaitingForExit()
         co_return;
     }
 
-    HANDLE exitEventHandle;
-    winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), &exitEventHandle));
+    wil::unique_handle exitEventHandle;
+    winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), exitEventHandle.put()));
 
     auto weak_this = get_weak();
-    co_await winrt::resume_on_signal(exitEventHandle);
+    co_await winrt::resume_on_signal(exitEventHandle.get());
 
     try
     {

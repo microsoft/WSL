@@ -99,12 +99,7 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
 
-    auto uri = winrt::to_string(options.Uri());
-    auto auth = winrt::to_string(options.RegistryAuth());
-
-    WslcPullImageOptions pullOptions{};
-    pullOptions.uri = uri.c_str();
-    pullOptions.registryAuth = auth.empty() ? nullptr : auth.c_str();
+    auto pullOptions = GetStruct(options);
     pullOptions.progressCallback = ImageProgressCallback;
     pullOptions.progressCallbackContext = &context;
 
@@ -180,12 +175,12 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
 
-    auto pushStruct = GetStructPointer(options);
-    pushStruct->progressCallback = ImageProgressCallback;
-    pushStruct->progressCallbackContext = &context;
+    auto pushOptions = GetStruct(options);
+    pushOptions.progressCallback = ImageProgressCallback;
+    pushOptions.progressCallbackContext = &context;
 
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcPushSessionImage(ToHandle(), pushStruct, errorMessage.put());
+    auto hr = WslcPushSessionImage(ToHandle(), &pushOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -286,16 +281,12 @@ IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
 {
     EnsureStarted();
 
-    WslcImageInfo* imagesArrayPtr = nullptr;
-    uint32_t count = 0;
-    winrt::check_hresult(WslcListSessionImages(ToHandle(), &imagesArrayPtr, &count));
-
-    // We can't pass this directly to WslcListSessionImages because the field for size is of a different type.
-    wil::unique_cotaskmem_array_ptr<WslcImageInfo> imagesArray{imagesArrayPtr, count};
+    wil::unique_cotaskmem_array_ptr<WslcImageInfo> imagesArray;
+    winrt::check_hresult(WslcListSessionImages(ToHandle(), imagesArray.put(), imagesArray.size_address<uint32_t>()));
 
     auto images = std::vector<winrt::Microsoft::WSL::Containers::ImageInfo>();
     images.reserve(imagesArray.size());
-    for (uint32_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < imagesArray.size(); i++)
     {
         images.push_back(winrt::make<implementation::ImageInfo>(imagesArray[i]));
     }

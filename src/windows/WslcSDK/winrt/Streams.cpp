@@ -31,11 +31,19 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
         throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), L"Only InputStreamOptions::None is supported");
     }
 
+    if (buffer == nullptr)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Buffer cannot be null");
+    }
+
+    if (count > buffer.Capacity())
+    {
+        throw winrt::hresult_error(E_BOUNDS, L"Count cannot be greater than the buffer capacity");
+    }
+
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.
     auto self = get_strong();
     co_await winrt::resume_background();
-
-    THROW_HR_IF(E_BOUNDS, count > buffer.Capacity());
 
     DWORD bytesRead = 0;
     if (!ReadFile(self->m_handle.get(), buffer.data(), count, &bytesRead, nullptr))

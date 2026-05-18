@@ -51,6 +51,11 @@ void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, Ti
 {
     wil::unique_cotaskmem_string errorMessage;
     auto timeoutSeconds = std::chrono::duration_cast<std::chrono::seconds>(timeout).count();
+    if (timeoutSeconds > std::numeric_limits<uint32_t>::max())
+    {
+        throw winrt::hresult_invalid_argument(L"Timeout is too large");
+    }
+
     if (timeoutSeconds < 0)
     {
         throw winrt::hresult_invalid_argument(L"Timeout must be non-negative");

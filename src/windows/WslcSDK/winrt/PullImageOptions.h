@@ -27,13 +27,11 @@ struct PullImageOptions : PullImageOptionsT<PullImageOptions>
     hstring RegistryAuth();
     void RegistryAuth(hstring const& value);
 
-    WslcPullImageOptions* ToStructPointer();
+    WslcPullImageOptions ToStruct();
 
 private:
     std::string m_uri;
     std::string m_registryAuth;
-
-    std::unique_ptr<WslcPullImageOptions> m_pullImageOptions;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
