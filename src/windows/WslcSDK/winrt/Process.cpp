@@ -25,8 +25,7 @@ Process::Process(winrt::Microsoft::WSL::Containers::Container const& container, 
     m_container = container;
 }
 
-Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) :
-    m_settings(settings)
+Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings) : m_settings(settings)
 {
     if (m_settings)
     {
