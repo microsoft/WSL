@@ -22,7 +22,7 @@ ContainerSettings::ContainerSettings(hstring const& imageName) : m_imageName(win
 {
     if (imageName.empty())
     {
-        throw hresult_invalid_argument(L"Image name cannot be empty");
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
     }
 }
 
@@ -35,12 +35,12 @@ void ContainerSettings::ImageName(hstring const& value)
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change image name after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change image name after container has been initialized");
     }
 
     if (value.empty())
     {
-        throw hresult_invalid_argument(L"Image name cannot be empty");
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
     }
 
     m_imageName = winrt::to_string(value);
@@ -55,7 +55,7 @@ void ContainerSettings::Name(hstring const& value)
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change container name after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change container name after container has been initialized");
     }
 
     m_name = winrt::to_string(value);
@@ -70,7 +70,7 @@ void ContainerSettings::InitProcess(winrt::Microsoft::WSL::Containers::ProcessSe
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change init process after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change init process after container has been initialized");
     }
 
     m_initProcess = value;
@@ -85,12 +85,12 @@ void ContainerSettings::NetworkingMode(winrt::Windows::Foundation::IReference<wi
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change networking mode after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change networking mode after container has been initialized");
     }
 
     if (value && value.Value() != ContainerNetworkingMode::None && value.Value() != ContainerNetworkingMode::Bridged)
     {
-        throw hresult_invalid_argument(L"Invalid networking mode");
+        throw winrt::hresult_invalid_argument(L"Invalid networking mode");
     }
 
     m_networkingMode = value;
@@ -105,7 +105,7 @@ void ContainerSettings::HostName(hstring const& value)
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change host name after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change host name after container has been initialized");
     }
 
     m_hostName = winrt::to_string(value);
@@ -120,7 +120,7 @@ void ContainerSettings::DomainName(hstring const& value)
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change domain name after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change domain name after container has been initialized");
     }
 
     m_domainName = winrt::to_string(value);
@@ -135,7 +135,7 @@ void ContainerSettings::Flags(ContainerFlags const& value)
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change container flags after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change container flags after container has been initialized");
     }
 
     m_flags = value;
@@ -150,7 +150,12 @@ void ContainerSettings::PortMappings(winrt::Windows::Foundation::Collections::IV
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change port mappings after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change port mappings after container has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Value cannot be null");
     }
 
     m_portMappings = value;
@@ -165,7 +170,12 @@ void ContainerSettings::Volumes(winrt::Windows::Foundation::Collections::IVector
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change volumes after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change volumes after container has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Value cannot be null");
     }
 
     m_volumes = value;
@@ -180,7 +190,12 @@ void ContainerSettings::NamedVolumes(winrt::Windows::Foundation::Collections::IV
 {
     if (m_containerSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change named volumes after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change named volumes after container has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Value cannot be null");
     }
 
     m_namedVolumes = value;
