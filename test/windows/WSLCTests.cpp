@@ -9538,13 +9538,11 @@ class WSLCTests
             auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
 
             // Prune with a label filter that no dangling image has - should not prune anything.
-            auto [deletedImages, spaceReclaimed] =
-                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = true}});
+            auto [deletedImages, spaceReclaimed] = pruneImages({{.Key = "label", .Value = "nonexistent.label"}});
             VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
 
-            // Prune with absent label filter - dangling image doesn't have the label, so it matches.
-            auto [deletedImages2, spaceReclaimed2] =
-                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = false}});
+            // Prune with absent label filter ("label!") - dangling image doesn't have the label, so it matches.
+            auto [deletedImages2, spaceReclaimed2] = pruneImages({{.Key = "label!", .Value = "nonexistent.label"}});
             VERIFY_IS_TRUE(deletedImages2.size() > 0);
         }
 
@@ -9585,16 +9583,7 @@ class WSLCTests
             // Null filter key - rejected by ParseKeyMultiValuePairs at the boundary.
             WSLCFilter nullKey{.Key = nullptr, .Value = "x"};
             VERIFY_ARE_EQUAL(
-                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
-                E_INVALIDARG);
-
-            // Null label key.
-            WSLCPruneLabelFilter nullKeyFilter{.Key = nullptr, .Value = nullptr, .Present = false};
-            invalidOptions.Flags = WSLCPruneImagesFlagsNone;
-            invalidOptions.Labels = &nullKeyFilter;
-            invalidOptions.LabelsCount = 1;
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                m_defaultSession->PruneImages(&nullKey, 1, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
                 E_POINTER);
         }
     }
