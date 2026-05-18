@@ -2111,6 +2111,19 @@ Usage:
     <value>A(z) {} tároló fut.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Tárolóhálózati módban nem engedélyezettek további hálózatok.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>A tárolóhálózati módhoz meg kell adni a céltároló nevét.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>A(z) {} céltároló nem található.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>A(z) {} tároló nem található.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2694,10 +2707,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
-    <value>Filter output based on conditions provided</value>
+    <value>Kimenet szűrése a megadott feltételek alapján</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
+    <value>Érvénytelen „{}” argumentum a '-f, --filter' kapcsolóhoz: hibás szűrőformátum (elvárt: name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Naplókimenet követése</value>
@@ -2739,7 +2752,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>N utoljára létrehozott tároló megjelenítése (tartalmazza az összes állapotot)</value>
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
-    <value>Show the latest created container (includes all states)</value>
+    <value>A legutóbb létrehozott tároló megjelenítése (az összes állapotot tartalmazza)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Tároló gazdagépének neve</value>

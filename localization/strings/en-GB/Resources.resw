@@ -2111,6 +2111,19 @@ Usage:
     <value>Container '{}' is running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Additional networks are not allowed with container network mode.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Target container name is required for container network mode.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Target container '{}' not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Container '{}' not found.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

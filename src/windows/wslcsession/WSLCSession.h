@@ -85,7 +85,7 @@ public:
 
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
-    IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm) override;
+    IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
@@ -129,9 +129,16 @@ public:
     // Volume management.
     IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
-    IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListVolumes)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count)
+        override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
+    IFACEMETHOD(PruneVolumes)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+     _In_ ULONG FiltersCount,
+     _Out_ WSLCVolumeName** Volumes,
+     _Out_ ULONG* VolumesCount,
+     _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
@@ -177,7 +184,16 @@ private:
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
+    _Requires_shared_lock_held_(m_lock)
+    std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageDeleted(const std::string& ImageId) noexcept;
+
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
@@ -221,6 +237,8 @@ private:
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
     std::atomic<bool> m_terminated{false};
+
+    wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
