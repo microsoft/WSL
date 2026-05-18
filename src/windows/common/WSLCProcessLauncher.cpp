@@ -132,11 +132,11 @@ int RunningWSLCProcess::Wait(DWORD TimeoutMs)
     return GetExitCode();
 }
 
-RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
+RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<io::OverlappedIOHandle>>&& ExtraHandles)
 {
     RunningWSLCProcess::ProcessResult result;
 
-    relay::MultiHandleWait io;
+    io::MultiHandleWait io;
 
     // Add a callback on IO for each std handle.
 
@@ -148,7 +148,7 @@ RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
         };
 
-        io.AddHandle(std::make_unique<relay::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
+        io.AddHandle(std::make_unique<io::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
     };
 
     if (WI_IsFlagSet(m_flags, WSLCProcessFlagsTty))
@@ -169,7 +169,7 @@ RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD
     // Add a callback for when the process exits.
     auto exitCallback = [&]() { result.Code = GetExitCode(); };
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(GetExitEvent(), std::move(exitCallback)));
+    io.AddHandle(std::make_unique<io::EventHandle>(GetExitEvent(), std::move(exitCallback)));
 
     io.Run(std::chrono::milliseconds(TimeoutMs));
 

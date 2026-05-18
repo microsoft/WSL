@@ -85,12 +85,12 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
 
     // Read stdout / stderr concurrently so that full pipe buffers do not stall the process.
     ProcessOutput output;
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
         std::move(ownedStdout), [&](const auto& buffer) { output.stdoutOutput.append(buffer.data(), buffer.size()); }));
 
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
         std::move(ownedStderr), [&](const auto& buffer) { output.stderrOutput.append(buffer.data(), buffer.size()); }));
 
     auto timeoutTime = std::chrono::steady_clock::now() + timeout;

@@ -1544,3 +1544,20 @@ std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValueP
 
     return result;
 }
+
+std::map<std::string, std::vector<std::string>> wsl::windows::common::wslutil::ParseKeyMultiValuePairs(const KeyValuePair* pairs, ULONG count)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::vector<std::string>> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Value, "Value at index %lu is null", i);
+
+        result[pairs[i].Key].emplace_back(pairs[i].Value);
+    }
+
+    return result;
+}

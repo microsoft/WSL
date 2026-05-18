@@ -16,7 +16,7 @@ Abstract:
 
 #include "SubProcess.h"
 
-using namespace wsl::windows::common::relay;
+using namespace wsl::windows::common::io;
 using wsl::windows::common::SubProcess;
 
 SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags, DWORD StartupFlags) :
@@ -224,11 +224,11 @@ SubProcess::ProcessOutput SubProcess::RunAndCaptureOutput(DWORD Timeout, HANDLE 
 
     m_stdOut = stdoutWrite.get();
 
-    relay::MultiHandleWait io;
+    io::MultiHandleWait io;
     std::string stdoutNative;
     std::string stderrNative;
 
-    io.AddHandle(std::make_unique<relay::ReadHandle>(
+    io.AddHandle(std::make_unique<io::ReadHandle>(
         std::move(stdoutRead), [&](const gsl::span<char>& buffer) { stdoutNative.append(buffer.data(), buffer.size()); }));
 
     wil::unique_hfile stderrWrite;
@@ -240,7 +240,7 @@ SubProcess::ProcessOutput SubProcess::RunAndCaptureOutput(DWORD Timeout, HANDLE 
 
         m_stdErr = stderrWrite.get();
 
-        io.AddHandle(std::make_unique<relay::ReadHandle>(
+        io.AddHandle(std::make_unique<io::ReadHandle>(
             std::move(stderrRead), [&](const gsl::span<char>& buffer) { stderrNative.append(buffer.data(), buffer.size()); }));
     }
     else

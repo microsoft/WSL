@@ -2814,13 +2814,13 @@ try
 }
 CATCH_LOG();
 
-class ReadHandleWithTargetValue : public wsl::windows::common::relay::ReadHandle
+class ReadHandleWithTargetValue : public wsl::windows::common::io::ReadHandle
 {
 public:
     NON_COPYABLE(ReadHandleWithTargetValue);
     NON_MOVABLE(ReadHandleWithTargetValue);
 
-    ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
+    ReadHandleWithTargetValue(wsl::windows::common::io::HandleWrapper&& MovedHandle, std::string_view targetValue) :
         ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
         m_targetValue(targetValue)
     {
@@ -2841,7 +2841,7 @@ public:
 private:
     void CheckIfTargetFound()
     {
-        using namespace wsl::windows::common::relay;
+        using namespace wsl::windows::common::io;
 
         if (State == IOHandleStatus::Standby || State == IOHandleStatus::Completed)
         {
@@ -2867,7 +2867,7 @@ private:
 
 void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
 {
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
     io.Run(timeout);
 }
@@ -2902,6 +2902,19 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     }
 
     return result;
+}
+
+void LoadTestImage(IWSLCSession& session, std::string_view imageName)
+{
+    std::filesystem::path imagePath = GetTestImagePath(imageName);
+    wil::unique_hfile imageFile{
+        CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!imageFile);
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
@@ -2989,5 +3002,54 @@ void WriteSocket(SOCKET Socket, const void* data, size_t size)
 
         size -= result;
         data = static_cast<const char*>(data) + result;
+    }
+}
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source)
+{
+    auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+    if (comError.has_value())
+    {
+        if (!Expected.has_value())
+        {
+            LogError("Unexpected COM error: '%ls'. Source: %hs", comError->Message.get(), std::format("{}", Source).c_str());
+            VERIFY_FAIL();
+        }
+
+        VERIFY_ARE_EQUAL(Expected.value(), comError->Message.get());
+    }
+    else
+    {
+        if (Expected.has_value())
+        {
+            LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
+            VERIFY_FAIL();
+        }
+    }
+}
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
+{
+    auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+    if (comError.has_value())
+    {
+        if (!comError->Message)
+        {
+            LogError("Expected COM error containing: '%ls', but COM error message was null", ExpectedSubstring.c_str());
+            VERIFY_FAIL();
+        }
+
+        if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
+        {
+            LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
+            VERIFY_FAIL();
+        }
+    }
+    else
+    {
+        LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
+        VERIFY_FAIL();
     }
 }

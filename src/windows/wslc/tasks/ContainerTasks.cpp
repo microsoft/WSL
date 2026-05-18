@@ -113,7 +113,33 @@ void GetContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Containers>(ContainerService::List(session));
+
+    int limit = -1;
+
+    if (context.Args.Contains(ArgType::Last))
+    {
+        limit = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::Last>(), L"--last");
+    }
+    else if (context.Args.Contains(ArgType::Latest))
+    {
+        limit = 1;
+    }
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.Contains(ArgType::All), limit, filters));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -161,14 +187,8 @@ void ListContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Containers));
     auto& containers = context.Data.Get<Data::Containers>();
 
-    // Filter by running state if --all is not specified
-    if (!context.Args.Contains(ArgType::All))
-    {
-        auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLCContainerState::WslcContainerStateRunning;
-        };
-        containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
-    }
+    // Note: --all and --filter status= are honored by the Docker daemon when
+    // GetContainers ran; no post-filtering needed here.
 
     if (context.Args.Contains(ArgType::Quiet))
     {

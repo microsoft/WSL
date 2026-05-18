@@ -5,84 +5,58 @@
   <description>Windows Subsystem for Linux</description>
   <resources>
     <stringTable>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="WindowsSubsystemForLinux">Windows Subsystem for Linux</string>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSL">Allow the Windows Subsystem for Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowWSLExplain">When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
 
-        <!-- {Locked="Windows Subsystem for Linux"} -->
-        <string id="AllowInboxWSL">Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <!-- {Locked="Windows Subsystem for Linux"}{Locked="WSL"} -->
-        <string id="AllowInboxWSLExplain">When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
 
-        <!-- {Locked="WSL1"} -->
-        <string id="AllowWSL1">Allow WSL1</string>
-        <!-- {Locked="WSL1"}{Locked="WSL2"} -->
-        <string id="AllowWSL1Explain">When set to disabled, this policy disables WSL1. When disabled, only WSL2 distributions can be used.</string>
+        <string id="AllowWSL1"><!-- _locComment='{Locked="WSL1"}' -->Allow WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment='{Locked="WSL1"}{Locked="WSL2"}' -->When set to disabled, this policy disables WSL1. When disabled, only WSL2 distributions can be used.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Allow custom kernel configuration</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"} -->
-        <string id="CustomKernelExplain">When set to disabled, this policy disables custom kernel configuration via .wslconfig (wsl2.kernel). This policy only applies to Store WSL.</string>
+        <string id="CustomKernelExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom kernel configuration via .wslconfig (wsl2.kernel). This policy only applies to Store WSL.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Allow custom system distribution configuration</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"} -->
-        <string id="CustomSystemDistroExplain">When set to disabled, this policy disables custom system distribution configuration via .wslconfig (wsl2.systemDistro). This policy only applies to Store WSL.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom system distribution configuration via .wslconfig (wsl2.systemDistro). This policy only applies to Store WSL.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Allow kernel command line configuration</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"} -->
-        <string id="CustomKernelCommandLineExplain">When set to disabled, this policy disables kernel command line configuration via .wslconfig (wsl2.kernelCommandLine). This policy only applies to Store WSL.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->When set to disabled, this policy disables kernel command line configuration via .wslconfig (wsl2.kernelCommandLine). This policy only applies to Store WSL.</string>
 
         <string id="AllowDebugShell">Allow the debug shell</string>
-        <!-- {Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"} -->
-        <string id="AllowDebugShellExplain">When set to disabled, this policy disables the debug shell (wsl.exe --debug-shell). This policy only applies to Store WSL.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->When set to disabled, this policy disables the debug shell (wsl.exe --debug-shell). This policy only applies to Store WSL.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Allow nested virtualization</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"} -->
-        <string id="NestedVirtualizationExplain">When set to disabled, this policy disables nested virtualization configuration via .wslconfig (wsl2.nestedVirtualization). This policy only applies to Store WSL.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->When set to disabled, this policy disables nested virtualization configuration via .wslconfig (wsl2.nestedVirtualization). This policy only applies to Store WSL.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Allow kernel debugging</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"} -->
-        <string id="KernelDebugExplain">When set to disabled, this policy disables kernel debugging configuration via .wslconfig (wsl2.kernelDebugPort). This policy only applies to Store WSL.</string>
+        <string id="KernelDebugExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->When set to disabled, this policy disables kernel debugging configuration via .wslconfig (wsl2.kernelDebugPort). This policy only applies to Store WSL.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Allow custom networking configuration</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"} -->
-        <string id="CustomNetworkingExplain">When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingMode). This policy only applies to Store WSL.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingMode). This policy only applies to Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Allow user setting firewall configuration</string>
-        <!-- {Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"} -->
-        <string id="FirewallExplain">When set to disabled, this policy disables firewall configuration via .wslconfig (wsl2.firewall). This policy only applies to Store WSL.</string>
+        <string id="FirewallExplain"><!-- _locComment='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->When set to disabled, this policy disables firewall configuration via .wslconfig (wsl2.firewall). This policy only applies to Store WSL.</string>
 
         <string id="AllowDiskMount">Allow passthrough disk mount</string>
-        <!-- {Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"} -->
-        <string id="AllowDiskMountExplain">When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
 
         <string id="DefaultNetworkingMode">Configure default networking mode</string>
-        <!-- {Locked="WSL2"} -->
-        <string id="DefaultNetworkingModeExplain">This policy specifies the default networking mode to be used for WSL2.</string>
-        <!-- {Locked="None"} -->
-        <string id="NetworkingModeNone">None</string>
-        <!-- {Locked="NAT"} -->
-        <string id="NetworkingModeNAT">NAT</string>
-        <!-- {Locked="Mirrored"} -->
-        <string id="NetworkingModeMirrored">Mirrored</string>
-        <!-- {Locked="VirtioProxy"} -->
-        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment='{Locked="WSL2"}' -->This policy specifies the default networking mode to be used for WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment="{Locked}" -->VirtioProxy</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainer">WSL container</string>
+        <string id="WSLContainer"><!-- _locComment='{Locked="WSL"}' -->WSL container</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="AllowWSLContainer">Allow WSL container</string>
-        <!-- {Locked="WSL"}{Locked="Disabled"} -->
-        <string id="AllowWSLContainerExplain">This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainer"><!-- _locComment='{Locked="WSL"}' -->Allow WSL container</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
 
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlist">Allowlist for WSL container registries</string>
-        <!-- {Locked="WSL"} -->
-        <string id="WSLContainerRegistryAllowlistExplain">When enabled, WSL container will only be allowed to pull images from the registries listed here. This affects both the WSL container CLI and all applications using the WSL container API.</string>
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment='{Locked="WSL"}' -->Allowlist for WSL container registries</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment='{Locked="WSL"}' -->When enabled, WSL container will only be allowed to pull images from the registries listed here. This affects both the WSL container CLI and all applications using the WSL container API.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
