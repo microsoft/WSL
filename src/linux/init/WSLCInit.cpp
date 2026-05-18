@@ -71,7 +71,7 @@ static WSLCState g_state;
 int CreateSymlink(PCSTR LinkName)
 try
 {
-    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0 && errno != EEXIST)
+    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0 && errno != EEXIST);
     return 0;
 }
 CATCH_RETURN_ERRNO()
