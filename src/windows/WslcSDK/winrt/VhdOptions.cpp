@@ -79,7 +79,12 @@ void VhdOptions::Type(VhdType const& value)
 
 void VhdOptions::SetOwner(uint32_t uid, uint32_t gid)
 {
-    throw hresult_not_implemented();
+    if (m_vhdOptions)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    m_owner = {uid, gid};
 }
 
 WslcVhdRequirements* VhdOptions::ToStructPointer()
@@ -90,6 +95,13 @@ WslcVhdRequirements* VhdOptions::ToStructPointer()
         m_vhdOptions->name = m_name.c_str();
         m_vhdOptions->sizeBytes = m_sizeInBytes;
         m_vhdOptions->type = static_cast<WslcVhdType>(m_type);
+
+        if (m_owner)
+        {
+            m_vhdOptions->uid = m_owner->first;
+            m_vhdOptions->gid = m_owner->second;
+            WI_SetFlag(m_vhdOptions->flags, WSLC_VHD_REQ_FLAG_OWNER);
+        }
     }
 
     return m_vhdOptions.get();

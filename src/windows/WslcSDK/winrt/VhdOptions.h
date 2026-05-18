@@ -38,6 +38,7 @@ private:
     std::string m_name;
     uint64_t m_sizeInBytes = s_DefaultStorageSize;
     winrt::Microsoft::WSL::Containers::VhdType m_type = winrt::Microsoft::WSL::Containers::VhdType::Dynamic;
+    std::optional<std::pair<uint32_t, uint32_t>> m_owner;
 
     std::unique_ptr<WslcVhdRequirements> m_vhdOptions;
 };

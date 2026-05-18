@@ -1411,9 +1411,38 @@ class WslcSdkWinRtTests
             constexpr auto c_fixedSizeBytes = 64ull * _1MB;
             VERIFY_NO_THROW(session.CreateVhdVolume(WSLCSDK::VhdOptions(c_fixedVolumeName, c_fixedSizeBytes, WSLCSDK::VhdType::Fixed)));
 
+            auto deleteVolume = SCOPE_CLEANUP(session.DeleteVhdVolume(c_fixedVolumeName));
+
             std::filesystem::path expectedVhdPath = vhdSessionStorage / L"volumes" / (std::wstring(c_fixedVolumeName) + L".vhdx");
             VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
             VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
+        }
+
+        // Positive: SetOwner() bakes uid/gid into the volume root inode at mkfs time.
+        // Verify by stat-ing the mount inside a container.
+        {
+            constexpr auto c_ownedVolumeName = L"wslc-sdk-vhd-owned";
+            auto vhdOptions = WSLCSDK::VhdOptions(c_ownedVolumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Dynamic);
+            vhdOptions.SetOwner(65534, 65534); // nobody:nogroup
+            session.CreateVhdVolume(vhdOptions);
+
+            auto deleteVolume = SCOPE_CLEANUP(session.DeleteVhdVolume(c_ownedVolumeName));
+
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/usr/bin/stat", L"-c", L"%u %g", L"/data"}));
+            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+            containerSettings.InitProcess(procSettings);
+            containerSettings.NamedVolumes(winrt::single_threaded_vector<WSLCSDK::ContainerNamedVolume>(
+                {WSLCSDK::ContainerNamedVolume(c_ownedVolumeName, L"/data", false)}));
+
+            auto container = session.CreateContainer(containerSettings);
+            StartContainerAndWaitForInitProcessExit(container);
+            auto output = GetProcessOutput(container.InitProcess());
+            VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
+            VERIFY_ARE_EQUAL(output.StandardOutput, L"65534 65534\n");
+            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
         }
     }
 
