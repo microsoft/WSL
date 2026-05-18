@@ -36,7 +36,7 @@ void VhdOptions::Name(hstring const& value)
 {
     if (m_vhdOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change VHD name after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_name = winrt::to_string(value);
@@ -51,7 +51,7 @@ void VhdOptions::SizeInBytes(uint64_t value)
 {
     if (m_vhdOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change VHD size after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value == 0)
@@ -71,7 +71,7 @@ void VhdOptions::Type(VhdType const& value)
 {
     if (m_vhdOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change VHD type after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_type = value;

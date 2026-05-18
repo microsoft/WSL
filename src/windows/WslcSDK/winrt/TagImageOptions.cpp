@@ -46,7 +46,7 @@ void TagImageOptions::Image(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change image after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -66,7 +66,7 @@ void TagImageOptions::Repository(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change repository after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -86,7 +86,7 @@ void TagImageOptions::Tag(hstring const& value)
 {
     if (m_tagImageOptions)
     {
-        throw hresult_illegal_state_change(L"Cannot change tag after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())

@@ -41,7 +41,7 @@ void ContainerVolume::WindowsPath(hstring const& value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change Windows path after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -61,7 +61,7 @@ void ContainerVolume::ContainerPath(hstring const& value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change container path after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -81,7 +81,7 @@ void ContainerVolume::ReadOnly(bool value)
 {
     if (m_containerVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change read-only flag after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_readOnly = value;

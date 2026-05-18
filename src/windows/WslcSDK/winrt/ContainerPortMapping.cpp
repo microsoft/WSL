@@ -32,7 +32,7 @@ void ContainerPortMapping::WindowsPort(uint16_t value)
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change(L"Cannot change Windows port after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_windowsPort = value;
@@ -47,7 +47,7 @@ void ContainerPortMapping::ContainerPort(uint16_t value)
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change(L"Cannot change container port after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_containerPort = value;
@@ -62,7 +62,7 @@ void ContainerPortMapping::Protocol(winrt::Microsoft::WSL::Containers::PortProto
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change(L"Cannot change protocol after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_protocol = value;
@@ -77,7 +77,7 @@ void ContainerPortMapping::WindowsAddress(winrt::Windows::Networking::HostName c
 {
     if (m_containerPortMapping)
     {
-        throw hresult_illegal_state_change(L"Cannot change Windows address after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value && value.Type() != winrt::Windows::Networking::HostNameType::Ipv4 && value.Type() != winrt::Windows::Networking::HostNameType::Ipv6)

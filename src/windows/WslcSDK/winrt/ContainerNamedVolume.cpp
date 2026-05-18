@@ -41,7 +41,7 @@ void ContainerNamedVolume::Name(hstring const& value)
 {
     if (m_containerNamedVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change volume name after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -61,7 +61,7 @@ void ContainerNamedVolume::ContainerPath(hstring const& value)
 {
     if (m_containerNamedVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change container path after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     if (value.empty())
@@ -81,7 +81,7 @@ void ContainerNamedVolume::ReadOnly(bool value)
 {
     if (m_containerNamedVolume)
     {
-        throw hresult_illegal_state_change(L"Cannot change read-only flag after the options have been applied");
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
     m_readOnly = value;
