@@ -54,8 +54,7 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_StoppedContainer)
     {
         // Create and stop a container, then prune it
-        auto createResult =
-            RunWslc(std::format(L"container create --name prune-test-container {}", DebianImage.NameAndTag()));
+        auto createResult = RunWslc(std::format(L"container create --name prune-test-container {}", DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() { RunWslc(L"container prune"); });
@@ -73,8 +72,7 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_RunningContainerNotPruned)
     {
         // Start a running container, verify prune does NOT remove it
-        auto runResult = RunWslc(
-            std::format(L"container run --detach --name prune-running-test {} sleep 300", DebianImage.NameAndTag()));
+        auto runResult = RunWslc(std::format(L"container run --detach --name prune-running-test {} sleep 300", DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() {
@@ -93,10 +91,8 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_MultipleStopped)
     {
         // Create multiple stopped containers and verify all are pruned
-        RunWslc(std::format(L"container create --name prune-multi-1 {}", DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
-        RunWslc(std::format(L"container create --name prune-multi-2 {}", DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name prune-multi-1 {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name prune-multi-2 {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() { RunWslc(L"container prune"); });
 
