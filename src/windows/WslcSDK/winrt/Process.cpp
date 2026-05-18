@@ -106,6 +106,12 @@ void Process::Start()
         throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
     }
 
+    auto cmdLine = GetImplementation(m_settings)->CmdLine();
+    if (!cmdLine || cmdLine.Size() == 0)
+    {
+        throw winrt::hresult_invalid_argument(L"Process settings require a non-empty CmdLine");
+    }
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
