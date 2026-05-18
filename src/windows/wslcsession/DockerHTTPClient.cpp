@@ -584,7 +584,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     // Connect that socket to the docker unix socket.
     shared::MessageWriter<WSLC_UNIX_CONNECT> writer;
-    writer.WriteString(writer->PathOffset, "/var/run/docker.sock");
+    writer.WriteString(writer->PathOffset, "/run/podman/podman.sock");
 
     auto result = newChannel.Transaction<WSLC_UNIX_CONNECT>(writer.Span());
     THROW_HR_IF_MSG(E_FAIL, result.Result < 0, "Failed to connect to unix socket: '/var/run/docker.sock', %i", result.Result);

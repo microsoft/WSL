@@ -29,9 +29,9 @@ using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-constexpr auto c_containerdStorage = "/var/lib/docker";
+constexpr auto c_containerdStorage = "/var/lib/containers";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
-constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
+constexpr auto c_dockerdReadyLogLine = "API service listening on";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -292,11 +292,10 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    // Launch containerd first
-    StartContainerd();
+    // Podman needs /dev/shm (tmpfs) for its shm-based lock manager.
+    m_virtualMachine->Mount("", "/dev/shm", "tmpfs", "rw,nosuid,nodev", 0);
 
-    // Launch dockerd with external containerd socket
-    StartDockerd();
+    StartPodmanSystemService();
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
@@ -503,34 +502,22 @@ ServiceRunningProcess WSLCSession::StartProcess(
     return process;
 }
 
-void WSLCSession::StartContainerd()
+void WSLCSession::StartPodmanSystemService()
 {
-    constexpr auto c_containerdRoot = "/var/lib/docker/containerd/daemon";
-    constexpr auto c_containerdState = "/run/docker/containerd/daemon";
-
-    std::vector<std::string> args{"/usr/bin/containerd", "--address", c_containerdSocket, "--root", c_containerdRoot, "--state", c_containerdState};
+    std::vector<std::string> args{"/usr/bin/podman", "system", "service", "--time=0"};
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
-        args.emplace_back("--log-level");
-        args.emplace_back("debug");
+        args.emplace_back("--log-level=debug");
     }
-
-    m_containerdProcess = StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
-    WSL_LOG("ContainerdStarted");
-}
-
-void WSLCSession::StartDockerd()
-{
-    std::vector<std::string> args{"/usr/bin/dockerd", "--containerd", c_containerdSocket};
-
-    if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
+    else
     {
-        args.emplace_back("--debug");
+        // info log level is required for the startup log line.
+        args.emplace_back("--log-level=info");
     }
 
-    m_dockerdProcess = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
-    WSL_LOG("DockerdStarted");
+    m_podmanSystemServiceProcess = StartProcess("/usr/bin/podman", args, "podman", std::bind(&WSLCSession::OnDockerdExited, this));
+    WSL_LOG("Podman system service started");
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
@@ -738,7 +725,9 @@ try
     auto unmountFolder =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
-    std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    // std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    // This will likely break.
+    std::vector<std::string> buildArgs{"/usr/bin/podman", "build"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -2526,18 +2515,10 @@ try
         {
             m_virtualMachine->OnSessionTerminated();
 
-            // Stop dockerd first, then containerd (dockerd is a client of containerd).
-            // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-            if (m_dockerdProcess.has_value())
+            if (m_podmanSystemServiceProcess.has_value())
             {
-                auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-                WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-            }
-
-            if (m_containerdProcess.has_value())
-            {
-                auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-                WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+                auto podmanExitCode = StopProcess(m_podmanSystemServiceProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+                WSL_LOG("PodmanSystemServiceExit", TraceLoggingValue(podmanExitCode, "code"));
             }
 
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
@@ -2549,8 +2530,7 @@ try
         }
     }
 
-    m_dockerdProcess.reset();
-    m_containerdProcess.reset();
+    m_podmanSystemServiceProcess.reset();
     m_virtualMachine.reset();
 
     // Delete the ephemeral swap VHD now that the VM is gone.

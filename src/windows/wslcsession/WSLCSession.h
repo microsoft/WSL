@@ -193,8 +193,7 @@ private:
     void OnVmExited();
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
-    void StartContainerd();
-    void StartDockerd();
+    void StartPodmanSystemService();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
@@ -224,8 +223,7 @@ private:
     wil::unique_event m_vmExitedEvent;
     wil::srwlock m_lock;
     IORelay m_ioRelay;
-    std::optional<ServiceRunningProcess> m_containerdProcess;
-    std::optional<ServiceRunningProcess> m_dockerdProcess;
+    std::optional<ServiceRunningProcess> m_podmanSystemServiceProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
