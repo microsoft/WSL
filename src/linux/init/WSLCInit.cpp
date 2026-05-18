@@ -34,6 +34,7 @@ Abstract:
 #include <filesystem>
 #include "JsonUtils.h"
 #include "cdi_schema.h"
+#include "lxfsshares.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -58,8 +59,7 @@ extern int g_LogFd;
 
 extern void WSLCEnableCrashDumpCollection();
 
-#define WSLC_GPU_LIB_PATH "/usr/lib/wsl/lib"
-#define WSLC_GPU_DRIVERS_PATH "/usr/lib/wsl/drivers"
+#define WSLC_GPU_DRIVERS_PATH LXSS_LIB_PREFIX "/drivers"
 
 struct WSLCState
 {
@@ -71,7 +71,7 @@ static WSLCState g_state;
 int CreateSymlink(PCSTR LinkName)
 try
 {
-    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0);
+    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0 && errno != EEXIST)
     return 0;
 }
 CATCH_RETURN_ERRNO()
@@ -84,8 +84,8 @@ try
     dxg.permissions = "rwm";
 
     wsl::shared::cdi::Mount libs;
-    libs.hostPath = WSLC_GPU_LIB_PATH;
-    libs.containerPath = WSLC_GPU_LIB_PATH;
+    libs.hostPath = LXSS_LIB_PATH;
+    libs.containerPath = LXSS_LIB_PATH;
     libs.options = {"ro", "rbind"};
 
     wsl::shared::cdi::Mount drivers;
@@ -118,26 +118,44 @@ CATCH_LOG()
 void WriteDockerDaemonConfig()
 try
 {
-    nlohmann::json config;
+    constexpr auto c_daemonConfigPath = "/etc/docker/daemon.json";
+
+    // Merge into any existing daemon.json rather than overwriting it, so user/image-provided settings are preserved.
+    nlohmann::json config = nlohmann::json::object();
+    if (std::filesystem::exists(c_daemonConfigPath))
+    {
+        try
+        {
+            auto existing = nlohmann::json::parse(UtilReadFileContent(c_daemonConfigPath));
+
+            if (existing.is_object())
+            {
+                config = std::move(existing);
+            }
+        }
+        CATCH_LOG()
+    }
+
     config["features"]["cdi"] = true;
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile("/etc/docker/daemon.json", config.dump().c_str()) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(c_daemonConfigPath, config.dump().c_str()) < 0);
 }
 CATCH_LOG()
 
-int WslcGpuHookEntry(int Argc, char* Argv[])
+int WslcGpuHookEntry()
 try
 {
     // OCI runtime hooks receive the container state as JSON on stdin.
     std::string stateJson;
     char buf[4096];
     ssize_t n;
-    while ((n = read(STDIN_FILENO, buf, sizeof(buf))) > 0)
+    while ((n = TEMP_FAILURE_RETRY(read(STDIN_FILENO, buf, sizeof(buf)))) > 0)
     {
         stateJson.append(buf, n);
     }
     THROW_LAST_ERROR_IF(n < 0);
+    THROW_ERRNO_IF(EINVAL, stateJson.empty());
 
     const auto state = nlohmann::json::parse(stateJson);
     const std::string bundle = state.at("bundle").get<std::string>();
@@ -155,11 +173,11 @@ try
     const std::string confPath = confDir + "/ld.wsl.conf";
 
     THROW_LAST_ERROR_IF(UtilMkdirPath(confDir.c_str(), 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), WSLC_GPU_LIB_PATH "\n") < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), LXSS_LIB_PATH "\n") < 0);
 
     // chroots into the rootfs and uses the container's own /etc/ld.so.conf chain,
     // writing /etc/ld.so.cache inside the container.
-    const char* const ldArgv[] = {"/sbin/ldconfig", "-r", rootfs.c_str(), nullptr};
+    const char* const ldArgv[] = {LDCONFIG_COMMAND, "-r", rootfs.c_str(), nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
     return 0;
