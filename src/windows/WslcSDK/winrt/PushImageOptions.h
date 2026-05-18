@@ -32,6 +32,8 @@ struct PushImageOptions : PushImageOptionsT<PushImageOptions>
 private:
     std::string m_image;
     std::string m_registryAuth;
+
+    std::unique_ptr<WslcPushImageOptions> m_pushImageOptions;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

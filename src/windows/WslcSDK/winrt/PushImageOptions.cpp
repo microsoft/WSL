@@ -39,6 +39,11 @@ hstring PushImageOptions::Image()
 
 void PushImageOptions::Image(hstring const& value)
 {
+    if (m_pushImageOptions)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
     if (value.empty())
     {
         throw hresult_invalid_argument(L"Image cannot be empty");
@@ -54,6 +59,11 @@ hstring PushImageOptions::RegistryAuth()
 
 void PushImageOptions::RegistryAuth(hstring const& value)
 {
+    if (m_pushImageOptions)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
     if (value.empty())
     {
         throw hresult_invalid_argument(L"Registry auth cannot be empty");
@@ -64,12 +74,16 @@ void PushImageOptions::RegistryAuth(hstring const& value)
 
 WslcPushImageOptions PushImageOptions::ToStruct()
 {
-    WslcPushImageOptions pushImageOptions{};
-    pushImageOptions.image = m_image.c_str();
-    pushImageOptions.registryAuth = m_registryAuth.c_str();
-    pushImageOptions.progressCallback = nullptr;
-    pushImageOptions.progressCallbackContext = nullptr;
-    return pushImageOptions;
+    if (!m_pushImageOptions)
+    {
+        m_pushImageOptions = std::make_unique<WslcPushImageOptions>();
+        m_pushImageOptions->image = m_image.c_str();
+        m_pushImageOptions->registryAuth = m_registryAuth.c_str();
+        m_pushImageOptions->progressCallback = nullptr;
+        m_pushImageOptions->progressCallbackContext = nullptr;
+    }
+
+    return *m_pushImageOptions;
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

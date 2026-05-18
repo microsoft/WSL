@@ -32,6 +32,8 @@ struct PullImageOptions : PullImageOptionsT<PullImageOptions>
 private:
     std::string m_uri;
     std::string m_registryAuth;
+
+    std::unique_ptr<WslcPullImageOptions> m_pullImageOptions;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
