@@ -68,6 +68,11 @@ void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<h
         throw winrt::hresult_error(E_POINTER, L"CmdLine cannot be null");
     }
 
+    if (value.Size() == 0)
+    {
+        throw winrt::hresult_invalid_argument(L"CmdLine cannot be empty");
+    }
+
     m_cmdLine = value;
 }
 
@@ -113,6 +118,11 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
         return m_processSettings.get();
     }
 
+    if (!m_cmdLine || m_cmdLine.Size() == 0)
+    {
+        throw winrt::hresult_illegal_method_call(L"Process settings require a non-empty CmdLine");
+    }
+
     m_processSettings = std::make_unique<WslcProcessSettings>();
     winrt::check_hresult(WslcInitProcessSettings(m_processSettings.get()));
 
@@ -121,7 +131,6 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
         winrt::check_hresult(WslcSetProcessSettingsWorkingDirectory(m_processSettings.get(), m_workingDirectory.c_str()));
     }
 
-    if (m_cmdLine.Size() > 0)
     {
         auto argc = m_cmdLine.Size();
         m_cmdLineStrings = StringArray{argc};
