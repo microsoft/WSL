@@ -2348,6 +2348,66 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
     *Labels = labelsArray.release();
 }
 
+void WSLCContainerImpl::AttachToNetwork(const WSLCNetworkAttachment* Attachment)
+{
+    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Attachment->ContainerIpAddress != nullptr);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Attachment->NetworkName || strlen(Attachment->NetworkName) == 0);
+
+    const std::string networkName = Attachment->NetworkName;
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkingMode == WSLCContainerNetworkTypeHost || m_networkingMode == WSLCContainerNetworkTypeNone);
+
+    common::docker_schema::ConnectNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.ConnectContainerToNetwork(networkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach container '%hs' to network '%hs'", m_id.c_str(), networkName.c_str());
+    }
+
+    WSL_LOG(
+        "ContainerAttachedToNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+}
+
+void WSLCContainerImpl::DetachFromNetwork(LPCSTR NetworkName)
+{
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkName) == 0);
+
+    const std::string networkName = NetworkName;
+
+    auto lock = m_lock.lock_shared();
+
+    common::docker_schema::DisconnectNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.DisconnectContainerFromNetwork(networkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to detach container '%hs' from network '%hs'", m_id.c_str(), networkName.c_str());
+    }
+
+    WSL_LOG(
+        "ContainerDetachedFromNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+}
+
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
@@ -2358,6 +2418,24 @@ try
     *Count = 0;
     *Labels = nullptr;
     return CallImpl(&WSLCContainerImpl::GetLabels, Labels, Count);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::AttachToNetwork(const WSLCNetworkAttachment* Attachment)
+try
+{
+    COMServiceExecutionContext context;
+    RETURN_HR_IF(E_POINTER, Attachment == nullptr);
+    return CallImpl(&WSLCContainerImpl::AttachToNetwork, Attachment);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::DetachFromNetwork(LPCSTR NetworkName)
+try
+{
+    COMServiceExecutionContext context;
+    RETURN_HR_IF(E_POINTER, NetworkName == nullptr);
+    return CallImpl(&WSLCContainerImpl::DetachFromNetwork, NetworkName);
 }
 CATCH_RETURN();
 

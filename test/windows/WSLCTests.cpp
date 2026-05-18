@@ -6294,6 +6294,17 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Network name cannot be empty.");
     }
 
+    WSLC_TEST_METHOD(DetachContainerEmptyNetworkNameTest)
+    {
+        const std::string containerName = "test-detach-empty-net";
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {});
+        auto container = launcher.Launch(*m_defaultSession);
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().DetachFromNetwork(""));
+        ValidateCOMErrorMessage(L"Network name cannot be empty.");
+    }
+
     WSLC_TEST_METHOD(AttachHostOrNoneModeContainerRejectedTest)
     {
         const std::string networkName = "test-attach-mode-net";
