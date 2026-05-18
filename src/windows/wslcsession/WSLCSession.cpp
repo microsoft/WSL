@@ -257,7 +257,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm)
+HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
@@ -267,6 +267,7 @@ try
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
+    m_pluginNotifier = PluginNotifier;
 
     // Get user token for the current process
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
@@ -645,6 +646,20 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
     }
 }
 
+void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
+try
+{
+    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
+}
+CATCH_LOG()
+
+void WSLCSession::OnImageDeleted(const std::string& ImageId) noexcept
+try
+{
+    LOG_IF_FAILED(m_pluginNotifier->OnImageDeleted(ImageId.c_str()));
+}
+CATCH_LOG()
+
 HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
@@ -672,6 +687,8 @@ try
 
     auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
+
+    OnImageCreated(Image);
 
     return S_OK;
 }
@@ -1014,6 +1031,7 @@ try
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -1039,6 +1057,8 @@ try
     auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
+
+    OnImageCreated(ImageName);
     return S_OK;
 }
 CATCH_RETURN();
@@ -1095,7 +1115,6 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
         else if (parsed.stream.has_value())
         {
-            // TODO: report progress to caller.
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
         }
         else
@@ -1376,6 +1395,15 @@ try
     *Count = static_cast<ULONG>(deletedImages.size());
     *DeletedImages = output.release();
 
+    // Notify plugin manager of all deleted image IDs.
+    for (const auto& image : deletedImages)
+    {
+        if (!image.Deleted.empty())
+        {
+            OnImageDeleted(image.Deleted);
+        }
+    }
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -1453,10 +1481,18 @@ try
     auto lock = m_lock.lock_shared();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectImageLockHeld(ImageNameOrId).c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
+{
     docker_schema::InspectImage dockerInspect;
     try
     {
-        dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+        dockerInspect = m_dockerClient->InspectImage(NameOrId);
     }
     catch (const DockerHTTPException& e)
     {
@@ -1475,12 +1511,8 @@ try
     auto wslcInspect = ConvertInspectImage(dockerInspect);
 
     // Serialize to JSON
-    std::string wslcJson = wsl::shared::ToJson(wslcInspect);
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslcJson.c_str()).release();
-
-    return S_OK;
+    return wsl::shared::ToJson(wslcInspect);
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::Authenticate(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken)
 try
@@ -1633,6 +1665,7 @@ try
             containerName,
             *this,
             m_virtualMachine.value(),
+            m_pluginNotifier.get(),
             m_networks,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
@@ -1969,7 +2002,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -1980,10 +2013,12 @@ try
     *Volumes = nullptr;
     *Count = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
-    auto volumeList = m_volumes->ListVolumes();
+    auto volumeList = m_volumes->ListVolumes(std::move(filters));
 
     if (volumeList.empty())
     {
@@ -1991,10 +2026,7 @@ try
     }
 
     auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    for (size_t i = 0; i < volumeList.size(); i++)
-    {
-        output[i] = volumeList[i];
-    }
+    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
 
     *Count = static_cast<ULONG>(volumeList.size());
     *Volumes = output.release();
@@ -2025,12 +2057,51 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
+HRESULT WSLCSession::PruneVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+try
 {
-    // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
-    // so WSLC VHD volumes require custom handling.
-    return E_NOTIMPL;
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Volumes);
+    RETURN_HR_IF_NULL(E_POINTER, VolumesCount);
+    RETURN_HR_IF_NULL(E_POINTER, SpaceReclaimed);
+    *Volumes = nullptr;
+    *VolumesCount = 0;
+    *SpaceReclaimed = 0;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
+
+    WSLCVolumes::PruneVolumesResult pruneResult;
+    try
+    {
+        pruneResult = m_volumes->PruneVolumes(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune volumes");
+
+    *SpaceReclaimed = pruneResult.SpaceReclaimed;
+
+    if (!pruneResult.Volumes.empty())
+    {
+        auto output = wil::make_unique_cotaskmem<WSLCVolumeName[]>(pruneResult.Volumes.size());
+        for (size_t i = 0; i < pruneResult.Volumes.size(); ++i)
+        {
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                strcpy_s(output[i], pruneResult.Volumes[i].c_str()) != 0,
+                "Unexpected volume name length: %hs",
+                pruneResult.Volumes[i].c_str());
+        }
+
+        *Volumes = output.release();
+        *VolumesCount = static_cast<ULONG>(pruneResult.Volumes.size());
+    }
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
 {
@@ -2675,6 +2746,7 @@ void WSLCSession::RecoverExistingContainers()
                 dockerContainer,
                 *this,
                 m_virtualMachine.value(),
+                m_pluginNotifier.get(),
                 *m_volumes,
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),

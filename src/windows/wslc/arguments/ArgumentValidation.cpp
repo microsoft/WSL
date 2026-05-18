@@ -248,7 +248,7 @@ void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstr
     }
 }
 
-ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
+int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
     auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
     if (!parsed.has_value())
@@ -256,7 +256,7 @@ ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring&
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return parsed.value();
+    return static_cast<int64_t>(parsed.value());
 }
 
 } // namespace wsl::windows::wslc::validation

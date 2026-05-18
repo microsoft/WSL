@@ -29,6 +29,8 @@ using namespace wsl::windows::policies;
 bool g_lxcoreInitialized{false};
 wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
+wsl::windows::service::PluginManager g_pluginManager;
+
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
 
@@ -177,6 +179,9 @@ try
     // Initialize Winsock.
     WSADATA Data;
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
+
+    // Load plugins.
+    g_pluginManager.LoadPlugins();
 
     // Check if WSL is disabled via policy and set up a registry watcher to watch for changes.
     //

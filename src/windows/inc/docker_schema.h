@@ -9,7 +9,8 @@ Module Name:
 Abstract:
 
     JSON schema for the docker API.
-    The documentation for the API can be found at: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Container
+    Targets the daemon API version bundled with WSLC's dockerd (currently v25.0.3, API v1.44).
+    The documentation for the API can be found at: https://docs.docker.com/reference/api/engine/version/v1.44/#tag/Container
 
 --*/
 
@@ -22,10 +23,9 @@ namespace wsl::windows::common::docker_schema {
 struct CreatedContainer
 {
     std::string Id;
-    std::string Name;
     std::vector<std::string> Warnings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(CreatedContainer, Id, Warnings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreatedContainer, Id, Warnings);
 };
 
 struct ErrorResponse
@@ -83,7 +83,10 @@ struct Volume
     std::string CreatedAt;
     std::optional<std::map<std::string, std::string>> Options;
     std::optional<std::map<std::string, std::string>> Labels;
-    std::optional<std::map<std::string, std::string>> Status;
+    // Docker's wire schema for Status is map[string]any: third-party volume
+    // drivers may set arbitrary JSON values (numbers, bools, objects), not
+    // just strings. Use nlohmann::json so deserialization never throws.
+    std::optional<std::map<std::string, nlohmann::json>> Status;
     std::optional<VolumeUsageData> UsageData;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, CreatedAt, Options, Labels, Status, UsageData);
@@ -223,7 +226,9 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
-    std::optional<ULONGLONG> ShmSize;
+    // Docker wire type is int64. 0 means "use daemon default" — same as omitting
+    // the field — so we don't bother with std::optional here.
+    std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
@@ -336,7 +341,9 @@ struct InspectContainer
 
 struct InspectExec
 {
-    std::optional<int> Pid{};
+    // N.B. Pid is a non-nullable int in moby's schema; it is 0 until runc forks the user process. ExitCode is a *int and
+    // is null until the exec exits.
+    int Pid{};
     std::optional<int> ExitCode{};
     bool Running{};
 
@@ -356,7 +363,7 @@ struct Image
     std::string Id;
     std::vector<std::string> RepoTags;
     std::vector<std::string> RepoDigests;
-    uint64_t Size{};
+    int64_t Size{};
     int64_t Created{};
     std::string ParentId;
 
@@ -377,6 +384,14 @@ struct PruneImageResult
     uint64_t SpaceReclaimed{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
+};
+
+struct PruneVolumeResult
+{
+    std::optional<std::vector<std::string>> VolumesDeleted;
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
 };
 
 struct ImportStatus
@@ -432,7 +447,7 @@ struct InspectImage
     std::string Variant;
     std::string Os;
     std::string OsVersion;
-    uint64_t Size{};
+    int64_t Size{};
     std::optional<GraphDriverData> GraphDriver;
     std::optional<RootFS> RootFS;
     std::optional<std::map<std::string, std::string>> Metadata;
@@ -455,41 +470,73 @@ struct CreateExec
     bool AttachStdout{};
     bool AttachStderr{};
     bool Tty{};
+    // Docker wire type is *[2]uint64. Sending an empty array on a TTY exec yields
+    // a 0x0 console; the field must be omitted entirely when the caller didn't set it.
     std::vector<ULONG> ConsoleSize;
     std::vector<std::string> Cmd;
     std::vector<std::string> Env;
     std::optional<std::string> User;
     std::string WorkingDir;
     std::optional<std::string> DetachKeys;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User, DetachKeys);
 };
+
+inline void to_json(nlohmann::json& j, const CreateExec& v)
+{
+    j = nlohmann::json{
+        {"AttachStdin", v.AttachStdin},
+        {"AttachStdout", v.AttachStdout},
+        {"AttachStderr", v.AttachStderr},
+        {"Tty", v.Tty},
+        {"Cmd", v.Cmd},
+        {"Env", v.Env},
+        {"WorkingDir", v.WorkingDir},
+        {"User", v.User},
+        {"DetachKeys", v.DetachKeys},
+    };
+
+    if (!v.ConsoleSize.empty())
+    {
+        j["ConsoleSize"] = v.ConsoleSize;
+    }
+}
 
 struct StartExec
 {
     using TResponse = void;
     bool Tty{};
     bool Detach{};
+    // See CreateExec::ConsoleSize.
     std::vector<ULONG> ConsoleSize;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
 };
+
+inline void to_json(nlohmann::json& j, const StartExec& v)
+{
+    j = nlohmann::json{{"Tty", v.Tty}, {"Detach", v.Detach}};
+
+    if (!v.ConsoleSize.empty())
+    {
+        j["ConsoleSize"] = v.ConsoleSize;
+    }
+}
 
 enum class ContainerState
 {
+    Unknown,
     Created,
     Running,
     Paused,
     Restarting,
     Exited,
     Removing,
-    Dead,
-    Unknown
+    Dead
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     ContainerState,
     {
+        // Unknown is first so unrecognized strings (or missing field) deserialize to Unknown,
+        // not to whatever the next entry happens to be.
+        {ContainerState::Unknown, nullptr},
         {ContainerState::Created, "created"},
         {ContainerState::Running, "running"},
         {ContainerState::Paused, "paused"},
@@ -580,7 +627,7 @@ struct CreateImageProgress
 };
 
 // Container stats (GET /containers/{id}/stats?stream=false)
-// See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Container/operation/ContainerStats
+// See: https://docs.docker.com/reference/api/engine/version/v1.44/#tag/Container/operation/ContainerStats
 
 struct ContainerStatsCpuUsage
 {
