@@ -173,20 +173,20 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     return SendRequestImpl(verb::post, url, {}, customHeaders);
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength, HANDLE BodySource)
 {
-    return SendRequestImpl(
-        verb::post, URL::Create("/images/load"), {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
+    return SendStreamRequest(verb::post, URL::Create("/images/load"), ContentLength, "application/x-tar", BodySource);
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportImage(
+    const std::string& Repo, const std::string& Tag, uint64_t ContentLength, HANDLE BodySource)
 {
     auto url = URL::Create("/images/create");
     url.SetParameter("tag", Tag);
     url.SetParameter("repo", Repo);
     url.SetParameter("fromSrc", "-");
 
-    return SendRequestImpl(verb::post, url, {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
+    return SendStreamRequest(verb::post, url, ContentLength, "application/x-tar", BodySource);
 }
 
 void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
@@ -785,6 +785,75 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
 #endif
 
     return std::move(context);
+}
+
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendStreamRequest(
+    verb Method, const URL& Url, uint64_t ContentLength, std::string_view ContentType, HANDLE BodySource)
+{
+    auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
+
+    // Use buffer_body so beast manages Content-Length consistently while we
+    // stream the payload in chunks. The previous approach (string_body with
+    // empty body + manual Content-Length header, then raw writes to the socket)
+    // was racy with the response reader and could be torn down mid-upload.
+    http::request<http::buffer_body> req{Method, Url.Get(), 11};
+    req.set(http::field::host, "localhost");
+    req.set(http::field::connection, "close");
+    req.set(http::field::accept, "application/json");
+    req.set(http::field::content_type, std::string{ContentType});
+    req.set(http::field::content_length, std::to_string(ContentLength));
+
+    http::request_serializer<http::buffer_body> sr{req};
+    boost::beast::error_code ec;
+
+    // 1) Write headers.
+    http::write_header(context->stream, sr, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.failed(), "Failed to write HTTP headers to '%hs': %hs", Url.Get().c_str(), ec.message().c_str());
+
+    // 2) Stream the body in chunks. Each iteration: read from BodySource, hand the
+    //    buffer to beast, then call http::write. Beast returns `need_buffer` when it
+    //    has consumed the current chunk and the message isn't done yet — we treat
+    //    that as the signal to refill.
+    constexpr size_t bufSize = 64 * 1024;
+    auto buf = std::make_unique<char[]>(bufSize);
+    uint64_t totalSent = 0;
+
+    while (totalSent < ContentLength)
+    {
+        const auto toRead = static_cast<DWORD>(std::min<uint64_t>(bufSize, ContentLength - totalSent));
+
+        DWORD bytesRead = 0;
+        THROW_LAST_ERROR_IF(!ReadFile(BodySource, buf.get(), toRead, &bytesRead, nullptr));
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, bytesRead == 0, "Premature EOF on body source at %llu of %llu bytes", totalSent, ContentLength);
+
+        totalSent += bytesRead;
+        const bool lastChunk = (totalSent >= ContentLength);
+
+        req.body().data = buf.get();
+        req.body().size = bytesRead;
+        req.body().more = !lastChunk;
+
+        ec = {};
+        http::write(context->stream, sr, ec);
+
+        if (ec == http::error::need_buffer)
+        {
+            // Expected when more=true: serializer consumed our chunk and wants the next one.
+            ec = {};
+        }
+
+        THROW_HR_IF_MSG(
+            E_FAIL,
+            ec.failed(),
+            "Failed to write body to '%hs' at %llu of %llu bytes: %hs",
+            Url.Get().c_str(),
+            totalSent,
+            ContentLength,
+            ec.message().c_str());
+    }
+
+    return context;
 }
 
 std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::SendRequest(

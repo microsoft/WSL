@@ -170,8 +170,8 @@ public:
 
     std::unique_ptr<HTTPRequestContext> PullImage(
         const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
-    std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
-    std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
+    std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength, HANDLE BodySource);
+    std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength, HANDLE BodySource);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::unique_ptr<HTTPRequestContext> PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::string& registryAuth);
     std::string Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password);
@@ -246,6 +246,17 @@ private:
 
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
+
+    // Streaming POST: writes the HTTP request and a Content-Length-bounded body by reading
+    // from BodySource in chunks via beast's buffer_body serializer. Use this for endpoints
+    // that take a large binary payload (LoadImage, ImportImage). Returns the HTTPRequestContext
+    // with the socket positioned to read the response.
+    std::unique_ptr<HTTPRequestContext> SendStreamRequest(
+        boost::beast::http::verb Method,
+        const URL& Url,
+        uint64_t ContentLength,
+        std::string_view ContentType,
+        HANDLE BodySource);
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");

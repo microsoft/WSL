@@ -844,13 +844,17 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->LoadImage(ContentSize);
+    // Open the source handle here and pass it to DockerHTTPClient, which now does the full
+    // streamed upload internally via beast's buffer_body serializer. We just consume the
+    // response afterwards.
+    auto userHandle = OpenUserHandle(ImageHandle);
+    auto requestContext = m_dockerClient->LoadImage(ContentSize, userHandle.Get());
 
     // No progress for LoadImage.
     auto onResponseChunk = [](const gsl::span<char>&) {};
     auto onResponseComplete = [] {};
 
-    ImportImageImpl(*requestContext, ImageHandle, std::move(onResponseChunk), std::move(onResponseComplete));
+    ImportImageImpl(*requestContext, std::move(onResponseChunk), std::move(onResponseComplete));
 
     return S_OK;
 }
@@ -874,7 +878,8 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
+    auto userHandle = OpenUserHandle(ImageHandle);
+    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize, userHandle.Get());
 
     auto errorMessage = std::make_shared<std::optional<std::string>>();
 
@@ -909,7 +914,7 @@ try
         THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage->value(), errorMessage->has_value());
     };
 
-    ImportImageImpl(*requestContext, ImageHandle, std::move(onResponseChunk), std::move(onResponseComplete));
+    ImportImageImpl(*requestContext, std::move(onResponseChunk), std::move(onResponseComplete));
 
     OnImageCreated(ImageName);
     return S_OK;
@@ -918,12 +923,11 @@ CATCH_RETURN();
 
 void WSLCSession::ImportImageImpl(
     DockerHTTPClient::HTTPRequestContext& Request,
-    const WSLCHandle ImageHandle,
     std::function<void(const gsl::span<char>&)>&& OnResponseChunk,
     std::function<void()>&& OnResponseComplete)
 {
-    auto userHandle = OpenUserHandle(ImageHandle);
-
+    // Upload was completed synchronously by DockerHTTPClient::LoadImage / ImportImage
+    // (via SendStreamRequest). Here we only consume the HTTP response.
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto io = CreateIOContext();
@@ -956,15 +960,6 @@ void WSLCSession::ImportImageImpl(
 
         OnResponseChunk(buffer);
     };
-
-    // Shutdown the Docker stream's write side when the user pipe is closed.
-    // This is required for Docker to know when the request body is complete.
-    auto onInputComplete = [socket = Request.stream.native_handle()]() {
-        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
-    };
-
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, common::io::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
