@@ -65,6 +65,7 @@ void PushImageOptions::RegistryAuth(hstring const& value)
 WslcPushImageOptions PushImageOptions::ToStruct()
 {
     WslcPushImageOptions pushImageOptions{};
+    pushImageOptions.image = m_image.c_str();
     pushImageOptions.registryAuth = m_registryAuth.c_str();
     pushImageOptions.progressCallback = nullptr;
     pushImageOptions.progressCallbackContext = nullptr;
