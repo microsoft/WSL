@@ -55,7 +55,7 @@ private:
     void EnsureNotStarted() const;
 
     void ApplyCallbacksToSettings();
-    winrt::Windows::Foundation::IAsyncAction StartWaitingForExit();
+    winrt::Windows::Foundation::IAsyncAction StartWaitingForExitAsync();
 
     static void CALLBACK OutputCallback(
         WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context) noexcept;

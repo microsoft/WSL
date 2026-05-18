@@ -37,7 +37,7 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& setti
 void Process::ApplyCallbacksToSettings()
 {
     // Callbacks are only used with OutputMode::Event.
-    // Stream and Discard modes use the exit event path (StartWaitingForExit).
+    // Stream and Discard modes use the exit event path (StartWaitingForExitAsync).
     if (m_outputMode != ProcessOutputMode::Event)
     {
         return;
@@ -53,7 +53,7 @@ void Process::ApplyCallbacksToSettings()
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
-winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExit()
+winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExitAsync()
 {
     // Event mode uses the exit callback set in ApplyCallbacksToSettings; no need to wait here.
     if (m_outputMode == ProcessOutputMode::Event)
@@ -89,7 +89,7 @@ void Process::AttachHandle(WslcProcess handle)
     }
 
     m_process.reset(handle);
-    StartWaitingForExit();
+    m_waitForExitAction = StartWaitingForExitAsync();
 }
 
 ProcessOutputMode Process::OutputMode()
@@ -113,7 +113,7 @@ void Process::Start()
     m_container = nullptr;
     m_settings = nullptr;
 
-    StartWaitingForExit();
+    m_waitForExitAction = StartWaitingForExitAsync();
 }
 
 void Process::EnsureStarted() const
