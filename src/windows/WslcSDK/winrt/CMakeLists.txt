@@ -68,3 +68,14 @@ set_target_properties(
     FOLDER windows
     EXCLUDE_FROM_ALL FALSE
 )
+
+# Copy the winmd to the bin output directory so the nuspec can reference it
+# from a stable, arch-aware path (bin\<platform>\<config>\Microsoft.WSL.Containers.winmd).
+set(WINMD_SRC ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wslcsdk.winmd)
+set(WINMD_DEST ${CMAKE_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/Microsoft.WSL.Containers.winmd)
+
+add_custom_command(TARGET wslcsdkwinrtidl POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}
+    COMMAND ${CMAKE_COMMAND} -E copy ${WINMD_SRC} ${WINMD_DEST}
+    COMMENT "Copying Microsoft.WSL.Containers.winmd to bin output"
+)
