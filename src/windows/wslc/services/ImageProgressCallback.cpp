@@ -122,10 +122,13 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         line = std::format(L"{}: {}", id, status);
     }
 
+    // Use the visible window width (not the buffer width) to prevent wrapping.
+    const auto visibleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left + 1);
+
     // Truncate to console width to prevent wrapping that would break cursor repositioning.
-    if (line.size() > static_cast<size_t>(info.dwSize.X))
+    if (line.size() > static_cast<size_t>(visibleWidth))
     {
-        line.resize(info.dwSize.X);
+        line.resize(visibleWidth);
 
         // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
         // drop it so we don't emit an invalid UTF-16 sequence.
@@ -136,7 +139,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     }
 
     // Erase any previously written char on that line.
-    while (line.size() < info.dwSize.X)
+    while (line.size() < static_cast<size_t>(visibleWidth))
     {
         line += L' ';
     }

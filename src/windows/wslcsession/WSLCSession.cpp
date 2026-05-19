@@ -932,13 +932,11 @@ try
 
             if (entry.total > 0)
             {
-                auto current = wsl::shared::string::FormatBytes(entry.current);
-                auto total = wsl::shared::string::FormatBytes(entry.total);
-                reportProgress(
-                    std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total),
-                    entry.id.c_str(),
-                    static_cast<ULONGLONG>(entry.current),
-                    static_cast<ULONGLONG>(entry.total));
+                auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
+                auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
+                auto current = wsl::shared::string::FormatBytes(currentBytes);
+                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
             {
