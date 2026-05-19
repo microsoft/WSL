@@ -63,7 +63,8 @@ include(FetchContent)
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/_deps/${TARGET_PLATFORM})
 
-# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson) must be reflected in cgmanifest.json
+# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson, yaml-cpp, boost, protobuf)
+# must be reflected in cgmanifest.json
 
 FetchContent_Declare(GSL
                      URL https://github.com/microsoft/GSL/archive/refs/tags/v4.0.0.tar.gz
@@ -103,6 +104,33 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(boost_headers)
+
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(protobuf
+                     URL https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
+                     URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
+
+FetchContent_MakeAvailable(protobuf)
+
+# protobuf exports different target names depending on how it is consumed.
+if (TARGET protobuf::protoc)
+    set(PROTOC_TARGET protobuf::protoc)
+elseif (TARGET protoc)
+    set(PROTOC_TARGET protoc)
+else()
+    message(FATAL_ERROR "Could not locate protobuf compiler target.")
+endif()
+
+if (TARGET protobuf::libprotobuf)
+    set(PROTOBUF_LIB_TARGET protobuf::libprotobuf)
+elseif (TARGET libprotobuf)
+    set(PROTOBUF_LIB_TARGET libprotobuf)
+else()
+    message(FATAL_ERROR "Could not locate protobuf runtime library target.")
+endif()
 
 
 # Import modules
