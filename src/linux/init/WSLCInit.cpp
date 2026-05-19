@@ -112,22 +112,9 @@ try
 {
     constexpr auto c_daemonConfigPath = "/etc/docker/daemon.json";
 
-    // Merge into any existing daemon.json rather than overwriting it, so user/image-provided settings are preserved.
+    THROW_ERRNO_IF(EEXIST, std::filesystem::exists(c_daemonConfigPath));
+
     nlohmann::json config = nlohmann::json::object();
-    if (std::filesystem::exists(c_daemonConfigPath))
-    {
-        try
-        {
-            auto existing = nlohmann::json::parse(UtilReadFileContent(c_daemonConfigPath));
-
-            if (existing.is_object())
-            {
-                config = std::move(existing);
-            }
-        }
-        CATCH_LOG()
-    }
-
     config["features"]["cdi"] = true;
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
