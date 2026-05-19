@@ -138,6 +138,7 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
         dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
+    // REVIEW: Can we always enable earlycon?
     m_dmesgCollector = DmesgCollector::Create(
         m_vmId, m_vmExitEvent, true, false, L"", true /* earlycon */, std::move(dmesgOutputHandle));
 
