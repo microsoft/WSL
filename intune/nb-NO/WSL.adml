@@ -8,9 +8,9 @@
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
         <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Tillat Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Når satt til deaktivert, deaktiverer denne policyen tilgang til å kjøre Linux-distribusjoner i Windows Subsystem for Linux for alle brukere på maskinen.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Tillat innboksversjonen av Windows Subsystem for Linux</string>
         <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Når deaktivert vil denne policyen deaktivere innboksversjonen (valgfri komponent) i Windows Subsystem for Linux. Hvis denne policyen er deaktivert, kan bare butikkversjonen av WSL brukes.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Allow WSL1</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-beholder</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Tillat WSL-beholder</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne policyen styrer om WSL-beholdere kan brukes på denne maskinen. Når den er aktivert eller ikke konfigurert, kan brukere og Windows-apper kjøre Linux-beholdere via WSL. Når den er deaktivert, blokkeres WSL-beholdere for alle brukere, og Windows-apper kan ikke kjøre Linux-beholdere. Advarsel: Hvis denne settes til 'Disabled', kan Windows-apper som er avhengige av Linux-beholdere, slutte å fungere.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Tillatelsesliste for WSL-beholderregistre</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Når dette er aktivert, har WSL-beholderen bare tillatelse til å hente bilder fra registrene som er oppført her. Dette påvirker både CLI for WSL-beholderen og alle programmer som bruker WSL-beholder-API-et.</string>
