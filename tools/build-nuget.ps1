@@ -20,9 +20,17 @@
 .PARAMETER Version
     NuGet package version string. Defaults to the git-computed version.
 
+.PARAMETER Fast
+    Skip the cmake reconfiguration step. Use this on subsequent runs when
+    cmake cache variables haven't changed, to iterate quickly.
+
 .EXAMPLE
     .\tools\build-nuget.ps1
     Builds a Debug package for the currently configured platform.
+
+.EXAMPLE
+    .\tools\build-nuget.ps1 -Fast
+    Skips cmake config and packs immediately (fastest iteration).
 
 .EXAMPLE
     .\tools\build-nuget.ps1 -Config Release -Version 0.0.1-local
@@ -33,7 +41,9 @@ param(
     [ValidateSet("Debug", "Release")]
     [string] $Config = "Debug",
 
-    [string] $Version = ""
+    [string] $Version = "",
+
+    [switch] $Fast
 )
 
 Set-StrictMode -Version Latest
@@ -45,19 +55,21 @@ Push-Location $RepoRoot
 try {
     # Update the cmake cache variables we need without touching the generator or
     # platform (those are already set from the user's initial cmake . run).
-    $cmakeArgs = @(
-        ".",
-        "-DCMAKE_BUILD_TYPE=$Config",
-        "-DWSL_NUGET_SINGLE_ARCH=ON"
-    )
+    if (-not $Fast) {
+        $cmakeArgs = @(
+            ".",
+            "-DCMAKE_BUILD_TYPE=$Config",
+            "-DWSL_NUGET_SINGLE_ARCH=ON"
+        )
 
-    if ($Version -ne "") {
-        $cmakeArgs += "-DWSL_NUGET_PACKAGE_VERSION=$Version"
+        if ($Version -ne "") {
+            $cmakeArgs += "-DWSL_NUGET_PACKAGE_VERSION=$Version"
+        }
+
+        Write-Host "Updating cmake cache for $Config build..." -ForegroundColor Cyan
+        cmake @cmakeArgs
+        if ($LASTEXITCODE -ne 0) { throw "cmake configure failed (exit code $LASTEXITCODE)" }
     }
-
-    Write-Host "Updating cmake cache for $Config build..." -ForegroundColor Cyan
-    cmake @cmakeArgs
-    if ($LASTEXITCODE -ne 0) { throw "cmake configure failed (exit code $LASTEXITCODE)" }
 
     Write-Host "`nBuilding wslcsdkwinrt (generates winmd)..." -ForegroundColor Cyan
     cmake --build . --config $Config --target wslcsdkwinrtidl -- -m

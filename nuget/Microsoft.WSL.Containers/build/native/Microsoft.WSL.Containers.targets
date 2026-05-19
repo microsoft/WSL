@@ -26,7 +26,10 @@
 
     <ItemGroup>
         <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform)\native\wslcsdk.dll" />
-        <CppWinRTInputs Include="$(MSBuildThisFileDirectory)..\..\winmd\Microsoft.WSL.Containers.winmd" />
+        <Reference Include="Microsoft.WSL.Containers">
+            <HintPath>$(MSBuildThisFileDirectory)..\..\winmd\Microsoft.WSL.Containers.winmd</HintPath>
+            <Implementation>wslcsdk.dll</Implementation>
+        </Reference>
     </ItemGroup>
 
     <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcIsInvalidPlatform)' == 'true'">

@@ -15,13 +15,6 @@ if(WSL_NUGET_SINGLE_ARCH)
     # Single-arch: only include the current platform's native binaries.
     set(WSL_NUGET_ARCH_ENTRIES "    <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\${TARGET_PLATFORM}\\${CMAKE_BUILD_TYPE}\\wslcsdk.lib\" target=\"runtimes\\win-${_wslcsdk_platform_lower}\\\"/>
     <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\${TARGET_PLATFORM}\\${CMAKE_BUILD_TYPE}\\wslcsdk.dll\" target=\"runtimes\\win-${_wslcsdk_platform_lower}\\native\\\"/>")
-
-    # wslcsdkcs.dll (the C# projection) is only built for x64.
-    if(TARGET_PLATFORM STREQUAL "x64")
-        set(WSL_NUGET_CSWINRT_ENTRY "    <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\x64\\${CMAKE_BUILD_TYPE}\\wslcsdkcs.dll\" target=\"lib\\${WSL_NUGET_TARGET_FRAMEWORK}\\\"/>")
-    else()
-        set(WSL_NUGET_CSWINRT_ENTRY "")
-    endif()
 else()
     # Dual-arch (default): include both x64 and arm64 native binaries, as the pipeline does.
     set(WSL_NUGET_ARCH_ENTRIES "    <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\x64\\${CMAKE_BUILD_TYPE}\\wslcsdk.lib\" target=\"runtimes\\win-x64\\\"/>
@@ -29,8 +22,13 @@ else()
 
     <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\arm64\\${CMAKE_BUILD_TYPE}\\wslcsdk.lib\" target=\"runtimes\\win-arm64\\\"/>
     <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\arm64\\${CMAKE_BUILD_TYPE}\\wslcsdk.dll\" target=\"runtimes\\win-arm64\\native\\\"/>")
+endif()
 
+# wslcsdkcs.dll (the C# projection) is only built when WSL_BUILD_SDKCS=ON.
+if(WSL_BUILD_SDKCS)
     set(WSL_NUGET_CSWINRT_ENTRY "    <file src=\"${CMAKE_SOURCE_DIR_NATIVE}\\bin\\x64\\${CMAKE_BUILD_TYPE}\\wslcsdkcs.dll\" target=\"lib\\${WSL_NUGET_TARGET_FRAMEWORK}\\\"/>")
+else()
+    set(WSL_NUGET_CSWINRT_ENTRY "")
 endif()
 
 unset(_wslcsdk_platform_lower)
