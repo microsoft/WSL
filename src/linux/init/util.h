@@ -313,6 +313,6 @@ std::string UtilReadFileContent(std::string_view path);
 
 uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
-int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
+int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY | O_CLOEXEC | O_CREAT, int Permissions = 0644);
 
 int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);

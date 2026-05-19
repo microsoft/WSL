@@ -32,6 +32,7 @@ Abstract:
 #include <pty.h>
 #include "mountutilcpp.h"
 #include <filesystem>
+#include <iostream>
 #include "JsonUtils.h"
 #include "cdi_schema.h"
 #include "lxfsshares.h"
@@ -59,8 +60,6 @@ extern int g_LogFd;
 
 extern void WSLCEnableCrashDumpCollection();
 
-#define WSLC_GPU_DRIVERS_PATH LXSS_LIB_PREFIX "/drivers"
-
 struct WSLCState
 {
     std::optional<std::filesystem::path> ModulesMountPoint;
@@ -68,50 +67,43 @@ struct WSLCState
 
 static WSLCState g_state;
 
-int CreateSymlink(PCSTR LinkName)
-try
-{
-    THROW_LAST_ERROR_IF(symlink("/init", LinkName) < 0 && errno != EEXIST);
-    return 0;
-}
-CATCH_RETURN_ERRNO()
-
 void WriteWslcCdiSpec()
 try
 {
-    wsl::shared::cdi::DeviceNode dxg;
+    wsl::shared::cdi::DeviceNode dxg{};
     dxg.path = "/dev/dxg";
     dxg.permissions = "rwm";
 
-    wsl::shared::cdi::Mount libs;
+    wsl::shared::cdi::Mount libs{};
     libs.hostPath = LXSS_LIB_PATH;
     libs.containerPath = LXSS_LIB_PATH;
     libs.options = {"ro", "rbind"};
 
-    wsl::shared::cdi::Mount drivers;
-    drivers.hostPath = WSLC_GPU_DRIVERS_PATH;
-    drivers.containerPath = WSLC_GPU_DRIVERS_PATH;
+    wsl::shared::cdi::Mount drivers{};
+    drivers.hostPath = LXSS_GPU_DRIVERS_PATH;
+    drivers.containerPath = LXSS_GPU_DRIVERS_PATH;
     drivers.options = {"ro", "rbind"};
 
-    wsl::shared::cdi::Hook hook;
+    wsl::shared::cdi::Hook hook{};
     hook.hookName = "createContainer";
     hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
     hook.args = {LX_INIT_WSLC_GPU_HOOK};
 
-    wsl::shared::cdi::Device gpu;
+    wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));
 
-    wsl::shared::cdi::Spec spec;
+    wsl::shared::cdi::Spec spec{};
     spec.cdiVersion = "0.6.0";
     spec.kind = LX_WSLC_CDI_KIND;
     spec.devices.push_back(std::move(gpu));
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/cdi", 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile("/etc/cdi/microsoft.com-wslc.json", nlohmann::json(spec).dump().c_str()) < 0);
+    THROW_LAST_ERROR_IF(
+        WriteToFile("/etc/cdi/microsoft.com-wslc.json", nlohmann::json(spec).dump().c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
 }
 CATCH_LOG()
 
@@ -139,7 +131,7 @@ try
     config["features"]["cdi"] = true;
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile(c_daemonConfigPath, config.dump().c_str()) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(c_daemonConfigPath, config.dump().c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
 }
 CATCH_LOG()
 
@@ -147,37 +139,36 @@ int WslcGpuHookEntry()
 try
 {
     // OCI runtime hooks receive the container state as JSON on stdin.
-    std::string stateJson;
-    char buf[4096];
-    ssize_t n;
-    while ((n = TEMP_FAILURE_RETRY(read(STDIN_FILENO, buf, sizeof(buf)))) > 0)
-    {
-        stateJson.append(buf, n);
-    }
-    THROW_LAST_ERROR_IF(n < 0);
+    const std::string stateJson{std::istreambuf_iterator<char>(std::cin), {}};
     THROW_ERRNO_IF(EINVAL, stateJson.empty());
 
     const auto state = nlohmann::json::parse(stateJson);
-    const std::string bundle = state.at("bundle").get<std::string>();
+    const std::filesystem::path bundle = state.at("bundle").get<std::string>();
+    THROW_ERRNO_IF(EINVAL, !bundle.is_absolute());
 
     // Read the OCI spec's root.path from <bundle>/config.json. For Docker/containerd this is an
-    // absolute path to the overlay-merged rootfs accessible from the runtime namespace.
-    const auto spec = nlohmann::json::parse(UtilReadFileContent(bundle + "/config.json"));
-    std::string rootfs = spec.at("root").at("path").get<std::string>();
-    if (!rootfs.empty() && rootfs.front() != '/')
+    // absolute path to the overlay-merged rootfs accessible from the runtime namespace or a path
+    // relative to the bundle directory.
+    const auto spec = nlohmann::json::parse(UtilReadFileContent((bundle / "config.json").native()));
+    std::filesystem::path rootfsPath = spec.at("root").at("path").get<std::string>();
+    if (rootfsPath.is_relative())
     {
-        rootfs = bundle + "/" + rootfs;
+        rootfsPath = bundle / rootfsPath;
     }
 
-    const std::string confDir = rootfs + "/etc/ld.so.conf.d";
-    const std::string confPath = confDir + "/ld.wsl.conf";
+    rootfsPath = std::filesystem::canonical(rootfsPath);
+    THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
+    THROW_ERRNO_IF(ENOTDIR, !std::filesystem::is_directory(rootfsPath));
+
+    const auto confDir = rootfsPath / "etc/ld.so.conf.d";
+    const auto confPath = confDir / "ld.wsl.conf";
 
     THROW_LAST_ERROR_IF(UtilMkdirPath(confDir.c_str(), 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), LXSS_LIB_PATH "\n") < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC | O_NOFOLLOW) < 0);
 
     // chroots into the rootfs and uses the container's own /etc/ld.so.conf chain,
     // writing /etc/ld.so.cache inside the container.
-    const char* const ldArgv[] = {LDCONFIG_COMMAND, "-r", rootfs.c_str(), nullptr};
+    const char* const ldArgv[] = {LDCONFIG_COMMAND, "-r", rootfsPath.c_str(), nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
     return 0;
@@ -186,8 +177,9 @@ CATCH_RETURN_ERRNO()
 
 void WSLCEnableCrashDumpCollection()
 {
-    if (CreateSymlink("/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
+    if (symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0 && errno != EEXIST)
     {
+        LOG_ERROR("symlink(/init, /" LX_INIT_WSL_CAPTURE_CRASH ") failed {}", errno);
         return;
     }
 
@@ -731,10 +723,9 @@ void HandleMessageImpl(
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
-            // Recreate the crash dump symlink inside the new root.
-            CreateSymlink("/" LX_INIT_WSL_CAPTURE_CRASH);
-
-            CreateSymlink("/" LX_INIT_WSLC_GPU_HOOK);
+            // Recreate the /init symlinks inside the new root.
+            THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0 && errno != EEXIST);
+            THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSLC_GPU_HOOK) < 0 && errno != EEXIST);
 
             WriteWslcCdiSpec();
             WriteDockerDaemonConfig();

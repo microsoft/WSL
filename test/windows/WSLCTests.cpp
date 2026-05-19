@@ -3384,7 +3384,37 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-container-gpu", {"sleep", "99999"});
             launcher.SetContainerFlags(WSLCContainerFlagsGpu);
 
-            auto container = launcher.Launch(*session);
+            auto [launchResult, maybeContainer] = launcher.LaunchNoThrow(*session);
+            if (FAILED(launchResult))
+            {
+                LogError("Launch failed with 0x%08x; dumping session diagnostics for triage", launchResult);
+
+                auto dumpCommand = [&](const std::vector<std::string>& cmd) {
+                    auto cmdStr = wsl::shared::string::Join(cmd, ' ');
+                    auto result = RunCommand(session.get(), cmd);
+                    LogError(
+                        "$ %hs\n  exit=%i\n  stdout=%hs\n  stderr=%hs",
+                        cmdStr.c_str(),
+                        result.Code,
+                        result.Output[1].c_str(),
+                        result.Output[2].c_str());
+                };
+
+                dumpCommand({"/bin/dmesg"});
+                dumpCommand({"/bin/cat", "/etc/cdi/microsoft.com-wslc.json"});
+                dumpCommand({"/bin/cat", "/etc/docker/daemon.json"});
+                dumpCommand({"/usr/bin/docker", "info", "-f", "{{json .}}"});
+                dumpCommand({"/bin/ls", "-la", "/wsl-gpu-hook", "/init"});
+                dumpCommand({"/usr/bin/docker", "ps", "-a"});
+                dumpCommand(
+                    {"/bin/sh",
+                     "-c",
+                     "for id in $(docker ps -aq); do echo \"=== $id ===\"; docker inspect $id; echo \"--- logs ---\"; docker "
+                     "logs $id 2>&1; done"});
+            }
+            VERIFY_SUCCEEDED(launchResult);
+
+            auto container = std::move(maybeContainer.value());
 
             auto expect = [&](const std::vector<std::string> command,
                               int exitCode,

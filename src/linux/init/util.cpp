@@ -3338,7 +3338,7 @@ uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
     return LinuxAddressFamily;
 }
 
-int WriteToFile(const char* Path, const char* Content, int permissions)
+int WriteToFile(const char* Path, const char* Content, int OpenFlags, int Permissions)
 
 /*++
 
@@ -3352,6 +3352,10 @@ Arguments:
 
     Content - Supplies the content to be written to the file.
 
+    Permissions - Supplies the file mode used when O_CREAT causes the file to be created.
+
+    OpenFlags - Supplies the flags passed to open(). Defaults to O_WRONLY | O_CLOEXEC | O_CREAT.
+
 Return Value:
 
     0 on success, -1 on failure.
@@ -3359,7 +3363,7 @@ Return Value:
 --*/
 
 {
-    wil::unique_fd Fd{open(Path, (O_WRONLY | O_CLOEXEC | O_CREAT), permissions)};
+    wil::unique_fd Fd{open(Path, OpenFlags, Permissions)};
     if (!Fd)
     {
         int errnoPrev = errno;
