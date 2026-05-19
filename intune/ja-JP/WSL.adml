@@ -7,11 +7,11 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux を許可する</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->無効に設定すると、このポリシーは、マシン上のすべてのユーザーに対して、Windows Subsystem for Linux で実行中の Linux ディストリビューションへのアクセスを無効にします。</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux の受信トレイ バージョンを許可する</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->無効に設定すると、このポリシーは Windows Subsystem for Linux の受信トレイ バージョン (オプション コンポーネント) を無効にします。このポリシーを無効にすると、WSL の Microsoft Store バージョンのみを使用できます。</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->WSL1 を許可する</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->無効に設定すると、このポリシーは WSL1 を無効にします。無効にすると、WSL2 ディストリビューションのみを使用できます。</string>
@@ -35,7 +35,7 @@
         <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.kernelDebugPort) によるカーネル デバッグ構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">カスタム ネットワーク構成を許可する</string>
-        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingMode). This policy only applies to Store WSL.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.networkingMode) によるカスタム ネットワーク構成を無効にします。このポリシーは Store WSL にのみ適用されます。</string>
 
         <string id="FirewallUserSettingConfigurable">ユーザーがファイアウォール構成を設定できるようにする</string>
         <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->無効に設定すると、このポリシーは .wslconfig (wsl2.firewall) によるファイアウォール構成を無効にします。このポリシーは Microsoft Store WSL にのみ適用されます。</string>
