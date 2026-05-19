@@ -253,7 +253,7 @@ void BuildImageCallback::Redraw()
     buffer += L"\033[22m\033[?25h";
 
     WriteTerminal(buffer);
-    m_displayedLines = displayCount + static_cast<SHORT>(m_pullLines.size());
+    m_displayedLines = displayCount;
 }
 
 } // namespace wsl::windows::wslc::services
