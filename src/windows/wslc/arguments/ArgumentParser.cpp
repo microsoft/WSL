@@ -67,21 +67,25 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     }
 }
 
+void ParseArgumentsStateMachine::AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const
+{
+    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
+    {
+        ++itr;
+    }
+}
+
 const Argument* ParseArgumentsStateMachine::NextPositional()
 {
-    // Find the next appropriate positional arg if the current itr isn't one or has hit its limit.
-    while (m_positionalSearchItr != m_positionalArgs.end() &&
-           (m_executionArgs.Count(m_positionalSearchItr->Type()) == m_positionalSearchItr->Limit()))
-    {
-        ++m_positionalSearchItr;
-    }
+    AdvanceToNextPositional(m_positionalSearchItr);
+    return m_positionalSearchItr != m_positionalArgs.end() ? &*m_positionalSearchItr : nullptr;
+}
 
-    if (m_positionalSearchItr == m_positionalArgs.end())
-    {
-        return nullptr;
-    }
-
-    return &*m_positionalSearchItr;
+bool ParseArgumentsStateMachine::HasNextPositional() const
+{
+    auto itr = m_positionalSearchItr;
+    AdvanceToNextPositional(itr);
+    return itr != m_positionalArgs.end();
 }
 
 // Parse arguments as such:
@@ -127,7 +131,14 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     // The currentArg is non-empty, and starts with a -.
     if (currArg.length() == 1)
     {
-        // If it is only one character, then it is an error since it is neither an alias nor a named argument.
+        if (HasNextPositional())
+        {
+            // The '-' character may be a valid positional argument value (ex: stdin), so treat this
+            // as a positional argument if there are any positionals left to fill.
+            return ProcessPositionalArgument(currArg);
+        }
+
+        // No positional argument remaining means this is an invalid argument.
         return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
     }
 
@@ -141,10 +152,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     return ProcessNamedArgument(currArg);
 }
 
-// Assumes non-empty and does not begin with '-'.
+// Assumes non-empty.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalArgument(const std::wstring_view& currArg)
 {
-    WI_ASSERT(!currArg.empty() && currArg[0] != WSLC_CLI_ARG_ID_CHAR);
+    WI_ASSERT(!currArg.empty());
 
     const Argument* nextPositional = NextPositional();
     if (!nextPositional)
@@ -173,15 +184,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
         (m_anchorPositional.value().Limit() == NO_LIMIT))
     {
-        // Validate that we don't have any invalid argument specifiers.
-        // Anchor positionals with multiple values should be order-independent, which means a
-        // '-' at the start of the first one would be invalid, so it should also be invalid for
-        // all other anchor positionals of the same type.
-        if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
-        {
-            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
-        }
-
         m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg});
         return {};
     }

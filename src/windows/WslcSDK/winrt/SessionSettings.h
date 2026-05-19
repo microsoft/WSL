@@ -14,9 +14,6 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.SessionSettings.g.h"
-#include "VhdRequirements.h"
-#include "Helpers.h"
-#include "Defaults.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct SessionSettings : SessionSettingsT<SessionSettings>
@@ -25,36 +22,23 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
 
     SessionSettings(hstring const& name, hstring const& storagePath);
     hstring Name();
+    void Name(hstring const& value);
     hstring StoragePath();
-    uint32_t CpuCount();
-    void CpuCount(uint32_t value);
-    uint32_t MemoryMb();
-    void MemoryMb(uint32_t value);
-    uint32_t TimeoutMS();
-    void TimeoutMS(uint32_t value);
-    winrt::Microsoft::WSL::Containers::VhdRequirements VhdRequirements();
-    void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdRequirements const& value);
+    void StoragePath(hstring const& value);
+    winrt::Windows::Foundation::IReference<uint32_t> CpuCount();
+    void CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value);
+    winrt::Windows::Foundation::IReference<uint32_t> MemoryMB();
+    void MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value);
+    winrt::Windows::Foundation::IReference<uint32_t> TimeoutMS();
+    void TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value);
+    winrt::Microsoft::WSL::Containers::VhdOptions VhdRequirements();
+    void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
     winrt::Microsoft::WSL::Containers::SessionFeatureFlags FeatureFlags();
     void FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value);
-
-    WslcSessionSettings* ToStructPointer();
-
-private:
-    WslcSessionSettings m_sessionSettings{};
-    std::wstring m_name;
-    std::wstring m_storagePath;
-    uint32_t m_cpuCount{s_DefaultCPUCount};
-    uint32_t m_memoryMb{s_DefaultMemoryMB};
-    uint32_t m_timeoutMS{s_DefaultBootTimeout};
-    winrt::Microsoft::WSL::Containers::VhdRequirements m_vhdRequirements{nullptr};
-    winrt::Microsoft::WSL::Containers::SessionFeatureFlags m_featureFlags{winrt::Microsoft::WSL::Containers::SessionFeatureFlags::None};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
-
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
 struct SessionSettings : SessionSettingsT<SessionSettings, implementation::SessionSettings>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
-
-DEFINE_TYPE_HELPERS(SessionSettings);

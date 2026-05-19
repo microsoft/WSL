@@ -40,6 +40,13 @@ winrt::Microsoft::WSL::Containers::VhdType VhdRequirements::Type()
     return static_cast<winrt::Microsoft::WSL::Containers::VhdType>(m_vhdRequirements.type);
 }
 
+void VhdRequirements::SetOwner(uint32_t uid, uint32_t gid)
+{
+    m_vhdRequirements.uid = uid;
+    m_vhdRequirements.gid = gid;
+    m_vhdRequirements.flags = m_vhdRequirements.flags | WSLC_VHD_REQ_FLAG_OWNER;
+}
+
 WslcVhdRequirements* VhdRequirements::ToStructPointer()
 {
     return &m_vhdRequirements;

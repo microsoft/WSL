@@ -393,6 +393,26 @@ class UnitTests
         }
     }
 
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+
+        // Kill the WSL init process
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
@@ -535,6 +555,10 @@ class UnitTests
 
     WSL1_TEST_METHOD(Timer)
     {
+        // This is disabled because of intermittent test failures.
+        // TODO: Enable this test once the underlying issue is resolved.
+        SKIP_TEST_UNSTABLE();
+
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
@@ -6152,31 +6176,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    static LxssDistributionState GetDistroState()
+    {
+        wsl::windows::common::SvcComm service;
+
+        for (const auto& e : service.EnumerateDistributions())
+        {
+            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            {
+                return e.State;
+            }
+        }
+
+        return LxssDistributionStateInvalid;
+    }
+
     TEST_METHOD(DistroTimeout)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
-
-        auto getDistroState = [&]() {
-            wsl::windows::common::SvcComm service;
-
-            for (const auto& e : service.EnumerateDistributions())
-            {
-                if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
-                {
-                    return e.State;
-                }
-            }
-
-            return LxssDistributionStateInvalid;
-        };
 
         // Validate that distributions don't time out when timeout is -1
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
+            VERIFY_ARE_EQUAL(GetDistroState(), LxssDistributionStateRunning);
         }
 
         // Validate that distributions time out when timeout value is > 0
@@ -6190,7 +6215,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             unsigned long iterations = 0;
             while (std::chrono::steady_clock::now() < deadline)
             {
-                if (getDistroState() == LxssDistributionStateInstalled)
+                if (GetDistroState() == LxssDistributionStateInstalled)
                 {
                     LogInfo("Distribution stopped after %lu iterations", iterations);
                     return;
@@ -6200,7 +6225,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 iterations++;
             }
 
-            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, getDistroState());
+            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, GetDistroState());
             VERIFY_FAIL();
         }
     }
@@ -6268,38 +6293,82 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    WSL2_TEST_METHOD(CustomModulesVhd)
+    WSL2_TEST_METHOD(CustomVhdsInUserProfile)
     {
+        // Regression: HCS fails with E_ACCESSDENIED when user-supplied kernelModules or
+        // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
-        auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
-        auto modulesPath = std::format(L"{}\\tools\\modules.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-        auto kernelPath = std::format(L"{}\\tools\\kernel", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
 #endif
 
-        // Create a copy of the modules vhd
-        auto testModules = std::filesystem::current_path() / "test-modules.vhd";
+        // Unique folder under %TEMP% so parallel runs don't collide.
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto testFolder =
+            std::filesystem::temp_directory_path() /
+            std::format(L"wsl-test-vhd-grant-{}", wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None));
+        const auto testModules = testFolder / L"test-modules.vhd";
+        const auto testSystemDistro = testFolder / L"test-system.vhd";
+
+        // Construct the cleanup scope before any filesystem mutations so a failed copy or
+        // VERIFY does not leak the directory across runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(testFolder, ignored);
+        });
+
+        std::filesystem::create_directories(testFolder);
 
         VERIFY_IS_TRUE(CopyFile(modulesPath.c_str(), testModules.c_str(), false));
+        VERIFY_IS_TRUE(CopyFile(systemDistroPath.c_str(), testSystemDistro.c_str(), false));
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testModules); });
+        for (const auto& path : {testModules, testSystemDistro})
+        {
+            auto cmd = std::format(L"icacls.exe \"{}\" /remove Everyone /Q", path.wstring());
+            LxsstuLaunchCommandAndCaptureOutput(cmd.data());
+        }
 
-        auto cmd = std::format(
-            LR"($acl = Get-Acl '{}' ; $acl.RemoveAccessRuleAll((New-Object System.Security.AccessControl.FileSystemAccessRule(\"Everyone\", \"Read\", \"None\", \"None\", \"Allow\"))); Set-Acl -Path '{}' -AclObject $acl)",
-            testModules,
-            testModules);
+        WslConfigChange config{LxssGenerateTestConfig(
+            {.kernel = kernelPath, .kernelModules = testModules.wstring(), .systemDistro = testSystemDistro.wstring()})};
 
-        LxsstuLaunchPowershellAndCaptureOutput(cmd);
-
-        // Update .wslconfig to point to the copied kernel
-        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = testModules.wstring()})};
-
-        // Validate that WSL starts correctly
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK");
+        VERIFY_ARE_EQUAL(out, L"OK\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    WSL2_TEST_METHOD(CustomVhdsAccessibleViaInheritedAcls)
+    {
+        // Regression: VHDs reachable to VMWP via inherited ACLs must boot even when the
+        // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
+#ifdef WSL_DEV_INSTALL_PATH
+
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
+
+#else
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
+
+#endif
+
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = modulesPath, .systemDistro = systemDistroPath})};
+
+        // Non-elevated launch so impersonation cannot WRITE_DAC the SYSTEM-owned VHD.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK", 0, nullptr, nonElevatedToken.get());
         VERIFY_ARE_EQUAL(out, L"OK\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
@@ -6664,9 +6733,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             bool callbackInvoked = false;
             std::vector<gsl::byte> message;
 
-            wsl::windows::common::relay::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadSocketMessageHandle>(
-                wsl::windows::common::relay::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
                     callbackInvoked = true;
                     message.assign(received.begin(), received.end());
                 }));

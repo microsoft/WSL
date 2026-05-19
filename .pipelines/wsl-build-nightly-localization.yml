@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
     - 'localization/strings/en-US/Resources.resw'
+    - 'intune/en-US/WSL.adml'
 
 # Schedule nightly build
 # Cron syntax: "mm HH DD MM DW" = minutes, hours, days, months, day of week (UTC time)
@@ -44,6 +45,7 @@ steps:
     resourceFilePath: |
       localization\strings\en-US\Resources.resw;O:localization\strings\
       storebroker\PDPs\en-us\PDP.xml;O:storebroker\PDPs\
+      intune\en-US\WSL.adml;O:intune\
     localizationTarget: true
     pseudoSetting: 'Excluded'
     cultureMappingType: 'None'

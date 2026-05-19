@@ -17,7 +17,7 @@ Abstract:
 IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
     m_process(process), m_callbackOptions(std::make_unique<WslcContainerProcessIOCallbackOptions>(options))
 {
-    using namespace wsl::windows::common::relay;
+    using namespace wsl::windows::common::io;
 
     auto addIOCallback = [&](WslcProcessIOHandle ioHandle, WslcStdIOCallback callback, PVOID context) {
         std::function<void(const gsl::span<char>& Buffer)> function;
