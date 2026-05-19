@@ -1065,18 +1065,18 @@ class WSLCTests
 
             // Test with single label filter
             {
-                WSLCLabel labels[] = {{"test.label", ""}};
-                options.Labels = labels;
-                options.LabelsCount = 1;
+                WSLCFilter filters[] = {{"label", "test.label"}};
+                options.Filters = filters;
+                options.FiltersCount = 1;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
             }
 
             // Test with multiple label filters (labels are AND'ed together)
             {
-                WSLCLabel labels[] = {{.Key = "test.label1", .Value = nullptr}, {.Key = "test.label2", .Value = "value"}};
-                options.Labels = labels;
-                options.LabelsCount = 2;
+                WSLCFilter filters[] = {{"label", "test.label1"}, {"label", "test.label2=value"}};
+                options.Filters = filters;
+                options.FiltersCount = 2;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
             }
