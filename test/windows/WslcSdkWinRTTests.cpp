@@ -1656,11 +1656,14 @@ class WslcSdkWinRtTests
         const auto debianTar = GetTestImagePath("debian:latest");
         gpuSession.LoadImageAsync(debianTar.wstring()).get();
 
-        // Positive: /dev/dxg must be available and LD_LIBRARY_PATH set in a GPU container.
+        // Positive: /dev/dxg must be available with rwm permissions and the wsl-gpu hook must have
+        // configured the dynamic linker inside a GPU container.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
-                winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test -c /dev/dxg && echo $LD_LIBRARY_PATH"}));
+            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+                {L"/bin/sh",
+                 L"-c",
+                 L"test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");

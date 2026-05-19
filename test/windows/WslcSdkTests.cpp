@@ -2509,9 +2509,11 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
         THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
 
-        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
+        // Validate /dev/dxg is available and the wsl-gpu hook configured the dynamic linker
+        // via the container init command.
         {
-            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
+            const char* initArgv[] = {
+                "/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"};
 
             auto output = RunContainerAndCapture(
                 gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);
