@@ -41,6 +41,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 # BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
 # Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
 option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+option(INCLUDE_OPENVMM "Include OpenVMM build integrations" OFF)
 if (BUNDLE_ONLY)
     if (NOT PACKAGE_VERSION)
         message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
@@ -109,28 +110,54 @@ set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
 
-FetchContent_Declare(protobuf
-                     URL https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
-                     URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
+if (INCLUDE_OPENVMM)
+    FetchContent_Declare(protobuf
+                         URL https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
+                         URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
 
-FetchContent_MakeAvailable(protobuf)
+    FetchContent_MakeAvailable(protobuf)
 
-# protobuf exports different target names depending on how it is consumed.
-if (TARGET protobuf::protoc)
-    set(PROTOC_TARGET protobuf::protoc)
-elseif (TARGET protoc)
-    set(PROTOC_TARGET protoc)
-else()
-    message(FATAL_ERROR "Could not locate protobuf compiler target.")
+    # protobuf exports different target names depending on how it is consumed.
+    if (TARGET protobuf::protoc)
+        set(PROTOC_TARGET protobuf::protoc)
+    elseif (TARGET protoc)
+        set(PROTOC_TARGET protoc)
+    else()
+        message(FATAL_ERROR "Could not locate protobuf compiler target.")
+    endif()
+
+    if (TARGET protobuf::libprotobuf)
+        set(PROTOBUF_LIB_TARGET protobuf::libprotobuf)
+    elseif (TARGET libprotobuf)
+        set(PROTOBUF_LIB_TARGET libprotobuf)
+    else()
+        message(FATAL_ERROR "Could not locate protobuf runtime library target.")
+    endif()
 endif()
 
-if (TARGET protobuf::libprotobuf)
-    set(PROTOBUF_LIB_TARGET protobuf::libprotobuf)
-elseif (TARGET libprotobuf)
-    set(PROTOBUF_LIB_TARGET libprotobuf)
-else()
-    message(FATAL_ERROR "Could not locate protobuf runtime library target.")
-endif()
+function(wsl_generate_openvmm_proto OUTPUT_DIR GENERATED_SRC_VAR GENERATED_HDR_VAR)
+    set(_wsl_openvmm_proto_file ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
+    set(_wsl_openvmm_generated_proto_src ${OUTPUT_DIR}/VMService.pb.cc)
+    set(_wsl_openvmm_generated_proto_hdr ${OUTPUT_DIR}/VMService.pb.h)
+
+    if (NOT EXISTS ${_wsl_openvmm_proto_file})
+        message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${_wsl_openvmm_proto_file}")
+    endif()
+
+    add_custom_command(
+        OUTPUT ${_wsl_openvmm_generated_proto_src} ${_wsl_openvmm_generated_proto_hdr}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
+        COMMAND $<TARGET_FILE:${PROTOC_TARGET}>
+                --cpp_out=${OUTPUT_DIR}
+                --proto_path=${WSL_DEVICE_HOST_SOURCE_DIR}/proto
+                --proto_path=${protobuf_SOURCE_DIR}/src
+                ${_wsl_openvmm_proto_file}
+        DEPENDS ${_wsl_openvmm_proto_file} ${PROTOC_TARGET}
+        VERBATIM)
+
+    set(${GENERATED_SRC_VAR} ${_wsl_openvmm_generated_proto_src} PARENT_SCOPE)
+    set(${GENERATED_HDR_VAR} ${_wsl_openvmm_generated_proto_hdr} PARENT_SCOPE)
+endfunction()
 
 
 # Import modules

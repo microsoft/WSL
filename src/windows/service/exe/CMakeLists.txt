@@ -21,9 +21,6 @@ set(SOURCES
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
     HcsVirtualMachine.cpp
-    OpenVmmVirtualMachine.cpp
-    TtrpcEnvelopeCodec.cpp
-    TtrpcClient.cpp
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     main.rc
@@ -55,43 +52,42 @@ set(HEADERS
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h
     HcsVirtualMachine.h
-    OpenVmmVirtualMachine.h
-    TtrpcEnvelopeCodec.h
-    TtrpcClient.h
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h)
 
-set(WSLSERVICE_PROTO_FILE ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
-set(WSLSERVICE_PROTO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
-set(WSLSERVICE_GENERATED_PROTO_SRC ${WSLSERVICE_PROTO_OUTPUT_DIR}/VMService.pb.cc)
-set(WSLSERVICE_GENERATED_PROTO_HDR ${WSLSERVICE_PROTO_OUTPUT_DIR}/VMService.pb.h)
+set(WSLSERVICE_ADDITIONAL_INCLUDE_DIRS)
+set(WSLSERVICE_ADDITIONAL_LIBRARIES)
 
-if (NOT EXISTS ${WSLSERVICE_PROTO_FILE})
-    message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${WSLSERVICE_PROTO_FILE}")
-endif()
+if (INCLUDE_OPENVMM)
+    list(APPEND SOURCES
+         OpenVmmVirtualMachine.cpp
+         TtrpcEnvelopeCodec.cpp
+         TtrpcClient.cpp)
+    list(APPEND HEADERS
+         OpenVmmVirtualMachine.h
+         TtrpcEnvelopeCodec.h
+         TtrpcClient.h)
 
-add_custom_command(
-    OUTPUT ${WSLSERVICE_GENERATED_PROTO_SRC} ${WSLSERVICE_GENERATED_PROTO_HDR}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${WSLSERVICE_PROTO_OUTPUT_DIR}
-    COMMAND $<TARGET_FILE:${PROTOC_TARGET}>
-            --cpp_out=${WSLSERVICE_PROTO_OUTPUT_DIR}
-            --proto_path=${WSL_DEVICE_HOST_SOURCE_DIR}/proto
-            --proto_path=${protobuf_SOURCE_DIR}/src
-            ${WSLSERVICE_PROTO_FILE}
-    DEPENDS ${WSLSERVICE_PROTO_FILE} ${PROTOC_TARGET}
-    VERBATIM)
+    set(WSLSERVICE_PROTO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    wsl_generate_openvmm_proto(${WSLSERVICE_PROTO_OUTPUT_DIR} WSLSERVICE_GENERATED_PROTO_SRC WSLSERVICE_GENERATED_PROTO_HDR)
 
-list(APPEND SOURCES ${WSLSERVICE_GENERATED_PROTO_SRC})
-list(APPEND HEADERS ${WSLSERVICE_GENERATED_PROTO_HDR})
+    list(APPEND SOURCES ${WSLSERVICE_GENERATED_PROTO_SRC})
+    list(APPEND HEADERS ${WSLSERVICE_GENERATED_PROTO_HDR})
+    list(APPEND WSLSERVICE_ADDITIONAL_INCLUDE_DIRS ${WSLSERVICE_PROTO_OUTPUT_DIR})
+    list(APPEND WSLSERVICE_ADDITIONAL_LIBRARIES ${PROTOBUF_LIB_TARGET})
 
-if (MSVC)
-    set_source_files_properties(${WSLSERVICE_GENERATED_PROTO_SRC} PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
-    set_source_files_properties(TtrpcClient.cpp PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+    if (MSVC)
+        set_source_files_properties(${WSLSERVICE_GENERATED_PROTO_SRC} PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+        set_source_files_properties(TtrpcClient.cpp PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+    endif()
 endif()
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)
-target_include_directories(wslservice PRIVATE ${WSLSERVICE_PROTO_OUTPUT_DIR})
+if (WSLSERVICE_ADDITIONAL_INCLUDE_DIRS)
+    target_include_directories(wslservice PRIVATE ${WSLSERVICE_ADDITIONAL_INCLUDE_DIRS})
+endif()
+target_compile_definitions(wslservice PRIVATE WSL_INCLUDE_OPENVMM=$<BOOL:${INCLUDE_OPENVMM}>)
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(__WRL_DISABLE_STATIC_INITIALIZE__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
@@ -101,7 +97,7 @@ target_link_libraries(wslservice
                       ${MSI_LINK_LIBRARIES}
                       ${HCS_LINK_LIBRARIES}
                       ${SERVICE_LINK_LIBRARIES}
-                      ${PROTOBUF_LIB_TARGET}
+                      ${WSLSERVICE_ADDITIONAL_LIBRARIES}
                       common
                       configfile
                       legacy_stdio_definitions

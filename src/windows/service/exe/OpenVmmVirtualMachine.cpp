@@ -179,6 +179,54 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     attachBootDisk(m_rootVhdPath.c_str());
     attachBootDisk(m_modulesVhdPath.c_str());
 
+    auto cleanupOnFailure = wil::scope_exit([this]() {
+        m_vmExitEvent.SetEvent();
+
+        if (m_ttrpcClient)
+        {
+            m_ttrpcClient->Disconnect();
+            m_ttrpcClient.reset();
+        }
+
+        if (m_processHandle)
+        {
+            TerminateProcess(m_processHandle.get(), 1);
+        }
+
+        if (m_processWatchThread.joinable())
+        {
+            m_processWatchThread.join();
+        }
+
+        if (m_waitVmThread.joinable())
+        {
+            m_waitVmThread.join();
+        }
+
+        if (m_initListenSocket != INVALID_SOCKET)
+        {
+            closesocket(m_initListenSocket);
+            m_initListenSocket = INVALID_SOCKET;
+        }
+        DeleteFileW(m_initListenPath.c_str());
+
+        if (m_crashDumpListenSocket != INVALID_SOCKET)
+        {
+            closesocket(m_crashDumpListenSocket);
+            m_crashDumpListenSocket = INVALID_SOCKET;
+        }
+        DeleteFileW(m_crashDumpListenPath.c_str());
+
+        try
+        {
+            if (!m_ttrpcSocketPath.empty())
+            {
+                std::filesystem::remove(m_ttrpcSocketPath);
+            }
+        }
+        CATCH_LOG()
+    });
+
     // Create the Unix domain socket listener for the init connection BEFORE
     // launching openvmm. The guest's mini_init will connect to vsock port
     // 50000 immediately on boot, and OpenVMM's hybrid_vsock bridge will relay
@@ -229,6 +277,8 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
     // Launch the openvmm process.
     LaunchOpenVmm();
+
+    cleanupOnFailure.release();
 }
 
 std::wstring OpenVmmVirtualMachine::BuildCommandLine() const

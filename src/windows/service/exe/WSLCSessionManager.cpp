@@ -29,7 +29,9 @@ Abstract:
 
 #include "WSLCSessionManager.h"
 #include "HcsVirtualMachine.h"
+#if WSL_INCLUDE_OPENVMM
 #include "OpenVmmVirtualMachine.h"
+#endif
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
 #include "wslutil.h"
@@ -37,7 +39,9 @@ Abstract:
 
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
+#if WSL_INCLUDE_OPENVMM
 using wsl::windows::service::wslc::OpenVmmVirtualMachine;
+#endif
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace settings = wsl::windows::wslc::settings;
@@ -213,6 +217,8 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         // Create the VM in the SYSTEM service (privileged).
         // Determine VMM backend based on user settings: OpenVMM (experimental) or HCS (default).
         Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
+
+    #if WSL_INCLUDE_OPENVMM
         const bool useOpenVmm = SessionSettings::LoadUserSettings(userToken.get()).Get<settings::Setting::SessionOpenVmm>();
 
         // For OpenVMM, disable unsupported features before creating the VM and session.
@@ -234,7 +240,8 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
             vm = Microsoft::WRL::Make<OpenVmmVirtualMachine>(Settings);
         }
-        else
+#endif
+        if (!vm)
         {
             vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
         }
