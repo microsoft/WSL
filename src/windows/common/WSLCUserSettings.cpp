@@ -47,9 +47,6 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size (e.g. 500GB default: 1TB)\n"
     "  # maxStorageSize: default\n"
     "\n"
-    "  # Use OpenVMM as the virtual machine backend (default: false)\n"
-    "  # openVmm: false\n"
-    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -115,16 +112,6 @@ namespace details {
     }
 
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)
-    {
-        return value;
-    }
-
-    WSLC_VALIDATE_SETTING(SessionOpenVmm)
-    {
-        return value;
-    }
-
-    WSLC_VALIDATE_SETTING(SessionOpenVmmTtrpc)
     {
         return value;
     }

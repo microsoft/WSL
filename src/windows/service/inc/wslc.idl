@@ -405,8 +405,6 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsGPU = 4,
     WslcFeatureFlagsVirtioFs = 8,
     WslcFeatureFlagsDebug = 16,
-    WslcFeatureFlagsOpenVmm = 32,
-    WslcFeatureFlagsOpenVmmTtrpc = 64,
 } WSLCFeatureFlags;
 
 cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsOpenVmm | WslcFeatureFlagsOpenVmmTtrpc)")

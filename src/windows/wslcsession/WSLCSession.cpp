@@ -408,14 +408,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         {
             m_swapVhdPath = storagePath / "swap.vhdx";
             DeleteFileW(m_swapVhdPath.c_str()); // Remove stale swap from prior run
-
-            // In CLI mode (OpenVMM without ttrpc), the swap VHD is pre-created
-            // and pre-attached at boot time. The file may already exist and be
-            // locked by the VM process, so skip creation if it already exists.
-            if (!std::filesystem::exists(m_swapVhdPath))
-            {
-                wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
-            }
+            wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
 
             auto [_, swapDevice] = m_virtualMachine->AttachDisk(m_swapVhdPath.c_str(), false);
 

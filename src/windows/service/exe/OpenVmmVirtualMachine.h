@@ -58,8 +58,7 @@ private:
 
     bool FeatureEnabled(WSLCFeatureFlags Value) const;
 
-    // Build the openvmm.exe command line.
-    // In ttrpc mode, only passes --ttrpc. In CLI mode, passes all VM config.
+    // Build the openvmm.exe command line (ttrpc-only in orchestration mode).
     std::wstring BuildCommandLine() const;
 
     // Build a ttrpc CreateVM configuration from stored VM settings.
@@ -83,10 +82,6 @@ private:
     WSLCNetworkingMode m_networkingMode{};
     ULONG m_bootTimeoutMs{};
 
-    // When true, VM configuration is sent via ttrpc (CreateVM RPC).
-    // When false, all configuration is passed as CLI arguments to openvmm.exe.
-    bool m_useTtrpc{};
-
     // OpenVMM process handle and management.
     wil::unique_handle m_processHandle;
     wil::unique_handle m_jobObject;
@@ -102,9 +97,6 @@ private:
 
     // Storage VHD for container data (pre-attached at boot).
     std::filesystem::path m_storageVhdPath;
-
-    // Swap VHD (ephemeral, pre-attached at boot in CLI mode).
-    std::filesystem::path m_swapVhdPath;
 
     // Vsock bridge path for HvSocket emulation.
     std::filesystem::path m_vsockPath;
