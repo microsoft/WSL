@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Windows-alijärjestelmä Linuxille</value>
   </data>
@@ -137,24 +153,27 @@ Jos haluat pakottaa WSL2:n pysäyttämään levyn ja irrottamaan sen, suorita ws
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Asema on jo otettu käyttöön WSL2:ssa.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Samanniminen levy on jo otettu käyttöön; poista levy käytöstä tai valitse uusi nimi ja yritä uudelleen.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Määritetty käyttöönottonimi sisältää virheellisen /-merkin. Yritä uudelleen ilman virheellistä merkkiä.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Levyn käyttöönotto nimellä /mnt/wsl/{} onnistui.
 Huomautus: Sijainti ei ole sama, jos olet muokannut automount.root-asetusta kohteessa /etc/wsl.conf.
 Jos haluat poistaa levyn käytöstä ja irrottaa sen, suorita wsl.exe {} {}.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Levy liitettiin, mutta käyttöönotto epäonnistui: {}.
 Saat lisätietoja suorittamalla dmesg-määrityksen WSL2:ssa.
 Jos haluat irrottaa levyn, suorita wsl.exe {} {}.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Seuraava on luettelo kelvollisista jakeluista, jotka voidaan asentaa.
@@ -177,6 +196,7 @@ Asenna käyttämällä tiedostoa wsl.exe {} &lt;Distro&gt;.
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Järjestelmänvalvojan oikeudet tarvitaan levyn käyttöönottoon.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Jakelun vienti epäonnistui.</value>
@@ -303,7 +323,7 @@ Lisätietoja löytyy osoitteesta https://aka.ms/enablevirtualization</value>
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>Virtuaalikiintolevy (VHD) on jo otettu käyttöön komennolla wsl.exe --mount, Poista levy käytöstä ennen käynnistämistä.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1:tä ei tueta nykyisessä tietokoneen kokoonpanossa.
@@ -465,7 +485,7 @@ Argumentit Windows-alijärjestelmän Linuxille hallintaan:
                 Siirrä jakelu uuteen sijaintiin.
 
             --set-sparse, -s &lt;true|false&gt;
-                Määritä jakelun virtuaalikiintolevy harvaksi, jolloin levytilaa voidaan vapauttaa automaattisesti.
+                Määritä jakelun VHD harvaksi, jolloin levytilaa voidaan vapauttaa automaattisesti.
 
             --set-default-user &lt;Username&gt;
                 Määritä jakelun oletuskäyttäjä.
@@ -602,7 +622,7 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL-versio: {}
@@ -626,7 +646,7 @@ Koontiaika: {}</value>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
     <value>Kohteen {} mukautettuja ydinmoduulien VHD:tä ei löytynyt: {}.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>Tiedostossa {} määritettyä mukautettua järjestelmän jakelua ei löytynyt, tai se ei ole oikeassa muodossa.</value>
@@ -687,7 +707,7 @@ Argumentit:
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount ARM64:ssä edellyttää Windows-versiota 27653 tai uudempaa.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Uusin versio Windows-alijärjestelmästä Linuxille on jo asennettu.</value>
@@ -821,7 +841,8 @@ Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>Käytetään vanhaa jakelurekisteröintiä. Harkitse sen sijaan tervapohjaista jakaumaa.</value>
+    <value>Perinteistä jakelun rekisteröintiä käytetään. Harkitse sen sijaan tar-pohjaisen jakelun käyttöä.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Vanhat jakelurekisteröinnit eivät tue --version argumenttia.</value>
@@ -853,7 +874,7 @@ Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Vaihtolevyn luominen kohteessa {}: {} epäonnistui</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Levyn {} luominen epäonnistui: {}</value>
@@ -872,6 +893,7 @@ Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>VIKASIETOTILA KÄYTÖSSÄ - monet ominaisuudet poistetaan käytöstä</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Peilatun verkon tilaa ei tueta: {}.
@@ -894,24 +916,30 @@ Palataan nat-verkkopalveluun.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>DNS-tunnelointia ei tueta</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>wsl2.localhostForwarding-asetuksella ei ole vaikutusta käytettäessä peilatun verkon tilaa</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>Isännässä on havaittu HTTP-välityspalvelimen muutos. Ota muutos käyttöön käynnistämällä WSL uudelleen.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>Havaittiin localhost-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL NAT-tilassa ei tue localhost-välityspalvelimia.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>Havaittiin IPv6-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. NAT-tilassa WSL ei tue IPv6:ta.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>Havaittiin localhost IPv6 -välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL ei tue localhost IPv6 -välityspalvelimia.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>Odottamaton virhe yritettäessä selvittää välityspalvelimen asetuksia, välityspalvelimen asetuksia ei peilattu WSL:ksi.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Virhe käytettäessä rekisteriä. Polku: {}. Virhe: {}</value>
@@ -954,10 +982,20 @@ Palataan nat-verkkopalveluun.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>Tietokoneen voimassa olevan käytännön vuoksi wsl.exe --mount -komento ei ole käytettävissä.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>Tietokonekäytäntö on poistanut WSL1:n käytöstä.</value>
+  </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL-säilö on poistettu käytöstä tietokoneen käytäntöasetusten vuoksi.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>Säilökuvien rekisteri {} on estetty tietokonekäytännön vuoksi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Säilökuvien luonti on estetty, koska tietokonekäytäntö on määrittänyt säilörekisteri sallittujen luettelon. Kuvien luonti voi noutaa peruskuvia mistä tahansa rekisteristä, eikä sitä voida luotettavasti rajoittaa sallittujen luetteloon.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Päivitä WSL2-versioksi suorittamalla wsl.exe --set-version {} 2.</value>
@@ -1017,14 +1055,15 @@ Palataan nat-verkkopalveluun.</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Toimintoa ei voitu suorittaa loppuun, koska VHD on parhaillaan käytössä. WSL:n käytön lopettaminen: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} ei ole kelvollinen totuusarvo, &lt;true|false&gt;</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Harvaa virtuaalikiintolevyä tuetaan vain WSL2:ssa.</value>
+    <value>Harvaa VHD tuetaan vain WSL2:ssa.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL:n suorittamista paikallisena järjestelmänä ei tueta.</value>
@@ -1074,7 +1113,7 @@ Palataan nat-verkkopalveluun.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Tämä näyttää VHD-tiedostolta. --vhd -näppäimellä voit tuoda VHD:n tar-tiedoston sijaan.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Kohteen {} asentaminen epäonnistui Microsoft Store: {}
@@ -1122,23 +1161,26 @@ Virhekoodi: {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Globaalin suojatun käytön asiakasohjelman nykyisen yhteensopivuusongelman vuoksi DNS-tunnelointi on poistettu käytöstä.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Harva virtuaalikiintolevyn tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
-Jos haluat pakottaa jakelun käyttämään harvaa virtuaalikiintolevyä, suorita seuraavasti:
+    <value>Harva VHD tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
+Jos haluat pakottaa jakelun käyttämään harvaa VHD, suorita seuraavasti:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Kohteen {} käyttöönotto epäonnistui, katso lisätietoja dmesg:stä.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>Kohteen /etc/fstab käsitteleminen mount -a -komennolla epäonnistui.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Jakelulevyn asennuksessa tapahtui virhe. Se otettiin käyttöön vain luku -tilassa varalevynä.
 Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Kääntäminen epäonnistui {}</value>
@@ -1177,28 +1219,35 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Automaattinen välityspalvelin käytössä</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Sallii WSL:n käyttää Windowsin HTTP-välityspalvelintietoja.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Automaattinen välityspalvelin käytössä.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Sallii WSL:n käyttää Windowsin HTTP-välityspalvelintietoja.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>Käytä parasta mahdollista DNS-jäsennystä</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.dnsTunneling on true. Kun asetus on true, Windows poimii kysymyksen DNS-pyynnöstä ja yrittää ratkaista sen ohittaen tuntemattomat tietueet.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Käytä parasta mahdollista DNS-jäsennystä.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.dnsTunneling-asetus on true. Kun asetus on true, Windows poimii kysymyksen DNS-pyynnöstä ja yrittää ratkaista sen ohittaen tuntemattomat tietueet.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Mukautettu ydin</value>
@@ -1220,6 +1269,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>Absoluuttinen Windows-polku mukautettuun Linux-ydinmoduulien VHD:hen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Selaa ydinmoduuleja</value>
@@ -1229,6 +1279,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Absoluuttinen Windows-polku mukautettuun Linux-ydinmoduulien VHD:hen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Mukautettu järjestelmän distro</value>
@@ -1238,7 +1289,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Määritä polku VHD-levylle, joka ladataan mukautettuna järjestelmädistrona, jota käytetään ensisijaisesti WSL:n GUI-sovellusten käyttämiseen. [Lisätietoja järjestelmädistroista täältä].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1249,6 +1300,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Määritä polku VHD-levylle, joka ladataan mukautettuna järjestelmädistrona, jota käytetään ensisijaisesti WSL:n GUI-sovellusten käyttämiseen.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Ota virheenkorjauskonsoli käyttöön</value>
@@ -1263,19 +1315,23 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
     <value>Totuusarvo, joka ottaa käyttöön tulostekonsolin ikkunan, joka näyttää diagnostiikkaviestien sisällön WSL 2 -distroesiintymän käynnistyksen yhteydessä.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Virtuaalikiintolevyn oletuskoko</value>
+    <value>VHD oletuskoko</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Laajennettavan WSL-virtuaalikiintolevyn (VHD) oletusarvoinen enimmäiskoko vain äskettäin luoduille jakeluille.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Palauta koko</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Virtuaalikiintolevyn oletuskoko</value>
+    <value>VHD oletuskoko</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Laajennettavan WSL-virtuaalikiintolevyn (VHD) oletusarvoinen enimmäiskoko, megatavuina määritettynä, vain äskettäin luoduille jakeluille.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Kehittäjä</value>
@@ -1295,28 +1351,35 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS-välityspalvelin käytössä</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.networkingMode-asetuksena on NAT. Totuusarvo, joka ilmoittaa WSL:lle DNS-palvelimen määrittämisestä Linuxissa NAT-kohteelle isännässä. Jos arvoksi määritetään epätosi, DNS-palvelimet peilataan Windowsista Linuxiin.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-välityspalvelin käytössä.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.networkingMode-asetuksena on NAT. Totuusarvo, joka ilmoittaa WSL:lle DNS-palvelimen määrittämisestä Linuxissa NAT-kohteelle isännässä. Jos arvoksi määritetään epätosi, DNS-palvelimet peilataan Windowsista Linuxiin.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS-tunnelointi käytössä</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>Muuttaa tapaa, miten DNS-pyyntöjä käytetään WSL:stä Windowsiin.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-tunnelointi käytössä.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Muuttaa tapaa, miten DNS-pyyntöjä käytetään WSL:stä Windowsiin.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Tiedostojärjestelmä</value>
@@ -1392,19 +1455,22 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Alkuperäinen automaattisen välityspalvelimen aikakatkaisu</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.autoProxy-asetuksena on tosi. Määrittää, kuinka kauan (millisekunteina) WSL odottaa HTTP-välityspalvelintietojen noutamista WSL-säilöä käynnistettäessä. Jos välityspalvelimen asetukset ratkeavat tämän ajan kuluttua, WSL-esiintymä on käynnistettävä uudelleen, jotta noudetut välityspalvelimen asetukset voidaan käyttää.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Palauta aikakatkaisu</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Alkuperäinen automaattisen välityspalvelimen aikakatkaisu</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Käytettävissä vain, kun wsl2.autoProxy-asetuksena on tosi. Määrittää, kuinka kauan (millisekunteina) WSL odottaa HTTP-välityspalvelintietojen noutamista WSL-säilöä käynnistettäessä. Jos välityspalvelimen asetukset ratkeavat tämän ajan kuluttua, WSL-esiintymä on käynnistettävä uudelleen, jotta noudetut välityspalvelimen asetukset voidaan käyttää.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Ytimen komentorivi</value>
@@ -1580,6 +1646,7 @@ Docker Desktopin ja WSL:n käytön etuja ovat seuraavat:
 • Voit suorittaa Docker-komentoja WSL:ssä tai Windowsissa käyttämällä samaa Docker-daemonia ja kuvia.
 • Voit jakaa tiedostoja ja kansioita saumattomasti Windowsin ja Linuxin välillä käyttämällä Windows-asemien automaattista käyttöönottoa WSL:ssä.
 • Voit käyttää ensisijaisia Windows-työkaluja ja -editoreja Linux-koodin ja -tiedostojen kanssa ja päinvastoin WSL:n yhteentoimivuuden ansiosta.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker-työpöytäintegrointi</value>
@@ -1747,15 +1814,19 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Ota käyttöön vikasietotila</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Suorita WSL vikasietotilassa, joka poistaa käytöstä monia ominaisuuksia ja jota on tarkoitus käyttää palauttamaan jakaumia, jotka ovat virheellisessä tilassa.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Ota käyttöön vikasietotila.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Suorita WSL vikasietotilassa, joka poistaa käytöstä monia ominaisuuksia ja jota on tarkoitus käyttää palauttamaan jakaumia, jotka ovat virheellisessä tilassa.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Tietoja</value>
@@ -1819,46 +1890,59 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Ota käyttöön harva virtuaalikiintolevy oletusarvon mukaan</value>
+    <value>Ota käyttöön harva VHD oletusarvon mukaan</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Uudet luodut virtuaalikiintolevyt asetetaan harvaksi automaattisesti, kun ne ovat käytössä.</value>
+    <value>Kaikki uudet VHD-tiedostot määritetään ohuiksi automaattisesti, kun tämä on käytössä.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Ota käyttöön harva virtuaalikiintolevy oletusarvoisesti.</value>
+    <value>Ota käyttöön harva VHD oletusarvoisesti.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Uudet luodut virtuaalikiintolevyt asetetaan harvaksi automaattisesti, kun ne ovat käytössä.</value>
+    <value>Kaikki uudet VHD-tiedostot määritetään ohuiksi automaattisesti, kun tämä on käytössä.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Sivutustiedoston sijainti</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>Absoluuttinen Windows-polku virtuaalikiintolevyn sivutustiedostoon.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Selaa sivutustiedostoja</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Sivutustiedoston sijainti</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Absoluuttinen Windows-polku virtuaalikiintolevyn sivutustiedostoon.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Sivutustiedoston koko</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Kuinka paljon sivutustiedostotilaa WSL 2 VM:ään lisätään, 0 sivutustiedostoa ei ole. Sivutustiedostontallennustila on levypohjainen RAM-muisti, jota käytetään, kun muistintarve ylittää laitteistolaitteen rajoituksen.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Palauta koko</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Sivutustiedoston koko</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL 2 VM:ään lisättävän sivutustilan määrä megatavuina. 0, jos sivutustiedostoa ei ole. Sivutustiedoston tallennustila on levypohjainen RAM-muisti, jota käytetään, kun muistintarve ylittää laitteistolaitteen rajoituksen.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>Ota VirtIO käyttöön</value>
@@ -1871,6 +1955,7 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Ottaa käyttöön 9P-tiedostojärjestelmän käyttöönoton isännästä virtio-siirron avulla.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>Näennäiskoneen käyttämättömyystilanteen aikakatkaisu</value>
@@ -2018,8 +2103,25 @@ Käyttö:
     <value>Säilö '{}' ei ole käynnissä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress ei vielä tueta.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Säilö '{}' on käynnissä.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Lisäverkkoja ei sallita säilön verkkotilassa.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Porttimäärityksiä ei tueta säilön verkkotilassa; portit kuuluvat kohdesäilölle.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Kohdesäilön nimi vaaditaan säilön verkkotilassa.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Kohdesäilöä {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
@@ -2028,6 +2130,9 @@ Käyttö:
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Säilöverkon nimi vaaditaan mukautetulle verkkotyypille.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Verkon nimi ei voi olla tyhjä.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Tunnistamaton komento: {}</value>
@@ -2179,6 +2284,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Pakollinen asetus puuttuu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Virheellinen arvo avaimelle {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Tuntematon asetus: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Aseman tyyppiä ei tueta: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2207,6 +2320,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Verkko {} on jo olemassa.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Lisäverkkoja ei sallita, kun ensisijainen verkkotila on host tai none.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Monistunut verkko: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Aseman {} luominen epäonnistui: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2222,6 +2343,9 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>Kohteen {} avaaminen epäonnistui: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Pystyviivasta tuontia ei tueta. Ohjaa standardisyöttö tiedostosta.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>Kohteesta {} ei löytynyt Containerfile- tai Dockerfile-tiedostoa</value>
@@ -2312,6 +2436,12 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Käynnistää säilön.</value>
   </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Näytä säilön resurssien käyttötilastot.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Näytä tilannevedos käynnissä olevan säilön resurssien käytöstä: suoritin, muisti, verkon I/O, eston I/O ja PID-tunnukset.</value>
+  </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Pysäytä säilöt.</value>
   </data>
@@ -2337,6 +2467,12 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Tarkastele kuvia.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Tuo kuva tarballista.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Tuo tarballin sisältö tiedostojärjestelmäkuvan luomiseksi. Voit myös liittää kuvaan arkiston nimen ja tunnisteen.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Listaa kuvat.</value>
@@ -2462,10 +2598,10 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Hallitse rekisterin tunnistetietoja, mukaan lukien sisään ja ulos kirjautuminen säilörekistereistä.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Järjestelmätason komennot</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Järjestelmätason hallintakomennot.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Merkitse kuva tunnisteella.</value>
@@ -2570,6 +2706,12 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Polku Dockerfile-tiedostoon (käytä "-" lukeaksesi stdin:stä)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Suodata tulos annettujen ehtojen perusteella</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Virheellinen argumentti "{}" merkinnälle '-f, --filter': virheellinen suodattimen muoto (odotettu nimi=arvo)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seuraa lokitulostetta</value>
   </data>
@@ -2594,6 +2736,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Kuvan nimi</value>
   </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Tiedosto tai - syötteen lukemiseksi standardisyötöstä</value>
+  </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Antaa polun tar-arkistotiedostoon, joka sisältää kuvan</value>
   </data>
@@ -2602,6 +2747,12 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>Tunnisteen avain ei voi olla tyhjä</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Näytä n viimeksi luotua säilöä (sisältää kaikki tilat)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Näytä viimeisin luotu säilö (sisältää kaikki tilat)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Säilön isäntänimi</value>
@@ -2816,9 +2967,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Aseman nimi</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Määritä äänenvoimakkuusohjaimen nimi (oletus {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Määritä aseman ajurin nimi, esim. guest tai vhd (oletus on guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Määritä ohjaimen erityisasetukset</value>
@@ -2868,6 +3019,42 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Objektia ei löydy: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>SÄILÖTUNNUS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>NIMI</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>KUVA</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>LUOTU</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>TILA</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>PORTIT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>SUORITIN %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>MUISTIN KÄYTTÖ / RAJA</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MUISTI %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>VERKON I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>ESTÄ I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PID-tunnukset</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Varoitus: Virheellinen arvo määrityksessä {} kohteessa {}:{}.</value>

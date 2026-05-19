@@ -121,6 +121,12 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 \\command\\?"" --f -z forward h
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc jrottenberg/ffmpeg:4.4-alpine ffmpeg -i http://url/to/media.mp4 -stats)") \
 WSLC_PARSER_TEST_CASE(Run, true, L"wslc jrottenberg/ffmpeg:4.4-alpine \\\nffmpeg \\\n-i http://url/to/media.mp4 \\\n-stats") \
 \
+/* Stdin dash ('-') as a positional value. A lone '-' conventionally means stdin and must  \
+ * be accepted as a valid positional rather than treated as an invalid flag specifier. */  \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc - command)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose -)") \
+\
 /* List cases with multiple args and flags that can come after the optional multi-positional. */ \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc)") \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc cont1)") \

@@ -535,6 +535,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernelModules;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
+    std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
@@ -616,6 +617,8 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
+void LoadTestImage(IWSLCSession& session, std::string_view imageName);
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
 template <typename T>
@@ -677,3 +680,7 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
 
 void WriteSocket(SOCKET Socket, const void* data, size_t size);
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);

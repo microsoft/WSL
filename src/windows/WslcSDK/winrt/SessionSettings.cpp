@@ -16,84 +16,65 @@ Abstract:
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.SessionSettings.g.cpp"
 
-namespace WSLC = winrt::Microsoft::WSL::Containers;
-
-namespace winrt::Microsoft::WSL::Containers {
-implementation::SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) :
-    m_name(name), m_storagePath(storagePath)
+namespace winrt::Microsoft::WSL::Containers::implementation {
+SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath)
 {
-    winrt::check_hresult(WslcInitSessionSettings(m_name.c_str(), m_storagePath.c_str(), &m_sessionSettings));
+    throw hresult_not_implemented();
 }
-
-hstring implementation::SessionSettings::Name()
+hstring SessionSettings::Name()
 {
-    return hstring{m_name};
+    throw hresult_not_implemented();
 }
-
-hstring implementation::SessionSettings::StoragePath()
+void SessionSettings::Name(hstring const& value)
 {
-    return hstring{m_storagePath};
+    throw hresult_not_implemented();
 }
-
-uint32_t implementation::SessionSettings::CpuCount()
+hstring SessionSettings::StoragePath()
 {
-    return m_cpuCount;
+    throw hresult_not_implemented();
 }
-
-void implementation::SessionSettings::CpuCount(uint32_t value)
+void SessionSettings::StoragePath(hstring const& value)
 {
-    m_cpuCount = value;
-    winrt::check_hresult(WslcSetSessionSettingsCpuCount(&m_sessionSettings, m_cpuCount));
+    throw hresult_not_implemented();
 }
-
-uint32_t implementation::SessionSettings::MemoryMb()
+winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::CpuCount()
 {
-    return m_memoryMb;
+    throw hresult_not_implemented();
 }
-
-void implementation::SessionSettings::MemoryMb(uint32_t value)
+void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
-    m_memoryMb = value;
-    winrt::check_hresult(WslcSetSessionSettingsMemory(&m_sessionSettings, m_memoryMb));
+    throw hresult_not_implemented();
 }
-
-uint32_t implementation::SessionSettings::TimeoutMS()
+winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::MemoryMB()
 {
-    return m_timeoutMS;
+    throw hresult_not_implemented();
 }
-
-void implementation::SessionSettings::TimeoutMS(uint32_t value)
+void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
-    m_timeoutMS = value;
-    winrt::check_hresult(WslcSetSessionSettingsTimeout(&m_sessionSettings, m_timeoutMS));
+    throw hresult_not_implemented();
 }
-
-WSLC::VhdRequirements implementation::SessionSettings::VhdRequirements()
+winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::TimeoutMS()
 {
-    return m_vhdRequirements;
+    throw hresult_not_implemented();
 }
-
-void implementation::SessionSettings::VhdRequirements(WSLC::VhdRequirements const& value)
+void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value)
 {
-    m_vhdRequirements = value;
-    auto vhdRequirements =
-        m_vhdRequirements ? winrt::get_self<implementation::VhdRequirements>(m_vhdRequirements)->ToStructPointer() : nullptr;
-    winrt::check_hresult(WslcSetSessionSettingsVhd(&m_sessionSettings, vhdRequirements));
+    throw hresult_not_implemented();
 }
-
-WSLC::SessionFeatureFlags implementation::SessionSettings::FeatureFlags()
+winrt::Microsoft::WSL::Containers::VhdOptions SessionSettings::VhdRequirements()
 {
-    return m_featureFlags;
+    throw hresult_not_implemented();
 }
-
-void implementation::SessionSettings::FeatureFlags(WSLC::SessionFeatureFlags const& value)
+void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value)
 {
-    m_featureFlags = value;
-    winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(&m_sessionSettings, static_cast<WslcSessionFeatureFlags>(m_featureFlags)));
+    throw hresult_not_implemented();
 }
-
-WslcSessionSettings* implementation::SessionSettings::ToStructPointer()
+winrt::Microsoft::WSL::Containers::SessionFeatureFlags SessionSettings::FeatureFlags()
 {
-    return &m_sessionSettings;
+    throw hresult_not_implemented();
 }
-} // namespace winrt::Microsoft::WSL::Containers
+void SessionSettings::FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value)
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

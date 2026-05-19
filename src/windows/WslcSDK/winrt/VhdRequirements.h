@@ -26,6 +26,8 @@ struct VhdRequirements : VhdRequirementsT<VhdRequirements>
     uint64_t SizeInBytes();
     winrt::Microsoft::WSL::Containers::VhdType Type();
 
+    void SetOwner(uint32_t uid, uint32_t gid);
+
     WslcVhdRequirements* ToStructPointer();
 
 private:

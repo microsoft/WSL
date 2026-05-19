@@ -18,8 +18,8 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::ClientRunningWSLCProcess;
-using wsl::windows::common::relay::ReadHandle;
-using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::RelayHandle;
 
 bool ConsoleService::RelayInteractiveTty(ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
@@ -70,7 +70,7 @@ bool ConsoleService::RelayInteractiveTty(ClientRunningWSLCProcess& Process, HAND
 
 void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
 
     // Create a thread to relay stdin to the pipe.
     wil::unique_event exitEvent(wil::EventOptions::ManualReset);

@@ -20,7 +20,7 @@ namespace wsl::windows::service::wslc {
 
 class IORelay;
 
-class PortRelayAcceptHandle : public common::relay::OverlappedIOHandle
+class PortRelayAcceptHandle : public common::io::OverlappedIOHandle
 {
 public:
     NON_COPYABLE(PortRelayAcceptHandle)

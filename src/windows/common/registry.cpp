@@ -230,6 +230,27 @@ std::vector<std::pair<std::wstring, DWORD>> wsl::windows::common::registry::Enum
     return values;
 }
 
+std::map<std::wstring, std::wstring> wsl::windows::common::registry::EnumStringValues(_In_ HKEY Key)
+{
+    std::map<std::wstring, std::wstring> values;
+    for (const auto& [name, type] : EnumValues(Key))
+    {
+        // Only return string values; callers that need other types should use EnumValues() directly.
+        // REG_EXPAND_SZ values are returned with environment variables expanded (per ReadOptionalString).
+        if (type != REG_SZ && type != REG_EXPAND_SZ)
+        {
+            continue;
+        }
+
+        if (auto value = ReadOptionalString(Key, nullptr, name.c_str()))
+        {
+            values.emplace(name, std::move(*value));
+        }
+    }
+
+    return values;
+}
+
 bool wsl::windows::common::registry::IsKeyVolatile(_In_ HKEY Key)
 {
     KEY_FLAGS_INFORMATION info{};

@@ -28,6 +28,7 @@
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
                 <File Id="wslc.exe" Name="wslc.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
+                <File Id="container.exe" Name="container.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
@@ -348,6 +349,14 @@
                 <!-- IWSLCVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLCVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCPluginNotifier-->
+                <RegistryKey Root="HKCR" Key="Interface\{F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2}">
+                    <RegistryValue Value="IWSLCPluginNotifier" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
