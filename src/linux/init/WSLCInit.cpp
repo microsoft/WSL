@@ -133,9 +133,8 @@ try
     const std::filesystem::path bundle = state.at("bundle").get<std::string>();
     THROW_ERRNO_IF(EINVAL, !bundle.is_absolute());
 
-    // Read the OCI spec's root.path from <bundle>/config.json. For Docker/containerd this is an
-    // absolute path to the overlay-merged rootfs accessible from the runtime namespace or a path
-    // relative to the bundle directory.
+    // Read the OCI spec's root.path from <bundle>/config.json. This is either an absolute path to
+    // the overlay-merged rootfs or a path relative to the bundle directory.
     const auto spec = nlohmann::json::parse(UtilReadFileContent((bundle / "config.json").native()));
     std::filesystem::path rootfsPath = spec.at("root").at("path").get<std::string>();
     if (rootfsPath.is_relative())
