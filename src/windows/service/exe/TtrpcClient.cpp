@@ -261,7 +261,9 @@ try
         auto* nicConfig = vmConfig->mutable_devices_config()->add_nic_config();
         nicConfig->set_nic_id(config.Nic->NicId);
         nicConfig->set_mac_address(config.Nic->MacAddress);
-        nicConfig->mutable_consomme();
+        // Set ConsommeBackend as the active oneof choice. The CIDR field is optional
+        // and will use OpenVMM's default if empty.
+        nicConfig->mutable_consomme()->set_cidr("");
     }
 
     if (!config.VirtioConsolePath.empty())

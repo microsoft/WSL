@@ -211,10 +211,9 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
         // Create the VM in the SYSTEM service (privileged).
-        // Select VMM backend: set WSLC_USE_OPENVMM=1 to use OpenVMM instead of HCS.
+        // Determine VMM backend based on user settings: OpenVMM (experimental) or HCS (default).
         Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
-        wchar_t envBuffer[2]{};
-        const bool useOpenVmm = GetEnvironmentVariableW(L"WSLC_USE_OPENVMM", envBuffer, ARRAYSIZE(envBuffer)) > 0 && envBuffer[0] == L'1';
+        const bool useOpenVmm = SessionSettings::LoadUserSettings(userToken.get()).Get<settings::Setting::SessionOpenVmm>();
 
         // For OpenVMM, disable unsupported features before creating the VM and session.
         // The copy must outlive all uses of Settings below (CreateSessionSettings, etc.).
