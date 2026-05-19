@@ -65,13 +65,13 @@ HRESULT GrpcStatusToHresult(int32_t statusCode)
 {
     switch (statusCode)
     {
-    case 3:
+    case 3:  // INVALID_ARGUMENT
         return E_INVALIDARG;
-    case 5:
+    case 5:  // NOT_FOUND
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-    case 8:
+    case 8:  // RESOURCE_EXHAUSTED
         return HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES);
-    case 12:
+    case 12: // UNIMPLEMENTED
         return E_NOTIMPL;
     default:
         return E_FAIL;
@@ -261,8 +261,7 @@ try
         auto* nicConfig = vmConfig->mutable_devices_config()->add_nic_config();
         nicConfig->set_nic_id(config.Nic->NicId);
         nicConfig->set_mac_address(config.Nic->MacAddress);
-        // Set ConsommeBackend as the active oneof choice. The CIDR field is optional
-        // and will use OpenVMM's default if empty.
+        // Empty CIDR uses OpenVMM's default subnet.
         nicConfig->mutable_consomme()->set_cidr("");
     }
 

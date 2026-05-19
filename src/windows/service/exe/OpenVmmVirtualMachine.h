@@ -10,9 +10,9 @@ Abstract:
 
     Implementation of IWSLCVirtualMachine using OpenVMM as the VMM backend.
 
-    This class spawns openvmm.exe as a child process, configures it via CLI
-    arguments and (in future) gRPC, and implements the same IWSLCVirtualMachine
-    interface as HcsVirtualMachine to allow the rest of WSLC to work unchanged.
+    This class spawns openvmm.exe as a child process, configures the VM via
+    ttrpc RPCs (vmservice.proto), and implements the same IWSLCVirtualMachine
+    interface as HcsVirtualMachine so the rest of WSLC can work unchanged.
 
 --*/
 

@@ -10,15 +10,12 @@ Abstract:
 
     Implementation of IWSLCVirtualMachine using OpenVMM as the VMM backend.
 
-    This is a proof-of-concept implementation that spawns openvmm.exe as a
-    child process with CLI arguments to boot a Linux VM, and provides the
-    same interface as HcsVirtualMachine.
+    Spawns openvmm.exe in ttrpc orchestration mode and configures the VM via
+    vmservice RPCs (CreateVM, ResumeVM, ModifyResource, etc.).
 
-    Current limitations (PoC):
-    - AttachDisk/DetachDisk at runtime require gRPC integration (TODO).
-    - AddShare/RemoveShare require OpenVMM proto extensions (TODO).
-    - ConfigureNetworking needs socket passthrough design (TODO).
-    - GPU passthrough is not supported (deferred).
+    Current limitations:
+    - AddShare/RemoveShare require vmservice.proto extensions.
+    - GPU passthrough is not supported.
 
 --*/
 
@@ -57,9 +54,6 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     // Resolve paths for kernel, initrd, and root VHD.
     auto basePath = wslutil::GetBasePath();
 
-    // OpenVMM requires an uncompressed ELF vmlinux, not a bzImage.
-    // The standard WSL kernel file is a bzImage (MZ/PE header) which HCS handles
-    // natively. For OpenVMM, a separate vmlinux must be placed alongside it.
 #ifdef WSL_KERNEL_PATH
     m_kernelPath = std::filesystem::path(WSL_KERNEL_PATH);
 #else
@@ -144,12 +138,10 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
         dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
-    // REVIEW: Can we always enable earlycon?
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", true /* always enable earlycon for OpenVMM */, std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent, true, false, L"", true /* earlycon */, std::move(dmesgOutputHandle));
 
-    // OpenVMM always uses earlycon to capture kernel output from the very start
-    // of boot via COM1, before the virtio console (hvc0) driver loads.
+    // Earlycon captures kernel output via COM1 before the hvc0 driver loads.
     m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
 
     m_kernelCmdLine += L" console=hvc0 debug";
@@ -165,7 +157,6 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     m_vsockPath = vsockDir / std::format(L"vm-{:.8}", m_vmIdString);
 
     // Set up the ttrpc socket path for runtime VM management.
-    // OpenVMM will listen on this Unix domain socket for ttrpc RPCs.
     m_ttrpcSocketPath = vsockDir / std::format(L"vm-{:.8}.ttrpc", m_vmIdString);
     DeleteFileW(m_ttrpcSocketPath.c_str());
 
@@ -283,28 +274,21 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
 std::wstring OpenVmmVirtualMachine::BuildCommandLine() const
 {
-    // Build the openvmm.exe command line.
-    //
     // In ttrpc orchestration mode, the command line only specifies the ttrpc
-    // socket path. All VM configuration (kernel, disks, memory, networking,
-    // etc.) is sent via the CreateVM RPC after the ttrpc server is ready.
-    // This matches the Kata Containers / vmservice workflow.
+    // socket path. All VM configuration is sent via the CreateVM RPC.
 
     std::wstring cmd = std::format(L"\"{}\"", m_openvmmPath.wstring());
 
-    // ttrpc server mode — OpenVMM will listen on this Unix domain socket
-    // for vmservice RPCs (CreateVM, ResumeVM, ModifyResource, etc.).
+    // ttrpc server mode — OpenVMM listens for vmservice RPCs on this socket.
     cmd += std::format(L" --ttrpc \"{}\"", m_ttrpcSocketPath.wstring());
 
     return cmd;
 }
 
-// Build the ttrpc CreateVM configuration from the stored VM settings.
 TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
 {
     TtrpcClient::VmConfig config;
 
-    // Linux direct boot paths.
     config.KernelPath = wsl::shared::string::WideToMultiByte(m_kernelPath.wstring());
     config.InitrdPath = wsl::shared::string::WideToMultiByte(m_initrdPath.wstring());
 
@@ -312,12 +296,10 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
     // automatically via HyperVGen2LinuxDirect chipset type.
     config.KernelCmdLine = wsl::shared::string::WideToMultiByte(m_kernelCmdLine);
 
-    // Memory (ensure 2MB granularity like HCS).
-    // Cap at 4GB for the PoC — OpenVMM on WHP allocates guest RAM upfront.
-    constexpr ULONG maxMemoryMbPoC = 4096;
-    config.MemoryMb = std::min(m_memoryMb, maxMemoryMbPoC) & ~0x1;
+    // Ensure 2MB granularity. Cap at 4GB because OpenVMM on WHP allocates guest RAM upfront.
+    constexpr ULONG c_maxMemoryMb = 4096;
+    config.MemoryMb = std::min(m_memoryMb, c_maxMemoryMb) & ~0x1;
 
-    // Processor count.
     config.ProcessorCount = m_cpuCount;
 
     // HvSocket bridge via vsock path (for the guest init connection).
@@ -334,7 +316,6 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
         });
     }
 
-    // Networking: virtio-net NIC with consomme NAT backend.
     // Consomme provides a self-contained userspace TCP/IP stack with DHCP,
     // so no host-side network setup is needed.
     if (m_networkingMode == WSLCNetworkingModeConsomme)
@@ -350,15 +331,13 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
         };
     }
 
-    // Serial ports for dmesg collection.
-    // Early boot console: COM1 (port 0) connected to the DmesgCollector's early console pipe.
-    // Always enabled for OpenVMM to capture output before hvc0 driver loads.
+    // COM1 (port 0) — earlycon output before hvc0 loads.
     config.SerialPorts.push_back({
         .Port = 0,
         .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
     });
 
-    // Virtio serial console (/dev/hvc0) connected to the DmesgCollector's virtio console pipe.
+    // Virtio console (/dev/hvc0) — primary console after boot.
     config.VirtioConsolePath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->VirtioConsoleName());
 
     return config;
@@ -384,9 +363,8 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Start the process. The returned handle is the process handle.
     m_processHandle = process.Start();
 
-    // Assign the openvmm process to a kill-on-close job object. This ensures
-    // the child process is terminated if the service exits without running our
-    // destructor (e.g., killed or crashes).
+    // Kill-on-close job object ensures the child is terminated if the service
+    // exits without running our destructor.
     m_jobObject.reset(CreateJobObjectW(nullptr, nullptr));
     THROW_LAST_ERROR_IF(!m_jobObject);
 
@@ -396,15 +374,13 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
         m_jobObject.get(), JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)));
     THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_jobObject.get(), m_processHandle.get()));
 
-    // Close our copy of the log handle.
     logFile.reset();
 
-    // Start a thread to watch for openvmm process exit.
+    // Monitor the openvmm process and signal m_vmExitEvent on exit.
     m_processWatchThread = std::thread(&OpenVmmVirtualMachine::WatchProcessExit, this);
 
-    // Connect the ttrpc client. In --ttrpc mode, the server is ready almost
-    // immediately (it only binds the socket, no VM setup yet). Connect()
-    // retries with backoff internally.
+    // Connect the ttrpc client. The server is ready almost immediately in
+    // --ttrpc mode (it only binds the socket). Connect() retries with backoff.
     m_ttrpcClient = std::make_unique<TtrpcClient>();
     THROW_IF_FAILED_MSG(
         m_ttrpcClient->Connect(m_ttrpcSocketPath.wstring(), 30000),
@@ -421,12 +397,10 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
         m_ttrpcClient->ResumeVm(),
         "Failed to resume VM via ttrpc ResumeVM");
 
-    // Start a thread that calls WaitVM to detect when the guest halts.
-    // This is analogous to HCS's OnVmExitCallback — when the guest performs
-    // an ACPI S5 power-down, WaitVM returns and we signal m_vmExitEvent.
-    // Uses a separate ttrpc connection because WaitVM blocks indefinitely and
-    // SendRequest holds the client lock for the entire send+recv — a single
-    // connection would deadlock all other RPCs (AttachDisk, etc.).
+    // WaitVM blocks until the guest halts (ACPI S5 power-down).
+    // Uses a separate ttrpc connection because SendRequest holds the client
+    // lock for the entire send+recv — sharing a connection would deadlock
+    // concurrent RPCs (AttachDisk, etc.).
     m_waitVmThread = std::thread([this]() {
         TtrpcClient waitClient;
         auto hr = waitClient.Connect(m_ttrpcSocketPath.wstring(), 30000);
@@ -472,8 +446,7 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // Signal termination to any pending operations.
     m_vmExitEvent.SetEvent();
 
-    // Ask openvmm to release all VM resources via TeardownVM.
-    // This unblocks WaitVM and allows the process to exit.
+    // TeardownVM releases all VM resources and unblocks WaitVM.
     if (m_ttrpcClient)
     {
         LOG_IF_FAILED(m_ttrpcClient->TeardownVm());
@@ -481,8 +454,7 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_ttrpcClient.reset();
     }
 
-    // Wait up to 5 seconds for the openvmm process to exit gracefully.
-    // If it doesn't, forcefully terminate it.
+    // Wait up to 5 seconds for graceful exit, then force-terminate.
     if (m_processHandle)
     {
         if (WaitForSingleObject(m_processHandle.get(), 5000) == WAIT_TIMEOUT)
@@ -502,8 +474,7 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_waitVmThread.join();
     }
 
-    // Join relay threads (they exit when the exit event is signaled
-    // or when the sockets they relay between close).
+    // Join relay threads.
     if (m_initRelayThread.joinable())
     {
         m_initRelayThread.join();
@@ -526,7 +497,6 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_relayThreads.clear();
     }
 
-    // Clean up the init listener socket if still open.
     if (m_initListenSocket != INVALID_SOCKET)
     {
         closesocket(m_initListenSocket);
@@ -534,7 +504,6 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     }
     DeleteFileW(m_initListenPath.c_str());
 
-    // Clean up the crash dump listener socket if still open.
     if (m_crashDumpListenSocket != INVALID_SOCKET)
     {
         closesocket(m_crashDumpListenSocket);
@@ -542,7 +511,6 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     }
     DeleteFileW(m_crashDumpListenPath.c_str());
 
-    // Clean up the vsock and ttrpc socket files.
     try
     {
         if (std::filesystem::exists(m_vsockPath))
@@ -570,9 +538,9 @@ try
 }
 CATCH_RETURN()
 
-// Bidirectional relay between a Unix domain socket and a TCP socket using select().
+// Bidirectional relay between an AF_UNIX socket and a TCP socket.
 // Runs until either socket closes or exitEvent is signaled.
-// Takes ownership of both sockets and closes them on exit.
+// Takes ownership of both sockets.
 static void RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent)
 {
     auto cleanup = wil::scope_exit([&] {
@@ -584,7 +552,6 @@ static void RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent)
 
     while (true)
     {
-        // Check if we should exit.
         if (WaitForSingleObject(exitEvent, 0) == WAIT_OBJECT_0)
         {
             break;
@@ -669,7 +636,7 @@ static std::pair<wil::unique_socket, std::thread> CreateRelayedSocket(
     sockaddr_in loopback{};
     loopback.sin_family = AF_INET;
     loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    loopback.sin_port = 0; // Let OS pick a port
+    loopback.sin_port = 0;
     THROW_LAST_ERROR_IF(bind(tcpListener, reinterpret_cast<sockaddr*>(&loopback), sizeof(loopback)) == SOCKET_ERROR);
     THROW_LAST_ERROR_IF(listen(tcpListener, 1) == SOCKET_ERROR);
 
@@ -723,8 +690,7 @@ try
     m_initListenSocket = INVALID_SOCKET;
     DeleteFileW(m_initListenPath.c_str());
 
-    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
-    // which SocketChannel requires. Bridge via a TCP loopback relay.
+    // Bridge AF_UNIX to TCP loopback for overlapped I/O support.
     auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
     m_initRelayThread = std::move(relayThread);
     *Socket = reinterpret_cast<HANDLE>(tcpSocket.release());
@@ -737,13 +703,9 @@ try
 {
     std::lock_guard lock(m_lock);
 
-    // The OpenVMM backend only supports consomme networking.
+    // Consomme networking is configured server-side via NICConfig.
     WI_ASSERT(m_networkingMode == WSLCNetworkingModeConsomme);
     THROW_HR_IF(E_INVALIDARG, m_networkingMode != WSLCNetworkingModeConsomme);
-
-    // In ttrpc orchestration mode, consomme networking is configured
-    // server-side via the ConsommeBackend in NICConfig. No host-side
-    // networking engine is needed — this call is a no-op.
     return S_OK;
 }
 CATCH_RETURN()
@@ -803,19 +765,7 @@ try
 
     std::lock_guard lock(m_lock);
 
-    // TODO: Implement share hot-add.
-    //
-    // This requires extending OpenVMM's ModifyResource proto to support
-    // Plan9/VirtioFS share hot-add. Currently, shares can only be configured
-    // at VM creation time via --virtio-9p or --virtio-fs CLI args.
-    //
-    // For the PoC, pre-configure commonly needed shares at boot time by
-    // adding --virtio-9p or --virtio-fs arguments in BuildCommandLine().
-    //
-    // Future work:
-    // 1. Extend vmservice.proto with Plan9Config/VirtioFSConfig in ModifyResourceRequest
-    // 2. Implement handler in openvmm_entry/src/ttrpc/mod.rs
-    // 3. Call ModifyResource(ADD, plan9_config) from here
+    // TODO: Requires vmservice.proto extension for Plan9/VirtioFS in ModifyResourceRequest.
 
     WSL_LOG(
         "OpenVmmAddShare",
@@ -833,7 +783,7 @@ try
 {
     std::lock_guard lock(m_lock);
 
-    // TODO: Implement share hot-remove. See AddShare comments.
+    // TODO: Requires vmservice.proto extension. See AddShare.
 
     WSL_LOG(
         "OpenVmmRemoveShare",
@@ -900,8 +850,7 @@ try
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(response, "Response"));
 
-    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
-    // which SocketChannel requires. Bridge via a TCP loopback relay.
+    // Bridge AF_UNIX to TCP loopback for overlapped I/O support.
     closeUnix.release();
     auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
     {
@@ -932,8 +881,7 @@ try
     SOCKET unixSock = accept(m_crashDumpListenSocket, nullptr, nullptr);
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
 
-    // AF_UNIX sockets don't support overlapped I/O (WSARecv with OVERLAPPED),
-    // which SocketChannel requires. Bridge via a TCP loopback relay.
+    // Bridge AF_UNIX to TCP loopback for overlapped I/O support.
     auto [tcpSocket, relayThread] = CreateRelayedSocket(unixSock, m_vmExitEvent.get());
     m_crashDumpRelayThread = std::move(relayThread);
     *Socket = reinterpret_cast<HANDLE>(tcpSocket.release());
