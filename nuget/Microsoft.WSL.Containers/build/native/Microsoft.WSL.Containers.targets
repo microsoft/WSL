@@ -3,6 +3,8 @@
     <PropertyGroup>
         <WslcPlatform Condition="'$(WslcPlatform)' == ''">$(Platform)</WslcPlatform>
         <_wslcIsInvalidPlatform Condition="'$(WslcPlatform)' != 'x64' and '$(WslcPlatform)' != 'arm64'">true</_wslcIsInvalidPlatform>
+        <!-- Set to false to suppress the C++/WinRT winmd reference and activation manifest injection. -->
+        <WslcEnableCppWinRT Condition="'$(WslcEnableCppWinRT)' == ''">true</WslcEnableCppWinRT>
     </PropertyGroup>
 
     <ItemDefinitionGroup>
@@ -24,9 +26,17 @@
         </Link>
     </ItemDefinitionGroup>
 
+    <!-- Inject the activatable class manifest so RoGetActivationFactory resolves wslcsdk.dll
+         without requiring COM registration or renaming the DLL to match the namespace. -->
+    <ItemDefinitionGroup Condition="'$(WslcEnableCppWinRT)' == 'true' and '$(ConfigurationType)' != 'StaticLibrary'">
+        <Manifest>
+            <AdditionalManifestFiles>$(MSBuildThisFileDirectory)..\..\manifests\Microsoft.WSL.Containers.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+        </Manifest>
+    </ItemDefinitionGroup>
+
     <ItemGroup>
         <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform)\native\wslcsdk.dll" />
-        <Reference Include="Microsoft.WSL.Containers">
+        <Reference Include="Microsoft.WSL.Containers" Condition="'$(WslcEnableCppWinRT)' == 'true'">
             <HintPath>$(MSBuildThisFileDirectory)..\..\winmd\Microsoft.WSL.Containers.winmd</HintPath>
             <Implementation>wslcsdk.dll</Implementation>
         </Reference>

@@ -71,9 +71,14 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "cmake configure failed (exit code $LASTEXITCODE)" }
     }
 
-    Write-Host "`nBuilding wslcsdkwinrt (generates winmd)..." -ForegroundColor Cyan
+    Write-Host "`nBuilding wslcsdkwinrtidl (generates winmd)..." -ForegroundColor Cyan
     cmake --build . --config $Config --target wslcsdkwinrtidl -- -m
     if ($LASTEXITCODE -ne 0) { throw "wslcsdkwinrtidl build failed (exit code $LASTEXITCODE)" }
+
+    # NOTE: The C# WinRT projection (wslcsdkcs.dll) is not built here. Building it
+    # requires a full Visual Studio installation's MSBuild (not Build Tools) to resolve
+    # Microsoft.NET.Sdk. To include it: run cmake with -DWSL_BUILD_SDKCS=ON, build
+    # the wslcsdkcs target in Visual Studio, then re-run this script with -Fast.
 
     Write-Host "`nPacking NuGet package..." -ForegroundColor Cyan
     cmake --build . --config $Config --target nuget_containers
