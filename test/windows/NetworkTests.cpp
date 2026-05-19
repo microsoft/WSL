@@ -4108,6 +4108,104 @@ class MirroredTests
         VERIFY_IS_TRUE(canBindUdp);
     }
 
+    WSL2_TEST_METHOD(GuestTcpBindToHostEphemeralRangeDenied)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        // Query the host TCP ephemeral port range via PowerShell.
+        auto [startStr, _1] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"(Get-NetTCPSetting | Where-Object { $_.DynamicPortRangeStartPort -gt 0 } | Select-Object -First "
+            L"1).DynamicPortRangeStartPort",
+            0);
+        const auto hostEphemeralStart = std::stoi(startStr);
+
+        auto [countStr, _2] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"(Get-NetTCPSetting | Where-Object { $_.DynamicPortRangeNumberOfPorts -gt 0 } | Select-Object -First "
+            L"1).DynamicPortRangeNumberOfPorts",
+            0);
+        const auto hostEphemeralEnd = hostEphemeralStart + std::stoi(countStr) - 1;
+
+        // Get the guest ephemeral port range.
+        auto [start, err1] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f1", 0);
+        start.pop_back();
+        const auto guestEphemeralRangeStart = std::stoi(start);
+
+        auto [end, err2] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f2", 0);
+        end.pop_back();
+        const auto guestEphemeralRangeEnd = std::stoi(end);
+
+        // Pick a port in the host ephemeral range but not in the guest's assigned range.
+        // The ranges may overlap
+        int testPort = 0;
+        if (hostEphemeralStart < guestEphemeralRangeStart || hostEphemeralStart > guestEphemeralRangeEnd)
+        {
+            testPort = hostEphemeralStart;
+        }
+        else if (guestEphemeralRangeEnd < hostEphemeralEnd)
+        {
+            testPort = guestEphemeralRangeEnd + 1;
+        }
+        else
+        {
+            VERIFY_FAIL(L"Guest ephemeral range fully covers the host ephemeral range, cannot find a test port");
+        }
+
+        auto [tcpListener, tcpSuccess, read] = NetworkTests::BindGuestPortHelper(L"TCP4-LISTEN:" + std::to_wstring(testPort));
+        VERIFY_IS_FALSE(tcpSuccess);
+    }
+
+    WSL2_TEST_METHOD(GuestUdpBindToHostEphemeralRangeDenied)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        // Query the host UDP ephemeral port range via PowerShell.
+        auto [startStr, _1] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"(Get-NetUDPSetting | Where-Object { $_.DynamicPortRangeStartPort -gt 0 } | Select-Object -First "
+            L"1).DynamicPortRangeStartPort",
+            0);
+        const auto hostEphemeralStart = std::stoi(startStr);
+
+        auto [countStr, _2] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"(Get-NetUDPSetting | Where-Object { $_.DynamicPortRangeNumberOfPorts -gt 0 } | Select-Object -First "
+            L"1).DynamicPortRangeNumberOfPorts",
+            0);
+        const auto hostEphemeralEnd = hostEphemeralStart + std::stoi(countStr) - 1;
+
+        // Get the guest ephemeral port range.
+        auto [start, err1] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f1", 0);
+        start.pop_back();
+        const auto guestEphemeralRangeStart = std::stoi(start);
+
+        auto [end, err2] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f2", 0);
+        end.pop_back();
+        const auto guestEphemeralRangeEnd = std::stoi(end);
+
+        // Pick a port in the host ephemeral range but not in the guest's assigned range.
+        // The ranges may overlap
+        int testPort = 0;
+        if (hostEphemeralStart < guestEphemeralRangeStart || hostEphemeralStart > guestEphemeralRangeEnd)
+        {
+            testPort = hostEphemeralStart;
+        }
+        else if (guestEphemeralRangeEnd < hostEphemeralEnd)
+        {
+            testPort = guestEphemeralRangeEnd + 1;
+        }
+        else
+        {
+            VERIFY_FAIL(L"Guest ephemeral range fully covers the host ephemeral range, cannot find a test port");
+        }
+
+        auto [udpListener, udpSuccess, udpRead] = NetworkTests::BindGuestPortHelper(L"UDP4-LISTEN:" + std::to_wstring(testPort));
+        VERIFY_IS_FALSE(udpSuccess);
+    }
+
     WSL2_TEST_METHOD(NonRootNamespaceEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();

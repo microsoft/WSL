@@ -54,10 +54,16 @@ private:
         ULONG ReferenceCount;
     };
 
-    // Returns true if the port allocation should be always allowed, without Windows.
+    // Returns true if the port allocation should be always allowed, without asking HNS.
     static bool IsPortAllocationLoopbackException(const SOCKADDR_INET& Address) noexcept;
 
     static bool IsPortAllocationMulticast(const SOCKADDR_INET& Address, _In_ int Protocol) noexcept;
+
+    bool IsPortInHostEphemeralRange(uint16_t PortNumber, int Protocol) const noexcept;
+
+    bool IsPortInGuestEphemeralRange(uint16_t PortNumber) const noexcept;
+
+    static std::pair<uint16_t, uint16_t> QueryHostEphemeralPortRange(LPCWSTR WmiClassName) noexcept;
 
     static std::optional<LxssDynamicFunction<decltype(HcnReserveGuestNetworkServicePortRange)>> m_allocatePortRange;
     static std::optional<LxssDynamicFunction<decltype(HcnReserveGuestNetworkServicePort)>> m_allocatePort;
@@ -70,5 +76,8 @@ private:
     _Guarded_by_(m_dataLock) std::set<uint16_t> m_ignoredPorts;
     _Guarded_by_(m_dataLock) std::map<std::pair<HCN_PORT_PROTOCOL, USHORT>, HcnPortReservation> m_reservedPorts;
     _Guarded_by_(m_dataLock) HCN_PORT_RANGE_RESERVATION m_reservedPortRange {};
+
+    std::pair<uint16_t, uint16_t> m_hostTcpEphemeralPortRange{};
+    std::pair<uint16_t, uint16_t> m_hostUdpEphemeralPortRange{};
 };
 } // namespace wsl::core::networking
