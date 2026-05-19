@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.ContainerNamedVolume.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct ContainerNamedVolume : ContainerNamedVolumeT<ContainerNamedVolume>
@@ -27,10 +28,22 @@ struct ContainerNamedVolume : ContainerNamedVolumeT<ContainerNamedVolume>
     void ContainerPath(hstring const& value);
     bool ReadOnly();
     void ReadOnly(bool value);
+
+    WslcContainerNamedVolume ToStruct();
+
+private:
+    std::string m_name;
+    std::string m_containerPath;
+    bool m_readOnly{};
+
+    std::unique_ptr<WslcContainerNamedVolume> m_containerNamedVolume;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
+
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
 struct ContainerNamedVolume : ContainerNamedVolumeT<ContainerNamedVolume, implementation::ContainerNamedVolume>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
+
+DEFINE_TYPE_HELPERS(ContainerNamedVolume);

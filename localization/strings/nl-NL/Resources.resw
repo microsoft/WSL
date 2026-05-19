@@ -2264,6 +2264,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Ongeldige afbeelding: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Invalid filter: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Ongeldige naam: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

@@ -9,11 +9,11 @@ Module Name:
 Abstract:
 
     This file contains the definition of the WinRT wrapper for the WSLC SDK Session class.
-
 --*/
 
 #pragma once
 #include "Microsoft.WSL.Containers.Session.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Session : SessionT<Session>
@@ -38,6 +38,19 @@ struct Session : SessionT<Session>
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
+
+    WslcSession ToHandle();
+
+private:
+    void EnsureStarted() const;
+    winrt::Microsoft::WSL::Containers::SessionSettings m_settings; // Only kept until Start() is called
+
+    static void CALLBACK TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept;
+
+    // Releasing the session handle may trigger the termination callback.
+    // Keep these two in this order so that the session handle is released before the termination event is destructed.
+    winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;
+    wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
@@ -45,3 +58,5 @@ struct Session : SessionT<Session, implementation::Session>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
+
+DEFINE_TYPE_HELPERS(Session);

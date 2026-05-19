@@ -2264,6 +2264,10 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Imagem inválida: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Filtro inválido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Nome inválido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
