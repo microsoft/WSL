@@ -827,9 +827,9 @@ struct CaseInsensitiveCompare
 
 inline std::wstring FormatBytes(uint64_t bytes)
 {
-    constexpr double c_kB = 1024.0;
-    constexpr double c_MB = 1024.0 * 1024.0;
-    constexpr double c_GB = 1024.0 * 1024.0 * 1024.0;
+    constexpr double c_kB = 1000.0;
+    constexpr double c_MB = 1000.0 * 1000.0;
+    constexpr double c_GB = 1000.0 * 1000.0 * 1000.0;
 
     if (bytes >= static_cast<uint64_t>(c_GB))
     {

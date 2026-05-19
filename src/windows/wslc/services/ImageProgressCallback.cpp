@@ -126,6 +126,13 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     if (line.size() > static_cast<size_t>(info.dwSize.X))
     {
         line.resize(info.dwSize.X);
+
+        // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
+        // drop it so we don't emit an invalid UTF-16 sequence.
+        if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+        {
+            line.pop_back();
+        }
     }
 
     // Erase any previously written char on that line.
