@@ -111,12 +111,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         }
 
         line = std::format(
-            L"{}: {} [{}] {}/{}",
-            id,
-            status,
-            bar,
-            wsl::shared::string::FormatBytes(current),
-            wsl::shared::string::FormatBytes(total));
+            L"{}: {} [{}] {}/{}", id, status, bar, wsl::shared::string::FormatBytes(current), wsl::shared::string::FormatBytes(total));
     }
     else if (current != 0)
     {
