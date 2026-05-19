@@ -64,9 +64,10 @@ void BuildImageCallback::CollapseWindow()
 
     m_lines.clear();
     m_pendingLine.clear();
+    m_pullLines.clear();
 }
 
-HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG /*current*/, ULONGLONG /*total*/)
+HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG /*current*/, ULONGLONG total)
 try
 {
     if (status == nullptr || *status == '\0')
@@ -91,11 +92,37 @@ try
     // accepting any non-empty id, so future or unrelated id usage defaults to permanent.
     const bool isLog = (id != nullptr && std::string_view{id} == "log");
 
+    // Pull/download progress: update the per-entry map so Redraw can show each entry
+    // on a single line that updates in place.
+    if (!isLog && id != nullptr && *id != '\0' && total > 0)
+    {
+        m_pullLines[id] = status;
+
+        auto now = std::chrono::steady_clock::now();
+        if (now - m_lastRedraw >= c_redrawInterval)
+        {
+            Redraw();
+            m_lastRedraw = now;
+        }
+
+        return S_OK;
+    }
+
     if (!isLog)
     {
-        // Permanent line: collapse the scrolling window then print directly.
+        // Permanent build-step line: collapse the scrolling window then print in teal.
         CollapseWindow();
-        WriteTerminal(MultiByteToWide(status));
+        auto wide = MultiByteToWide(status);
+        if (!wide.empty() && wide.back() == L'\n')
+        {
+            wide.insert(0, L"\033[36m");
+            wide.insert(wide.size() - 1, L"\033[0m");
+        }
+        else
+        {
+            wide = std::format(L"\033[36m{}\033[0m", wide);
+        }
+        WriteTerminal(wide);
         return S_OK;
     }
 
@@ -217,10 +244,16 @@ void BuildImageCallback::Redraw()
         appendLine(m_pendingLine);
     }
 
+    // Render per-entry pull progress (each entry updates in place via the map).
+    for (const auto& [key, line] : m_pullLines)
+    {
+        appendLine(line);
+    }
+
     buffer += L"\033[22m\033[?25h";
 
     WriteTerminal(buffer);
-    m_displayedLines = displayCount;
+    m_displayedLines = displayCount + static_cast<SHORT>(m_pullLines.size());
 }
 
 } // namespace wsl::windows::wslc::services
