@@ -144,15 +144,7 @@ bool WSLCExecutionResult::StdoutContainsLine(const std::wstring& expectedLine) c
 bool WSLCExecutionResult::StdoutContainsSubstring(const std::wstring& substring) const
 {
     VERIFY_IS_TRUE(Stdout.has_value());
-    for (const auto& line : GetStdoutLines())
-    {
-        if (line.find(substring) != std::wstring::npos)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return Stdout.value().find(substring) != std::wstring::npos;
 }
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType)

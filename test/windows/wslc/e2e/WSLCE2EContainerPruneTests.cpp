@@ -26,6 +26,12 @@ class WSLCE2EContainerPruneTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+
+        // Clean up any leftover containers from previous failed runs
+        EnsureContainerDoesNotExist(L"prune-test-container");
+        EnsureContainerDoesNotExist(L"prune-running-test");
+        EnsureContainerDoesNotExist(L"prune-multi-1");
+        EnsureContainerDoesNotExist(L"prune-multi-2");
         return true;
     }
 
@@ -56,6 +62,7 @@ class WSLCE2EContainerPruneTests
         // Create and stop a container, then prune it
         auto createResult = RunWslc(std::format(L"container create --name prune-test-container {}", DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = createResult.GetStdoutOneLine();
 
         auto cleanup = wil::scope_exit([&]() { RunWslc(L"container prune"); });
 
@@ -63,7 +70,8 @@ class WSLCE2EContainerPruneTests
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        // Verify pruned container ID is in output
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId));
 
         // Verify the container is actually removed
         VerifyContainerIsNotListed(L"prune-test-container");
@@ -91,15 +99,22 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_MultipleStopped)
     {
         // Create multiple stopped containers and verify all are pruned
-        RunWslc(std::format(L"container create --name prune-multi-1 {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
-        RunWslc(std::format(L"container create --name prune-multi-2 {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        auto create1 = RunWslc(std::format(L"container create --name prune-multi-1 {}", DebianImage.NameAndTag()));
+        create1.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId1 = create1.GetStdoutOneLine();
+
+        auto create2 = RunWslc(std::format(L"container create --name prune-multi-2 {}", DebianImage.NameAndTag()));
+        create2.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId2 = create2.GetStdoutOneLine();
 
         auto cleanup = wil::scope_exit([&]() { RunWslc(L"container prune"); });
 
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        // Verify pruned container IDs are in output
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId1));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId2));
 
         // Verify both containers are removed
         VerifyContainerIsNotListed(L"prune-multi-1");

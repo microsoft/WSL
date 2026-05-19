@@ -551,9 +551,10 @@ PruneContainersResult ContainerService::Prune(Session& session)
 
     PruneContainersResult pruneResult;
     pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;
+    pruneResult.PrunedContainers.reserve(result.result.ContainersCount);
     for (ULONG i = 0; i < result.result.ContainersCount; i++)
     {
-        pruneResult.Containers.push_back(result.result.Containers[i]);
+        pruneResult.PrunedContainers.push_back(result.result.Containers[i]);
     }
 
     return pruneResult;

@@ -70,7 +70,7 @@ struct StopContainerOptions
 
 struct PruneContainersResult
 {
-    std::vector<std::string> Containers;
+    std::vector<std::string> PrunedContainers;
     ULONGLONG SpaceReclaimed{};
 };
 

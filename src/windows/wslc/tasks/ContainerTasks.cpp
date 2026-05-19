@@ -703,7 +703,7 @@ void PruneContainers(CLIExecutionContext& context)
 
     auto result = ContainerService::Prune(session);
 
-    for (const auto& containerId : result.Containers)
+    for (const auto& containerId : result.PrunedContainers)
     {
         PrintMessage(MultiByteToWide(containerId));
     }
