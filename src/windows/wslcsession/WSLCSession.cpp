@@ -674,8 +674,8 @@ try
         "Invalid flags: 0x%x",
         Options->Flags);
 
-    // Image builds shell out to `docker build` inside the VM, which fetches FROM
-    // base images directly through the in-VM docker daemon and bypasses the
+    // Image builds shell out to `podman build` inside the VM, which fetches FROM
+    // base images directly through the in-VM podman service and bypasses the
     // per-pull registry policy gate. When an allowlist is configured, refuse the
     // build outright since we cannot reliably attribute its registry traffic.
     if (wsl::windows::policies::HasRegistryAllowlist(wsl::windows::policies::OpenPoliciesKey().get()))
@@ -735,19 +735,111 @@ try
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
 
+    // -----------------------------------------------------------------------
+    // Dockerfile staging
+    // -----------------------------------------------------------------------
+    //
+    // Goal: make the user-supplied Dockerfile available to `podman build` at a
+    // path that podman/buildah will accept.
+    //
+    // History — what did NOT work, and why:
+    //
+    //   1. `docker build -f - <ctx>` (the original approach for the docker
+    //      backend) — podman/buildah does NOT recognize `-f -` as a stdin
+    //      shorthand. It treats `-` as a literal path *relative to the build
+    //      context*, then stats `<ctx>/-` and fails with "no such file".
+    //
+    //   2. `podman build -f /dev/stdin <ctx>` — same outcome. Buildah resolves
+    //      *every* `-f` argument relative to the build context, even ones that
+    //      look absolute, so it ends up stat'ing `<ctx>/dev/stdin`. An
+    //      otherwise-valid absolute path is therefore rejected if it happens
+    //      to start with `/dev/`.
+    //
+    //   3. Spawning `sh -c 'cat > Containerfile'` inside the VM and piping the
+    //      bytes via stdin — the cat process hung forever waiting for EOF.
+    //      Closing the Windows-side write end of the pipe does NOT propagate
+    //      as EOF through the multi-layer wslc process-IO IPC chain (Win pipe
+    //      → m_ioRelay → hvsocket → in-VM IO → Linux pipe → process stdin)
+    //      under the ServiceProcessLauncher path. The helper never exits.
+    //
+    // What we do instead: write the Dockerfile to a Windows-side temp dir,
+    // mount that dir read-only into the VM via the same MountWindowsFolder
+    // machinery we already use for the build context, and point `podman build
+    // -f` at the Containerfile under that mount. Absolute paths that point
+    // OUTSIDE the build context (e.g. /mnt/wslc-build-<GUID>/Containerfile)
+    // ARE honored verbatim by buildah, so this resolves cleanly.
+    //
+    // Pros: no helper process, no stdin EOF propagation, no extra in-VM state
+    // to clean up. Cons: an extra 9P mount per build (~tens of ms) and a small
+    // amount of disk I/O on the host. Both are noise compared to the actual
+    // image build time.
+    GUID stageId{};
+    THROW_IF_FAILED(CoCreateGuid(&stageId));
+    const auto stageIdStr = wsl::shared::string::GuidToString<wchar_t>(stageId);
+    const std::filesystem::path stageDirHost = std::filesystem::temp_directory_path() / (L"wslc-build-" + stageIdStr);
+    const auto stagedDockerfileHost = stageDirHost / L"Containerfile";
+
+    // Make sure the host stage dir is removed on every exit path (success,
+    // throw, or cancellation). The Windows %TEMP% cleanup would eventually
+    // catch leaks, but doing it here keeps things tidy and bounded.
+    std::filesystem::create_directories(stageDirHost);
+    auto cleanupStageHost = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        std::error_code ec;
+        std::filesystem::remove_all(stageDirHost, ec);
+    });
+
+    // Stream the Dockerfile bytes from the user-supplied handle to the staged
+    // file. We do this synchronously on the wslcsession thread — Dockerfiles
+    // are tiny (KBs) and the IO is local, so there's no value in async here.
+    {
+        wil::unique_hfile out(::CreateFileW(
+            stagedDockerfileHost.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!out.is_valid());
+
+        char buf[64 * 1024];
+        while (true)
+        {
+            DWORD bytesRead = 0;
+            THROW_LAST_ERROR_IF(!::ReadFile(buildFileHandle.Get(), buf, sizeof(buf), &bytesRead, nullptr));
+            if (bytesRead == 0)
+            {
+                break; // EOF on user handle — Dockerfile fully copied.
+            }
+
+            DWORD bytesWritten = 0;
+            THROW_LAST_ERROR_IF(!::WriteFile(out.get(), buf, bytesRead, &bytesWritten, nullptr));
+            THROW_HR_IF_MSG(
+                E_FAIL,
+                bytesWritten != bytesRead,
+                "Short write staging Dockerfile (wrote %lu of %lu bytes)",
+                bytesWritten,
+                bytesRead);
+        }
+    }
+
+    // Expose the staged Dockerfile to the VM via a separate 9P mount. We use
+    // a different GUID-based path so it never collides with the build-context
+    // mount and so podman/buildah see the file at an absolute path that lies
+    // outside the context (a requirement, as explained above).
+    const auto stageMountPath = std::format("/mnt/wslc-build-{}", wsl::shared::string::GuidToString<char>(stageId));
+    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(stageDirHost.c_str(), stageMountPath.c_str(), TRUE));
+    auto unmountStage = wil::scope_exit_log(
+        WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(stageMountPath.c_str()); });
+
+    const auto stagedDockerfile = std::format("{}/Containerfile", stageMountPath);
+
+    // Final podman invocation: `-f <staged absolute path> <context mount>`. No
+    // stdin pipe — the build process doesn't need WSLCProcessFlagsStdin.
     buildArgs.push_back("-f");
-    buildArgs.push_back("-");
+    buildArgs.push_back(stagedDockerfile);
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsStdin);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();
-
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     // Podman emits human-readable build output on stderr (e.g. "STEP 1/3: FROM ...", "--> abcd...", per-step logs,
     // including the final "Error: ..." line on failure). Echo each line straight to the client so the user sees both
