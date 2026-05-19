@@ -2265,7 +2265,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
-    <value>Invalid filter: '{}'</value>
+    <value>Érvénytelen szűrő: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">

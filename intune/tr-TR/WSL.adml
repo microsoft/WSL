@@ -7,11 +7,11 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux’ne izin ver</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Bu ilke devre dışı bırakıldığında, bilgisayardaki tüm kullanıcılar için Windows Subsystem for Linux’nde çalışan Linux dağıtımlarına erişimi engeller.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux’nin kutudan çıkan sürümüne izin ver</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Devre dışı bırakıldığında, bu ilke Windows Subsystem for Linux’nin gelen kutusu sürümünü (isteğe bağlı bileşen) devre dışı bırakır. Bu ilke devre dışı bırakılırsa, yalnızca WSL'nin Store sürümü kullanılabilir.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->WSL1'e izin ver</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Devre dışı olarak ayarlandığında, bu ilke WSL1'i devre dışı bırakır. Devre dışı bırakıldığında yalnızca WSL2 dağıtımları kullanılabilir.</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısı</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısına izin ver</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Bu ilke, bu makinede WSL kapsayıcısının kullanılıp kullanılamayacağını denetler. Bu özellik etkinleştirildiğinde veya yapılandırılmadığında, kullanıcılar ve Windows uygulamaları WSL aracılığıyla Linux kapsayıcılarını çalıştırabilir. Devre dışı bırakıldığında, WSL kapsayıcısı tüm kullanıcılar için engellenir ve Windows uygulamaları Linux kapsayıcılarını çalıştıramaz. Uyarı: Bu ayarı 'Disabled' olarak belirlemek, Linux kapsayıcılarına bağlı Windows uygulamalarının çalışmamasına neden olabilir.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısı kayıt defterleri için izin listesi</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Etkinleştirildiğinde, WSL kapsayıcısının yalnızca burada listelenen kayıt defterlerinden görüntü çekmesine izin verilir. Bu, hem WSL kapsayıcı CLI'sini hem de WSL kapsayıcı API'sini kullanan tüm uygulamaları etkiler.</string>

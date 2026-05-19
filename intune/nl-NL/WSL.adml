@@ -7,11 +7,11 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Het Windows Subsystem for Linux toestaan</string>
         <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
 
         <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Als dit beleid is uitgeschakeld, wordt de inbox-versie (optioneel onderdeel) van het Windows Subsystem for Linux uitgeschakeld. Als dit beleid is uitgeschakeld, kan alleen de Store-versie van WSL worden gebruikt.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->WSL1 toestaan</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Als deze optie is uitgeschakeld, wordt WSL1 met dit beleid uitgeschakeld. Als deze optie is uitgeschakeld, kunnen alleen WSL2-distributies worden gebruikt.</string>
@@ -35,7 +35,7 @@
         <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Als dit beleid is uitgeschakeld, wordt configuratie voor kernelfoutopsporing via .wslconfig (wsl2.kernelDebugPort) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Aangepaste netwerkconfiguratie toestaan</string>
-        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingMode). This policy only applies to Store WSL.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Als dit beleid is uitgeschakeld, wordt aangepaste netwerkconfiguratie via .wslconfig (wsl2.networkingMode) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Sta de gebruiker toe de firewallconfiguratie in te stellen</string>
         <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Als dit beleid is uitgeschakeld, wordt firewallconfiguratie via .wslconfig (wsl2.firewall) uitgeschakeld. Dit beleid is alleen van toepassing op Store WSL.</string>
