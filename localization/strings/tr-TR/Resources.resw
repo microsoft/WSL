@@ -2264,6 +2264,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz resim: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Geçersiz filtre: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Geçersiz ad: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

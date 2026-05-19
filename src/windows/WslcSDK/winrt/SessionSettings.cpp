@@ -15,66 +15,208 @@ Abstract:
 #include "precomp.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.SessionSettings.g.cpp"
+#include "Session.h"
+
+using namespace winrt::Windows::Foundation;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath)
+SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) : m_name(name), m_storagePath(storagePath)
 {
-    throw hresult_not_implemented();
+    if (name.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Session name cannot be empty");
+    }
+
+    if (storagePath.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Storage path cannot be empty");
+    }
 }
+
 hstring SessionSettings::Name()
 {
-    throw hresult_not_implemented();
+    return hstring(m_name);
 }
+
 void SessionSettings::Name(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change session name after session has been initialized");
+    }
+
+    if (value.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Session name cannot be empty");
+    }
+
+    m_name = value;
 }
+
 hstring SessionSettings::StoragePath()
 {
-    throw hresult_not_implemented();
+    return hstring(m_storagePath);
 }
+
 void SessionSettings::StoragePath(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change storage path after session has been initialized");
+    }
+
+    if (value.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Storage path cannot be empty");
+    }
+
+    m_storagePath = value;
 }
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::CpuCount()
+
+IReference<uint32_t> SessionSettings::CpuCount()
 {
-    throw hresult_not_implemented();
+    return m_cpuCount;
 }
-void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+
+void SessionSettings::CpuCount(IReference<uint32_t> const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change CPU count after session has been initialized");
+    }
+
+    if (value && value.Value() == 0)
+    {
+        throw hresult_invalid_argument(L"CPU count cannot be 0");
+    }
+
+    m_cpuCount = value;
 }
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::MemoryMB()
+
+IReference<uint32_t> SessionSettings::MemoryMB()
 {
-    throw hresult_not_implemented();
+    return m_memoryMB;
 }
-void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+
+void SessionSettings::MemoryMB(IReference<uint32_t> const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change memory size after session has been initialized");
+    }
+
+    if (value && value.Value() == 0)
+    {
+        throw hresult_invalid_argument(L"Memory size cannot be 0");
+    }
+
+    m_memoryMB = value;
 }
-winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::TimeoutMS()
+
+IReference<TimeSpan> SessionSettings::Timeout()
 {
-    throw hresult_not_implemented();
+    return m_timeout;
 }
-void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+
+void SessionSettings::Timeout(IReference<TimeSpan> const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change timeout after session has been initialized");
+    }
+
+    if (value)
+    {
+        if (value.Value() == TimeSpan::zero())
+        {
+            throw hresult_invalid_argument(L"Timeout cannot be 0");
+        }
+
+        // The C API takes the timeout in milliseconds as a uint32_t, so we need to validate that the value is within range.
+        auto timeoutMS = std::chrono::duration_cast<std::chrono::milliseconds>(value.Value()).count();
+        if (timeoutMS > std::numeric_limits<uint32_t>::max())
+        {
+            throw hresult_invalid_argument(L"Timeout exceeds the allowed limit");
+        }
+
+        if (timeoutMS < 0)
+        {
+            throw hresult_invalid_argument(L"Timeout cannot be negative");
+        }
+    }
+
+    m_timeout = value;
 }
+
 winrt::Microsoft::WSL::Containers::VhdOptions SessionSettings::VhdRequirements()
 {
-    throw hresult_not_implemented();
+    return m_vhdRequirements;
 }
+
 void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change VHD requirements after session has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"VHD requirements cannot be null");
+    }
+
+    m_vhdRequirements = value;
 }
+
 winrt::Microsoft::WSL::Containers::SessionFeatureFlags SessionSettings::FeatureFlags()
 {
-    throw hresult_not_implemented();
+    return m_featureFlags;
 }
+
 void SessionSettings::FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value)
 {
-    throw hresult_not_implemented();
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change feature flags after session has been initialized");
+    }
+
+    m_featureFlags = value;
 }
+
+WslcSessionSettings* SessionSettings::ToStructPointer()
+{
+    if (m_sessionSettings)
+    {
+        return m_sessionSettings.get();
+    }
+
+    m_sessionSettings = std::make_unique<WslcSessionSettings>();
+    winrt::check_hresult(WslcInitSessionSettings(m_name.c_str(), m_storagePath.c_str(), m_sessionSettings.get()));
+
+    if (m_cpuCount)
+    {
+        winrt::check_hresult(WslcSetSessionSettingsCpuCount(m_sessionSettings.get(), m_cpuCount.Value()));
+    }
+
+    if (m_memoryMB)
+    {
+        winrt::check_hresult(WslcSetSessionSettingsMemory(m_sessionSettings.get(), m_memoryMB.Value()));
+    }
+
+    if (m_timeout)
+    {
+        auto timeoutMS = std::chrono::duration_cast<std::chrono::milliseconds>(m_timeout.Value()).count();
+        winrt::check_hresult(WslcSetSessionSettingsTimeout(m_sessionSettings.get(), static_cast<uint32_t>(timeoutMS)));
+    }
+
+    if (m_vhdRequirements)
+    {
+        winrt::check_hresult(WslcSetSessionSettingsVhd(m_sessionSettings.get(), GetStructPointer(m_vhdRequirements)));
+    }
+
+    winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(m_sessionSettings.get(), static_cast<WslcSessionFeatureFlags>(m_featureFlags)));
+
+    return m_sessionSettings.get();
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation
