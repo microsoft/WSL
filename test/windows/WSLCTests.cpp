@@ -3408,8 +3408,7 @@ class WSLCTests
             expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
             expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
 
-            // Validate that the wsl-gpu runtime dropped the ld.so.conf fragment and pre-populated the
-            // ld.so.cache so that /usr/lib/wsl/lib is resolvable via the dynamic linker.
+            // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
             expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
             expect({"/bin/sh", "-c", "ldconfig -p | grep -q ' => /usr/lib/wsl/lib/'"}, 0);
         }
