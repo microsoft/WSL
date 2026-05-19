@@ -99,7 +99,8 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         }
     }
 
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
+    // skip ipv6, virtio loopback0 device doesn't support ipv6 loopback
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback) && addr.si_family == AF_INET)
     {
         SOCKADDR_INET localAddr = addr;
         if (!loopback)
