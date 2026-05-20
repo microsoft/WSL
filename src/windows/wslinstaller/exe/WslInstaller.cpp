@@ -97,13 +97,22 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
     auto result = wsl::windows::common::install::UpgradeViaMsi(
         GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->path.c_str() : nullptr, messageCallback);
 
-    // ERROR_SUCCESS_REBOOT_REQUIRED (3010) means the install succeeded but some files
-    // will be replaced on the next reboot. Treat as success since the service runs
-    // silently with no user-facing console.
+    // ERROR_SUCCESS_REBOOT_REQUIRED (3010) means MSI completed its database changes but
+    // one or more files (e.g. system.vhd, wslservice.exe) were in use and have been moved
+    // to .rbf backups under %WINDIR%\Installer\Config.Msi with their replacements scheduled
+    // via MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT). Until the user reboots, the install
+    // location is in a half-replaced state — notably, the old system.vhd has been renamed
+    // away and the new one is not yet in place. Propagate this distinctly so the client
+    // does not proceed to launch WSL against a broken install (which surfaces to users as
+    // "my system.vhd disappeared after the update").
     const bool rebootRequired = (result == ERROR_SUCCESS_REBOOT_REQUIRED);
+
+    // Write a volatile (auto-cleared on reboot) registry marker so subsequent wsl.exe
+    // invocations know the install is incomplete. Without this, CallMsiPackage() would
+    // short-circuit and launch against the half-replaced install directory.
     if (rebootRequired)
     {
-        result = ERROR_SUCCESS;
+        wsl::windows::common::install::SetRebootRequiredMarker();
     }
 
     WSL_LOG(
@@ -112,7 +121,10 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         TraceLoggingValue(rebootRequired, "rebootRequired"),
         TraceLoggingValue(errors.c_str(), "errorMessage"));
 
-    if (result != ERROR_SUCCESS && result != ERROR_SUCCESS_REBOOT_REQUIRED)
+    // Preserve MSI logs on anything other than a clean success — including
+    // ERROR_SUCCESS_REBOOT_REQUIRED, since the log identifies which file(s) forced the
+    // delayed rename.
+    if (result != ERROR_SUCCESS)
     {
         clearLogs.release();
     }
