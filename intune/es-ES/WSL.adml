@@ -8,9 +8,9 @@
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
         <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir el Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Cuando se configura como deshabilitada, esta directiva no permite el acceso a las distribuciones de Linux en ejecución en Windows Subsystem for Linux en todos los usuarios del equipo.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir la versión incluida de Windows Subsystem for Linux</string>
         <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la versión incluida (componente opcional) del Windows Subsystem for Linux. Si esta directiva está deshabilitada, solo se puede usar la versión de WSL disponible en la Store.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Permitir WSL1</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Contenedor WSL</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Permitir contenedor WSL</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Esta directiva controla si se puede usar el contenedor de WSL en esta máquina. Cuando está habilitada o no se configura, los usuarios y las aplicaciones de Windows pueden ejecutar contenedores de Linux a través de WSL. Cuando se configura como deshabilitada, el contenedor de WSL se bloquea para todos los usuarios y las aplicaciones de Windows no pueden ejecutar contenedores de Linux. Advertencia: configurar esta opción como "Disabled" puede interrumpir las aplicaciones de Windows que dependen de contenedores de Linux.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Lista de permitidos para registros de contenedor WSL</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Cuando se habilita, el contenedor WSL solo podrá extraer imágenes de los registros que se enumeran aquí. Esto afecta tanto a la CLI del contenedor WSL como a todas las aplicaciones que usan la API del contenedor WSL.</string>

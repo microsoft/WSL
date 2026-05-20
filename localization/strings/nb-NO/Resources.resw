@@ -2421,6 +2421,16 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Vis logger for en beholder.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Remove all stopped containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Removes all stopped containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Total frigjort plass: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern beholdere.</value>
   </data>
