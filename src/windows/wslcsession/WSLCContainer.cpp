@@ -800,6 +800,18 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_id.c_str(),
         m_state);
 
+    // Mount volumes and configure ports BEFORE attaching IO. podman's
+    // /containers/{id}/attach has a side effect of triggering conmon to set up
+    // the container's mount namespace, snapshotting whatever is at the bind
+    // source at that moment. If MountVolumes runs after attach, the virtiofs
+    // share is mounted in the system distro too late and the container's
+    // mount namespace never sees it (the bind ends up pointing at an empty
+    // overlay subdir). See p0-volume-bug-root-cause.md.
+    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
+
+    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
+    MapPorts();
+
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLCProcessIO> io;
 
@@ -838,11 +850,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
     });
-
-    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
-
-    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
-    MapPorts();
 
     m_stopNotification.Event.ResetEvent();
     m_stopNotification.EventTime.store(0, std::memory_order_relaxed);
