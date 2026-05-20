@@ -84,6 +84,7 @@ stages:
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.lib" "$dest\wslcsdk.lib"
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.dll" "$dest\wslcsdk.dll"
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdkcs.dll" "$dest\wslcsdkcs.dll"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\Microsoft.WSL.Containers.winmd" "$dest\Microsoft.WSL.Containers.winmd"
               }
 
               # Copy MSIs to the output bundle directory
