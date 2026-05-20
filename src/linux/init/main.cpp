@@ -104,6 +104,8 @@ Abstract:
 
 constexpr auto c_trueString = "1";
 constexpr size_t c_systemReservedMemory = 128 * 1024 * 1024; // 128MB reserved for WSL system processes
+constexpr long c_cpuPeriodMicros = 100000;
+constexpr long c_systemReservedCpuMicros = 5000; // 0.05 CPU reserved for WSL system processes
 
 struct VmConfiguration
 {
@@ -3906,6 +3908,10 @@ Routine Description:
     hard cap. When this limit is reached, the cgroup-local OOM killer activates and only
     kills processes within wsl-user, leaving system processes unaffected.
 
+    The cpu.max limit is set to (nproc * c_cpuPeriodMicros - c_systemReservedCpuMicros) per
+    c_cpuPeriodMicros period, reserving ~0.05 CPU for WSL system processes so they remain
+    schedulable even when user workloads saturate every CPU.
+
 Arguments:
 
     None.
@@ -3953,6 +3959,35 @@ try
     }
 
     LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, totalRam, c_systemReservedMemory);
+
+    //
+    // Enable the cpu controller and apply a cpu.max limit that reserves a small slice for
+    // WSL system processes in the root cgroup. Failure here is non-fatal: the memory limit
+    // is still in effect even if the cpu controller is unavailable on this kernel.
+    //
+
+    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+cpu") < 0)
+    {
+        LOG_WARNING("Failed to enable cpu controller {}", errno);
+        return;
+    }
+
+    const long nproc = get_nprocs();
+    if (nproc <= 0)
+    {
+        LOG_WARNING("get_nprocs returned {}, skipping cpu.max", nproc);
+        return;
+    }
+
+    const long cpuQuota = (nproc * c_cpuPeriodMicros) - c_systemReservedCpuMicros;
+    auto userCpuMax = std::format("{} {}", cpuQuota, c_cpuPeriodMicros);
+    if (WriteToFile(WSL_USER_CGROUP_CPU_MAX, userCpuMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set cpu.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
 }
 CATCH_LOG()
 

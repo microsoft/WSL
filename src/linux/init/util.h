@@ -47,6 +47,7 @@ struct WslDistributionConfig;
 #define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
 #define WSL_USER_CGROUP_PROCS WSL_USER_CGROUP_PATH "/cgroup.procs"
 #define WSL_USER_CGROUP_MEMORY_MAX WSL_USER_CGROUP_PATH "/memory.max"
+#define WSL_USER_CGROUP_CPU_MAX WSL_USER_CGROUP_PATH "/cpu.max"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
