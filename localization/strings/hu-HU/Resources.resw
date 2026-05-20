@@ -2422,10 +2422,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Tároló naplóinak megtekintése.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Távolítsa el az összes leállított tárolót.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Eltávolítja az összes leállított tárolót.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Teljes felszabadított terület: {:.2f} MB</value>
