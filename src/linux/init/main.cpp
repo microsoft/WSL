@@ -103,7 +103,7 @@ Abstract:
 #define syscall_arch (offsetof(struct seccomp_data, arch))
 
 constexpr auto c_trueString = "1";
-constexpr size_t c_systemReservedMemory = 128 * 1024 * 1024; // 128MB reserved for WSL system processes
+constexpr size_t c_systemReservedMemory = 32 * 1024 * 1024; // 32MiB reserved for WSL system processes
 constexpr long c_cpuPeriodMicros = 100000;
 constexpr long c_systemReservedCpuMicros = 5000; // 0.05 CPU reserved for WSL system processes
 
