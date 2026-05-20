@@ -1218,6 +1218,15 @@ class InstallerTests
         auto combined = output + warnings;
         VERIFY_IS_TRUE(combined.find(L"restart") != std::wstring::npos);
 
+        // Non-distro commands (--version, --list, --shutdown, --update) must keep working
+        // even with the marker set — they go through CallMsiPackage but don't reach the
+        // service's _CreateInstance gate, so they should not be blocked.
+        std::wstring versionCmd = wsl::windows::common::wslutil::GetMsiPackagePath().value_or(L"") + L"\\wsl.exe --version";
+        auto [versionOutput, versionWarnings, versionExitCode] =
+            LxsstuLaunchCommandAndCaptureOutputWithResult(versionCmd.data());
+        LogInfo("wsl --version output: %ls", versionOutput.c_str());
+        VERIFY_ARE_EQUAL(versionExitCode, 0L);
+
         // Clean up: delete the volatile marker and reinstall cleanly.
         wsl::windows::common::registry::DeleteKey(OpenLxssMachineKey(KEY_ALL_ACCESS).get(), L"MSI\\RebootPending");
         VERIFY_IS_FALSE(wsl::windows::common::install::IsRebootRequired());

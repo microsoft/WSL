@@ -40,4 +40,9 @@ void SetRebootRequiredMarker();
 // since a 3010-result MSI install).
 bool IsRebootRequired();
 
+// Clears the reboot-required marker. Should be called after any MSI install path that
+// completes successfully without ERROR_SUCCESS_REBOOT_REQUIRED, so a user who shuts WSL
+// down and runs `wsl --update` can self-recover without an additional reboot.
+void ClearRebootRequiredMarker();
+
 } // namespace wsl::windows::common::install
