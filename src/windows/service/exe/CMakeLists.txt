@@ -55,9 +55,6 @@ set(HEADERS
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h)
 
-set(WSLSERVICE_ADDITIONAL_INCLUDE_DIRS)
-set(WSLSERVICE_ADDITIONAL_LIBRARIES)
-
 if (INCLUDE_OPENVMM)
     list(APPEND SOURCES
          OpenVmmVirtualMachine.cpp
@@ -67,27 +64,19 @@ if (INCLUDE_OPENVMM)
          OpenVmmVirtualMachine.h
          TtrpcEnvelopeCodec.h
          TtrpcClient.h)
-
-    set(WSLSERVICE_PROTO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
-    wsl_generate_openvmm_proto(${WSLSERVICE_PROTO_OUTPUT_DIR} WSLSERVICE_GENERATED_PROTO_SRC WSLSERVICE_GENERATED_PROTO_HDR)
-
-    list(APPEND SOURCES ${WSLSERVICE_GENERATED_PROTO_SRC})
-    list(APPEND HEADERS ${WSLSERVICE_GENERATED_PROTO_HDR})
-    list(APPEND WSLSERVICE_ADDITIONAL_INCLUDE_DIRS ${WSLSERVICE_PROTO_OUTPUT_DIR})
-    list(APPEND WSLSERVICE_ADDITIONAL_LIBRARIES ${PROTOBUF_LIB_TARGET})
-
-    if (MSVC)
-        set_source_files_properties(${WSLSERVICE_GENERATED_PROTO_SRC} PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
-        set_source_files_properties(TtrpcClient.cpp PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
-    endif()
 endif()
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)
-if (WSLSERVICE_ADDITIONAL_INCLUDE_DIRS)
-    target_include_directories(wslservice PRIVATE ${WSLSERVICE_ADDITIONAL_INCLUDE_DIRS})
-endif()
 target_compile_definitions(wslservice PRIVATE WSL_INCLUDE_OPENVMM=$<BOOL:${INCLUDE_OPENVMM}>)
+
+if (INCLUDE_OPENVMM)
+    wsl_add_openvmm_proto(wslservice)
+
+    if (MSVC)
+        set_source_files_properties(TtrpcClient.cpp PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+    endif()
+endif()
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(__WRL_DISABLE_STATIC_INITIALIZE__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
@@ -97,7 +86,6 @@ target_link_libraries(wslservice
                       ${MSI_LINK_LIBRARIES}
                       ${HCS_LINK_LIBRARIES}
                       ${SERVICE_LINK_LIBRARIES}
-                      ${WSLSERVICE_ADDITIONAL_LIBRARIES}
                       common
                       configfile
                       legacy_stdio_definitions

@@ -116,47 +116,36 @@ if (INCLUDE_OPENVMM)
                          URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
 
     FetchContent_MakeAvailable(protobuf)
-
-    # protobuf exports different target names depending on how it is consumed.
-    if (TARGET protobuf::protoc)
-        set(PROTOC_TARGET protobuf::protoc)
-    elseif (TARGET protoc)
-        set(PROTOC_TARGET protoc)
-    else()
-        message(FATAL_ERROR "Could not locate protobuf compiler target.")
-    endif()
-
-    if (TARGET protobuf::libprotobuf)
-        set(PROTOBUF_LIB_TARGET protobuf::libprotobuf)
-    elseif (TARGET libprotobuf)
-        set(PROTOBUF_LIB_TARGET libprotobuf)
-    else()
-        message(FATAL_ERROR "Could not locate protobuf runtime library target.")
-    endif()
+    include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
 endif()
 
-function(wsl_generate_openvmm_proto OUTPUT_DIR GENERATED_SRC_VAR GENERATED_HDR_VAR)
-    set(_wsl_openvmm_proto_file ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
-    set(_wsl_openvmm_generated_proto_src ${OUTPUT_DIR}/VMService.pb.cc)
-    set(_wsl_openvmm_generated_proto_hdr ${OUTPUT_DIR}/VMService.pb.h)
+# Adds protobuf-generated C++ sources from VMService.proto to the given TARGET.
+# The target must already exist. This function handles code generation, include
+# directories, library linking, and MSVC warning suppression for generated code.
+function(wsl_add_openvmm_proto TARGET)
+    set(_proto_file ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
+    set(_proto_out_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
-    if (NOT EXISTS ${_wsl_openvmm_proto_file})
-        message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${_wsl_openvmm_proto_file}")
+    if (NOT EXISTS ${_proto_file})
+        message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${_proto_file}")
     endif()
 
-    add_custom_command(
-        OUTPUT ${_wsl_openvmm_generated_proto_src} ${_wsl_openvmm_generated_proto_hdr}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
-        COMMAND $<TARGET_FILE:${PROTOC_TARGET}>
-                --cpp_out=${OUTPUT_DIR}
-                --proto_path=${WSL_DEVICE_HOST_SOURCE_DIR}/proto
-                --proto_path=${protobuf_SOURCE_DIR}/src
-                ${_wsl_openvmm_proto_file}
-        DEPENDS ${_wsl_openvmm_proto_file} ${PROTOC_TARGET}
-        VERBATIM)
+    protobuf_generate(
+        TARGET ${TARGET}
+        PROTOS ${_proto_file}
+        IMPORT_DIRS ${WSL_DEVICE_HOST_SOURCE_DIR}/proto ${protobuf_SOURCE_DIR}/src
+        PROTOC_OUT_DIR ${_proto_out_dir}
+    )
 
-    set(${GENERATED_SRC_VAR} ${_wsl_openvmm_generated_proto_src} PARENT_SCOPE)
-    set(${GENERATED_HDR_VAR} ${_wsl_openvmm_generated_proto_hdr} PARENT_SCOPE)
+    target_include_directories(${TARGET} PRIVATE ${_proto_out_dir})
+    target_link_libraries(${TARGET} protobuf::libprotobuf)
+
+    if (MSVC)
+        set_source_files_properties(
+            ${_proto_out_dir}/VMService.pb.cc
+            TARGET_DIRECTORY ${TARGET}
+            PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+    endif()
 endfunction()
 
 
