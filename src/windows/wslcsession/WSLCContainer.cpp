@@ -151,32 +151,20 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 constexpr std::string_view c_containerNetworkPrefix = "container:";
 
-// Returns the target container name (the part after "container:") if Mode is a
-// container-mode network spec; std::nullopt otherwise.
-std::optional<std::string> ParseContainerNetworkMode(LPCSTR Mode)
+// Returns the target name after "container:" if present, std::nullopt otherwise.
+std::optional<std::string> ParseContainerNetworkMode(std::string_view mode)
 {
-    if (Mode == nullptr)
+    if (!mode.starts_with(c_containerNetworkPrefix))
     {
         return std::nullopt;
     }
 
-    const std::string_view view{Mode};
-    if (!view.starts_with(c_containerNetworkPrefix))
-    {
-        return std::nullopt;
-    }
-
-    return std::string{view.substr(c_containerNetworkPrefix.size())};
+    return std::string{mode.substr(c_containerNetworkPrefix.size())};
 }
 
-std::optional<std::string> ParseContainerNetworkMode(std::string_view Mode)
+std::optional<std::string> ParseContainerNetworkMode(LPCSTR mode)
 {
-    if (!Mode.starts_with(c_containerNetworkPrefix))
-    {
-        return std::nullopt;
-    }
-
-    return std::string{Mode.substr(c_containerNetworkPrefix.size())};
+    return mode != nullptr ? ParseContainerNetworkMode(std::string_view{mode}) : std::nullopt;
 }
 
 // Builds port mapping list from container options and returns the network mode string.
