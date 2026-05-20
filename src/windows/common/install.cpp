@@ -112,6 +112,7 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
+            wsl::windows::common::install::SetRebootRequiredMarker();
             if (callerOwnsProcess)
             {
                 PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
@@ -124,6 +125,11 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
                 HRESULT_FROM_WIN32(exitCode),
                 wsl::shared::Localization::MessageUpdateFailed(exitCode) + L"\r\n" +
                     wsl::shared::Localization::MessageSeeLogFile(logFile.c_str()));
+        }
+        else
+        {
+            // Clean install — clear any pending reboot marker from a prior 3010-result install.
+            wsl::windows::common::install::ClearRebootRequiredMarker();
         }
     }
     else
@@ -260,6 +266,15 @@ void wsl::windows::common::install::SetRebootRequiredMarker()
     WriteDword(key.get(), nullptr, L"RebootRequired", 1);
 }
 
+void wsl::windows::common::install::ClearRebootRequiredMarker()
+{
+    // Best-effort. registry::DeleteKey treats ERROR_FILE_NOT_FOUND as a no-op,
+    // so this is safe to call on any successful install path even if no marker
+    // was previously set.
+    const auto lxssKey = OpenLxssMachineKey(KEY_ALL_ACCESS);
+    wsl::windows::common::registry::DeleteKey(lxssKey.get(), c_rebootPendingSubkey);
+}
+
 bool wsl::windows::common::install::IsRebootRequired()
 {
     auto [key, hr] = OpenKeyNoThrow(OpenLxssMachineKey(KEY_READ).get(), c_rebootPendingSubkey, KEY_READ);
@@ -275,13 +290,12 @@ int wsl::windows::common::install::CallMsiPackage()
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::CallMsi);
 
-    // If a previous MSI install returned ERROR_SUCCESS_REBOOT_REQUIRED, files like system.vhd
-    // are pending delayed-rename and the install directory is incomplete. Block early rather
-    // than launching against a broken install.
-    if (IsRebootRequired())
-    {
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED), wsl::shared::Localization::MessageUpdateRebootRequired());
-    }
+    // N.B. We intentionally do not block here on IsRebootRequired(). CallMsiPackage()
+    // is the bootstrap forwarder used by every MSIX-lifted wsl.exe invocation,
+    // including read-only commands like `--version`, `--list`, and recovery commands
+    // like `--shutdown` and `--update`. Blocking those would be user-hostile.
+    // The service-side check in LxssUserSession::_CreateInstance gates the
+    // distro-launching paths that actually depend on the half-installed files.
 
     auto msiPath = GetMsiPackagePath();
     if (!msiPath.has_value())

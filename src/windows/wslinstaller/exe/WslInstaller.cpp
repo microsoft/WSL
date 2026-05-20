@@ -114,6 +114,12 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
     {
         wsl::windows::common::install::SetRebootRequiredMarker();
     }
+    else if (result == ERROR_SUCCESS)
+    {
+        // A clean install means any previously-pending reboot has been resolved (the new
+        // files are in place). Clear the marker so the user can resume without a reboot.
+        wsl::windows::common::install::ClearRebootRequiredMarker();
+    }
 
     WSL_LOG(
         "MSIUpgradeResult",
