@@ -22,6 +22,9 @@ set_target_properties(
   wslcsdkcs PROPERTIES
   FOLDER windows
   LINKER_LANGUAGE CSharp
+  VS_GLOBAL_Platform "AnyCPU"
+  VS_GLOBAL_Platforms "AnyCPU"
+  VS_GLOBAL_PlatformTarget "AnyCPU"
   VS_PACKAGE_REFERENCES "Microsoft.Windows.CsWinRT_${CSWINRT_VERSION}"
   VS_GLOBAL_CsWinRTIncludes "Microsoft.WSL.Containers"
 )

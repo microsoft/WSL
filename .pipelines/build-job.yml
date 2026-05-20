@@ -70,8 +70,7 @@ jobs:
       ob_artifactBaseName: 'drop_wsl'
       ob_artifactSuffix: '${{ parameters.artifactSuffix }}'
       packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
-      ${{ if parameters.includeTestArtifacts }}:
-        ob_sdl_codeSignValidation_excludes: -|**testbin\**
+      ob_sdl_codeSignValidation_excludes: -|**\*.ps1;-|**\testbin\**
       ${{ if parameters.includeCodeQL }}:
         Codeql.PublishDatabaseLog: true
         Codeql.SourceRoot: src
@@ -215,9 +214,11 @@ jobs:
               if ('${{ parameters.isRelease }}' -eq 'True') {
                   Copy-Item -Path "$(packageStagingDir)\${{ parameters.platform }}\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
                   Copy-Item -Path "$(packageStagingDir)\${{ parameters.platform }}\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
+                  Copy-Item -Path "$(packageStagingDir)\${{ parameters.platform }}\Microsoft.WSL.Containers.winmd" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\Microsoft.WSL.Containers.winmd"
               } else {
                   Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
                   Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
+                  Copy-Item -Path "bin\${{ parameters.platform }}\release\Microsoft.WSL.Containers.winmd" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\Microsoft.WSL.Containers.winmd"
               }
 
       - task: PowerShell@2

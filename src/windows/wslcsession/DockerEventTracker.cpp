@@ -83,7 +83,7 @@ DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSessi
 
     auto socket = dockerClient.MonitorEvents();
 
-    relay.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
+    relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
 DockerEventTracker::~DockerEventTracker()

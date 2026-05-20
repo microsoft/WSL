@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCContainerMetadata.h"
 #include <thread>
 #include <filesystem>
+#include <optional>
 
 namespace wsl::windows::service::wslc {
 
@@ -148,7 +149,7 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
-    void Ext4Format(_In_ const std::string& Device);
+    void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);

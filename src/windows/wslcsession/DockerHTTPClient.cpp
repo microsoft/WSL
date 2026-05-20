@@ -31,8 +31,8 @@ Abstract:
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
 using wsl::windows::common::docker_schema::EmptyRequest;
-using wsl::windows::common::relay::HandleWrapper;
-using wsl::windows::common::relay::MultiHandleWait;
+using wsl::windows::common::io::HandleWrapper;
+using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using namespace wsl::windows::common;
 
@@ -66,9 +66,20 @@ nlohmann::json PruneFiltersToJson(const TFilters& filters)
         }
     }
 
-    if (filters.until.has_value())
+    if constexpr (requires { filters.all; })
     {
-        j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+        if (filters.all.has_value() && filters.all.value())
+        {
+            j["all"] = nlohmann::json::array({"true"});
+        }
+    }
+
+    if constexpr (requires { filters.until; })
+    {
+        if (filters.until.has_value())
+        {
+            j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+        }
     }
 
     if (!filters.presentLabels.empty())
@@ -297,10 +308,18 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesF
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneImageResult>(verb::post, url);
 }
 
-std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
+    url.SetParameter("limit", std::to_string(limit));
+
+    if (!filters.empty())
+    {
+        nlohmann::json filtersJson = filters;
+        url.SetParameter("filters", filtersJson.dump());
+    }
 
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::ContainerInfo>>(verb::get, url);
 }
@@ -445,10 +464,29 @@ void DockerHTTPClient::RemoveVolume(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
 }
 
-std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
+std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes(const std::map<std::string, std::vector<std::string>>& filters)
 {
-    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
+    auto url = URL::Create("/volumes");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, url);
     return response.Volumes;
+}
+
+docker_schema::PruneVolumeResult DockerHTTPClient::PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/volumes/prune");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneVolumeResult>(verb::post, url);
 }
 
 docker_schema::CreateNetworkResponse DockerHTTPClient::CreateNetwork(const docker_schema::CreateNetwork& Request)
@@ -503,13 +541,13 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLo
     return std::move(socket);
 }
 
-docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const PruneContainersFilters& filters)
+docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/containers/prune");
 
-    auto filtersJson = PruneFiltersToJson(filters);
-    if (!filtersJson.empty())
+    if (!filters.empty())
     {
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 
@@ -612,7 +650,7 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
     auto onHttpResponse = [&](const auto& response) { responseHeader = response; };
     MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
+    io.AddHandle(std::make_unique<io::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
     io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
@@ -627,7 +665,7 @@ DockerHTTPClient::DockerHttpResponseHandle::DockerHttpResponseHandle(
     std::function<void(const HTTPResponse&)>&& onResponseHeader,
     std::function<void(const gsl::span<char>&)>&& onResponseBytes,
     std::function<void()>&& onCompleted) :
-    common::relay::ReadHandle(
+    common::io::ReadHandle(
         HandleWrapper{context.stream.native_handle()}, std::bind(&DockerHttpResponseHandle::OnRead, this, std::placeholders::_1)),
     Context(context),
     OnResponseHeader(std::move(onResponseHeader)),
@@ -638,7 +676,7 @@ DockerHTTPClient::DockerHttpResponseHandle::DockerHttpResponseHandle(
 
 DockerHTTPClient::DockerHttpResponseHandle::~DockerHttpResponseHandle()
 {
-    if (State == common::relay::IOHandleStatus::Completed)
+    if (State == common::io::IOHandleStatus::Completed)
     {
         OnCompleted();
     }
@@ -725,7 +763,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnResponseBytes(const gsl::span
         *RemainingContentLength -= consume;
         if (*RemainingContentLength == 0)
         {
-            State = common::relay::IOHandleStatus::Completed;
+            State = common::io::IOHandleStatus::Completed;
         }
 
         span = span.subspan(0, consume);
