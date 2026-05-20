@@ -3471,3 +3471,8 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     return 0;
 }
+
+std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid)
+{
+    return std::format("{}/systemd-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
+}

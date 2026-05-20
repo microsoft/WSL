@@ -319,3 +319,5 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
 int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
+
+std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid);

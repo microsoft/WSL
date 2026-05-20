@@ -104,6 +104,7 @@ Abstract:
 
 constexpr auto c_trueString = "1";
 constexpr size_t c_systemReservedMemory = 128 * 1024 * 1024; // 128MB reserved for WSL system processes
+constexpr auto c_killCgroupProcessesTimeout = std::chrono::milliseconds(1000);
 
 struct VmConfiguration
 {
@@ -162,6 +163,7 @@ void LaunchInit(
     const char* Target,
     bool EnableGuiApps,
     const VmConfiguration& Config,
+    pid_t MiniInitDirectChildPid,
     const char* VmId = nullptr,
     const char* DistributionName = nullptr,
     const char* SharedMemoryRoot = nullptr,
@@ -178,7 +180,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid);
+    pid_t DistroInitPid,
+    pid_t SystemInitPid);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -1649,6 +1652,7 @@ void LaunchInit(
     const char* Target,
     bool EnableGuiApps,
     const VmConfiguration& Config,
+    pid_t MiniInitDirectChildPid,
     const char* VmId,
     const char* DistributionName,
     const char* SharedMemoryRoot,
@@ -1690,6 +1694,8 @@ Arguments:
     UserProfile - Supplies the Windows path for user profile of the VM owner.
         If this value is a non-empty string, it is passed to init as an
         environment variable.
+
+    MiniInitDirectChildPid - Supplies the pid of the direct child of mini_init. Will be WSLg's init when it's enabled.
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
@@ -1799,6 +1805,7 @@ try
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
+    AddEnvironmentVariable(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID, std::format("{}", MiniInitDirectChildPid).c_str());
 
     if (DistroInitPid.has_value())
     {
@@ -1900,7 +1907,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid)
+    pid_t DistroInitPid,
+    pid_t SystemInitPid)
 
 /*++
 
@@ -1937,6 +1945,8 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
+    SystemInitPid - Supplies the pid of the system distribution's init process.
+
 Return Value:
 
     None. This method does not return.
@@ -1955,7 +1965,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
+    LaunchInit(SocketFd, Target, true, Config, SystemInitPid, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
     _exit(1);
 }
 catch (...)
@@ -2462,6 +2472,9 @@ void ProcessLaunchInitMessage(
 
         THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
+        auto MiniInitDirectChildPidStr = std::filesystem::read_symlink(PROCFS_PATH "/self");
+        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
+
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
@@ -2536,7 +2549,8 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->SharedMemoryRootOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
-                        ChildPid);
+                        ChildPid,
+                        MiniInitDirectChildPid);
                 }
             }
 
@@ -2553,6 +2567,7 @@ void ProcessLaunchInitMessage(
             DISTRO_PATH,
             enableGuiApps,
             Config,
+            MiniInitDirectChildPid,
             wsl::shared::string::FromSpan(Buffer, Message->VmIdOffset),
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
@@ -4276,6 +4291,102 @@ int main(int Argc, char* Argv[])
                     //
 
                     sync();
+
+                    //
+                    // Clear the distro systemd cgroup
+                    //
+
+                    auto CgroupDir = UtilGetDistroSystemdCgroup(Result);
+                    if (access(CgroupDir.c_str(), F_OK) == 0)
+                    {
+                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
+
+                        //
+                        // Kill any remaining processes in the cgroup with a timeout.
+                        //
+
+                        try
+                        {
+                            const auto KillPath = CgroupDir + "/cgroup.kill";
+                            THROW_LAST_ERROR_IF(WriteToFile(KillPath.c_str(), "1") < 0);
+
+                            const auto EventsPath = CgroupDir + "/cgroup.events";
+                            wil::unique_fd EventsFd{open(EventsPath.c_str(), O_RDONLY | O_CLOEXEC)};
+                            THROW_LAST_ERROR_IF(!EventsFd);
+
+                            const auto Deadline = std::chrono::steady_clock::now() + c_killCgroupProcessesTimeout;
+
+                            for (;;)
+                            {
+                                char Buffer[256];
+                                auto Bytes = TEMP_FAILURE_RETRY(pread(EventsFd.get(), Buffer, sizeof(Buffer) - 1, 0));
+                                THROW_LAST_ERROR_IF(Bytes < 0);
+
+                                Buffer[Bytes] = '\0';
+                                bool Populated = true;
+                                for (const auto& Line : wsl::shared::string::Split<char>(Buffer, '\n'))
+                                {
+                                    if (Line.starts_with("populated "))
+                                    {
+                                        Populated = (Line != "populated 0");
+                                        break;
+                                    }
+                                }
+
+                                if (!Populated)
+                                {
+                                    break;
+                                }
+
+                                const auto Now = std::chrono::steady_clock::now();
+                                if (Now >= Deadline)
+                                {
+                                    LOG_ERROR("Timed out waiting for cgroup {} to drain", CgroupDir);
+                                    break;
+                                }
+
+                                const auto RemainingMs = std::chrono::duration_cast<std::chrono::milliseconds>(Deadline - Now).count();
+
+                                pollfd Pfd{EventsFd.get(), POLLPRI, 0};
+                                if (poll(&Pfd, 1, static_cast<int>(RemainingMs)) < 0)
+                                {
+                                    THROW_LAST_ERROR_IF(errno != EINTR);
+                                }
+                            }
+                        }
+                        CATCH_LOG();
+
+                        //
+                        // Recursively rmdir the cgroup subtree.
+                        //
+
+                        try
+                        {
+                            std::vector<std::string> dirs;
+                            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                                     CgroupDir, std::filesystem::directory_options::skip_permission_denied))
+                            {
+                                if (entry.is_directory())
+                                {
+                                    dirs.emplace_back(entry.path().string());
+                                }
+                            }
+
+                            for (auto it = dirs.rbegin(); it != dirs.rend(); ++it)
+                            {
+                                if (rmdir(it->c_str()) < 0 && errno != ENOENT)
+                                {
+                                    LOG_ERROR("rmdir({}) failed {}", *it, errno);
+                                }
+                            }
+
+                            if (rmdir(CgroupDir.c_str()) < 0 && errno != ENOENT)
+                            {
+                                LOG_ERROR("rmdir({}) failed {}", CgroupDir, errno);
+                            }
+                        }
+                        CATCH_LOG();
+                    }
 
                     //
                     // Send a message with the child's pid to the service.
