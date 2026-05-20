@@ -167,6 +167,11 @@ public:
         return m_vmId;
     }
 
+    IWSLCVirtualMachine* Vm() const
+    {
+        return m_vm.get();
+    }
+
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
 private:
@@ -197,7 +202,7 @@ private:
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 
-    void CollectCrashDumps(wil::unique_socket&& listenSocket);
+    void CollectCrashDumps();
 
     struct AttachedDisk
     {

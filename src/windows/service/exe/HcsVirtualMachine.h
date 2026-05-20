@@ -45,6 +45,8 @@ public:
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(ConnectToVsockPort)(_In_ ULONG Port, _Out_ HANDLE* Socket) override;
+    IFACEMETHOD(AcceptCrashDumpConnection)(_Out_ HANDLE* Socket) override;
 
 private:
     struct DiskInfo
@@ -80,6 +82,7 @@ private:
     WSLCNetworkingMode m_networkingMode{};
 
     wil::unique_socket m_listenSocket;
+    wil::unique_socket m_crashDumpListenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     std::optional<wsl::core::Config> m_natConfig;

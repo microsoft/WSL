@@ -304,7 +304,7 @@ try
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->Vm(), 10 * 1000);
 
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
@@ -401,7 +401,25 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    // If the mount fails (e.g., unformatted disk from pre-attach), format and retry.
+    auto mountResult = wil::ResultFromException([&]() {
+        m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    });
+
+    if (FAILED(mountResult) && !vhdCreated)
+    {
+        // The disk exists but may be unformatted (pre-attached by OpenVMM backend).
+        WSL_LOG("StorageMountFailedFormatting",
+            TraceLoggingValue(diskDevice.c_str(), "Device"),
+            TraceLoggingValue(mountResult, "MountResult"));
+
+        m_virtualMachine->Ext4Format(diskDevice);
+        m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    }
+    else
+    {
+        THROW_IF_FAILED(mountResult);
+    }
 
     // Configure swap on a separate ephemeral VHD.
     if (Settings.SwapSizeMb > 0)

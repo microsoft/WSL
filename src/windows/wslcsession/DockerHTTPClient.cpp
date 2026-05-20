@@ -155,8 +155,8 @@ std::string DockerHTTPClient::URL::Escape(const std::string& Value)
     return wsl::shared::string::WideToMultiByte(escaped.c_str());
 }
 
-DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
-    m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
+DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, IWSLCVirtualMachine* Vm, ULONG ConnectTimeoutMs) :
+    m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vm(Vm), m_connectTimeoutMs(ConnectTimeoutMs)
 {
 }
 
@@ -607,9 +607,11 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     THROW_HR_IF_MSG(E_FAIL, response.Pid <= 0, "fork() returned %i", response.Pid);
 
-    // Connect the new hvsocket.
+    // Connect the new socket via the VM interface.
+    wil::unique_socket connSocket;
+    THROW_IF_FAILED(m_vm->ConnectToVsockPort(response.Port, reinterpret_cast<HANDLE*>(&connSocket)));
     wsl::shared::SocketChannel newChannel{
-        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_exitingEvent, m_connectTimeoutMs), "DockerClient", {m_exitingEvent}};
+        std::move(connSocket), "DockerClient", {m_exitingEvent}};
     lock.reset();
 
     // Connect that socket to the docker unix socket.

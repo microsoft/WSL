@@ -25,6 +25,7 @@ set(SOURCES
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    ConsommeNetworking.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -100,6 +101,7 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    ConsommeNetworking.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
@@ -146,6 +148,19 @@ add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+
+# ATL headers (atlsafe.h) are needed by precomp.h but not automatically included
+# by CMake. Derive the path from the MSVC toolset directory.
+get_filename_component(_MSVC_TOOLS_DIR "${CMAKE_LINKER}" DIRECTORY) # .../bin/Hostx64/x64
+get_filename_component(_MSVC_TOOLS_DIR "${_MSVC_TOOLS_DIR}" DIRECTORY) # .../bin/Hostx64
+get_filename_component(_MSVC_TOOLS_DIR "${_MSVC_TOOLS_DIR}" DIRECTORY) # .../bin
+get_filename_component(_MSVC_TOOLS_DIR "${_MSVC_TOOLS_DIR}" DIRECTORY) # .../MSVC/<version>
+set(_ATL_INCLUDE_DIR "${_MSVC_TOOLS_DIR}/atlmfc/include")
+if(EXISTS "${_ATL_INCLUDE_DIR}")
+    target_include_directories(common PRIVATE "${_ATL_INCLUDE_DIR}")
+else()
+    message(WARNING "ATL include directory not found: ${_ATL_INCLUDE_DIR}")
+endif()
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 set_source_files_properties(WSLCUserSettings.cpp PROPERTIES

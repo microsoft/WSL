@@ -29,6 +29,9 @@ Abstract:
 
 #include "WSLCSessionManager.h"
 #include "HcsVirtualMachine.h"
+#if WSL_INCLUDE_OPENVMM
+#include "OpenVmmVirtualMachine.h"
+#endif
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
 #include "WSLCPluginNotifier.h"
@@ -42,6 +45,9 @@ extern wsl::windows::service::PluginManager g_pluginManager;
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
+#if WSL_INCLUDE_OPENVMM
+using wsl::windows::service::wslc::OpenVmmVirtualMachine;
+#endif
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -262,7 +268,36 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
         // Create the VM in the SYSTEM service (privileged).
-        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        // Determine VMM backend based on user settings: OpenVMM (experimental) or HCS (default).
+        Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
+
+#if WSL_INCLUDE_OPENVMM
+        const bool useOpenVmm = SessionSettings::LoadUserSettings(userToken.get()).Get<settings::Setting::SessionOpenVmm>();
+
+        // For OpenVMM, disable unsupported features before creating the VM and session.
+        // The copy must outlive all uses of Settings below (CreateSessionSettings, etc.).
+        WSLCSessionSettings openVmmSettings;
+        if (useOpenVmm)
+        {
+            openVmmSettings = *Settings;
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsGPU);
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
+
+            // OpenVMM provides networking via its built-in consomme backend.
+            // Use ConsommeNetworking mode so the session process skips GNS but
+            // still configures the networking engine and port relay.
+            openVmmSettings.NetworkingMode = WSLCNetworkingModeConsomme;
+
+            Settings = &openVmmSettings;
+
+            vm = Microsoft::WRL::Make<OpenVmmVirtualMachine>(Settings);
+        }
+#endif
+        if (!vm)
+        {
+            vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        }
 
         // Launch per-user COM server factory and add it to our job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());

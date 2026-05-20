@@ -670,6 +670,94 @@ void HandleMessageImpl(
     Transaction.SendResultMessage(result < 0 ? errno : 0);
 }
 
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel,
+    wsl::shared::Transaction& Transaction,
+    const WSLC_CONFIGURE_NETWORKING& Message,
+    const gsl::span<gsl::byte>& Buffer)
+{
+    int result = -EINVAL;
+    auto sendResult = wil::scope_exit([&]() { Transaction.SendResultMessage<int32_t>(result); });
+
+    const auto* iface = wsl::shared::string::FromSpan(Buffer, Message.InterfaceOffset);
+    const auto* address = wsl::shared::string::FromSpan(Buffer, Message.AddressOffset);
+    const auto* gateway = wsl::shared::string::FromSpan(Buffer, Message.GatewayOffset);
+    const auto* dnsServer = wsl::shared::string::FromSpan(Buffer, Message.DnsServerOffset);
+
+    THROW_ERRNO_IF(EINVAL, iface == nullptr || address == nullptr || gateway == nullptr || dnsServer == nullptr);
+
+    // Bring up the interface and configure the static address, route, and DNS.
+    auto configCmd = std::format(
+        "ip link set {} up && ip addr add {} dev {} && ip route add default via {}",
+        iface, address, iface, gateway);
+
+    // Use a pipe to detect child completion. The child inherits the write end;
+    // when it exits (via execl or _exit), the write end is closed and read()
+    // returns 0. This avoids racing with the WSLC_WATCH_PROCESSES handler's
+    // waitpid(-1) which may reap the child before we can.
+    int pipeFds[2]{};
+    THROW_LAST_ERROR_IF(pipe2(pipeFds, O_CLOEXEC) < 0);
+    wil::unique_fd pipeRead{pipeFds[0]};
+    wil::unique_fd pipeWrite{pipeFds[1]};
+
+    int childPid = UtilCreateChildProcess("ConfigureNetworking", [&configCmd, &pipeWrite]() {
+        // Clear CLOEXEC on the write end so it stays open across execl.
+        // When the shell exits, the fd is closed and the parent's read returns.
+        fcntl(pipeWrite.get(), F_SETFD, 0);
+        execl("/bin/sh", "/bin/sh", "-c", configCmd.c_str(), nullptr);
+        LOG_ERROR("execl(/bin/sh) failed, {}", errno);
+    });
+
+    // Close the write end in the parent — only the child holds it now.
+    pipeWrite.reset();
+
+    if (childPid < 0)
+    {
+        result = -errno;
+        return;
+    }
+
+    // Wait for the child to exit by reading from the pipe. When the child
+    // (and the shell it exec'd) exits, all write ends are closed and read
+    // returns 0.
+    char dummy{};
+    TEMP_FAILURE_RETRY(read(pipeRead.get(), &dummy, sizeof(dummy)));
+
+    // Try to reap the child. If WSLC_WATCH_PROCESSES already reaped it, we
+    // get ECHILD which is fine — the pipe close confirms the child exited.
+    int status = -1;
+    if (TEMP_FAILURE_RETRY(waitpid(childPid, &status, 0)) < 0)
+    {
+        if (errno == ECHILD)
+        {
+            // Child was already reaped by the WatchProcesses handler.
+            // The pipe confirmed it exited, so treat as success.
+            status = 0;
+        }
+        else
+        {
+            result = -errno;
+            return;
+        }
+    }
+
+    result = UtilProcessChildExitCode(status, "ConfigureNetworking");
+    if (result != 0)
+    {
+        return;
+    }
+
+    // Write DNS configuration.
+    auto resolv = std::format("nameserver {}\n", dnsServer);
+    if (WriteToFile("/etc/resolv.conf", resolv.c_str()) < 0)
+    {
+        result = -errno;
+        return;
+    }
+
+    result = 0;
+}
+
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNMOUNT&, const gsl::span<gsl::byte>& Buffer)
 {
     auto* path = wsl::shared::string::FromMessageBuffer<WSLC_UNMOUNT>(Buffer);
@@ -831,7 +919,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_CONFIGURE_NETWORKING>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)
