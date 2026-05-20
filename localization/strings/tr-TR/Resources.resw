@@ -2422,10 +2422,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Kapsayıcının günlüklerini görüntüle.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Durdurulmuş tüm kapsayıcıları kaldırın.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Durdurulmuş tüm kapsayıcıları kaldırır.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Geri kazanılan toplam alan: {:.2f} MB</value>

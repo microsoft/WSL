@@ -2422,10 +2422,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Zobrazit protokoly kontejneru.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Odeberte všechny zastavené kontejnery.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Odebere všechny zastavené kontejnery.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Celkové uvolněné místo: {:.2f} MB</value>

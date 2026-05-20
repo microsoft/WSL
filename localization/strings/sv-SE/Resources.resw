@@ -2422,10 +2422,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Visa loggar för en container.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Ta bort alla stoppade containrar.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Tar bort alla stoppade containrar.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Totalt frigjort utrymme: {:.2f} MB</value>

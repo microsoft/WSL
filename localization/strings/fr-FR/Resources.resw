@@ -2429,10 +2429,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Affichez les journaux d’un conteneur.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Supprimez tous les conteneurs arrêtés.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Supprime tous les conteneurs arrêtés.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Espace total récupéré : {:.2f} Mo</value>
