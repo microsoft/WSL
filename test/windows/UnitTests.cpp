@@ -338,8 +338,9 @@ class UnitTests
         auto cleanup = EnableSystemd("initTimeout=0");
 
         // Wait for systemd to be started
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Validate that the X11 socket has not been deleted
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
@@ -348,7 +349,8 @@ class UnitTests
     WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
     {
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -421,15 +423,17 @@ class UnitTests
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto revert = EnableSystemd("initTimeout=0");
         // Wait for systemd to start
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Kill the WSL init process
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
 
         // Wait for the distro to exit.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
 
         // Verify that a new WSL command succeeds (the distro restarts cleanly).
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
@@ -443,15 +447,35 @@ class UnitTests
         // Import a second WSL2 distro.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistro, g_testDistroPath)), 0L);
 
-        auto cleanupDistro = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [secondDistro]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistro));
-        });
+        auto cleanupDistro = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [secondDistro]() { LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistro)); });
 
         // Enable systemd on both distros.
         auto cleanupSystemd = EnableSystemd();
 
-        LxsstuLaunchWsl(std::format(L"-d {} -u root -e sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", secondDistro).c_str());
+        // Enable systemd in the second distro.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                std::format(L"-d {} -u root -e sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", secondDistro)
+                    .c_str()),
+            0L);
         TerminateDistribution(secondDistro);
+
+        // Wait for systemd to come up in both distros before relying on it for shutdown behavior.
+        auto waitForSystemd = [](const std::wstring& Command) {
+            VERIFY_NO_THROW(
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() {
+                        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(Command.c_str());
+                        Trim(out);
+                        THROW_HR_IF(E_UNEXPECTED, out.compare(L"running") != 0 && out.compare(L"degraded") != 0);
+                    },
+                    std::chrono::seconds(1),
+                    std::chrono::minutes(1)));
+        };
+
+        waitForSystemd(L"systemctl is-system-running --wait ; exit 0");
+        waitForSystemd(std::format(L"-d {} systemctl is-system-running --wait ; exit 0", secondDistro));
 
         // Verify interop works in both distros.
         auto [out1, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
@@ -466,9 +490,13 @@ class UnitTests
         auto [out3, ___] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
         VERIFY_ARE_EQUAL(out3, L"ok\r\n");
 
-        // Verify binfmt handler is still registered.
+        // Verify the binfmt handler is still registered AND retained the 'F' (fix-binary) flag.
+        // Without 'F' the kernel resolves /init in the calling mount namespace at exec time, which
+        // breaks interop from Docker containers and chroots.
         auto [binfmtStatus, ____] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/WSLInterop");
         VERIFY_IS_TRUE(binfmtStatus.find(L"enabled") != std::wstring::npos);
+        VERIFY_IS_TRUE(binfmtStatus.find(L"interpreter /init") != std::wstring::npos);
+        VERIFY_IS_TRUE(binfmtStatus.find(L"flags:") != std::wstring::npos && binfmtStatus.find(L"F") != std::wstring::npos);
     }
 
     TEST_METHOD(Dup)
@@ -3991,8 +4019,9 @@ localhostForwarding=true
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
+                LxsstuLaunchWsl(
+                    std::format(
+                        L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
                 0L);
         }
 
@@ -6607,8 +6636,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
-            dmesg.find(
-                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            dmesg.find(L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
             std::wstring::npos);
     }
 
@@ -6792,11 +6820,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::vector<gsl::byte> message;
 
             wsl::windows::common::io::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
-                    callbackInvoked = true;
-                    message.assign(received.begin(), received.end());
-                }));
+            io.AddHandle(
+                std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                        callbackInvoked = true;
+                        message.assign(received.begin(), received.end());
+                    }));
 
             const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
             VERIFY_ARE_EQUAL(hr, expectedHr);
