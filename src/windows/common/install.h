@@ -32,4 +32,12 @@ UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INS
 
 void WriteInstallLog(const std::string& Content);
 
+// Sets a volatile (auto-cleared on reboot) registry marker indicating the MSI install
+// completed but files are pending replacement until the next reboot (ERROR_SUCCESS_REBOOT_REQUIRED).
+void SetRebootRequiredMarker();
+
+// Returns true if the reboot-required marker is present (i.e. the machine has not rebooted
+// since a 3010-result MSI install).
+bool IsRebootRequired();
+
 } // namespace wsl::windows::common::install
