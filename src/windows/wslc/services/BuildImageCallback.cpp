@@ -67,7 +67,7 @@ void BuildImageCallback::CollapseWindow()
     m_pullLines.clear();
 }
 
-HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG /*current*/, ULONGLONG total)
+HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
 try
 {
     if (status == nullptr || *status == '\0')
@@ -84,6 +84,12 @@ try
 
     if (m_verbose || !m_isConsole)
     {
+        // Skip pull progress updates when output is redirected, show only major steps
+        if (id != nullptr && *id != '\0' && total > 0)
+        {
+            return S_OK;
+        }
+
         wprintf(L"%hs", status);
         return S_OK;
     }
@@ -113,15 +119,13 @@ try
         // Permanent build-step line: collapse the scrolling window then print in teal.
         CollapseWindow();
         auto wide = MultiByteToWide(status);
-        if (!wide.empty() && wide.back() == L'\n')
+        std::wstring terminator;
+        while (!wide.empty() && (wide.back() == L'\n' || wide.back() == L'\r'))
         {
-            wide.insert(0, L"\033[36m");
-            wide.insert(wide.size() - 1, L"\033[0m");
+            terminator.insert(terminator.begin(), wide.back());
+            wide.pop_back();
         }
-        else
-        {
-            wide = std::format(L"\033[36m{}\033[0m", wide);
-        }
+        wide = std::format(L"\033[36m{}\033[0m{}", wide, terminator);
         WriteTerminal(wide);
         return S_OK;
     }
@@ -194,14 +198,16 @@ void BuildImageCallback::Redraw()
     // to std::wstring::resize).
     const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
 
-    // Determine how many completed lines to show, leaving room for the pending line.
+    // Determine how many completed lines to show, leaving room for the pending line and pull progress.
     const bool showPending = !m_pendingLine.empty();
+    const SHORT pullCount = static_cast<SHORT>(m_pullLines.size());
     SHORT completedCount = static_cast<SHORT>(m_lines.size());
-    if (showPending && completedCount >= c_maxDisplayLines)
+    const SHORT reservedLines = (showPending ? 1 : 0) + pullCount;
+    if (completedCount + reservedLines > c_maxDisplayLines)
     {
-        completedCount = c_maxDisplayLines - 1;
+        completedCount = std::max<SHORT>(0, c_maxDisplayLines - reservedLines);
     }
-    const SHORT displayCount = completedCount + (showPending ? 1 : 0);
+    const SHORT displayCount = completedCount + reservedLines;
 
     // Build the entire frame in one buffer to minimize console writes. Hide the cursor
     // during the redraw so the user doesn't see it bouncing through the cursor movement,
