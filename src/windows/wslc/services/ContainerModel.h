@@ -68,6 +68,12 @@ struct StopContainerOptions
     LONG Timeout = DefaultTimeout;
 };
 
+struct PruneContainersResult
+{
+    std::vector<std::string> PrunedContainers;
+    ULONGLONG SpaceReclaimed{};
+};
+
 struct KillContainerOptions
 {
     int Signal = WSLCSignalSIGKILL;
