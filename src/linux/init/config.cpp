@@ -993,7 +993,7 @@ try
     {
         UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
             // Move boot command into the memory-limited user cgroup.
-            if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+            if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
             {
                 // Non-critical.
                 LOG_ERROR("Failed to move boot command into user cgroup: {}", errno);

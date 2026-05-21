@@ -1209,7 +1209,7 @@ try
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
                 // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
                 {
                     // Non-critical.
                     LOG_ERROR("Failed to move session leader into user cgroup, {}", errno);
@@ -1265,7 +1265,7 @@ try
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
                 // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
                 {
                     // Non-critical.
                     LOG_ERROR("Failed to move session leader into user cgroup, {}", errno);

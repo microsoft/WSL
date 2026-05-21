@@ -3954,14 +3954,26 @@ try
         return;
     }
 
-    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+memory") < 0)
+    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
     {
-        LOG_ERROR("Failed to enable memory controller {}", errno);
+        LOG_ERROR("Failed to enable cgorup controllers for root {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_NON_SYSTEMD_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user non-systemd cgroup directory {}", errno);
+        return;
+    }
+
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/cgroup.subtree_control", "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
+    {
+        LOG_ERROR("Failed to enable cgorup controllers for wsl-user {}", errno);
         return;
     }
 
     auto userMemoryMax = std::to_string(totalRam - c_systemReservedMemory);
-    if (WriteToFile(WSL_USER_CGROUP_MEMORY_MAX, userMemoryMax.c_str()) < 0)
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/memory.max", userMemoryMax.c_str()) < 0)
     {
         LOG_ERROR("Failed to set memory.max for wsl-user cgroup {}", errno);
         return;
