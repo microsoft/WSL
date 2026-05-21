@@ -3394,8 +3394,7 @@ class WSLCTests
                 ValidateProcessOutput(process, expectedOutput, exitCode);
             };
 
-            // Validate that /dev/dxg is available as a character device with the
-            // read/write/mknod permissions.
+            // Validate that /dev/dxg is available as a character device with read/write permissions.
             expect({"/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg"}, 0);
 
             // Validate that the GPU library directory is mounted and contains libraries.

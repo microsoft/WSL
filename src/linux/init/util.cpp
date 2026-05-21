@@ -3357,9 +3357,9 @@ Arguments:
 
     Content - Supplies the content to be written to the file.
 
-    Permissions - Supplies the file mode used when O_CREAT causes the file to be created.
+    OpenFlags - Supplies the flags passed to open().
 
-    OpenFlags - Supplies the flags passed to open(). Defaults to O_WRONLY | O_CLOEXEC | O_CREAT.
+    Permissions - Supplies the file mode used when O_CREAT causes the file to be created.
 
 Return Value:
 
