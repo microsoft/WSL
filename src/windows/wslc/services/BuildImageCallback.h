@@ -55,7 +55,7 @@ private:
     std::string m_pendingLine;
     SHORT m_displayedLines = 0;
     std::chrono::steady_clock::time_point m_lastRedraw{};
-    // Per-entry pull progress lines, keyed by entry id. Updated in place by Redraw.
+    // Per-entry pull progress lines, keyed by entry id. Updated in place by Redraw. std::map so order is consistent.
     std::map<std::string, std::string> m_pullLines;
     // Captured at construction so the destructor can detect destruction during exception unwinding.
     int m_uncaughtExceptions = std::uncaught_exceptions();

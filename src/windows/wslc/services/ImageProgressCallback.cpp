@@ -99,16 +99,11 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
 
         filled = std::clamp(filled, 0, c_progressBarWidth);
 
-        std::wstring bar(c_progressBarWidth, L' ');
-        for (int i = 0; i < filled; ++i)
-        {
-            bar[i] = L'=';
-        }
-
-        if (filled < c_progressBarWidth)
-        {
-            bar[filled] = L'>';
-        }
+        std::wstring bar;
+        bar.reserve(c_progressBarWidth);
+        bar.append(filled, L'=');
+        bar.append(L">");
+        bar.resize(c_progressBarWidth, L' ');
 
         line = std::format(
             L"{}: {} [{}] {}/{}", id, status, bar, wsl::shared::string::FormatBytes(current), wsl::shared::string::FormatBytes(total));
@@ -139,10 +134,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     }
 
     // Erase any previously written char on that line.
-    while (line.size() < static_cast<size_t>(visibleWidth))
-    {
-        line += L' ';
-    }
+    line.resize(visibleWdith, L' ');
 
     return line;
 }

@@ -82,25 +82,23 @@ try
         return S_OK;
     }
 
+    const std::string_view idView = (id != nullptr) ? id : std::string_view{};
+    const bool isLog = (idView == "log");
+    const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
+
     if (m_verbose || !m_isConsole)
     {
         // Skip pull progress updates when output is redirected, show only major steps
-        if (id != nullptr && *id != '\0' && total > 0)
+        if (!isPullProgress)
         {
-            return S_OK;
+            wprintf(L"%hs", status);
         }
-
-        wprintf(L"%hs", status);
         return S_OK;
     }
 
-    // Match the specific "log" sentinel sent by WSLCSession::BuildImage rather than
-    // accepting any non-empty id, so future or unrelated id usage defaults to permanent.
-    const bool isLog = (id != nullptr && std::string_view{id} == "log");
-
     // Pull/download progress: update the per-entry map so Redraw can show each entry
     // on a single line that updates in place.
-    if (!isLog && id != nullptr && *id != '\0' && total > 0)
+    if (isPullProgress)
     {
         m_pullLines[id] = status;
 
@@ -114,76 +112,73 @@ try
         return S_OK;
     }
 
-    if (!isLog)
+    if (isLog)
     {
-        // Permanent build-step line: collapse the scrolling window then print in teal.
-        CollapseWindow();
-        auto wide = MultiByteToWide(status);
-        std::wstring terminator;
-        while (!wide.empty() && (wide.back() == L'\n' || wide.back() == L'\r'))
+        // Log line: add to the scrolling window.
+        for (const char* p = status; *p != '\0'; ++p)
         {
-            terminator.insert(terminator.begin(), wide.back());
-            wide.pop_back();
+            if (*p == '\n')
+            {
+                // Store with the trailing newline so the byte count matches what is replayed.
+                // Cap retained log output to avoid unbounded growth on very long builds.
+                m_allLines.push_back(m_pendingLine + '\n');
+                m_allLinesBytes += m_allLines.back().size();
+                while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
+                {
+                    m_allLinesBytes -= m_allLines.front().size();
+                    m_allLines.pop_front();
+                }
+
+                m_lines.push_back(std::move(m_pendingLine));
+                m_pendingLine.clear();
+                if (m_lines.size() > c_maxDisplayLines)
+                {
+                    m_lines.pop_front();
+                }
+            }
+            else if (*p == '\r')
+            {
+                // \r\n is a line ending; standalone \r overwrites the current line.
+                if (*(p + 1) != '\n')
+                {
+                    // Flush a throttled redraw before clearing so \r-based progress
+                    // updates are visible even when batched in a single OnProgress call.
+                    auto now = std::chrono::steady_clock::now();
+                    if (!m_pendingLine.empty() && now - m_lastRedraw >= c_redrawInterval)
+                    {
+                        Redraw();
+                        m_lastRedraw = now;
+                    }
+                    m_pendingLine.clear();
+                }
+            }
+            else
+            {
+                m_pendingLine += *p;
+            }
         }
-        wide = std::format(L"\033[92m{}\033[0m{}", wide, terminator);
-        WriteTerminal(wide);
+
+        // Throttle redraws to avoid blocking the server's IO loop with console writes
+        // during rapid output. Lines accumulate in the deque immediately; the display
+        // catches up at ~20fps.
+        auto now = std::chrono::steady_clock::now();
+        if (now - m_lastRedraw >= c_redrawInterval)
+        {
+            Redraw();
+            m_lastRedraw = now;
+        }
+
         return S_OK;
     }
 
-    // Log line: add to the scrolling window.
-    for (const char* p = status; *p != '\0'; ++p)
-    {
-        if (*p == '\n')
-        {
-            // Store with the trailing newline so the byte count matches what is replayed.
-            // Cap retained log output to avoid unbounded growth on very long builds.
-            m_allLines.push_back(m_pendingLine + '\n');
-            m_allLinesBytes += m_allLines.back().size();
-            while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
-            {
-                m_allLinesBytes -= m_allLines.front().size();
-                m_allLines.pop_front();
-            }
+    // Else is a build step
+    CollapseWindow();
+    auto wide = MultiByteToWide(status);
+    const auto bodyLength = wide.find_last_not_of(L"\r\n") + 1;
+    const auto newlines = wide.substr(bodyLength);
+    wide.resize(bodyLength);
 
-            m_lines.push_back(std::move(m_pendingLine));
-            m_pendingLine.clear();
-            if (m_lines.size() > c_maxDisplayLines)
-            {
-                m_lines.pop_front();
-            }
-        }
-        else if (*p == '\r')
-        {
-            // \r\n is a line ending; standalone \r overwrites the current line.
-            if (*(p + 1) != '\n')
-            {
-                // Flush a throttled redraw before clearing so \r-based progress
-                // updates are visible even when batched in a single OnProgress call.
-                auto now = std::chrono::steady_clock::now();
-                if (!m_pendingLine.empty() && now - m_lastRedraw >= c_redrawInterval)
-                {
-                    Redraw();
-                    m_lastRedraw = now;
-                }
-                m_pendingLine.clear();
-            }
-        }
-        else
-        {
-            m_pendingLine += *p;
-        }
-    }
-
-    // Throttle redraws to avoid blocking the server's IO loop with console writes
-    // during rapid output. Lines accumulate in the deque immediately; the display
-    // catches up at ~20fps.
-    auto now = std::chrono::steady_clock::now();
-    if (now - m_lastRedraw >= c_redrawInterval)
-    {
-        Redraw();
-        m_lastRedraw = now;
-    }
-
+    WriteTerminal(std::format(L"\033[92m{}\033[0m{}", wide, newlines));
     return S_OK;
 }
 CATCH_RETURN();
