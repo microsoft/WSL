@@ -785,7 +785,7 @@ try
         return -1;
     }
 
-    wsl::shared::SocketChannel Channel{std::move(channelFd), "VirtoFs"};
+    wsl::shared::SocketChannel Channel{std::move(channelFd), "VirtioFs"};
 
     gsl::span<gsl::byte> ResponseSpan;
     const auto& Response = Channel.Transaction<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(AddShare.Span(), &ResponseSpan);
