@@ -230,11 +230,14 @@ private:
     wsl::shared::SocketChannel m_initChannel;
     DWORD m_initChannelTimeout = 30 * 1000;
 
+    // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
+    // Declared before the port relay pipes so it is destroyed after them: any remaining
+    // wslrelay.exe is given the chance to exit via the closed pipes / signaled terminating
+    // event before the job-close kill kicks in.
+    wil::unique_handle m_processJobObject;
+
     wil::unique_handle m_portRelayChannelRead;
     wil::unique_handle m_portRelayChannelWrite;
-
-    // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
-    wil::unique_handle m_processJobObject;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;
