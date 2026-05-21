@@ -1211,8 +1211,7 @@ try
                 // Move session leader into the memory-limited user cgroup.
                 if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
                 {
-                    // Non-critical.
-                    LOG_ERROR("Failed to move session leader into user cgroup, {}", errno);
+                    LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
                 }
 
                 umask(Config.Umask);
@@ -1267,8 +1266,7 @@ try
                 // Move session leader into the memory-limited user cgroup.
                 if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
                 {
-                    // Non-critical.
-                    LOG_ERROR("Failed to move session leader into user cgroup, {}", errno);
+                    LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
                 }
 
                 umask(Mask);
@@ -2408,8 +2406,7 @@ Return Value:
             // Move systemd into the memory-limited user cgroup.
             if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
             {
-                // Non-critical.
-                LOG_ERROR("Failed to move systemd to user cgroup {}", errno);
+                LOG_WARNING("Failed to move systemd to user cgroup {}", errno);
             }
 
             const char* Argv[] = {INIT_PATH, nullptr};

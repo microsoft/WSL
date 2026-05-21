@@ -995,8 +995,7 @@ try
             // Move boot command into the memory-limited user cgroup.
             if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
             {
-                // Non-critical.
-                LOG_ERROR("Failed to move boot command into user cgroup: {}", errno);
+                LOG_WARNING("Failed to move boot command into user cgroup: {}", errno);
             }
 
             //

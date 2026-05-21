@@ -3420,8 +3420,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
         // Move child into the memory-limited user cgroup.
         if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
         {
-            // Non-critical
-            LOG_ERROR("Failed to add process to user cgroup: {}", errno);
+            LOG_WARNING("Failed to add process to user cgroup: {}", errno);
         }
 
         try
