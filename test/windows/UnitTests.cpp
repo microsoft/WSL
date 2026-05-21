@@ -457,9 +457,8 @@ class UnitTests
         // Import a second distro from the same tarball as the test distro.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
 
-        auto cleanupPeer = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
-        });
+        auto cleanupPeer =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
 
         // Enable systemd in the peer distro (no helper exists for non-test distros).
         VERIFY_ARE_EQUAL(
