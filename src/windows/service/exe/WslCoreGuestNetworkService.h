@@ -61,6 +61,7 @@ private:
 
     bool IsPortInHostEphemeralRange(uint16_t PortNumber, int Protocol) const noexcept;
 
+    _Requires_lock_held_(m_dataLock)
     bool IsPortInGuestEphemeralRange(uint16_t PortNumber) const noexcept;
 
     static std::pair<uint16_t, uint16_t> QueryHostEphemeralPortRange(LPCWSTR WmiClassName) noexcept;
@@ -77,6 +78,7 @@ private:
     _Guarded_by_(m_dataLock) std::map<std::pair<HCN_PORT_PROTOCOL, USHORT>, HcnPortReservation> m_reservedPorts;
     _Guarded_by_(m_dataLock) HCN_PORT_RANGE_RESERVATION m_reservedPortRange {};
 
+    // Host ephemeral port ranges can change. They are queried once at startup, if a change occurs, the service will need to be restarted.
     std::pair<uint16_t, uint16_t> m_hostTcpEphemeralPortRange{};
     std::pair<uint16_t, uint16_t> m_hostUdpEphemeralPortRange{};
 };

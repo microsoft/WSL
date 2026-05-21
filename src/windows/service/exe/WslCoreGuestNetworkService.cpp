@@ -17,7 +17,7 @@ static constexpr auto c_dnsPortNumber = 53;
 static constexpr auto c_mdnsPortNumber = 5353;
 static constexpr auto c_llmnrPortNumber = 5355;
 
-static constexpr std::pair<uint16_t, uint16_t> c_invalidEphemeralPortRange = {UINT16_MAX, UINT16_MAX};
+static constexpr std::pair<uint16_t, uint16_t> c_invalidEphemeralPortRange = {1, 0};
 
 using namespace wsl::shared;
 
@@ -194,8 +194,14 @@ try
         if (instance.get(L"DynamicPortRangeStartPort", &startPort) &&
             instance.get(L"DynamicPortRangeNumberOfPorts", &numberOfPorts) && startPort > 0 && numberOfPorts > 0)
         {
-            const auto endPort = static_cast<uint16_t>(startPort + numberOfPorts - 1);
-            return {static_cast<uint16_t>(startPort), endPort};
+            const auto endPort = static_cast<uint64_t>(startPort) + numberOfPorts - 1;
+            if (startPort > UINT16_MAX || endPort > UINT16_MAX)
+            {
+                LOG_HR_MSG(E_FAIL, "Ephemeral port range overflows uint16_t: start=%u, count=%u", startPort, numberOfPorts);
+                return c_invalidEphemeralPortRange;
+            }
+
+            return {static_cast<uint16_t>(startPort), static_cast<uint16_t>(endPort)};
         }
     }
 
