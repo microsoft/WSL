@@ -1318,7 +1318,29 @@ void WSLCVirtualMachine::CollectCrashDumps()
             THROW_LAST_ERROR_IF(!file);
 
             transaction.SendResultMessage<std::int32_t>(0);
-            relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            // InterruptableRelay uses overlapped I/O which is not supported on AF_UNIX.
+            // Use a simple blocking recv-to-write loop for sockets in blocking I/O mode.
+            if (channel.IsBlockingIO())
+            {
+                constexpr size_t bufferSize = 65536;
+                std::vector<char> buf(bufferSize);
+                for (;;)
+                {
+                    int bytesRead = ::recv(channel.Socket(), buf.data(), static_cast<int>(buf.size()), 0);
+                    if (bytesRead <= 0)
+                    {
+                        break;
+                    }
+
+                    DWORD bytesWritten{};
+                    THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), buf.data(), static_cast<DWORD>(bytesRead), &bytesWritten, nullptr));
+                }
+            }
+            else
+            {
+                relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+            }
         }
         CATCH_LOG()
     }

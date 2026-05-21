@@ -137,12 +137,6 @@ private:
 
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
-    // Relay threads bridging AF_UNIX sockets to TCP loopback for overlapped I/O.
-    std::thread m_initRelayThread;
-    std::thread m_crashDumpRelayThread;
-    std::mutex m_relayLock;
-    std::vector<std::thread> m_relayThreads;
-
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 

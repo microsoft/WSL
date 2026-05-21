@@ -110,7 +110,7 @@ public:
         HTTPRequestContext(wil::unique_socket&& Socket) : stream(context)
         {
             // Detect the socket's address family to create the correct protocol descriptor.
-            // HCS returns AF_HYPERV sockets; OpenVMM returns AF_INET (TCP loopback relay).
+            // HCS returns AF_HYPERV sockets; OpenVMM returns AF_UNIX sockets.
             WSAPROTOCOL_INFOW protocolInfo{};
             int infoLen = sizeof(protocolInfo);
             int family = AF_INET; // Default to TCP/IPv4.
