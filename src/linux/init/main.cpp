@@ -1551,11 +1551,19 @@ Return Value:
     }
 
     //
-    // Mount the binfmt_misc filesystem.
+    // Mount the binfmt_misc filesystem and mark it private so that unmounts
+    // in child mount namespaces (e.g. when a peer distro's systemd shuts down)
+    // do not propagate back and wipe the global registration table.
     //
 
     if (UtilMount(nullptr, BINFMT_PATH, "binfmt_misc", MS_RELATIME, nullptr) < 0)
     {
+        return -1;
+    }
+
+    if (mount(nullptr, BINFMT_PATH, nullptr, MS_PRIVATE, nullptr) < 0)
+    {
+        LOG_ERROR("mount({}, MS_PRIVATE) failed {}", BINFMT_PATH, errno);
         return -1;
     }
 
