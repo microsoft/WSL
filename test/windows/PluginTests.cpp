@@ -16,10 +16,16 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslc.h"
+#include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 
 using namespace wsl::windows::common::registry;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDistroPath;
+extern std::wstring g_testDataPath;
 
 class PluginTests
 {
@@ -592,6 +598,186 @@ class PluginTests
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
+    static wil::com_ptr<IWSLCSessionManager> OpenWslcSessionManager()
+    {
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
+
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone)
+    {
+        WSLCSessionSettings settings{};
+        settings.DisplayName = Name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 4096;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = NetworkingMode;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
+
+        return session;
+    }
+
+    WSL2_TEST_METHOD(WslcSuccess)
+    {
+        ConfigurePlugin(PluginTestType::WslcSuccess);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-test");
+
+            LoadTestImage(*session, "debian:latest");
+
+            // Create a container that will have a stuck process so it's still in a running state when the callback is made.
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-container", {"/bin/sh", "-c", "sleep 120"});
+
+            auto container = launcher.Launch(*session, WSLCContainerStartFlagsAttach);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            // Delete the image so we get an ImageDeleted notification before the session goes away.
+            WSLCDeleteImageOptions options{.Image = "debian:latest", .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        }
+
+        const auto ExpectedOutput = std::format(
+            LR"(Plugin loaded. TestMode=18
+            WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
+            Command: 'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
+            Command: 'cat', status=0, stdout: stdin-ok, stderr: 
+            Command: 'exit 12', status=12, stdout: , stderr: 
+            Command: 'echo -n $ENV', status=0, stdout: env-ok, stderr: 
+            WSLCCreateProcess(does-not-exist): {:x}, errno=2
+            WSLCProcessGetFd(999): {}
+            WSLCProcessGetExitCode(<running>): {}
+            WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-test.txt', status=0, stdout: Windows-content, stderr: 
+            WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
+            Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
+            WSLCMountFolder(nonexistent): {}
+            WSLCMountFolder(../escape): {}
+            WSLCMountFolder(): {}
+            Test completed
+            WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container stopping, session=*, id=*
+            WSLC Image deleted, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-test, id=*)",
+            static_cast<uint32_t>(E_FAIL),
+            E_INVALIDARG,
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            E_INVALIDARG,
+            E_INVALIDARG);
+
+        ValidateLogFile(ExpectedOutput.c_str());
+    }
+
+    WSL2_TEST_METHOD(WslcPullImageNotification)
+    {
+        ConfigurePlugin(PluginTestType::WslcImagePull);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-pull-test", WSLCNetworkingModeVirtioProxy);
+
+            // Load the registry and debian images.
+            LoadTestImage(*session, "debian:latest");
+
+            // Start a local registry container.
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+
+            // Tag debian:latest for the local registry and push it.
+            auto registryImage = std::format("{}/debian:latest", registryAddress);
+            auto registryRepo = std::format("{}/debian", registryAddress);
+            WSLCTagImageOptions tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = registryRepo.c_str();
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
+
+            auto emptyAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr));
+
+            // Delete the local tagged copy so PullImage actually downloads it.
+            WSLCDeleteImageOptions deleteOpts{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+            // Pull the image back — this should trigger the ImageCreated plugin callback.
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=21
+            WSLC Session created, name=plugin-wslc-pull-test, id=*, pid=*, token=set, sid=set
+            WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
+            WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcSessionRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcSessionRejected);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-rejected";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
+        ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=19
+            WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
+            OnWslcSessionCreated: ERROR_ACCESS_DENIED)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRejected);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-rejected");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-rejected-container", {"/bin/sh", "-c", "echo nope"});
+
+            auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsAttach);
+            ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=20
+            WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
+            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            OnWslcContainerStarted: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {

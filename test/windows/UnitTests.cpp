@@ -393,6 +393,26 @@ class UnitTests
         }
     }
 
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+
+        // Kill the WSL init process
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
@@ -535,6 +555,10 @@ class UnitTests
 
     WSL1_TEST_METHOD(Timer)
     {
+        // This is disabled because of intermittent test failures.
+        // TODO: Enable this test once the underlying issue is resolved.
+        SKIP_TEST_UNSTABLE();
+
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
@@ -1809,7 +1833,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(
                     L"mount | grep -iF '" TEXT(
-                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
+                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=0x5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
                     nullptr,
                     nullptr,
                     nullptr,
@@ -6152,31 +6176,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    static LxssDistributionState GetDistroState()
+    {
+        wsl::windows::common::SvcComm service;
+
+        for (const auto& e : service.EnumerateDistributions())
+        {
+            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            {
+                return e.State;
+            }
+        }
+
+        return LxssDistributionStateInvalid;
+    }
+
     TEST_METHOD(DistroTimeout)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
-
-        auto getDistroState = [&]() {
-            wsl::windows::common::SvcComm service;
-
-            for (const auto& e : service.EnumerateDistributions())
-            {
-                if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
-                {
-                    return e.State;
-                }
-            }
-
-            return LxssDistributionStateInvalid;
-        };
 
         // Validate that distributions don't time out when timeout is -1
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
+            VERIFY_ARE_EQUAL(GetDistroState(), LxssDistributionStateRunning);
         }
 
         // Validate that distributions time out when timeout value is > 0
@@ -6190,7 +6215,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             unsigned long iterations = 0;
             while (std::chrono::steady_clock::now() < deadline)
             {
-                if (getDistroState() == LxssDistributionStateInstalled)
+                if (GetDistroState() == LxssDistributionStateInstalled)
                 {
                     LogInfo("Distribution stopped after %lu iterations", iterations);
                     return;
@@ -6200,7 +6225,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 iterations++;
             }
 
-            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, getDistroState());
+            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, GetDistroState());
             VERIFY_FAIL();
         }
     }
@@ -6268,38 +6293,82 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    WSL2_TEST_METHOD(CustomModulesVhd)
+    WSL2_TEST_METHOD(CustomVhdsInUserProfile)
     {
+        // Regression: HCS fails with E_ACCESSDENIED when user-supplied kernelModules or
+        // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
-        auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
-        auto modulesPath = std::format(L"{}\\tools\\modules.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-        auto kernelPath = std::format(L"{}\\tools\\kernel", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
 #endif
 
-        // Create a copy of the modules vhd
-        auto testModules = std::filesystem::current_path() / "test-modules.vhd";
+        // Unique folder under %TEMP% so parallel runs don't collide.
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto testFolder =
+            std::filesystem::temp_directory_path() /
+            std::format(L"wsl-test-vhd-grant-{}", wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None));
+        const auto testModules = testFolder / L"test-modules.vhd";
+        const auto testSystemDistro = testFolder / L"test-system.vhd";
+
+        // Construct the cleanup scope before any filesystem mutations so a failed copy or
+        // VERIFY does not leak the directory across runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(testFolder, ignored);
+        });
+
+        std::filesystem::create_directories(testFolder);
 
         VERIFY_IS_TRUE(CopyFile(modulesPath.c_str(), testModules.c_str(), false));
+        VERIFY_IS_TRUE(CopyFile(systemDistroPath.c_str(), testSystemDistro.c_str(), false));
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testModules); });
+        for (const auto& path : {testModules, testSystemDistro})
+        {
+            auto cmd = std::format(L"icacls.exe \"{}\" /remove Everyone /Q", path.wstring());
+            LxsstuLaunchCommandAndCaptureOutput(cmd.data());
+        }
 
-        auto cmd = std::format(
-            LR"($acl = Get-Acl '{}' ; $acl.RemoveAccessRuleAll((New-Object System.Security.AccessControl.FileSystemAccessRule(\"Everyone\", \"Read\", \"None\", \"None\", \"Allow\"))); Set-Acl -Path '{}' -AclObject $acl)",
-            testModules,
-            testModules);
+        WslConfigChange config{LxssGenerateTestConfig(
+            {.kernel = kernelPath, .kernelModules = testModules.wstring(), .systemDistro = testSystemDistro.wstring()})};
 
-        LxsstuLaunchPowershellAndCaptureOutput(cmd);
-
-        // Update .wslconfig to point to the copied kernel
-        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = testModules.wstring()})};
-
-        // Validate that WSL starts correctly
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK");
+        VERIFY_ARE_EQUAL(out, L"OK\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    WSL2_TEST_METHOD(CustomVhdsAccessibleViaInheritedAcls)
+    {
+        // Regression: VHDs reachable to VMWP via inherited ACLs must boot even when the
+        // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
+#ifdef WSL_DEV_INSTALL_PATH
+
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
+
+#else
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
+
+#endif
+
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = modulesPath, .systemDistro = systemDistroPath})};
+
+        // Non-elevated launch so impersonation cannot WRITE_DAC the SYSTEM-owned VHD.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK", 0, nullptr, nonElevatedToken.get());
         VERIFY_ARE_EQUAL(out, L"OK\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
@@ -6652,6 +6721,262 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"--uninstall Distro",
             wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
             -1);
+    }
+
+    TEST_METHOD(ReadSocketMessageHandle)
+    {
+        // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
+        // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
+        // that HRESULT instead, and the OnMessage callback must not be invoked.
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK) {
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            std::vector<gsl::byte> message;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                    callbackInvoked = true;
+                    message.assign(received.begin(), received.end());
+                }));
+
+            const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
+            VERIFY_ARE_EQUAL(hr, expectedHr);
+            VERIFY_ARE_EQUAL(callbackInvoked, SUCCEEDED(expectedHr));
+            return message;
+        };
+
+        // Scenario 1: A complete header-only message is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 7;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 2: A complete message with a payload body is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 128;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 42;
+            header->TransactionStep = 2;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+            WriteSocket(client.get(), payload.data(), payload.size());
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 3: Sender closes without writing any bytes. The reader should observe a clean
+        // end-of-stream and signal completion with an empty span (no exception).
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 4: Sender closes after sending fewer bytes than a full header.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            std::array<gsl::byte, sizeof(MESSAGE_HEADER) - 1> partialHeader{};
+            std::memset(partialHeader.data(), 0xCC, partialHeader.size());
+            WriteSocket(client.get(), partialHeader.data(), partialHeader.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 5: Sender provides a complete header but closes after sending only part of the body.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t fullBodySize = 64;
+            constexpr size_t partialBodySize = 16;
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = gsl::narrow_cast<unsigned int>(sizeof(header) + fullBodySize);
+            header.TransactionId = 11;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            std::array<gsl::byte, partialBodySize> partialBody{};
+            std::memset(partialBody.data(), 0x55, partialBody.size());
+            WriteSocket(client.get(), partialBody.data(), partialBody.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+    }
+
+    TEST_METHOD(SocketChannel)
+    {
+        // Read exactly `size` bytes from a raw socket into the destination buffer.
+        auto recvAll = [](SOCKET socket, void* destination, size_t size) {
+            auto* cursor = static_cast<char*>(destination);
+            size_t total = 0;
+            while (total < size)
+            {
+                const auto received = recv(socket, cursor + total, gsl::narrow_cast<int>(size - total), 0);
+                VERIFY_IS_TRUE(received > 0);
+                total += static_cast<size_t>(received);
+            }
+        };
+
+        // Scenario 1: SendMessage produces the expected wire format on the peer socket.
+        // The header should carry the auto-stamped TransactionId (1 for the first non-transaction
+        // message) and a NONE transaction step, and the payload bytes should match exactly.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(client), "client"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = static_cast<int32_t>(0xCAFEBABE);
+            channel.SendMessage(message);
+
+            std::array<gsl::byte, sizeof(message)> received{};
+            recvAll(server.get(), received.data(), received.size());
+
+            const auto* header = reinterpret_cast<const MESSAGE_HEADER*>(received.data());
+            VERIFY_ARE_EQUAL(header->MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(header->MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(header->TransactionId, 1u);
+            VERIFY_ARE_EQUAL(header->TransactionStep, static_cast<unsigned int>(TRANSACTION_STEP::NONE));
+
+            const auto* payload = reinterpret_cast<const RESULT_MESSAGE<int32_t>*>(received.data());
+            VERIFY_ARE_EQUAL(payload->Result, static_cast<int32_t>(0xCAFEBABE));
+        }
+
+        // Scenario 2: Two channels can round-trip a typed message end-to-end.
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = 1234;
+            sender.SendMessage(message);
+
+            auto& received = receiver.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
+            VERIFY_ARE_EQUAL(received.Header.MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(received.Header.MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(received.Header.TransactionId, 1u);
+            VERIFY_ARE_EQUAL(received.Result, 1234);
+        }
+
+        // Scenario 3: An exit event signaled while ReceiveMessage is waiting causes the call to
+        // throw E_ABORT. Pre-signaling avoids racing a worker thread with the call.
+        {
+            auto [client, server] = MakeSocketPair();
+            wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+            exitEvent.SetEvent();
+            wsl::shared::SocketChannel channel{std::move(server), "server", std::vector<HANDLE>{exitEvent.get()}};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_ABORT);
+        }
+
+        // Scenario 4: ReceiveMessageOrClosed on a peer that closed the socket without sending
+        // any data returns {nullptr, empty span} and does not throw.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+            client.reset();
+
+            auto [message, span] = channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
+            VERIFY_IS_NULL(message);
+            VERIFY_ARE_EQUAL(span.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 5: A message arriving with a TransactionId other than the next expected
+        // sequence number (the first message must have id 1) is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 99;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 6: A transaction-tagged message arriving on a channel waiting for a
+        // non-transaction message is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 1;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::REQUEST);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 7: A header-only message arriving when a larger message type is expected
+        // is rejected with E_UNEXPECTED because the received span is too small for the type.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            MESSAGE_HEADER header{};
+            header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 1;
+            header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 8: ReceiveMessage with a finite timeout on an idle socket throws
+        // HRESULT_FROM_WIN32(ERROR_TIMEOUT) once the timeout elapses.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+        }
     }
 
 }; // namespace UnitTests

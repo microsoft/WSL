@@ -15,29 +15,13 @@ static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel,
-    VirtioNetworkingFlags flags,
-    LPCWSTR dnsOptions,
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-    wil::shared_handle userToken,
-    wil::unique_socket&& dnsHvsocket) :
+    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
     m_dnsOptions(dnsOptions)
 {
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        ((!!dnsHvsocket != WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket)) ||
-         (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket) && WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))),
-        "Incompatible DNS settings");
-
-    if (dnsHvsocket)
-    {
-        networking::DnsResolverFlags resolverFlags{};
-        m_dnsTunnelingResolver.emplace(std::move(dnsHvsocket), resolverFlags);
-    }
 }
 
 VirtioNetworking::~VirtioNetworking()
@@ -196,26 +180,17 @@ void VirtioNetworking::RefreshGuestConnection()
     };
 
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
-    appendOption(L"client_mac", networkSettings->MacAddress);
-
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
-    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
-
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
-        appendOption(L"gateway_mac_ipv6", networkSettings->GetBestGatewayMacAddress(AF_INET6));
     }
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
     {
         currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
-    }
-    else if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket))
-    {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(TEXT(LX_INIT_DNS_TUNNELING_IP_ADDRESS));
     }
     else
     {

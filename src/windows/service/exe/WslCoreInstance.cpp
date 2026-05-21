@@ -271,7 +271,7 @@ void WslCoreInstance::CreateLxProcess(
 
 void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::service::DistributionRegistration&& registration)
 {
-    wsl::shared::SocketChannel channel(std::move(Socket), "OOBE", m_destroyingEvent.get());
+    wsl::shared::SocketChannel channel(std::move(Socket), "OOBE", {m_destroyingEvent.get()});
 
     const auto* oobeResult = channel.ReceiveMessageOrClosed<LX_INIT_OOBE_RESULT>().first;
 
@@ -475,9 +475,9 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
             terminateMessage.Header.MessageSize = sizeof(terminateMessage);
             terminateMessage.Force = Force;
 
-            auto transaction = m_initChannel->GetChannel().StartTransaction();
+            auto transaction = m_initChannel->GetChannel().StartTransaction(m_socketTimeout);
             transaction.Send(terminateMessage);
-            auto [message, span] = transaction.ReceiveOrClosed<RESULT_MESSAGE<bool>>(m_socketTimeout);
+            auto [message, span] = transaction.ReceiveOrClosed<RESULT_MESSAGE<bool>>();
             if (message)
             {
                 shutdown = message->Result;

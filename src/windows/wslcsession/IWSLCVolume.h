@@ -18,6 +18,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include <map>
 #include <string>
 
 namespace wsl::windows::service::wslc {
@@ -35,9 +36,18 @@ public:
     // driver (which may be "local" for guest volumes).
     virtual const char* Driver() const noexcept = 0;
 
+    // The user-specified labels on this volume (excludes the WSLC metadata label).
+    virtual const std::map<std::string, std::string>& Labels() const noexcept = 0;
+
     // Remove the volume from docker and release any host-side resources
     // (e.g. detach/delete the VHD for VHD volumes). Throws on failure.
     virtual void Delete() = 0;
+
+    // Called when Docker has already destroyed the volume (e.g. container delete with -v).
+    // Releases any host-side resources without contacting Docker. Default is a no-op.
+    virtual void OnDeleted()
+    {
+    }
 
     // Returns a JSON string for the COM-facing InspectVolume result.
     virtual std::string Inspect() const = 0;

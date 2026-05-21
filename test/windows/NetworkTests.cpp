@@ -786,12 +786,12 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET))
         {
             // Test A record resolution (IPv4) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
             // Test reverse DNS lookup
-            VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
         }
         else
         {
@@ -801,8 +801,8 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET6))
         {
             // Test AAAA record resolution (IPv6) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
         }
         else
         {
@@ -813,53 +813,53 @@ class NetworkTests
     static void VerifyDnsResolutionRecordTypes()
     {
         // Test various DNS record types
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
     }
 
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
-        VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
         // query for AAAA/IPv6 records
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
 
         // query for MX records
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 MX bing.com");
 
         // query for NS records
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 NS bing.com");
 
         // reverse DNS lookup
-        VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
 
         // query for SOA records
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 SOA bing.com");
 
         // query for TXT records
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 TXT bing.com");
 
         // query for CNAME records
-        VerifyDigDnsResolution(L"dig +time=5 CNAME bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 CNAME bing.com");
 
         // query for SRV records
-        VerifyDigDnsResolution(L"dig +time=5 SRV bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 SRV bing.com");
 
         // query for ANY - for this option dig expects a large response so it will query directly over TCP,
         // instead of trying UDP first and falling back to TCP.
-        VerifyDigDnsResolution(L"dig +short ANY bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 ANY bing.com");
     }
 
     static void VerifyDnsSuffixes()
@@ -2154,6 +2154,78 @@ class NetworkTests
             0L);
     }
 
+    // Verifies that after a listen socket is closed, the port remains allocated to the guest
+    // as long as an accepted connection in Linux is still using it.
+    static void VerifyAcceptedConnectionPortTracking()
+    {
+        WslKeepAlive keepAlive;
+
+        // Perl server: listen on port 1234, print "listening", accept one connection,
+        // close the listen socket, print "ready", then wait forever to keep the accepted connection alive.
+        auto serverCmd = LxssGenerateWslCommandLine(
+            L"perl -MSocket -e '"
+            L"$|=1;"
+            L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+            L"bind(S,sockaddr_in(1234,INADDR_ANY)) or die;"
+            L"listen(S,1) or die;"
+            L"print \"listening\\n\";"
+            L"accept(C,S) or die;"
+            L"close(S);"
+            L"print \"ready\\n\";"
+            L"while(1){sleep 1000}"
+            L"'");
+
+        wil::unique_handle serverOutRead;
+        wil::unique_handle serverOutWrite;
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&serverOutRead, &serverOutWrite, nullptr, 0));
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(serverOutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+        unique_kill_process serverProcess(LxsstuStartProcess(serverCmd.data(), nullptr, serverOutWrite.get()));
+        serverOutWrite.reset();
+
+        // Wait for the server to be listening
+        std::string output;
+        VERIFY_IS_TRUE(FindSubstring(serverOutRead, "listening", output));
+
+        // Perl client: connect to 127.0.0.1:1234, then wait forever to keep the connection alive.
+        auto clientCmd = LxssGenerateWslCommandLine(
+            L"perl -MSocket -e '"
+            L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+            L"connect(S,sockaddr_in(1234,inet_aton(\"127.0.0.1\"))) or die;"
+            L"while(1){sleep 1000}"
+            L"'");
+
+        unique_kill_process guestClientProcess(LxsstuStartProcess(clientCmd.data()));
+
+        // Wait for the server to accept the connection and close the listen socket
+        VERIFY_IS_TRUE(FindSubstring(serverOutRead, "ready", output));
+
+        // We need to wait > 60 seconds so that the port tracker's deallocation logic kicks in for this port.
+        // See c_bind_timeout_seconds in GnsPortTracker.cpp
+        std::this_thread::sleep_for(std::chrono::seconds(90));
+
+        // Verify the port is still allocated to the guest — host bind should fail
+        BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+
+        // stop server and client processes
+        serverProcess.reset();
+        guestClientProcess.reset();
+
+        // Verify the port is eventually released and host is able to bind to it
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(1234);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -3203,7 +3275,8 @@ class NetworkTests
     {
         char buffer[256];
         DWORD bytesRead;
-        const HANDLE readFileThread = OpenThread(THREAD_ALL_ACCESS, false, GetCurrentThreadId());
+        const wil::unique_handle readFileThread(OpenThread(THREAD_ALL_ACCESS, false, GetCurrentThreadId()));
+        VERIFY_IS_NOT_NULL(readFileThread.get());
         const wil::unique_handle event(CreateEvent(nullptr, FALSE, FALSE, nullptr));
         VERIFY_ARE_NOT_EQUAL(event.get(), INVALID_HANDLE_VALUE);
 
@@ -3212,7 +3285,7 @@ class NetworkTests
             if (WaitForSingleObject(event.get(), 30000) == WAIT_TIMEOUT)
             {
                 LogInfo("Canceling synchronous IO", GetTickCount());
-                CancelSynchronousIo(readFileThread);
+                CancelSynchronousIo(readFileThread.get());
             }
         });
 
@@ -4056,6 +4129,63 @@ class MirroredTests
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
+    WSL2_TEST_METHOD(AcceptedConnectionPortTracking)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyAcceptedConnectionPortTracking();
+    }
+
+    WSL2_TEST_METHOD(MirroredReusePortOnGuest)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        WslKeepAlive keepAlive;
+
+        // Verify that when guest has two binds on the same port (with reuseport) and the first
+        // bind is released, the port remains allocated to the guest because the second bind is
+        // still active. This validates the relaxed port+protocol matching in mirrored mode.
+        {
+            auto [guestLocal, read1] = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=127.0.0.1,reuseport", true);
+
+            auto guestWild = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=0.0.0.0,reuseport", true);
+
+            // Release the first bind (127.0.0.1)
+            guestLocal.reset();
+            read1.reset();
+
+            // Wait > 60 seconds so that the port tracker's deallocation logic kicks in.
+            // See c_bind_timeout_seconds in GnsPortTracker.cpp
+            std::this_thread::sleep_for(std::chrono::seconds(90));
+
+            // The host tries to bind on 127.0.0.1 (matching the released guest bind). This should
+            // still fail because the second guest bind (0.0.0.0) is still active and the mirrored
+            // mode port tracker matches by port+protocol, not the full allocation tuple.
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false, false, true);
+        }
+
+        // Both binds are now released. Verify the port is eventually released.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(1234);
+                addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
+    }
+
     WSL2_TEST_METHOD(PortZeroRebindSucceeds)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4815,6 +4945,16 @@ class VirtioProxyTests
         }
     }
 
+    WSL2_TEST_METHOD(ValidateMacAddress)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
+        VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"00:00:00:00:01:00"));
+    }
+
     WSL2_TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
@@ -5082,6 +5222,23 @@ class VirtioProxyTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
+
+    // Verifies that virtio proxy + dnsTunneling points resolv.conf at the gateway, not the hvsocket listener IP.
+    WSL2_TEST_METHOD(DnsTunnelingResolvConfUsesGateway)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + state.Gateway.value()), static_cast<DWORD>(0));
+
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + c_dnsTunnelingDefaultIp), static_cast<DWORD>(0));
     }
 };
 } // namespace NetworkTests

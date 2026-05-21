@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Linux için Windows Alt Sistemi</value>
   </data>
@@ -137,24 +153,27 @@ WSL2'yi diski durdurmaya ve ayırmaya zorlamak için 'wsl.exe {}' çalıştırı
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Bu birim zaten WSL2 içine bağlı.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Bu ada sahip bir disk zaten takılı; lütfen diskin bağlantısını kesin veya yeni bir ad seçin ve tekrar deneyin.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Belirtilen bağlama adı geçersiz bir '/' karakteri içeriyor. Lütfen geçersiz karakter olmadan yeniden deneyin.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Disk başarıyla '/mnt/wsl/{}' olarak bağlandı.
 Not: /etc/wsl.conf içinde automount.root ayarını değiştirdiyseniz konum farklı olacak.
 Diski çıkarıp ayırmak için '{} {}' wsl.exe çalıştırın.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Disk eklendi ancak bağlanamadı: {}.
 Daha fazla ayrıntı için WSL2 içinde 'dmesg' çalıştırın.
 Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Aşağıdakiler, yüklenemedik geçerli dağıtımların listesidir.
@@ -169,7 +188,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name komutunu kullanın.</value>
+    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -177,6 +196,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Bir diski bağlamak için yönetici erişimi gerekiyor.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Dağıtım dışarı aktarılamadı.</value>
@@ -303,7 +323,7 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/enablevirtualization</valu
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD zaten wsl.exe --mount, aracılığıyla bağlandı, lütfen başlatmadan önce diskin bağlantısını kesin.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1, mevcut makine yapılandırmanızla desteklenmiyor.
@@ -602,7 +622,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL sürümü: {}
@@ -626,7 +646,7 @@ Derleme zamanı: {}</value>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
     <value>{} içinde özel çekirdek modülleri VHD'si bulunamadı: '{}'.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>{} içinde belirtilen özel sistem dağıtımı bulunamadı veya doğru biçimde değil.</value>
@@ -687,7 +707,7 @@ Bağımsız değişkenler:
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>arm64 wsl.exe --mount , Windows sürüm 27653 veya daha yenisini gerektirir.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Linux için Windows Alt Sistemi'nin en son sürümü zaten yüklü.</value>
@@ -805,7 +825,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <value>EventViewer'ı aç</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name seçeneğini kullanın.</value>
+    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -822,6 +842,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Eski dağıtım kaydı kullanılıyor. Bunun yerine tar tabanlı bir dağıtım kullanmayı düşünün.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Eski dağıtım kayıtları bağımsız değişken --version desteklemez.</value>
@@ -853,7 +874,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>'{}' içinde takas diski oluşturulamadı: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>Disk '{}' oluşturulamadı: {}</value>
@@ -872,6 +893,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>GÜVENLİ MOD ETKİN: birçok özellik devre dışı bırakılır</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Yansıtılmış ağ modu desteklenmiyor: {}.
@@ -894,24 +916,30 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>DNS Tüneli desteklenmiyor</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Yansıtılmış ağ modu kullanılırken wsl2.localhostForwarding ayarının etkisi yoktur</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>Konakta bir Http Proxy değişikliği algılandı. Değişikliği uygulamak için lütfen WSL'yi yeniden başlatın.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>Bir localhost proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modundaki WSL, localhost proxy'lerini desteklemez.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>Bir IPv6 proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modunda WSL, IPv6'yı desteklemez.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>Bir localhost IPv6 proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. WSL, localhost IPv6 proxy'lerini desteklemez.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>Proxy ayarları çözümlanmaya çalışılırken beklenmeyen bir hata oluştu, proxy ayarları WSL'ye yansıtılamadı.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Kayıt defterine erişilirken bir hata oluştu. Yol: '{}'. Hata: {}</value>
@@ -954,10 +982,20 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>WSL1, bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+  </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL kapsayıcısı bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>'{}' kapsayıcı görüntüsü kayıt defteri bilgisayar ilkesi tarafından engellendi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Bilgisayar ilkesi tarafından bir kapsayıcı kayıt defteri izin listesi yapılandırıldığı için kapsayıcı görüntüleri oluşturulamaz. Görüntü derlemeleri, temel görüntüleri rastgele kayıt defterlerinden alabilir ve izin verilenler listesiyle güvenilir bir şekilde sınırlandırılamaz.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>WSL2'ye yükseltmek için lütfen 'wsl.exe --set-version {} 2' çalıştırın.</value>
@@ -1017,7 +1055,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>İşlem tamamlanamadı çünkü VHD şu anda kullanımda. WSL'yi durmaya zorlamak için şu komutu kullanın: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} geçerli bir boole değil, &lt;true|false&gt;</value>
@@ -1025,6 +1063,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>Seyrek VHD yalnızca WSL2'de desteklenir.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL'nin yerel sistem olarak çalıştırılması desteklenmez.</value>
@@ -1074,7 +1113,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Bu bir VHD dosyası gibi görünüyor. Tar yerine VHD dosyasını içeri aktarmak için --vhd kullanın.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Microsoft Store'dan {} yüklenemedi: {}
@@ -1122,23 +1161,26 @@ Hata kodu: {}</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Küresel Güvenli Erişim İstemcisiyle ilgili mevcut bir uyumluluk sorunu nedeniyle DNS Tünelleme devre dışı bırakıldı.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışı bırakılmıştır.
 Bir dağıtımı seyrek VHD kullanmaya zorlamak için lütfen şu komutu çalıştırın:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{} bağlanamadı, daha fazla ayrıntı için dmesg komutuna bakın.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>/etc/fstab with mount -a işlenemedi.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Dağıtım diski bağlanırken bir hata oluştu, yedek plan olarak salt okunur şekilde bağlandı.
 Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>‘{}’ çevrilemedi</value>
@@ -1177,28 +1219,35 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Otomatik Ara Sunucu etkin</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>WSL'nin Windows'un HTTP ara sunucusu bilgilerini kullanmasına olanak verir.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Otomatik Ara Sunucu etkin.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL'nin Windows'un HTTP ara sunucusu bilgilerini kullanmasına olanak verir.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>DNS ayrıştırma için en iyi çabayı kullan</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Yalnızca wsl2.dnsTunneling true olarak ayarlandığında geçerlidir. True olarak ayarlandığında, Windows soruyu DNS isteğinden çıkarır ve bilinmeyen kayıtları yok sayarak çözmeye çalışır.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS ayrıştırma için en iyi girişimi kullanın.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Yalnızca wsl2.dnsTunneling true olarak ayarlandığında geçerlidir. True olarak ayarlandığında, Windows soruyu DNS isteğinden çıkarır ve bilinmeyen kayıtları yok sayarak çözmeye çalışır.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Özel çekirdek</value>
@@ -1220,6 +1269,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>Özel bir Linux çekirdek modülü VHD'sine giden mutlak bir Windows yolu.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Çekirdek modüllerine göz at</value>
@@ -1229,6 +1279,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Özel bir Linux çekirdek modülü VHD'sine giden mutlak bir Windows yolu.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Özel sistem dağıtımı</value>
@@ -1238,7 +1289,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Öncelikle WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı olarak yüklenecek bir VHD'ye giden yolu belirtin. [Buradan sistem dağıtımları hakkında daha fazla bilgi edinin].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1249,6 +1300,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Öncelikli olarak WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı şeklinde yüklenecek VHD'ye giden yolu belirtin.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Hata ayıklama konsolunu etkinleştir</value>
@@ -1264,18 +1316,22 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>Varsayılan VHD Boyutu</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Yalnızca yeni oluşturulan dağıtımlar için genişletilebilir WSL sanal sabit diski (VHD) için varsayılan en büyük boyut.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Boyutu sıfırla</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Varsayılan VHD Boyutu</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Yalnızca yeni oluşturulan dağıtımlar için genişletilebilir WSL sanal sabit diski (VHD) için megabayt olarak belirtilen varsayılan en büyük boyut.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Geliştirici</value>
@@ -1295,28 +1351,35 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS Ara Sunucusu etkin</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Sadece wsl2.networkingMode NAT olarak ayarlandığında uygulanabilir. WSL'ye Linux'taki DNS Sunucusunu ana bilgisayardaki NAT'a göre yapılandırmasını bildiren boole değeri. False olarak ayarlandığında Windows'tan Linux'a DNS sunucuları yansıtılır.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS Ara Sunucusu etkin.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Sadece wsl2.networkingMode NAT olarak ayarlandığında uygulanabilir. WSL'ye Linux'taki DNS Sunucusunu ana bilgisayardaki NAT'a göre yapılandırmasını bildiren boole değeri. False olarak ayarlandığında Windows'tan Linux'a DNS sunucuları yansıtılır.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS Tüneli etkin</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>DNS isteklerinin WSL'den Windows'a ara sunucudan aktarılma şeklini değiştirir.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS Tüneli etkin.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>DNS isteklerinin WSL'den Windows'a ara sunucudan aktarılma şeklini değiştirir.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Dosya Sistemi</value>
@@ -1392,19 +1455,22 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>İlk Otomatik Ara Sunucu zaman aşımı</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Yalnızca wsl2.autoProxy true olarak ayarlandığında geçerlidir. WSL kapsayıcısını başlatırken WSL'nin HTTP ara sunucusu bilgilerini almak için beklediği süreyi (milisaniye cinsinden) yapılandırır. Ara sunucu ayarları bu süreden sonra çözülürse, alınan ara sunucu ayarlarını kullanmak için WSL örneğinin yeniden başlatılması gerekir.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Zaman aşımını sıfırla</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>İlk Otomatik Ara Sunucu zaman aşımı</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Yalnızca wsl2.autoProxy true olarak ayarlandığında geçerlidir. WSL kapsayıcısını başlatırken WSL'nin HTTP ara sunucusu bilgilerini almak için beklediği süreyi (milisaniye cinsinden) yapılandırır. Ara sunucu ayarları bu süreden sonra çözülürse, alınan ara sunucu ayarlarını kullanmak için WSL örneğinin yeniden başlatılması gerekir.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Çekirdek Komut Satırı</value>
@@ -1580,6 +1646,7 @@ Docker Masaüstü'nü WSL ile kullanmanın avantajlarından bazıları şunlard�
 • Docker komutlarını WSL'de veya Windows'da aynı Docker daemon'ını ve resimlerini kullanarak çalıştırabilirsiniz.
 • WSL'de Windows sürücülerinin otomatik olarak bağlanmasını kullanarak Windows ve Linux arasında dosya ve klasörleri sorunsuz bir şekilde paylaşabilirsiniz.
 • WSL'nin birlikte çalışabilirliği sayesinde, Linux kodu ve dosyaları üzerinde çalışmak için tercih ettiğiniz Windows araçlarını ve düzenleyicilerini kullanabilir veya tam tersini yapabilirsiniz.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Masaüstü Tümleştirmesi</value>
@@ -1747,15 +1814,19 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Güvenli modu etkinleştir</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>WSL'yi birçok özelliği devre dışı bırakan ve kötü durumdaki dağıtımları kurtarmak için kullanılması amaçlanan "Güvenli Mod "da çalıştırın.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Güvenli modu etkinleştirin.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL'yi birçok özelliği devre dışı bırakan ve kötü durumdaki dağıtımları kurtarmak için kullanılması amaçlanan "Güvenli Mod "da çalıştırın.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Hakkında</value>
@@ -1820,45 +1891,58 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>Seyrek VHD'yi varsayılan olarak etkinleştir</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Yeni oluşturulan tüm sanal sabit diskler, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+    <value>Yeni oluşturulan tüm VHD, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Seyrek VHD'yi varsayılan olarak etkinleştirin.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Yeni oluşturulan tüm sanal sabit diskler, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+    <value>Yeni oluşturulan tüm VHD’ler, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Takas Dosya Konumu</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>Takas sanal sabit diskine giden mutlak bir Windows yolu.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Takas dosyalarına gözat</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Takas Dosya Konumu</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Takas sanal sabit diskine giden mutlak bir Windows yolu.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Takas Boyutu</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>WSL 2 VM'ye ekli takas alanı boyutu, takas dosyası yoksa 0. Takas depolama alanı, bellek ihtiyacı donanım aygıtındaki sınırı aştığında kullanılan disk tabanlı RAM'dir.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Boyutu sıfırla</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Takas Boyutu</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL 2 VM'sine eklenecek, megabayt cinsinden takas alanı. Takas dosyası yoksa 0. Takas depolama alanı, bellek ihtiyacı donanım cihazındaki sınırı aştığında kullanılan disk tabanlı RAM'dir.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>VirtIO’yu etkinleştir</value>
@@ -1871,6 +1955,7 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Virtio aktarımını kullanarak ana bilgisayardan 9P dosya sisteminin bağlanmasını etkinleştirir.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>VM Boşta Kalma Zaman Aşımı</value>
@@ -2018,8 +2103,25 @@ Kullanım:
     <value>'{}' kapsayıcısı çalışmıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress henüz desteklenmiyor.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>'{}' kapsayıcısı çalışıyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Kapsayıcı ağ modunda ek ağlara izin verilmiyor.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Bağlantı noktası eşlemeleri kapsayıcı ağ modunda desteklenmez; bağlantı noktalarının sahibi hedef kapsayıcıdır.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Kapsayıcı ağ modu için hedef kapsayıcı adı gereklidir.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Hedef kapsayıcı '{}' bulunamadı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
@@ -2028,6 +2130,9 @@ Kullanım:
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>Özel ağ türü için kapsayıcı ağ adı gereklidir.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Ağ adı boş olamaz.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Tanınmayan komut: '{}'</value>
@@ -2159,6 +2264,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz resim: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Geçersiz filtre: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Geçersiz ad: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2177,6 +2286,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Gerekli seçenek eksik: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Seçenek '{}' için geçersiz değer: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Bilinmeyen seçenek: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2207,6 +2324,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>'{}' ağı zaten var.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Birincil ağ modu 'host' veya 'none' olduğunda ek ağlara izin verilmez.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Yinelenen ağ: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>'{}': {} disk birimi oluşturulamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2222,6 +2347,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>'{}' açılamadı: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Bir kanal üzerinden içeri aktarma desteklenmiyor. Lütfen stdin'i bir dosyadan yönlendirin.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>'{}' içinde Containerfile veya Dockerfile bulunamadı</value>
@@ -2293,6 +2421,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Kapsayıcının günlüklerini görüntüle.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Durdurulmuş tüm kapsayıcıları kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Durdurulmuş tüm kapsayıcıları kaldırır.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Kapsayıcılar kaldır.</value>
   </data>
@@ -2311,6 +2449,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>Kapsayıcıyı başlatır.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Kapsayıcı kaynak kullanım istatistiklerini görüntüleyin.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Çalışan bir kapsayıcının kaynak kullanımının anlık görüntüsünü görüntüleyin: CPU, bellek, ağ G/Ç, blok G/Ç ve PID'ler.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Kapsayıcıları durdur.</value>
@@ -2337,6 +2481,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Görüntüleri incele.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Bir tarball’dan bir görüntü içeri aktarın.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Bir dosya sistemi görüntüsü oluşturmak için bir tar dosyasının içeriğini içe aktarır. İsteğe bağlı olarak, görüntüyü bir depo ve etiket adıyla etiketleyin.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Görüntüleri listele.</value>
@@ -2461,6 +2611,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Kapsayıcı kayıt defterlerinde oturum açma ve oturumu kapatma da dahil olmak üzere kayıt defteri kimlik bilgilerini yönetin.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Sistem düzeyinde komutlar</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Sistem düzeyinde yönetim komutları.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Bir resmi etiketleyin.</value>
   </data>
@@ -2564,6 +2720,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Uygulamanın yolu Dockerfile ("-"'tan okumak için stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Çıktıyı sağlanan koşullara göre filtrele</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>'-f, --filter' bayrağı için "{}" argümanı geçersiz: filtre biçimi hatalı (beklenen biçim: name=değer)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Günlük çıktısını takip et</value>
   </data>
@@ -2588,6 +2750,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Görüntü adı</value>
   </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Dosya ya da - stdin'den okumak için</value>
+  </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Görüntüyü içeren tar arşiv dosyasının yolunu sağlar</value>
   </data>
@@ -2596,6 +2761,12 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>Etiket anahtarı boş olamaz</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Son oluşturulan n kapsayıcıyı göster (tüm durumları içerir)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>En son oluşturulan kapsayıcıyı göster (tüm durumları içerir)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Kapsayıcı ana bilgisayar adı</value>
@@ -2630,11 +2801,21 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Kapsayıcı durduktan sonra kaldır</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Kapsayıcıyı durdurma sinyali</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>/dev/shm klasörünün boyutu (örneğin 64 MB, 1 GB)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Oturum Kimliği</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Oturum depolama alanı yolu</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Gönderilecek sinyal</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
@@ -2643,7 +2824,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Oluşturulan görüntünün etiketi</value>
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
-    <value>Number of lines to show from the end of the logs</value>
+    <value>Günlüklerin sonundan itibaren gösterilecek satır sayısı</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde yeni resim referansı</value>
@@ -2668,7 +2849,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Kapsayıcı içindeki çalışma dizini</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Kapsayıcı kimliğini sağlanan yola yazın.</value>
+    <value>Kapsayıcı kimliğini verilen yola yazın</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf'deki DNS ad sunucusunun IP adresi</value>
@@ -2737,11 +2918,19 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Geçersiz {} bağımsız değişken değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Geçersiz {} değeri: {} geçerli aralığın dışında ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Beklenen bellek boyutu (ör. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>'{}' dosyası zaten var</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
@@ -2792,9 +2981,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Birim adı</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Birim sürücü adını belirtin (varsayılan {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Birim sürücüsünün adını belirtin, örneğin 'guest' veya 'vhd' (varsayılan: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Sürücüye özgü seçenekleri ayarlayın</value>
@@ -2844,6 +3033,42 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>Nesne bulunamadı: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>KAPSAYICI KİMLİĞİ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>AD</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>RESİM</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>OLUŞTURULDU</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>DURUM</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>BAĞLANTI NOKTALARI</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>BELLEK KULLANIMI / SINIRI</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>BELLEK %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET G/Ç</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>BLOK G/Ç</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PID’LER</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Uyarı: {}:{} içinde '{}' ayarı için geçersiz değer.</value>

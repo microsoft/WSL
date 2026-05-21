@@ -17,12 +17,9 @@ Abstract:
 #include "wslc.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
-#include "IWSLCVolume.h"
-#include "WSLCVhdVolume.h"
-#include "WSLCGuestVolume.h"
-#include "WSLCVolumeMetadata.h"
+#include "WSLCVolumes.h"
 #include "WSLCNetworkMetadata.h"
-#include "ContainerEventTracker.h"
+#include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
 #include <unordered_map>
@@ -88,7 +85,7 @@ public:
 
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
-    IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm) override;
+    IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
@@ -114,8 +111,13 @@ public:
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
-    IFACEMETHOD(ListContainers)(_Out_ WSLCContainerEntry** Containers, _Out_ ULONG* Count, _Out_ WSLCContainerPortMapping** Ports, _Out_ ULONG* PortsCount) override;
-    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
+    IFACEMETHOD(ListContainers)(
+        _In_opt_ const WSLCListContainersOptions* Options,
+        _Out_ WSLCContainerEntry** Containers,
+        _Out_ ULONG* Count,
+        _Out_ WSLCContainerPortMapping** Ports,
+        _Out_ ULONG* PortsCount) override;
+    IFACEMETHOD(PruneContainers)(_In_opt_ const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCPruneContainersResults* Result) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -127,9 +129,16 @@ public:
     // Volume management.
     IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
-    IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListVolumes)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count)
+        override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
+    IFACEMETHOD(PruneVolumes)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+     _In_ ULONG FiltersCount,
+     _Out_ WSLCVolumeName** Volumes,
+     _Out_ ULONG* VolumesCount,
+     _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
@@ -148,7 +157,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
 
-    common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
+    common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
@@ -166,6 +175,8 @@ public:
         return m_id;
     }
 
+    bool WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const;
+
 private:
     ULONG m_id = 0;
 
@@ -173,7 +184,16 @@ private:
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
+    _Requires_shared_lock_held_(m_lock)
+    std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    _Requires_shared_lock_held_(m_lock)
+    void OnImageDeleted(const std::string& ImageId) noexcept;
+
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
@@ -185,7 +205,6 @@ private:
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
-    void RecoverExistingVolumes();
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
@@ -193,20 +212,19 @@ private:
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
-    std::optional<ContainerEventTracker> m_eventTracker;
+    std::optional<DockerEventTracker> m_eventTracker;
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_volumesLock, m_containersLock, or m_networksLock.
-    // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
-    // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
+    // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
+    // These locks protect m_containers without requiring an exclusive m_lock.
+    // This allows independent operations to proceed while container bookkeeping remains synchronized.
+    // WSLCVolumes has its own internal srwlock and does not require m_lock.
     std::mutex m_containersLock;
-    std::mutex m_volumesLock;
-    std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
-    std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
-    std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
+    std::unordered_map<std::string, std::unique_ptr<WSLCContainerImpl>> m_containers;
+    std::optional<WSLCVolumes> m_volumes;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
@@ -219,6 +237,8 @@ private:
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
     std::atomic<bool> m_terminated{false};
+
+    wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

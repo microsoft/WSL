@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Linux용 Windows 하위 시스템</value>
   </data>
@@ -137,24 +153,27 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>해당 볼륨은 이미 WSL2 내부에 탑재되어 있습니다.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>해당 이름의 디스크가 이미 탑재되어 있습니다. 디스크를 분리하거나 새 이름을 선택하고 다시 시도하십시오.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>지정한 탑재 이름에 잘못된 '/' 문자가 있습니다. 잘못된 문자 없이 다시 시도하세요.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>디스크가 '/mnt/wsl/{}'(으)로 탑재되었습니다.
 참고: /etc/wsl.conf에서 automount.root 설정을 수정한 경우 위치가 달라집니다.
 디스크를 마운트 해제하고 분리하려면 'wsl.exe {} {}'을(를) 실행합니다.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>디스크가 연결되었지만 탑재하지 못함: {}.
 자세한 내용은 WSL2 내에서 'dmesg'를 실행합니다.
 디스크를 분리하려면 'wsl.exe {} {}'을(를) 실행합니다.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>다음은 설치할 수 있는 유효한 배포 목록입니다.
@@ -177,6 +196,7 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>디스크를 탑재하려면 관리자 액세스 권한이 필요합니다.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>배포를 내보내지 못했습니다.</value>
@@ -309,7 +329,7 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD가 이미 wsl.exe --mount, 를 통해 마운트되었습니다. 시작하기 전에 디스크를 마운트 해제하세요.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>현재 컴퓨터 구성에서는 WSL1이 지원되지 않습니다.
@@ -608,7 +628,7 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL 버전: {}
@@ -631,8 +651,8 @@ Windows 버전: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>{}에서 사용자 지정 커널 모듈 vhd를 찾을 수 없습니다. '{}'.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>{}에서 사용자 지정 커널 모듈 VHD를 찾을 수 없습니다. '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>{}에 지정된 사용자 지정 시스템 배포가 없거나 올바른 형식이 아닙니다.</value>
@@ -693,7 +713,7 @@ Windows 버전: {}</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>ARM64의 wsl.exe --mount Windows 버전 27653 이상이 필요합니다.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Linux용 Windows 하위 시스템 최신 버전이 이미 설치되어 있습니다.</value>
@@ -828,6 +848,7 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>레거시 배포 등록을 사용하고 있습니다. tar 기반 배포를 대신 사용하는 것이 좋습니다.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>레거시 배포 등록은 --version 인수를 지원하지 않습니다.</value>
@@ -859,7 +880,7 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>'{}'에서 스왑 디스크를 만들지 못함: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="MessageFailedToCreateDisk" xml:space="preserve">
     <value>디스크 '{}' 생성에 실패했습니다. {}</value>
@@ -878,6 +899,7 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>안전 모드 사용 - 많은 기능을 사용할 수 없습니다.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>미러된 네트워킹 모드는 지원되지 않음: {}.
@@ -900,24 +922,30 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>DNS 터널링은 지원되지 않습니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>미러된 네트워킹 모드를 사용할 때는 wsl2.localhostForwarding 설정이 적용되지 않습니다.</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>호스트에서 HTTP 프록시 변경이 검색되었습니다. 변경 내용을 적용하려면 WSL을 다시 시작하세요.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>localhost 프록시 구성이 검색되었지만 WSL로 미러링되지 않았습니다. NAT 모드의 WSL은 localhost 프록시를 지원하지 않습니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>IPv6 프록시 구성이 검색되었지만 WSL로 미러링되지 않았습니다. NAT 모드의 WSL은 IPv6을 지원하지 않습니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>localhost IPv6 프록시 구성이 검색되었지만 WSL에 미러링되지 않았습니다. WSL은 localhost IPv6 프록시를 지원하지 않습니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>프록시 설정을 확인하는 동안 예기치 않은 오류가 발생했습니다. 프록시 설정이 WSL에 미러링되지 않았습니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>레지스트리에 액세스하는 동안 오류가 발생했습니다. 경로: '{}'. 오류: {}</value>
@@ -960,10 +988,20 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount 가 컴퓨터 정책에 의해 비활성화되었습니다.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>컴퓨터 정책에 따라 WSL1을 사용할 수 없습니다.</value>
+  </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>WSL 컨테이너가 컴퓨터 정책에 의해 비활성화되었습니다.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>컴퓨터 정책에 따라 컨테이너 레지스트리 허용 목록이 구성되어 컨테이너 이미지 빌드가 차단되었습니다. 이미지 빌드는 임의의 레지스트리에서 기본 이미지를 가져올 수 있으며 허용 목록으로 안정적으로 제한할 수 없습니다.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>'wsl.exe --set-version {} 2'를 실행하여 WSL2로 업그레이드하세요.</value>
@@ -1023,7 +1061,7 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{}은(는) 올바른 부울이 아닙니다&lt;true|false&gt;</value>
@@ -1031,6 +1069,7 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>스파스 VHD는 WSL2에서만 지원됩니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL을 로컬 시스템으로 실행할 수 없습니다.</value>
@@ -1080,7 +1119,7 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>VHD 파일인 것 같습니다. --vhd 사용하여 tar 대신 VHD를 가져옵니다.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Microsoft Store에서 {}을(를) 설치하지 못함: {}
@@ -1128,23 +1167,26 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>현재 전역 보안 액세스 클라이언트와의 호환성 문제가 발생하여 DNS 터널링이 비활성화되었습니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>데이터 손상 가능성으로 인해 스파스 VHD 지원은 현재 비활성화되어 있습니다.
 배포 시 강제로 스파스 VHD를 사용하도록 하려면 다음을 실행하세요. 
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{}을(를) 탑재하지 못했습니다. 자세한 내용은 dmesg를 참조하세요.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>/etc/fstab을 mount -a로 처리하지 못했습니다.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>배포 디스크를 탑재하는 동안 오류가 발생했습니다. 대체로 읽기 전용으로 탑재되었습니다.
 복구 지침 참조: https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>'{}'을(를) 번역하지 못했습니다</value>
@@ -1183,28 +1225,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>자동 프록시 사용</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>WSL에서 Windows의 HTTP 프록시 정보를 사용할 수 있도록 합니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>자동 프록시를 사용하도록 설정했습니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL에서 Windows의 HTTP 프록시 정보를 사용할 수 있도록 합니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>최상의 DNS 구문 분석 사용</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>wsl2.dnsTunneling true로 설정된 경우에만 적용할 수 있습니다. true로 설정하면 Windows에서 DNS 요청에서 질문을 추출하고 resolve 시도합니다. 알 수 없는 레코드는 무시됩니다.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>최상의 DNS 구문 분석을 사용합니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>wsl2.dnsTunneling이 true로 설정된 경우에만 적용할 수 있습니다. true로 설정하면 Windows에서 DNS 요청에서 질문을 추출하고 resolve 시도합니다. 알 수 없는 레코드는 무시됩니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>사용자 지정 커널</value>
@@ -1226,6 +1275,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>사용자 지정 Linux 커널 모듈 VHD에 대한 절대 Windows 경로입니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>커널 모듈 찾아보기</value>
@@ -1235,6 +1285,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>사용자 지정 Linux 커널 모듈 VHD에 대한 절대 Windows 경로입니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>사용자 지정 시스템 배포판</value>
@@ -1244,7 +1295,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>사용자 지정 시스템 배포판으로 로드되는 VHD의 경로를 지정합니다. 주로 WSL에서 GUI 앱을 제공하는 데 사용됩니다. [] 여기서 시스템 배포판에 대해 자세히 알아보세요.</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1255,6 +1306,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL에서 주로 GUI 앱 구동에 사용하는 사용자 지정 시스템 배포판으로 로드할 VHD의 경로를 지정합니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>디버그 콘솔 사용</value>
@@ -1270,18 +1322,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
     <value>기본 VHD 크기</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>새로 만든 배포에 대해서만 확장 가능한 WSL VHD(가상 하드 디스크)의 기본 최대 크기입니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>크기 초기화</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>기본 VHD 크기</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>새로 만든 배포에 대해서만 확장 가능한 WSL VHD(가상 하드 디스크)의 기본 최대 크기(MB)입니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>개발자</value>
@@ -1301,28 +1357,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS 프록시 사용</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>wsl2.networkingMode NAT로 설정된 경우에만 적용할 수 있습니다. WSL에 Linux의 DNS 서버를 호스트의 NAT로 구성하도록 알리는 부울입니다. false로 설정하면 DNS 서버가 Windows에서 Linux로 미러.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS 프록시를 사용하도록 설정했습니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>wsl2.networkingMode가 NAT로 설정된 경우에만 적용할 수 있습니다. WSL에 Linux의 DNS 서버를 호스트의 NAT로 구성하도록 알리는 부울입니다. false로 설정하면 DNS 서버가 Windows에서 Linux로 미러.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>DNS 터널링 사용</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>DNS 요청이 WSL에서 Windows로 프록시되는 방법을 변경합니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS 터널링을 사용하도록 설정했습니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>DNS 요청이 WSL에서 Windows로 프록시되는 방법을 변경합니다.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>파일 시스템</value>
@@ -1398,19 +1461,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>초기 자동 프록시 시간 제한</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>wsl2.autoProxy true로 설정된 경우에만 적용할 수 있습니다. WSL 컨테이너를 시작할 때 WSL에서 HTTP 프록시 정보를 검색할 때까지 대기하는 시간(밀리초)을 구성합니다. 이 시간 후에 프록시 설정이 확인되면 검색된 프록시 설정을 사용하려면 WSL instance 다시 시작해야 합니다.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>초기화 시간 제한</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>초기 자동 프록시 시간 제한</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>wsl2.autoProxy가 true로 설정된 경우에만 적용할 수 있습니다. WSL 컨테이너를 시작할 때 WSL에서 HTTP 프록시 정보 검색을 기다리는 시간(밀리초)을 구성합니다. 이 시간 후에 프록시 설정이 확인되면 검색된 프록시 설정을 사용하려면 WSL 인스턴스를 다시 시작해야 합니다.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>커널 명령줄</value>
@@ -1586,6 +1652,7 @@ WSL과 함께 Docker Desktop을 사용할 경우의 이점은 다음과 같습�
 • 동일한 Docker 디먼 및 이미지를 사용하여 WSL 또는 Windows에서 Docker 명령을 실행할 수 있습니다.
 • WSL에서 Windows 드라이브의 자동 탑재를 사용하여 Windows와 Linux 간에 파일 및 폴더를 원활하게 공유할 수 있습니다.
 • WSL의 상호 운용성 덕분에 기본 Windows 도구 및 편집기를 사용하여 Linux 코드 및 파일에서 작업할 수 있으며 그 반대의 경우도 마찬가지입니다.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker 데스크톱 통합</value>
@@ -1753,15 +1820,19 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>안전 모드 사용</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>많은 기능을 사용하지 않도록 설정하고 잘못된 상태의 배포를 복구하는 데 사용되는 "안전 모드"에서 WSL을 실행합니다.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>안전 모드를 사용하도록 설정합니다.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>많은 기능을 사용하지 않도록 설정하고 잘못된 상태의 배포를 복구하는 데 사용되는 "안전 모드"에서 WSL을 실행합니다.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>정보</value>
@@ -1826,45 +1897,58 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
     <value>기본값으로 스파스 VHD 사용</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
     <value>새로 생성된 VHD는 활성화하면 자동으로 스파스로 설정됩니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>기본값으로 스파스 VHD를 사용하도록 설정합니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>새로 생성된 VHD는 활성화하면 자동으로 스파스로 설정됩니다.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>스왑 파일 위치</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>스왑 가상 하드 디스크의 절대 Windows 경로입니다.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>스왑 파일 찾아보기</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>스왑 파일 위치</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>스왑 가상 하드 디스크의 절대 Windows 경로입니다.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>스왑 크기</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>WSL 2 VM에 추가할 스왑 공간의 크기입니다. 스왑 파일이 없으면 0입니다. 스왑 스토리지는 메모리 요구량이 하드웨어 장치의 한도를 초과할 때 사용되는 디스크 기반 RAM입니다.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>크기 초기화</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>전환 크기</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL 2 VM에 추가할 스왑 공간(MB)입니다. 스왑 파일이 없는 경우 0입니다. 스왑 스토리지는 메모리 요구가 하드웨어 장치의 한도를 초과하는 경우 사용되는 디스크 기반 RAM입니다.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>VirtIO 사용</value>
@@ -1877,6 +1961,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>virtio 전송을 사용하여 호스트에서 9P 파일 시스템을 탑재할 수 있도록 합니다.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>VM 유휴 시간 제한</value>
@@ -2024,8 +2109,25 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 '{}'(이)가 실행되고 있지 않습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress는 아직 지원되지 않습니다.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>컨테이너 '{}'(이)가 실행 중입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>컨테이너 네트워크 모드에서는 추가 네트워크가 허용되지 않습니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>컨테이너 네트워크 모드에는 대상 컨테이너 이름이 필요합니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>'{}' 대상 컨테이너를 찾을 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
@@ -2034,6 +2136,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
     <value>사용자 지정 네트워크 유형에는 컨테이너 네트워크 이름이 필요합니다.</value>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>네트워크 이름은 비워 둘 수 없습니다.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>인식할 수 없는 명령: '{}'</value>
@@ -2165,6 +2270,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 이미지: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>잘못된 필터: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>잘못된 이름: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2183,6 +2292,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>필수 옵션 누락: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>'{}' 옵션에 대한 값이 잘못됨: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>알 수 없는 옵션: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2213,6 +2330,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크 '{}'이(가) 이미 있습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>기본 네트워크 모드가 'host' 또는 'none'일 때 추가 네트워크는 허용되지 않습니다.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>중복 네트워크: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>볼륨 '{}'을(를) 만들지 못함: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2228,6 +2353,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
     <value>'{}'을(를) 열지 못함: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>파이프에서 가져오기는 지원되지 않습니다. 파일에서 stdin을 리디렉션하세요.</value>
   </data>
   <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
     <value>'{}'에서 Containerfile 또는 Dockerfile을 찾을 수 없습니다.</value>
@@ -2299,6 +2427,16 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>컨테이너에 대한 로그를 봅니다.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>중지된 모든 컨테이너를 제거하세요.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>중지된 모든 컨테이너를 제거하세요.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>회수된 총 공간: {:.2f}MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>컨테이너를 제거합니다.</value>
   </data>
@@ -2317,6 +2455,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
     <value>컨테이너를 시작합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>컨테이너 리소스 사용량 통계를 표시합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>실행 중인 컨테이너의 리소스 사용량(CPU, 메모리, 네트워크 I/O, 블록 I/O 및 PID)의 스냅샷을 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>컨테이너를 중지합니다.</value>
@@ -2343,6 +2487,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>이미지를 검사합니다.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>tarball에서 이미지를 가져옵니다.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>tarball의 콘텐츠를 가져와서 파일 시스템 이미지를 만듭니다. 필요에 따라 리포지토리 및 태그 이름으로 이미지에 태그를 지정합니다.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>이미지를 나열합니다.</value>
@@ -2467,6 +2617,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>컨테이너 레지스트리 로그인 및 로그아웃을 포함하여 레지스트리 자격 증명을 관리합니다.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>시스템 수준 명령</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>시스템 수준 관리 명령입니다.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>이미지에 태그를 지정합니다.</value>
   </data>
@@ -2570,6 +2726,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>Dockerfile 경로(stdin 읽으려면 "-" 사용)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>제공된 조건에 따라 출력 필터링</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>'-f, --filter' 플래그에 대한 인수 "{}"가 잘못되었습니다: 필터 형식이 잘못되었습니다(name=value 형식이어야 함).</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>로그 출력 따라가기</value>
   </data>
@@ -2594,6 +2756,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>이미지 이름</value>
   </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>stdin에서 읽으려면 파일 또는 -</value>
+  </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>이미지가 포함된 tar 보관 파일의 경로를 제공합니다.</value>
   </data>
@@ -2602,6 +2767,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>레이블 키는 비워 둘 수 없습니다.</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>최근에 생성된 컨테이너 n개 표시(모든 상태 포함)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>가장 최근에 만든 컨테이너 표시(모든 상태 포함)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>컨테이너 호스트 이름</value>
@@ -2636,11 +2807,21 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>중지된 후 컨테이너 제거</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>컨테이너를 중지하라는 신호</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>/dev/shm의 크기(예: 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>세션 ID</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>세션 저장소 경로</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>보낼 신호</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 현재 또는 기존 이미지 참조</value>
@@ -2674,7 +2855,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 내부의 작업 디렉터리</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>제공된 경로에 컨테이너 ID를 씁니다.</value>
+    <value>제공된 경로에 컨테이너 ID 쓰기</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf DNS 이름 서버의 IP 주소</value>
@@ -2750,6 +2931,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 {} 값: {}이(가) 유효한 범위({}-{})를 벗어났습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>잘못된 {} 인수 값: '{}'. 메모리 크기가 필요합니다(예: 256M, 1G).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID 파일 '{}'이(가) 이미 존재합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>이미지 '{}'을(를) 찾을 수 없습니다. 끌어오는 중</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2798,9 +2987,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>볼륨 이름</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>볼륨 드라이버 이름 지정(기본값 {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>볼륨 드라이버 이름을 지정합니다. 예: 'guest' 또는 'vhd' (기본값: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>드라이버별 옵션 설정</value>
@@ -2850,6 +3039,42 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
     <value>개체를 찾을 수 없음: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>컨테이너 ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>IMAGE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>생성됨</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>포트</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>CPU %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>최대 사용량/제한</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>MEM %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>NET I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>블록 I/O</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PIDS</value>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>경고: {}:{}의 '{}' 설정 값이 잘못되었습니다.</value>

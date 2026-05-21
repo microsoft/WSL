@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName><!-- _locComment_text='{Locked="WSL"}' -->WSL</displayName>
+  <description><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
+
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Povolit Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Pokud je tato zásada nastavená na zakázáno, zakáže přístup ke spouštění linuxových distribucí v nástroji Windows Subsystem for Linux pro všechny uživatele na počítači.</string>
+
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Povolit integrovanou verzi Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Když je tato zásada zakázaná, zakáže se integrovaná verze (volitelná součást) Windows Subsystem for Linux. Pokud je tato zásada zakázaná, dá se používat jen verze WSL ze Storu.</string>
+
+        <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Povolit WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Když je tato zásada zakázaná, zakáže se WSL1. Když je zakázaná, dají se používat jen distribuce WSL2.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Povolit vlastní konfiguraci jádra</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace jádra prostřednictvím .wslconfig (wsl2.kernel). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Povolit vlastní konfiguraci systémové distribuce</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace systémové distribuce prostřednictvím .wslconfig (wsl2.systemDistro). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Povolit konfiguraci příkazového řádku jádra</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace příkazového řádku jádra prostřednictvím .wslconfig (wsl2.kernelCommandLine). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="AllowDebugShell">Povolit ladicí shell</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se ladicí shell (wsl.exe --debug-shell). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Povolit vnořenou virtualizaci</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace vnořené virtualizace prostřednictvím .wslconfig (wsl2.nestedVirtualization). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Povolit ladění jádra</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace ladění jádra prostřednictvím .wslconfig (wsl2.kernelDebugPort). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Povolit vlastní konfiguraci sítě</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se vlastní konfigurace sítě prostřednictvím .wslconfig (wsl2.networkingMode). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Povolit uživatelskou konfiguraci brány firewall</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Když je tato zásada zakázaná, zakáže se konfigurace brány firewall prostřednictvím .wslconfig (wsl2.firewall). Tato zásada platí jen pro Store WSL.</string>
+
+        <string id="AllowDiskMount">Povolit připojení předávaného disku</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Nakonfigurovat výchozí síťový režim</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment_text='{Locked="WSL2"}' -->Tato zásada určuje výchozí síťový režim, který se má používat pro WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+
+        <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Kontejner WSL</string>
+
+        <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Povolit kontejner WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tato zásada určuje, jestli se na tomto počítači dá používat kontejner WSL. Když je tato zásada povolená nebo není nakonfigurovaná, uživatelé a aplikace pro Windows můžou spouštět kontejnery Linuxu přes WSL. Když je tato zásada zakázaná, kontejner WSL se zablokuje pro všechny uživatele a aplikace pro Windows nemůžou spouštět kontejnery Linuxu. Upozornění: Nastavení na 'Disabled' může narušit aplikace pro Windows, které závisejí na kontejnerech Linuxu.</string>
+
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Seznam povolených registrů pro kontejnery WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Když je tato zásada povolená, kontejner WSL bude moct stahovat image jen z registrů uvedených tady. Ovlivní to rozhraní CLI kontejneru WSL i všechny aplikace používající rozhraní API kontejneru WSL.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Výchozí síťový režim</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Povolené registry</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

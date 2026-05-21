@@ -40,25 +40,23 @@ using namespace std::chrono_literals;
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
-// Use these instead of TEST_METHOD() for tests that only apply to a specific WSL version.
-// When run via run-tests.ps1 or CloudTest, inapplicable tests are excluded from the run
-// entirely (no "skipped" noise) via TAEF /select: queries.
+// If the test version doesn't match the version passed to te.exe, the test is ignored.
 //
 #define WSL1_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"1") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=1)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSL2_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
@@ -88,6 +86,15 @@ using namespace std::chrono_literals;
         if constexpr (wsl::shared::Arm64) \
         { \
             LogSkipped("This test is skipped for ARM64"); \
+            return; \
+        } \
+    }
+
+#define SKIP_TEST_SERVER() \
+    { \
+        if (IsWindowsServer()) \
+        { \
+            LogSkipped("This test is skipped on Windows Server SKUs"); \
             return; \
         } \
     }
@@ -528,6 +535,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernelModules;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
+    std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
@@ -594,6 +602,10 @@ void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, con
 std::string ReadToString(SOCKET Handle);
 std::string ReadToString(HANDLE Handle);
 
+// Connects a pair of overlapped TCP sockets via an anonymous bind on the loopback interface.
+// Returns {client, server}.
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
+
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
@@ -604,6 +616,8 @@ std::string EscapeString(const std::string& Input);
 void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
+
+void LoadTestImage(IWSLCSession& session, std::string_view imageName);
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
@@ -664,3 +678,9 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size);
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);

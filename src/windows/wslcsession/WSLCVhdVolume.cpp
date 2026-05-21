@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "DockerHTTPClient.h"
+#include "OptionParser.h"
 #include "WSLCVhdVolume.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCVolumeMetadata.h"
@@ -26,6 +27,45 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
+    constexpr auto c_sizeBytesOpt = "SizeBytes";
+    constexpr auto c_fixedOpt = "Fixed";
+    constexpr auto c_uidOpt = "Uid";
+    constexpr auto c_gidOpt = "Gid";
+
+    struct VhdVolumeOptions
+    {
+        ULONGLONG SizeBytes{};
+        bool Fixed{false};
+        std::optional<uint32_t> Uid;
+        std::optional<uint32_t> Gid;
+
+        static VhdVolumeOptions Parse(const std::map<std::string, std::string>& DriverOpts)
+        {
+            OptionParser parser(DriverOpts);
+            VhdVolumeOptions opts{};
+
+            opts.SizeBytes = parser.Required<ULONGLONG>(c_sizeBytesOpt);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, DriverOpts.at(c_sizeBytesOpt)), opts.SizeBytes == 0);
+
+            opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
+
+            // Uid and Gid must be supplied together — leaving one as the
+            // mkfs default (root) is a confusing footgun.
+            opts.Uid = parser.Optional<uint32_t>(c_uidOpt);
+            opts.Gid = parser.Optional<uint32_t>(c_gidOpt);
+            if (opts.Uid.has_value() != opts.Gid.has_value())
+            {
+                const auto* missing = opts.Uid.has_value() ? c_gidOpt : c_uidOpt;
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(missing));
+            }
+
+            parser.RejectUnknown();
+
+            return opts;
+        }
+    };
+
     std::string GenerateName()
     {
         std::random_device rd;
@@ -42,22 +82,6 @@ namespace {
         }
 
         return name;
-    }
-
-    ULONGLONG ParseSizeBytes(std::map<std::string, std::string>& DriverOpts)
-    {
-        const auto it = DriverOpts.find("SizeBytes");
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption("SizeBytes"), it == DriverOpts.end());
-
-        auto& value = it->second;
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value.empty() || value[0] == '-');
-
-        errno = 0;
-        char* end = nullptr;
-        auto sizeBytes = wsl::shared::string::ToUInt64(value.c_str(), &end);
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), errno != 0 || *end != '\0' || sizeBytes == 0);
-
-        return sizeBytes;
     }
 
 } // namespace
@@ -98,7 +122,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     DockerHTTPClient& DockerClient)
 {
     std::string name = (Name != nullptr && Name[0] != '\0') ? std::string(Name) : GenerateName();
-    auto sizeBytes = ParseSizeBytes(DriverOpts);
+    const auto opts = VhdVolumeOptions::Parse(DriverOpts);
     auto hostPath = StoragePath / "volumes" / (name + ".vhdx");
 
     auto createVhdCleanup =
@@ -107,12 +131,14 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     std::filesystem::create_directories(hostPath.parent_path());
 
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
-    wsl::core::filesystem::CreateVhd(hostPath.c_str(), sizeBytes, tokenInfo->User.Sid, false, false);
+    wsl::core::filesystem::CreateVhd(hostPath.c_str(), opts.SizeBytes, tokenInfo->User.Sid, false, opts.Fixed);
 
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
 
-    VirtualMachine.Ext4Format(device);
+    // Ownership is baked into the ext4 root inode at format time so the
+    // container user can write without a post-mount chown.
+    VirtualMachine.Ext4Format(device, opts.Uid, opts.Gid);
 
     auto virtualMachinePath = std::format("/mnt/wslc-volumes/{}", name);
     VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
@@ -147,7 +173,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-            std::move(name), std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), std::move(DriverOpts), std::move(Labels), VirtualMachine, DockerClient);
+            std::move(name), std::move(hostPath), opts.SizeBytes, lun, std::move(virtualMachinePath), std::move(DriverOpts), std::move(Labels), VirtualMachine, DockerClient);
         volume->m_createdAt = createdVolume.CreatedAt;
 
         mountCleanup.release();
@@ -176,7 +202,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
 
     auto hostPath = std::filesystem::path(hostPathIt->second);
     auto driverOpts = metadata.DriverOpts;
-    auto sizeBytes = ParseSizeBytes(driverOpts);
+    const auto opts = VhdVolumeOptions::Parse(driverOpts);
 
     THROW_HR_IF(E_INVALIDARG, !Volume.Options.has_value());
     auto deviceIt = Volume.Options->find("device");
@@ -201,7 +227,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
     auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-        std::string{Volume.Name}, std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), std::move(driverOpts), std::move(userLabels), VirtualMachine, DockerClient);
+        std::string{Volume.Name}, std::move(hostPath), opts.SizeBytes, lun, std::move(virtualMachinePath), std::move(driverOpts), std::move(userLabels), VirtualMachine, DockerClient);
     volume->m_createdAt = Volume.CreatedAt;
 
     mountCleanup.release();
