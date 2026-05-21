@@ -2429,10 +2429,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Exibir logs de um contêiner.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Remova todos os contêineres parados.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Remove todos os contêineres parados.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Espaço total recuperado: {:.2f} MB</value>

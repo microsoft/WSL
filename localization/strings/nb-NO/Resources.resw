@@ -2422,10 +2422,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Vis logger for en beholder.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Fjern alle beholdere som er stoppet.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Fjerner alle beholdere som er stoppet.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Total frigjort plass: {:.2f} MB</value>

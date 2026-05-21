@@ -2422,10 +2422,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Logboeken van een container weergeven.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Verwijder alle gestopte containers.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Verwijdert alle gestopte containers.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Totale opnieuw vrijgemaakt ruimte: {:.2f} MB</value>

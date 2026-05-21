@@ -2428,10 +2428,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Protokolle für einen Container anzeigen.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
-    <value>Remove all stopped containers.</value>
+    <value>Entfernen Sie alle beendeten Container.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
-    <value>Removes all stopped containers.</value>
+    <value>Entfernt alle beendeten Container.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
     <value>Insgesamt zurückgewonnener Speicherplatz: {:.2f} MB</value>
