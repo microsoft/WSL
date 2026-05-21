@@ -2270,6 +2270,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Imagen no válida: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Filtro no válido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Nombre no válido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2422,6 +2426,16 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Consulta los registros de un contenedor.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Quita todos los contenedores detenidos.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Quita todos los contenedores detenidos.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Espacio total reclamado: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Quita los contenedores.</value>

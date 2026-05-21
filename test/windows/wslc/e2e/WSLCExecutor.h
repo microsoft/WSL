@@ -44,6 +44,7 @@ struct WSLCExecutionResult
     std::vector<std::wstring> GetStdoutLines() const;
     std::wstring GetStdoutOneLine() const;
     bool StdoutContainsLine(const std::wstring& expectedLine) const;
+    bool StdoutContainsSubstring(const std::wstring& substring) const;
 };
 
 // Interactive session for testing wslc commands that require stdin/stdout interaction.

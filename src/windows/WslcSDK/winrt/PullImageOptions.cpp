@@ -17,24 +17,62 @@ Abstract:
 #include "Microsoft.WSL.Containers.PullImageOptions.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-PullImageOptions::PullImageOptions(hstring const& uri)
+
+PullImageOptions::PullImageOptions(hstring const& uri) : m_uri(winrt::to_string(uri))
 {
-    throw hresult_not_implemented();
+    if (uri.empty())
+    {
+        throw hresult_invalid_argument(L"URI cannot be empty");
+    }
 }
+
 hstring PullImageOptions::Uri()
 {
-    throw hresult_not_implemented();
+    return winrt::to_hstring(m_uri);
 }
+
 void PullImageOptions::Uri(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_pullImageOptions)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument(L"URI cannot be empty");
+    }
+
+    m_uri = winrt::to_string(value);
 }
+
 hstring PullImageOptions::RegistryAuth()
 {
-    throw hresult_not_implemented();
+    return winrt::to_hstring(m_registryAuth);
 }
+
 void PullImageOptions::RegistryAuth(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_pullImageOptions)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    m_registryAuth = winrt::to_string(value);
 }
+
+WslcPullImageOptions PullImageOptions::ToStruct()
+{
+    if (!m_pullImageOptions)
+    {
+        m_pullImageOptions = std::make_unique<WslcPullImageOptions>();
+        m_pullImageOptions->uri = m_uri.c_str();
+        m_pullImageOptions->registryAuth = m_registryAuth.empty() ? nullptr : m_registryAuth.c_str();
+        m_pullImageOptions->progressCallback = nullptr;
+        m_pullImageOptions->progressCallbackContext = nullptr;
+    }
+
+    return *m_pullImageOptions;
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

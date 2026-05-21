@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.WslcService.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct WslcService
@@ -30,3 +31,5 @@ struct WslcService : WslcServiceT<WslcService, implementation::WslcService>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
+
+DEFINE_TYPE_HELPERS(WslcService);
