@@ -162,24 +162,19 @@ std::optional<std::string> ParseContainerTarget(std::string_view mode)
     return std::string{mode.substr(c_containerNetworkPrefix.size())};
 }
 
-std::optional<std::string> ParseContainerTarget(LPCSTR mode)
-{
-    return mode != nullptr ? ParseContainerTarget(std::string_view{mode}) : std::nullopt;
-}
-
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
     std::vector<_WSLCPortMapping>& requestedPorts,
     WSLCContainerNetworkType networkType,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
-    LPCSTR containerNetworkName,
+    const std::optional<std::string>& primaryNetworkName,
     DockerHTTPClient& dockerClient)
 {
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        containerNetworkName != nullptr && networkType != WSLCContainerNetworkTypeCustom,
-        "ContainerNetworkName must be null when network type is not Custom");
+        primaryNetworkName.has_value() && networkType != WSLCContainerNetworkTypeCustom,
+        "Primary network name must not be set when network type is not Custom");
 
     // Determine network mode string.
     std::string networkMode;
@@ -199,9 +194,9 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
     else if (networkType == WSLCContainerNetworkTypeCustom)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcContainerNetworkNameRequired(), !containerNetworkName || strlen(containerNetworkName) == 0);
+            E_INVALIDARG, Localization::MessageWslcContainerNetworkNameRequired(), !primaryNetworkName || primaryNetworkName->empty());
 
-        containerTarget = ParseContainerTarget(containerNetworkName);
+        containerTarget = ParseContainerTarget(*primaryNetworkName);
         if (containerTarget)
         {
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcContainerModeRequiresTarget(), containerTarget->empty());
@@ -223,9 +218,9 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
         else
         {
             THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(containerNetworkName), !sessionNetworks.contains(containerNetworkName));
+                WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(*primaryNetworkName), !sessionNetworks.contains(*primaryNetworkName));
 
-            networkMode = containerNetworkName;
+            networkMode = *primaryNetworkName;
         }
     }
     else
@@ -442,20 +437,22 @@ constexpr ULONG GetAdditionalStartIndex(WSLCContainerNetworkType type)
     return (type == WSLCContainerNetworkTypeCustom) ? 1 : 0;
 }
 
-LPCSTR GetPrimaryNetworkName(const WSLCContainerNetwork& network)
+std::optional<std::string> GetPrimaryNetworkName(const WSLCContainerNetwork& network)
 {
     const auto type = network.ContainerNetworkType;
     if (type != WSLCContainerNetworkTypeCustom || network.NetworksCount == 0)
     {
-        return nullptr;
+        return std::nullopt;
     }
     THROW_HR_IF_MSG(E_INVALIDARG, network.Networks == nullptr, "Networks pointer is null but NetworksCount=%lu", network.NetworksCount);
-    return network.Networks[0].NetworkName;
+    THROW_HR_IF_MSG(E_INVALIDARG, network.Networks[0].NetworkName == nullptr, "NetworkName is null for first network entry");
+    return std::string{network.Networks[0].NetworkName};
 }
 
 void ProcessAdditionalNetworks(
     const WSLCContainerNetwork& network,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    const std::optional<std::string>& primaryNetworkName,
     const std::string& primaryNetworkMode,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
@@ -480,7 +477,7 @@ void ProcessAdditionalNetworks(
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcContainerModeNoAdditionalNetworks(),
-        ParseContainerTarget(GetPrimaryNetworkName(network)).has_value());
+        primaryNetworkName && ParseContainerTarget(*primaryNetworkName).has_value());
 
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
@@ -1663,17 +1660,14 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     // Process port mappings from container options.
+    auto primaryNetworkName = GetPrimaryNetworkName(containerOptions.ContainerNetwork);
+
     auto [mappedPorts, networkMode] = ProcessPortMappings(
-        ports,
-        containerOptions.ContainerNetwork.ContainerNetworkType,
-        virtualMachine,
-        sessionNetworks,
-        GetPrimaryNetworkName(containerOptions.ContainerNetwork),
-        DockerClient);
+        ports, containerOptions.ContainerNetwork.ContainerNetworkType, virtualMachine, sessionNetworks, primaryNetworkName, DockerClient);
 
     request.HostConfig.NetworkMode = networkMode;
 
-    ProcessAdditionalNetworks(containerOptions.ContainerNetwork, sessionNetworks, networkMode, request);
+    ProcessAdditionalNetworks(containerOptions.ContainerNetwork, sessionNetworks, primaryNetworkName, networkMode, request);
 
     for (const auto& e : mappedPorts)
     {
