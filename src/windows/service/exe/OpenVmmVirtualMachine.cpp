@@ -329,6 +329,25 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
 
     SubProcess process(m_openvmmPath.c_str(), cmd.c_str());
 
+    // Set OPENVMM_LOG so the openvmm tracing subscriber emits detailed logs.
+    // Without this, only INFO-level messages appear (the default), which omits
+    // most operational output from VM creation and runtime.
+    // The variable is set in the current process environment and inherited by the
+    // child; restore it after Start() to avoid polluting the service environment.
+    wil::unique_hlocal_string previousLog;
+    DWORD prevLen = GetEnvironmentVariableW(L"OPENVMM_LOG", nullptr, 0);
+    if (prevLen > 0)
+    {
+        previousLog.reset(static_cast<PWSTR>(LocalAlloc(LMEM_FIXED, prevLen * sizeof(WCHAR))));
+        THROW_IF_NULL_ALLOC(previousLog.get());
+        GetEnvironmentVariableW(L"OPENVMM_LOG", previousLog.get(), prevLen);
+    }
+
+    SetEnvironmentVariableW(L"OPENVMM_LOG", L"info,openvmm=debug");
+    auto restoreEnv = wil::scope_exit([&] {
+        SetEnvironmentVariableW(L"OPENVMM_LOG", previousLog.get());
+    });
+
     // Redirect stdout and stderr to a log file for diagnostics.
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
     auto logPath = m_vsockPath.wstring() + L".log";
@@ -336,7 +355,17 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
         logPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
 
-    process.SetStdHandles(nullptr, logFile.get(), logFile.get());
+    // Duplicate the log file handle for stderr so that stdout and stderr are
+    // independent.  OpenVMM closes stdout after startup (pal::close_stdout),
+    // and if both handles share the same value that also invalidates stderr,
+    // silencing all tracing output.
+    wil::unique_hfile logFileForStderr;
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+        GetCurrentProcess(), logFile.get(),
+        GetCurrentProcess(), logFileForStderr.put(),
+        0, TRUE, DUPLICATE_SAME_ACCESS));
+
+    process.SetStdHandles(nullptr, logFile.get(), logFileForStderr.get());
 
     // Start the process. The returned handle is the process handle.
     m_processHandle = process.Start();
