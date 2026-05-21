@@ -2474,8 +2474,8 @@ void ProcessLaunchInitMessage(
 
         THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
-        auto MiniInitDirectChildPidStr = std::filesystem::read_symlink(PROCFS_PATH "/self");
-        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
+        auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
+        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
