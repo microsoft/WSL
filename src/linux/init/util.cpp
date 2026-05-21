@@ -3418,7 +3418,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         // Move child into the memory-limited user cgroup.
-        if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+        if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
         {
             LOG_WARNING("Failed to add process to user cgroup: {}", errno);
         }
@@ -3469,4 +3469,9 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     }
 
     return 0;
+}
+
+std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid)
+{
+    return std::format("{}/systemd-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
 }

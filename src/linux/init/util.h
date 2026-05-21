@@ -45,9 +45,8 @@ struct WslDistributionConfig;
 #define CGROUP_MOUNTPOINT "/sys/fs/cgroup"
 #define CGROUP2_DEVICE "cgroup2"
 #define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
-#define WSL_USER_CGROUP_PROCS WSL_USER_CGROUP_PATH "/cgroup.procs"
-#define WSL_USER_CGROUP_MEMORY_MAX WSL_USER_CGROUP_PATH "/memory.max"
-#define WSL_USER_CGROUP_CPU_MAX WSL_USER_CGROUP_PATH "/cpu.max"
+#define WSL_USER_NON_SYSTEMD_CGROUP_PATH WSL_USER_CGROUP_PATH "/non-systemd"
+#define WSL_USER_NON_SYSTEMD_CGROUP_PROCS WSL_USER_NON_SYSTEMD_CGROUP_PATH "/cgroup.procs"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
@@ -320,3 +319,5 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
 int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
+
+std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid);

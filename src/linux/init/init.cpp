@@ -1209,7 +1209,7 @@ try
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
                 // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
                 {
                     LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
                 }
@@ -1264,7 +1264,7 @@ try
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
                 // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
                 {
                     LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
                 }
@@ -2403,11 +2403,24 @@ Return Value:
 
             CreateWslSystemdUnits(Config);
 
-            // Move systemd into the memory-limited user cgroup.
-            if (WriteToFile(WSL_USER_CGROUP_PROCS, "0") != 0)
+            //
+            // Isolate systemd cgroups between distros.
+            //
+
+            try
             {
-                LOG_WARNING("Failed to move systemd to user cgroup {}", errno);
+                const auto MiniInitDirectChildPidStr = getenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+                if (MiniInitDirectChildPidStr == nullptr)
+                {
+                    throw RuntimeErrorWithSourceLocation("Missing environment variable: " LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+                }
+                unsetenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+                pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
+                std::string SystemdCgroup = UtilGetDistroSystemdCgroup(MiniInitDirectChildPid);
+                THROW_LAST_ERROR_IF(UtilMkdir(SystemdCgroup.c_str(), 0755) < 0 && errno != EEXIST);
+                THROW_LAST_ERROR_IF(WriteToFile((SystemdCgroup + "/cgroup.procs").c_str(), "0") != 0);
             }
+            CATCH_LOG();
 
             const char* Argv[] = {INIT_PATH, nullptr};
             std::vector<const char*> Env;
