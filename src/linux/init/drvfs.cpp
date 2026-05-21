@@ -156,8 +156,122 @@ Return Value:
     return {std::move(Plan9Options), std::move(StandardOptions)};
 }
 
-bool IsDrvfsElevated(void)
+DrvFsTransport ParseTransportName(std::string_view Value)
 
+/*++
+
+Routine Description:
+
+    Parses a transport= option value into a DrvFsTransport enum.
+
+Arguments:
+
+    Value - Supplies the value portion of a transport=<value> option.
+
+Return Value:
+
+    The parsed transport. Unknown values log a warning and return Invalid.
+
+--*/
+
+{
+    if (Value == "plan9")
+    {
+        return DrvFsTransport::Plan9;
+    }
+    else if (Value == "virtio9p")
+    {
+        return DrvFsTransport::Virtio9p;
+    }
+    else if (Value == "virtiofs")
+    {
+        return DrvFsTransport::Virtiofs;
+    }
+
+    LOG_WARNING("Unknown DrvFs transport '{}'", Value);
+    return DrvFsTransport::Invalid;
+}
+
+DrvFsTransport ExtractTransportOption(std::string& Options)
+
+/*++
+
+Routine Description:
+
+    Scans an option string for one or more transport=<value> tokens, removes
+    each from Options, and returns the requested transport. If multiple
+    transport= tokens are present, the last one wins. If no transport=
+    token is found, the function returns DrvFsTransport::Default and Options
+    is left unchanged. If the value is empty or unrecognized, returns
+    DrvFsTransport::Invalid.
+
+Arguments:
+
+    Options - Supplies a comma-separated DrvFs option string. Modified in
+        place: any transport= tokens are removed.
+
+Return Value:
+
+    The requested transport, DrvFsTransport::Default, or DrvFsTransport::Invalid.
+
+--*/
+
+{
+    constexpr std::string_view Prefix = "transport=";
+
+    if (Options.empty())
+    {
+        return DrvFsTransport::Default;
+    }
+
+    DrvFsTransport Result = DrvFsTransport::Default;
+    std::string Rebuilt;
+    Rebuilt.reserve(Options.size());
+    bool Found = false;
+
+    std::string_view Remaining = Options;
+    bool First = true;
+    while (!Remaining.empty())
+    {
+        auto Token = UtilStringNextToken(Remaining, ",");
+        if (wsl::shared::string::StartsWith(Token, Prefix))
+        {
+            Found = true;
+            const auto Value = std::string_view{Token}.substr(Prefix.size());
+            if (Value.empty())
+            {
+                LOG_WARNING("transport= option requires a value (plan9, virtio9p, virtiofs)");
+                Result = DrvFsTransport::Invalid;
+                continue;
+            }
+
+            if (Result != DrvFsTransport::Default)
+            {
+                LOG_WARNING("Multiple transport= options, using last");
+            }
+
+            Result = ParseTransportName(Value);
+            continue;
+        }
+
+        if (!First)
+        {
+            Rebuilt += ',';
+        }
+
+        Rebuilt += Token;
+        First = false;
+    }
+
+    if (Found)
+    {
+        Options = std::move(Rebuilt);
+    }
+
+    return Result;
+}
+
+bool IsDrvfsElevated(void)
 /*++
 
 Routine Description:
@@ -354,16 +468,58 @@ Return Value:
 
 try
 {
-    if (!UtilIsUtilityVm())
+    //
+    // Parse and consume any transport= override from the option string. The
+    // option is always honored on WSL2: if the user requests a transport
+    // whose backend the host has not set up, the underlying mount syscall
+    // (or the virtiofs RPC) will fail with a clear error. On WSL1 there is
+    // only the in-kernel drvfs driver, so the chosen value is ignored, but
+    // the token must still be stripped so it does not leak into mount(2).
+    //
+
+    std::string OptionsBuffer = Options ? Options : "";
+    const auto Transport = ExtractTransportOption(OptionsBuffer);
+    const char* EffectiveOptions = OptionsBuffer.c_str();
+
+    if (Transport == DrvFsTransport::Invalid)
     {
-        return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
-    }
-    else if (WSL_USE_VIRTIO_FS())
-    {
-        return MountVirtioFs(Source, Target, Options, Admin, Config, ExitCode);
+        fprintf(stderr, "mount: invalid transport= value; valid options are: plan9, virtio9p, virtiofs\n");
+        if (ExitCode)
+        {
+            *ExitCode = c_exitCodeInvalidUsage;
+        }
+
+        return -1;
     }
 
-    return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
+    if (!UtilIsUtilityVm())
+    {
+        if (Transport != DrvFsTransport::Default)
+        {
+            LOG_WARNING("transport= mount option is ignored on WSL1");
+        }
+
+        return MountFilesystem(DRVFS_FS_TYPE, Source, Target, EffectiveOptions, ExitCode);
+    }
+
+    switch (Transport)
+    {
+    case DrvFsTransport::Virtiofs:
+        return MountVirtioFs(Source, Target, EffectiveOptions, Admin, Config, ExitCode, false);
+
+    case DrvFsTransport::Plan9:
+    case DrvFsTransport::Virtio9p:
+        return MountPlan9(Source, Target, EffectiveOptions, Admin, Config, ExitCode, Transport);
+
+    case DrvFsTransport::Default:
+    default:
+        if (WSL_USE_VIRTIO_FS())
+        {
+            return MountVirtioFs(Source, Target, EffectiveOptions, Admin, Config, ExitCode);
+        }
+
+        return MountPlan9(Source, Target, EffectiveOptions, Admin, Config, ExitCode);
+    }
 }
 CATCH_RETURN_ERRNO()
 
@@ -409,7 +565,7 @@ Return Value:
     return ExitCode;
 }
 
-int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, int* ExitCode)
+int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, DrvFsTransport Transport, int* ExitCode)
 
 /*++
 
@@ -427,6 +583,10 @@ Arguments:
 
     Admin - Supplies a boolean specifying if the admin share should be used.
 
+    Transport - Supplies an optional transport override. When
+        DrvFsTransport::Default, the global feature flag (WSL_USE_VIRTIO_9P)
+        is consulted to pick between virtio9p and plan9-over-hvsocket.
+
     ExitCode - Supplies an optional pointer that receives the exit code.
 
 Return Value:
@@ -436,8 +596,23 @@ Return Value:
 --*/
 
 {
+    bool UseVirtio9p;
+    switch (Transport)
+    {
+    case DrvFsTransport::Plan9:
+        UseVirtio9p = false;
+        break;
+    case DrvFsTransport::Virtio9p:
+        UseVirtio9p = true;
+        break;
+    case DrvFsTransport::Default:
+    default:
+        UseVirtio9p = WSL_USE_VIRTIO_9P();
+        break;
+    }
+
     std::string MountOptions;
-    if (WSL_USE_VIRTIO_9P())
+    if (UseVirtio9p)
     {
         Source = Admin ? LX_INIT_DRVFS_ADMIN_VIRTIO_TAG : LX_INIT_DRVFS_VIRTIO_TAG;
         MountOptions = std::format("msize=262144,trans=virtio,{}", Options);
@@ -459,7 +634,7 @@ Return Value:
     }
 }
 
-int MountPlan9(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
+int MountPlan9(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode, DrvFsTransport Transport)
 
 /*++
 
@@ -534,7 +709,7 @@ try
     //
 
     MountOptions += Plan9Options;
-    if (MountPlan9Share(Source, Target, MountOptions.c_str(), Elevated, ExitCode) < 0)
+    if (MountPlan9Share(Source, Target, MountOptions.c_str(), Elevated, Transport, ExitCode) < 0)
     {
         return -1;
     }
@@ -543,7 +718,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
+int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode, bool AllowFallback)
 
 /*++
 
@@ -573,8 +748,6 @@ Return Value:
 
 try
 {
-    assert(WSL_USE_VIRTIO_FS());
-
     //
     // Check whether to use the elevated or non-elevated virtiofs server.
     //
@@ -603,19 +776,26 @@ try
     AddShare.WriteString(AddShare->OptionsOffset, Plan9Options);
 
     //
-    // Connect to the wsl service to add the virtiofs share. If adding the share fails, fallback to mounting using Plan9.
+    // Connect to the wsl service to add the virtiofs share.
     //
 
-    wsl::shared::SocketChannel Channel{UtilConnectVsock(LX_INIT_UTILITY_VM_VIRTIOFS_PORT, true), "VirtoFs"};
-    if (Channel.Socket() < 0)
+    wil::unique_fd channelFd{UtilConnectVsock(LX_INIT_UTILITY_VM_VIRTIOFS_PORT, true).release()};
+    if (!channelFd)
     {
         return -1;
     }
+
+    wsl::shared::SocketChannel Channel{std::move(channelFd), "VirtoFs"};
 
     gsl::span<gsl::byte> ResponseSpan;
     const auto& Response = Channel.Transaction<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(AddShare.Span(), &ResponseSpan);
     if (Response.Result != 0)
     {
+        if (!AllowFallback)
+        {
+            return -1;
+        }
+
         LOG_WARNING("Add virtiofs share for {} failed {}, falling back to Plan9", Source, Response.Result);
         return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
     }
@@ -667,8 +847,6 @@ Return Value:
 
 try
 {
-    assert(WSL_USE_VIRTIO_FS());
-
     wsl::shared::MessageWriter<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE> RemountShare(LxInitMessageRemountVirtioFsDevice);
     RemountShare->Admin = Admin;
     RemountShare.WriteString(RemountShare->TagOffset, Tag);
@@ -722,11 +900,6 @@ Return Value:
 
 try
 {
-    if (!WSL_USE_VIRTIO_FS())
-    {
-        return {};
-    }
-
     //
     // Validate the tag is a GUID.
     //

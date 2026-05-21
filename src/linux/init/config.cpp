@@ -2405,12 +2405,40 @@ try
             }
 
             //
+            // Detect the transport used by the existing mount from its
+            // super options. virtio9p mounts have `trans=virtio`; hvsocket
+            // plan9 mounts have `trans=fd`. This is required because the
+            // global default (WSL_USE_VIRTIO_9P) may not match the actual
+            // transport when the experimental DrvFsTransports option lets
+            // mounts use different transports concurrently.
+            //
+
+            DrvFsTransport ExistingTransport = WSL_USE_VIRTIO_9P() ? DrvFsTransport::Virtio9p : DrvFsTransport::Plan9;
+            {
+                std::string_view SuperOptions = MountEntry.SuperOptions;
+                while (!SuperOptions.empty())
+                {
+                    auto Option = UtilStringNextToken(SuperOptions, ",");
+                    if (Option == "trans=virtio")
+                    {
+                        ExistingTransport = DrvFsTransport::Virtio9p;
+                        break;
+                    }
+                    else if (Option == "trans=fd")
+                    {
+                        ExistingTransport = DrvFsTransport::Plan9;
+                        break;
+                    }
+                }
+            }
+
+            //
             // Construct new Plan9 mount options based on the existing mount.
             //
 
             NewMountOptions = MountEntry.MountOptions;
             NewMountOptions += ',';
-            if (WSL_USE_VIRTIO_9P())
+            if (ExistingTransport == DrvFsTransport::Virtio9p)
             {
                 //
                 // Check if the existing mount is a drvfs mount that needs to be remounted.
@@ -2443,7 +2471,7 @@ try
                 NewMountOptions += ',';
             }
 
-            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin);
+            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, ExistingTransport);
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
