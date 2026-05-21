@@ -233,6 +233,9 @@ private:
     wil::unique_handle m_portRelayChannelRead;
     wil::unique_handle m_portRelayChannelWrite;
 
+    // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
+    wil::unique_handle m_processJobObject;
+
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;
 
