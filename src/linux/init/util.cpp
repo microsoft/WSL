@@ -17,6 +17,7 @@ Abstract:
 #include <sys/epoll.h>
 #include <sys/utsname.h>
 #include <sys/types.h>
+#include <sys/sysinfo.h>
 #include <grp.h>
 #include <unistd.h>
 #include <sys/prctl.h>
@@ -26,6 +27,10 @@ Abstract:
 #include <iostream>
 #include <sstream>
 #include <regex>
+#include <thread>
+#include <chrono>
+#include <climits>
+#include <pthread.h>
 #include "common.h"
 #include "wslpath.h"
 #include "util.h"
@@ -3464,3 +3469,240 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     return 0;
 }
+
+#define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
+
+static long long int GetUserCpuTime()
+
+/*++
+
+Routine Description:
+
+    This routine parses /proc/stat to query a summary of all user CPU time.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    The current user CPU counter for all cores.
+
+--*/
+
+{
+    wil::unique_fd Fd{open("/proc/stat", O_RDONLY)};
+    if (!Fd)
+    {
+        LOG_ERROR("open failed {}", errno);
+        return -1;
+    }
+
+    char Buffer[32];
+    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
+    if (Result <= 0)
+    {
+        LOG_ERROR("read failed {}", errno);
+        return -1;
+    }
+
+    //
+    // Parse the first line of /proc/stat which is in the format
+    // "cpu  <counter>".
+    //
+
+    Buffer[Result] = '\0';
+    char* Sp1;
+    char* Info = strtok_r(Buffer, " \n", &Sp1);
+    if (Info == nullptr)
+    {
+        LOG_ERROR("/proc/stat first line missing cpu label");
+        return -1;
+    }
+
+    Info = strtok_r(nullptr, " \n", &Sp1);
+    if (Info == nullptr)
+    {
+        LOG_ERROR("/proc/stat first line missing cpu counter");
+        return -1;
+    }
+
+    return strtoll(Info, nullptr, 10);
+}
+
+static ssize_t GetMemoryInUse()
+
+/*++
+
+Routine Description:
+
+    This routine returns the amount memory in use in bytes.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    Total memory - Free memory. Includes that used by cache and buffers.
+
+--*/
+
+try
+{
+    struct sysinfo Info = {};
+    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
+    return (Info.totalram - Info.freeram) * Info.mem_unit;
+}
+CATCH_RETURN_ERRNO()
+
+void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
+
+/*++
+
+Routine Description:
+
+    This routine starts a background thread that performs memory compaction and optional cache/memory
+    reclaim when the VM is idle. This ensures that the maximum number of pages can be discarded to the host.
+
+Arguments:
+
+    Mode - Supplies the memory reclaim mode.
+
+Return Value:
+
+    None.
+
+--*/
+
+try
+{
+    std::thread([Mode = Mode]() mutable {
+        try
+        {
+            //
+            // Set the thread's scheduling policy to idle.
+            //
+
+            sched_param Parameter{};
+            Parameter.sched_priority = 0;
+            const int Result = pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter);
+            THROW_ERRNO_IF(Result, Result != 0);
+
+            //
+            // Periodically check if the machine is idle by querying procfs for CPU usage.
+            // Memory compaction will occur if both of the following conditions are true:
+            //     1. The CPU time since the last check is greater than the idle threshold.
+            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
+            //
+
+            double MemoryLow = 1024 * 1024 * 1024;
+            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
+            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
+            long long int Start, Stop = 0;
+            auto constexpr SleepDuration = std::chrono::seconds(30);
+            size_t ReclaimIndex = 0;
+            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
+            long long int ReclaimWindow[20] = {}; // 10 minutes
+            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
+            bool ReclaimIdling = false;
+
+            //
+            // Fall back to drop cache if the required cgroup path is not present.
+            //
+
+            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
+            {
+                LOG_WARNING("access({}, W_OK) failed {}, falling back to drop_caches", RECLAIM_PATH, errno);
+                Mode = LxMiniInitMemoryReclaimModeDropCache;
+            }
+
+            if (Mode == LxMiniInitMemoryReclaimModeGradual)
+            {
+                static_assert(COUNT_OF(ReclaimWindow) >= 6);
+                ReclaimWindowLength = 6; // Set to 3 minutes.
+            }
+
+            for (auto i = 1; i < ReclaimWindowLength; i++)
+            {
+                ReclaimWindow[i] = LLONG_MIN;
+            }
+
+            std::this_thread::sleep_for(SleepDuration);
+            for (;;)
+            {
+                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
+                Start = GetUserCpuTime();
+                THROW_LAST_ERROR_IF(Start == -1);
+
+                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
+                {
+                    //
+                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
+                    //
+
+                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
+                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
+                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
+                    {
+                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
+                        {
+                            double MemorySize = GetMemoryInUse();
+                            THROW_LAST_ERROR_IF(MemorySize < 0);
+
+                            if (MemorySize > MemoryHigh)
+                            {
+                                ReclaimIdling = false;
+                            }
+
+                            if (!ReclaimIdling && MemorySize > MemoryLow)
+                            {
+                                double MemoryTargetSize = MemorySize * 0.97;
+                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
+                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
+                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
+
+                                if (MemoryTargetSize < MemoryLow)
+                                {
+                                    ReclaimIdling = true;
+                                }
+                            }
+                        }
+                        else if (!ReclaimIdling)
+                        {
+                            ReclaimIdling = true;
+                            THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/drop_caches", "1\n") < 0);
+                        }
+                    }
+                    else
+                    {
+                        ReclaimIdling = false;
+                    }
+
+                    ReclaimIndex = LastIndex;
+                    ReclaimWindow[ReclaimIndex] = Start;
+                }
+
+                //
+                // Perform memory compaction if the VM is idle.
+                // This coalesces free pages into larger blocks for more efficient page reporting.
+                //
+
+                if ((Start - Stop) > IdleThreshold)
+                {
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    Stop = GetUserCpuTime();
+                    THROW_LAST_ERROR_IF(Stop == -1);
+                    if ((Stop - Start) < IdleThreshold)
+                    {
+                        THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/compact_memory", "1\n") < 0);
+                    }
+                }
+
+                std::this_thread::sleep_until(Target);
+            }
+        }
+        CATCH_LOG()
+    }).detach();
+}
+CATCH_LOG()
