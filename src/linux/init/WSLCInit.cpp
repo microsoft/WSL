@@ -30,6 +30,7 @@ Abstract:
 #include <arpa/inet.h>
 
 #include <pty.h>
+#include <mutex>
 #include "mountutilcpp.h"
 #include <filesystem>
 #include <iostream>
@@ -715,6 +716,10 @@ void HandleMessageImpl(
 
             WriteWslcCdiSpec();
             WriteDockerDaemonConfig();
+
+            // Start the memory reduction thread now that procfs is in its final location.
+            static std::once_flag memoryReductionFlag;
+            std::call_once(memoryReductionFlag, [] { StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache); });
         }
 
         response.Result = 0;

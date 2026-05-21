@@ -7,38 +7,38 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux zulassen</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Wenn diese Richtlinie deaktiviert ist, wird der Zugriff auf laufende Linux-Distributionen im Windows Subsystem for Linux für alle Benutzer auf dem Computer deaktiviert.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Die Inbox-Version des Windows Subsystem for Linux zulassen</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Wenn diese Richtlinie deaktiviert ist, wird die Inbox-Version (optionale Komponente) des Windows Subsystem for Linux deaktiviert. Wenn diese Richtlinie deaktiviert ist, kann nur die Speicherversion von WSL verwendet werden.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->WSL1 zulassen</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Wenn diese Richtlinie auf deaktiviert festgelegt ist, deaktiviert sie WSL1. Wenn diese Option deaktiviert ist, können nur WSL2-Distributionen verwendet werden.</string>
 
         <string id="CustomKernelUserSettingConfigurable">Benutzerdefinierte Kernelkonfiguration zulassen</string>
-        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom kernel configuration via .wslconfig (wsl2.kernel). This policy only applies to Store WSL.</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die benutzerdefinierte Kernelkonfiguration über .wslconfig (wsl2.kernel). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="CustomSystemDistroUserSettingConfigurable">Benutzerdefinierte Systemverteilungskonfiguration zulassen</string>
-        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom system distribution configuration via .wslconfig (wsl2.systemDistro). This policy only applies to Store WSL.</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die benutzerdefinierte Systemverteilungskonfiguration über .wslconfig (wsl2.systemDistro). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="CustomKernelCommandLineUserSettingConfigurable">Kernelbefehlszeilen-Konfiguration zulassen</string>
-        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->When set to disabled, this policy disables kernel command line configuration via .wslconfig (wsl2.kernelCommandLine). This policy only applies to Store WSL.</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die Kernelbefehlszeilen-Konfiguration über .wslconfig (wsl2.kernelCommandLine). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="AllowDebugShell">Debugshell zulassen</string>
-        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->When set to disabled, this policy disables the debug shell (wsl.exe --debug-shell). This policy only applies to Store WSL.</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Wenn diese Richtlinie deaktiviert ist, wird die Debugshell (wsl.exe --debug-shell) deaktiviert. Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="NestedVirtualizationUserSettingConfigurable">Geschachtelte Virtualisierung zulassen</string>
-        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->When set to disabled, this policy disables nested virtualization configuration via .wslconfig (wsl2.nestedVirtualization). This policy only applies to Store WSL.</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Wenn diese Richtlinie deaktiviert ist, wird die Konfiguration der geschachtelten Virtualisierung über .wslconfig (wsl2.nestedVirtualization) deaktiviert. Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="KernelDebugUserSettingConfigurable">Kerneldebugging zulassen</string>
-        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->When set to disabled, this policy disables kernel debugging configuration via .wslconfig (wsl2.kernelDebugPort). This policy only applies to Store WSL.</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die Kerneldebugkonfiguration über .wslconfig (wsl2.kernelDebugPort). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="CustomNetworkingUserSettingConfigurable">Benutzerdefinierte Netzwerkkonfiguration zulassen</string>
-        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingMode). This policy only applies to Store WSL.</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „Deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die benutzerdefinierte Netzwerkkonfiguration über .wslconfig (wsl2.networkingMode). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="FirewallUserSettingConfigurable">Benutzern das Festlegen der Firewallkonfiguration erlauben</string>
-        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->When set to disabled, this policy disables firewall configuration via .wslconfig (wsl2.firewall). This policy only applies to Store WSL.</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Wenn diese Richtlinie auf „deaktiviert“ festgelegt ist, deaktiviert diese Richtlinie die Firewallkonfiguration über .wslconfig (wsl2.firewall). Diese Richtlinie gilt nur für Store WSL.</string>
 
         <string id="AllowDiskMount">Passthrough-Datenträgereinbindung zulassen</string>
         <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-Container</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-Container zulassen</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Diese Richtlinie steuert, ob der WSL-Container auf diesem Computer verwendet werden kann. Wenn diese Option aktiviert oder nicht konfiguriert ist, können Benutzer und Windows-Anwendungen Linux-Container über WSL ausführen. Wenn diese Option auf „Deaktiviert“ festgelegt ist, ist der WSL-Container für alle Benutzer blockiert, und Windows-Apps können keine Linux-Container ausführen. Warnung: Wenn Sie diese Option auf „Disabled“ festlegen, kann dies zu Fehlfunktionen bei Windows-Apps führen, die auf Linux-Containern basieren.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Zulassungsliste für WSL-Containerregistrierungen</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Wenn diese Richtlinie aktiviert ist, darf der WSL-Container nur Bilder aus den hier aufgeführten Registrierungen abrufen. Dies betrifft sowohl die WSL-Container-CLI als auch alle Anwendungen, die die WSL-Container-API verwenden.</string>

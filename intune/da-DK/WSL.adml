@@ -7,11 +7,11 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Tillad Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Når denne politik er indstillet til deaktiveret, deaktiverer den adgangen til kørende Linux-distributioner i Windows Subsystem for Linux for alle brugere på computeren.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Tillad indbakkeversionen af Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Når denne politikindstilling er deaktiveret, deaktiveres indbakkeversionen (valgfri komponent) af Windows Subsystem for Linux. Hvis denne politik er deaktiveret, er det kun lagerversionen af WSL, der kan bruges.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Tillad WSL1</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Når denne politik er indstillet til deaktiveret, deaktiverer den WSL1. Når indstillingen er deaktiveret, er det kun WSL2-distributioner, der kan bruges.</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-objektbeholder</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Tillad WSL-objektbeholder</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne politik styrer, om en WSL-objektbeholder kan bruges på denne enhed. Når den er aktiveret eller ikke konfigureret, kan brugere og Windows-programmer køre Linux-containere via WSL. Når den er indstillet til deaktiveret, blokeres WSL-objektbeholderen for alle brugere, og Windows-apps kan ikke køre Linux-objektbeholdere. Advarsel: Hvis du indstiller denne til "Disabled", kan det ødelægge Windows-apps, der er afhængige af Linux-objektbeholdere.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Liste over tilladte registreringsdatabaser for WSL-objektbeholdere</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Når den er aktiveret, har WSL-objektbeholderen kun tilladelse til at hente billeder fra de registreringsdatabaser, der er angivet her. Dette påvirker både WSL-objektbeholderens CLI og alle programmer, der bruger WSL-objektbeholder-API'et.</string>
