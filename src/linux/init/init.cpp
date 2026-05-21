@@ -1208,10 +1208,9 @@ try
 
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
-                // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
+                if (Config.CgroupPath.has_value())
                 {
-                    LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
+                    UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), false, "session leader");
                 }
 
                 umask(Config.Umask);
@@ -1263,10 +1262,9 @@ try
 
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
-                // Move session leader into the memory-limited user cgroup.
-                if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
+                if (Config.CgroupPath.has_value())
                 {
-                    LOG_WARNING("Failed to move session leader into user cgroup, {}", errno);
+                    UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), false, "session leader");
                 }
 
                 umask(Mask);
@@ -2339,6 +2337,31 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_INIT_PID);
     }
 
+    //
+    // Setup per-distro cgroup
+    //
+
+    try
+    {
+        THROW_LAST_ERROR_IF(access(WSL_USER_CGROUP_PATH, F_OK) < 0);
+        const auto MiniInitDirectChildPidStr = getenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+        if (MiniInitDirectChildPidStr == nullptr)
+        {
+            throw RuntimeErrorWithSourceLocation("Missing environment variable: " LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+        }
+        unsetenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
+        auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
+        THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0 && errno != EEXIST);
+        // If systemd is enabled. Create a non-systemd cgroup for rest of the user processes.
+        if (Config.BootInit)
+        {
+            THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
+        }
+        Config.CgroupPath = DistroCgroupPath;
+    }
+    CATCH_LOG();
+
     std::vector<gsl::byte> Buffer;
     if (Config.BootInit)
     {
@@ -2403,24 +2426,10 @@ Return Value:
 
             CreateWslSystemdUnits(Config);
 
-            //
-            // Isolate systemd cgroups between distros.
-            //
-
-            try
+            if (Config.CgroupPath.has_value())
             {
-                const auto MiniInitDirectChildPidStr = getenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-                if (MiniInitDirectChildPidStr == nullptr)
-                {
-                    throw RuntimeErrorWithSourceLocation("Missing environment variable: " LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-                }
-                unsetenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-                pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
-                std::string SystemdCgroup = UtilGetDistroSystemdCgroup(MiniInitDirectChildPid);
-                THROW_LAST_ERROR_IF(UtilMkdir(SystemdCgroup.c_str(), 0755) < 0 && errno != EEXIST);
-                THROW_LAST_ERROR_IF(WriteToFile((SystemdCgroup + "/cgroup.procs").c_str(), "0") != 0);
+                UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), true, "systemd");
             }
-            CATCH_LOG();
 
             const char* Argv[] = {INIT_PATH, nullptr};
             std::vector<const char*> Env;
@@ -2566,7 +2575,7 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span);
+                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath);
                 break;
 
             default:

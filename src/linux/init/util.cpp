@@ -3381,7 +3381,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPathOpt)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3417,14 +3417,12 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
-        // Move child into the memory-limited user cgroup.
-        if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
-        {
-            LOG_WARNING("Failed to add process to user cgroup: {}", errno);
-        }
-
         try
         {
+            if (DistroCgroupPathOpt.has_value())
+            {
+                UtilTryMoveSelfToDistroCgroup(DistroCgroupPathOpt.value(), false, "CreateChildProcess");
+            }
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);
 
@@ -3471,7 +3469,46 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     return 0;
 }
 
-std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid)
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
 {
-    return std::format("{}/systemd-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
+    return std::format("{}/distro-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
 }
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
+{
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
+        return -1;
+    }
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+rdma") < 0)
+    {
+        LOG_WARNING("Failed to enable optional cgroup controller rdma for {}: {}", CgroupPath, errno);
+    }
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+misc") < 0)
+    {
+        LOG_WARNING("Failed to enable optional cgroup controller misc for {}: {}", CgroupPath, errno);
+    }
+    return 0;
+}
+
+void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject)
+try
+{
+    std::string ProcsFile{};
+    auto NonSystemdCgroupPath = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
+    bool NonSystemdCgroupExists = access(NonSystemdCgroupPath.c_str(), F_OK) == 0;
+    if (IsSystemd || !NonSystemdCgroupExists)
+    {
+        ProcsFile = CgroupPath + "/cgroup.procs";
+    }
+    else
+    {
+        ProcsFile = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR "/cgroup.procs";
+    }
+    if (WriteToFile(ProcsFile.c_str(), "0") < 0)
+    {
+        LOG_WARNING("Failed to move process to cgroup {} for {}: {}", CgroupPath, LogSubject, errno);
+    }
+}
+CATCH_LOG();

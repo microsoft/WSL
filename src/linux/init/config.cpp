@@ -991,11 +991,10 @@ try
 
     if (Config.BootCommand.has_value())
     {
-        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
-            // Move boot command into the memory-limited user cgroup.
-            if (WriteToFile(WSL_USER_NON_SYSTEMD_CGROUP_PROCS, "0") != 0)
+        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions, CgroupPathOpt = Config.CgroupPath]() {
+            if (CgroupPathOpt.has_value())
             {
-                LOG_WARNING("Failed to move boot command into user cgroup: {}", errno);
+                UtilTryMoveSelfToDistroCgroup(CgroupPathOpt.value(), false, "boot command");
             }
 
             //

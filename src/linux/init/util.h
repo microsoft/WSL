@@ -45,8 +45,7 @@ struct WslDistributionConfig;
 #define CGROUP_MOUNTPOINT "/sys/fs/cgroup"
 #define CGROUP2_DEVICE "cgroup2"
 #define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
-#define WSL_USER_NON_SYSTEMD_CGROUP_PATH WSL_USER_CGROUP_PATH "/non-systemd"
-#define WSL_USER_NON_SYSTEMD_CGROUP_PROCS WSL_USER_NON_SYSTEMD_CGROUP_PATH "/cgroup.procs"
+#define WSL_USER_NON_SYSTEMD_CGROUP_DIR "/wsl-non-systemd"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
@@ -318,6 +317,10 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPathOpt);
 
-std::string UtilGetDistroSystemdCgroup(pid_t DistroInitPid);
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath);
+
+void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject);

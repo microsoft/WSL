@@ -3479,7 +3479,7 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Transaction, Buffer);
+        return ProcessCreateProcessMessage(Transaction, Buffer, {});
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3954,27 +3954,21 @@ try
         return;
     }
 
+    if (UtilEnableAllCgroupControllers(CGROUP_MOUNTPOINT) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for root {}", errno);
+        return;
+    }
+
     if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
     {
         LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
         return;
     }
 
-    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
+    if (UtilEnableAllCgroupControllers(WSL_USER_CGROUP_PATH) < 0)
     {
-        LOG_ERROR("Failed to enable cgorup controllers for root {}", errno);
-        return;
-    }
-
-    if (UtilMkdir(WSL_USER_NON_SYSTEMD_CGROUP_PATH, 0755) < 0)
-    {
-        LOG_ERROR("Failed to create wsl-user non-systemd cgroup directory {}", errno);
-        return;
-    }
-
-    if (WriteToFile(WSL_USER_CGROUP_PATH "/cgroup.subtree_control", "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
-    {
-        LOG_ERROR("Failed to enable cgorup controllers for wsl-user {}", errno);
+        LOG_ERROR("Failed to enable cgroup controllers for wsl-user {}", errno);
         return;
     }
 
@@ -3987,18 +3981,6 @@ try
 
     LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, totalRam, c_systemReservedMemory);
 
-    //
-    // Enable the cpu controller and apply a cpu.max limit that reserves a small slice for
-    // WSL system processes in the root cgroup. Failure here is non-fatal: the memory limit
-    // is still in effect even if the cpu controller is unavailable on this kernel.
-    //
-
-    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+cpu") < 0)
-    {
-        LOG_WARNING("Failed to enable cpu controller {}", errno);
-        return;
-    }
-
     const long nproc = get_nprocs();
     if (nproc <= 0)
     {
@@ -4008,7 +3990,7 @@ try
 
     const long cpuQuota = (nproc * c_cpuPeriodMicros) - c_systemReservedCpuMicros;
     auto userCpuMax = std::format("{} {}", cpuQuota, c_cpuPeriodMicros);
-    if (WriteToFile(WSL_USER_CGROUP_CPU_MAX, userCpuMax.c_str()) < 0)
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/cpu.max", userCpuMax.c_str()) < 0)
     {
         LOG_ERROR("Failed to set cpu.max for wsl-user cgroup {}", errno);
         return;
@@ -4340,10 +4322,10 @@ int main(int Argc, char* Argv[])
                     sync();
 
                     //
-                    // Clear the distro systemd cgroup
+                    // Clear the distro cgroup
                     //
 
-                    auto CgroupDir = UtilGetDistroSystemdCgroup(Result);
+                    auto CgroupDir = UtilGetDistroCgroupPath(Result);
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
                         LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
