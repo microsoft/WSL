@@ -184,11 +184,11 @@ void WaitForMsiInstall()
     if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
     {
         // The MSI completed but one or more files (typically system.vhd or wslservice.exe)
-        // were in use and have been scheduled for replacement on the next reboot. Surface
-        // this distinctly so the caller does not proceed to launch WSL against a
-        // half-installed package — notably, the previous system.vhd has been renamed away
-        // to %WINDIR%\Installer\Config.Msi\*.rbf and the new one is not yet in place.
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED), wsl::shared::Localization::MessageUpdateRebootRequired());
+        // were in use and have been scheduled for replacement on the next reboot. Warn
+        // the user so they understand why WSL may not work, but do not throw — the
+        // service's _CreateInstance gate will also warn when launching a distro.
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageUpdateRebootRequired());
+        return;
     }
 
     if (exitCode != 0)
@@ -310,18 +310,6 @@ int wsl::windows::common::install::CallMsiPackage()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-
-            // If the install completed but is pending a reboot to finish replacing files
-            // (ERROR_SUCCESS_REBOOT_REQUIRED), the registered MSI install path is already
-            // populated even though some files (e.g. system.vhd) are physically missing
-            // until the user reboots. Do not fall through to the race-recovery
-            // GetMsiPackagePath() retry below — that would silently proceed to launch
-            // wsl.exe against a half-installed package. Surface the reboot-required
-            // error to the user instead.
-            if (wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED))
-            {
-                throw;
-            }
 
             // GetMsiPackagePath() will generate a user error if the registry access fails.
             // Save the error from GetMsiPackagePath() to return a proper 'install failed' message.
