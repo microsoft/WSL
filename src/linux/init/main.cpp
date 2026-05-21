@@ -1515,10 +1515,12 @@ Return Value:
     }
 
     //
-    // Mount the binfmt_misc filesystem.
+    // Mount the binfmt_misc filesystem as private so that unmounts in child
+    // mount namespaces (e.g. when a peer distro's systemd shuts down) do not
+    // propagate back and wipe the global registration table.
     //
 
-    if (UtilMount(nullptr, BINFMT_PATH, "binfmt_misc", MS_RELATIME, nullptr) < 0)
+    if (UtilMount(nullptr, BINFMT_PATH, "binfmt_misc", MS_RELATIME | MS_PRIVATE, nullptr) < 0)
     {
         return -1;
     }

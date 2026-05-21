@@ -413,6 +413,90 @@ class UnitTests
         VERIFY_ARE_EQUAL(out, L"hello\n");
     }
 
+    WSL2_TEST_METHOD(InteropSurvivesPeerDistroShutdown)
+    {
+        //
+        // Validates that binfmt_misc registrations (Windows interop) survive when a peer
+        // distro running systemd terminates. Without MS_PRIVATE on the binfmt_misc mount,
+        // systemd's shutdown unmount propagates back through the shared mount peer group
+        // and wipes ALL registrations in the VM, causing "Exec format error" globally.
+        //
+
+        constexpr auto peerDistroName = L"binfmt-peer-test";
+
+        // Import a second distro from the same tarball as the test distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+
+        auto cleanupPeer = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--terminate {}", peerDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+        });
+
+        // Enable systemd in the peer distro.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+
+        // Terminate so the config takes effect on next start.
+        LxsstuLaunchWsl(std::format(L"--terminate {}", peerDistroName));
+
+        // Start the peer distro and wait for systemd to come up.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- true", peerDistroName)), 0L);
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] =
+                    LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- systemctl is-system-running --wait", peerDistroName));
+                // Accept "running" or "degraded" — both mean systemd booted.
+                THROW_HR_IF(E_UNEXPECTED, out.find(L"running") == std::wstring::npos && out.find(L"degraded") == std::wstring::npos);
+            },
+            std::chrono::seconds(2),
+            std::chrono::minutes(2)));
+
+        // Verify interop works in the primary distro before the peer terminates.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo alive");
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
+
+        // Terminate the peer distro (triggers systemd shutdown -> unmounts binfmt_misc).
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", peerDistroName)), 0L);
+
+        // Wait for the peer distro to fully stop.
+        {
+            wsl::windows::common::SvcComm service;
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    bool found = false;
+                    for (const auto& e : service.EnumerateDistributions())
+                    {
+                        if (wsl::shared::string::IsEqual(e.DistroName, peerDistroName))
+                        {
+                            found = true;
+                            THROW_HR_IF(E_UNEXPECTED, e.State == LxssDistributionStateRunning);
+                            break;
+                        }
+                    }
+
+                    THROW_HR_IF(E_UNEXPECTED, !found);
+                },
+                std::chrono::seconds(1),
+                std::chrono::seconds(30)));
+        }
+
+        // Verify interop still works in the primary distro.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo survived");
+            VERIFY_ARE_EQUAL(out, L"survived\r\n");
+        }
+
+        // Verify the binfmt entry still exists and has the F (fix-binary) flag.
+        {
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+        }
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));

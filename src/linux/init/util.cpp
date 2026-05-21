@@ -1773,11 +1773,31 @@ Return Value:
     //      - For Plan9 (9p): device is busy or not found
     //      - For VirtioFS: invalid tag (device not ready)
     //
-    // N.B. MS_SHARED must be applied in a separate mount() call, so it is
-    //      stripped from the initial mount flags and applied after the mount.
+    // N.B. Propagation flags (MS_SHARED, MS_PRIVATE, MS_SLAVE, MS_UNBINDABLE) are
+    //      mutually exclusive and must be applied in a separate mount() call after
+    //      the initial mount. The kernel rejects propagation flags combined with
+    //      MS_BIND, MS_MOVE, or MS_REMOUNT in a single syscall (EINVAL).
+    //      MS_REC may be combined with a propagation flag to apply it recursively.
     //
 
-    const unsigned long initialFlags = MountFlags & ~MS_SHARED;
+    constexpr unsigned long propagationFlags = MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE;
+    const unsigned long propagation = MountFlags & propagationFlags;
+    if (propagation != 0 && (propagation & (propagation - 1)) != 0)
+    {
+        LOG_ERROR("mount({}) invalid: multiple propagation flags specified ({:#x})", Target, propagation);
+        return -EINVAL;
+    }
+
+    if (propagation != 0 && WI_IsAnyFlagSet(MountFlags, MS_BIND | MS_MOVE | MS_REMOUNT))
+    {
+        LOG_ERROR("mount({}) invalid: propagation flags cannot combine with MS_BIND/MS_MOVE/MS_REMOUNT", Target);
+        return -EINVAL;
+    }
+
+    // MS_REC is passed through with the propagation flag when one is present,
+    // otherwise it stays in initialFlags (e.g. for MS_BIND | MS_REC).
+    const unsigned long propagationCallFlags = propagation != 0 ? propagation | (MountFlags & MS_REC) : 0;
+    const unsigned long initialFlags = MountFlags & ~(propagationFlags | (propagation != 0 ? MS_REC : 0));
 
     try
     {
@@ -1820,12 +1840,12 @@ Return Value:
         return -errno;
     }
 
-    // N.B. The shared flag must be applied in a separate mount() call.
-    if (WI_IsFlagSet(MountFlags, MS_SHARED))
+    // Apply the propagation flag in a separate mount() call.
+    if (propagationCallFlags != 0)
     {
-        if (mount(nullptr, Target, nullptr, MS_SHARED, nullptr) < 0)
+        if (mount(nullptr, Target, nullptr, propagationCallFlags, nullptr) < 0)
         {
-            LOG_ERROR("Failed to make shared mount {} {}", Target, errno);
+            LOG_ERROR("mount({}, {:#x}) propagation failed {}", Target, propagationCallFlags, errno);
             return -errno;
         }
     }
