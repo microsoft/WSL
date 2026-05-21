@@ -3946,7 +3946,7 @@ try
         return;
     }
 
-    uint64_t totalRam = info.totalram * info.mem_unit;
+    uint64_t totalRam = static_cast<uint64_t>(info.totalram) * info.mem_unit;
 
     if (totalRam <= c_systemReservedMemory)
     {
@@ -3960,7 +3960,7 @@ try
         return;
     }
 
-    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
+    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0 && errno != EEXIST)
     {
         LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
         return;
@@ -4207,7 +4207,7 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) != 0)
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
     {
         LOG_ERROR("Failed to mount cgroup2 filesystem: {}", errno);
     }

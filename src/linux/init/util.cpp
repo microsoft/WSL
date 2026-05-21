@@ -3476,18 +3476,19 @@ std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
 
 int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
 {
-    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory +pids +io +cpuset +hugetlb") < 0)
+    // Only cpu and memory are required for wsl's resource limit.
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory") < 0)
     {
         LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
         return -1;
     }
-    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+rdma") < 0)
+    const char* const OptionalControllers[] = {"+pids", "+io", "+cpuset", "+hugetlb", "+rdma", "+misc"};
+    for (const auto Controller : OptionalControllers)
     {
-        LOG_WARNING("Failed to enable optional cgroup controller rdma for {}: {}", CgroupPath, errno);
-    }
-    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+misc") < 0)
-    {
-        LOG_WARNING("Failed to enable optional cgroup controller misc for {}: {}", CgroupPath, errno);
+        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Controller) < 0)
+        {
+            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Controller, CgroupPath, errno);
+        }
     }
     return 0;
 }
@@ -3496,16 +3497,24 @@ void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd
 try
 {
     std::string ProcsFile{};
-    auto NonSystemdCgroupPath = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
-    bool NonSystemdCgroupExists = access(NonSystemdCgroupPath.c_str(), F_OK) == 0;
-    if (IsSystemd || !NonSystemdCgroupExists)
+    if (IsSystemd)
     {
-        ProcsFile = CgroupPath + "/cgroup.procs";
+        ProcsFile = CgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR + "/cgroup.procs";
     }
     else
     {
-        ProcsFile = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR "/cgroup.procs";
+        auto NonSystemdCgroupPath = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
+        auto NonSystemdCgroupExists = access(NonSystemdCgroupPath.c_str(), F_OK) == 0;
+        if (NonSystemdCgroupExists)
+        {
+            ProcsFile = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR "/cgroup.procs";
+        }
+        else
+        {
+            ProcsFile = CgroupPath + "/cgroup.procs";
+        }
     }
+
     if (WriteToFile(ProcsFile.c_str(), "0") < 0)
     {
         LOG_WARNING("Failed to move process to cgroup {} for {}: {}", CgroupPath, LogSubject, errno);

@@ -2353,9 +2353,11 @@ Return Value:
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
         auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
         THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0 && errno != EEXIST);
-        // If systemd is enabled. Create a non-systemd cgroup for rest of the user processes.
+        // If systemd is enabled. Enable controllers in distro cgroup and create systemd and non-systemd sub-cgroups.
         if (Config.BootInit)
         {
+            THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
+            THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
             THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
         }
         Config.CgroupPath = DistroCgroupPath;
