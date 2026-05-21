@@ -505,7 +505,7 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 
-std::string LxssWriteWslDistroConfig(const std::string& Content);
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 enum class DrvFsMode
 {

@@ -6979,5 +6979,74 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    void ValidateIsolatedCgroupLayout(bool Systemd)
+    {
+        constexpr auto secondDistroName = L"cgroup-test-distro";
+
+        // Ensure no stale state from a previous run.
+        TerminateDistribution();
+        LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+        });
+
+        // Import the second distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistroName, g_testDistroPath)), 0L);
+
+        std::optional<decltype(EnableSystemd())> systemdCleanup;
+        if (Systemd)
+        {
+            systemdCleanup.emplace(EnableSystemd());
+
+            LxssWriteWslDistroConfig("[boot]\nsystemd=true\n", secondDistroName);
+            LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+        }
+
+        auto getCgroup = [](LPCWSTR distro) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} --cd / -- cat /proc/self/cgroup", distro));
+            while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
+            {
+                out.pop_back();
+            }
+            return out;
+        };
+
+        const auto cgroup1 = getCgroup(LXSS_DISTRO_NAME_TEST_L);
+        const auto cgroup2 = getCgroup(secondDistroName);
+
+        LogInfo("test_distro cgroup: %ls", cgroup1.c_str());
+        LogInfo("%ls cgroup: %ls", secondDistroName, cgroup2.c_str());
+
+        const std::wstring prefix = L"0::/wsl-user/distro-";
+        VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
+        VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
+        VERIFY_ARE_NOT_EQUAL(cgroup1, std::wstring(L"0::/"));
+        VERIFY_ARE_NOT_EQUAL(cgroup2, std::wstring(L"0::/"));
+        VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
+
+        // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
+        TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
+        TerminateDistribution(secondDistroName);
+
+        // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
+        // the one belonging to the distro we just started to perform the check.  The stale cgroups of
+        // the two terminated distros must have been removed.
+        auto [out2, _] =
+            LxsstuLaunchWslAndCaptureOutput(L"--cd / -- /bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+        VERIFY_ARE_EQUAL(out2, std::wstring(L"1\n"));
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayout)
+    {
+        ValidateIsolatedCgroupLayout(false);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
+    {
+        ValidateIsolatedCgroupLayout(true);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests
