@@ -91,15 +91,32 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
 
     // Image management.
-    IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(BuildImage)(
+        _In_ const WSLCBuildImageOptions* Options,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ HANDLE CancelEvent,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(ImportImage)(_In_ const WSLCHandle ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ const WSLCHandle ImageHandle,
+        _In_ LPCSTR ImageName,
+        _In_ IProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImageOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
-    IFACEMETHOD(PushImage)(_In_ LPCSTR Image, _In_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
     IFACEMETHOD(PruneImages)(

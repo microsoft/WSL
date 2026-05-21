@@ -444,7 +444,8 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -1407,7 +1408,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 

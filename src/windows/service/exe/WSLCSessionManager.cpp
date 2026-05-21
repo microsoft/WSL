@@ -551,7 +551,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
