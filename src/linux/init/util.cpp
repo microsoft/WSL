@@ -3381,7 +3381,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPathOpt)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::string& DistroCgroupPath)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3419,9 +3419,9 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         try
         {
-            if (DistroCgroupPathOpt.has_value())
+            if (!DistroCgroupPath.empty())
             {
-                UtilTryMoveSelfToDistroCgroup(DistroCgroupPathOpt.value(), false, "CreateChildProcess");
+                UtilTryMoveSelfToDistroCgroup(DistroCgroupPath, false, "CreateChildProcess");
             }
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);

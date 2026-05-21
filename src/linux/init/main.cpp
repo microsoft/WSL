@@ -3479,7 +3479,7 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Transaction, Buffer, {});
+        return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3969,6 +3969,12 @@ try
     if (UtilEnableAllCgroupControllers(WSL_USER_CGROUP_PATH) < 0)
     {
         LOG_ERROR("Failed to enable cgroup controllers for wsl-user {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0 && errno != EEXIST)
+    {
+        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
         return;
     }
 

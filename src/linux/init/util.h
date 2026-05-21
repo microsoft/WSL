@@ -47,6 +47,7 @@ struct WslDistributionConfig;
 #define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
 #define WSL_USER_SYSTEMD_CGROUP_DIR "/systemd"
 #define WSL_USER_NON_SYSTEMD_CGROUP_DIR "/non-systemd"
+#define WSL_USER_NON_DISTRO_CGROUP_PATH CGROUP_MOUNTPOINT "/non-distro"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
@@ -318,7 +319,7 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPathOpt);
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::string& DistroCgroupPath);
 
 std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
 

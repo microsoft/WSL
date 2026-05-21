@@ -2577,7 +2577,7 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath);
+                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath.has_value() ? Config.CgroupPath.value() : "");
                 break;
 
             default:
