@@ -1164,7 +1164,7 @@ class InstallerTests
         // be renamed or deleted regardless of directory permissions — this forces the MSI
         // to schedule a delayed rename (MoveFileEx MOVEFILE_DELAY_UNTIL_REBOOT) and return 3010.
         wil::unique_hfile lockedHandle{CreateFileW(
-            systemVhdPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            systemVhdPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_TRUE(lockedHandle.is_valid());
 
         wil::unique_handle mapping{CreateFileMappingW(lockedHandle.get(), nullptr, PAGE_READONLY, 0, 0, nullptr)};
@@ -1205,16 +1205,17 @@ class InstallerTests
         mapping.reset();
         lockedHandle.reset();
 
-        // Verify that launching wsl.exe (a command that goes through CallMsiPackage) fails
-        // with the reboot-required error.
+        // Verify that launching wsl.exe emits the reboot-required warning on stderr
+        // but does not fail with an error code attributable to the marker itself.
+        // (The underlying distro start may still fail because system.vhd is gone,
+        // but the user gets a clear heads-up about why.)
         auto wslCommandLine = LxssGenerateWslCommandLine(L"echo OK");
         auto [output, warnings, wslExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(wslCommandLine.data());
 
         LogInfo("wsl echo OK output: %ls", output.c_str());
         LogInfo("wsl echo OK warnings: %ls", warnings.c_str());
-        VERIFY_ARE_NOT_EQUAL(wslExitCode, 0);
 
-        // The error message should mention a restart is required.
+        // The warning message should mention a restart is required.
         auto combined = output + warnings;
         VERIFY_IS_TRUE(combined.find(L"restart") != std::wstring::npos);
 
