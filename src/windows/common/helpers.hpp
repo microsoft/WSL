@@ -116,6 +116,8 @@ std::wstring_view ConsumeArgument(_In_ std::wstring_view CommandLine, _In_ std::
 
 void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);
 
+[[nodiscard]] wil::unique_handle CreateKillOnCloseJob();
+
 unique_proc_attribute_list CreateProcThreadAttributeList(_In_ DWORD AttributeCount);
 
 std::vector<gsl::byte> GenerateConfigurationMessage(
@@ -165,7 +167,8 @@ bool IsWslOptionalComponentPresent();
 
 bool IsWslSupportInterfacePresent();
 
-void LaunchDebugConsole(_In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry);
+void LaunchDebugConsole(
+    _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject = nullptr);
 
 [[nodiscard]] wil::unique_handle LaunchInteropServer(
     _In_opt_ LPCGUID DistroId,
@@ -173,11 +176,12 @@ void LaunchDebugConsole(_In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _I
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
     _In_opt_ LPCGUID VmId,
-    _In_opt_ HANDLE UserToken = nullptr);
+    _In_opt_ HANDLE UserToken = nullptr,
+    _In_opt_ HANDLE JobObject = nullptr);
 
-void LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry);
+void LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject = nullptr);
 
-void LaunchPortRelay(_In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry);
+void LaunchPortRelay(_In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject = nullptr);
 
 void LaunchWslSettingsOOBE(_In_ HANDLE UserToken);
 
