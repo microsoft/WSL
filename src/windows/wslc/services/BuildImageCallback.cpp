@@ -125,7 +125,7 @@ try
             terminator.insert(terminator.begin(), wide.back());
             wide.pop_back();
         }
-        wide = std::format(L"\033[36m{}\033[0m{}", wide, terminator);
+        wide = std::format(L"\033[92m{}\033[0m{}", wide, terminator);
         WriteTerminal(wide);
         return S_OK;
     }
