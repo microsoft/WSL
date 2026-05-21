@@ -2227,10 +2227,10 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 
-HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 

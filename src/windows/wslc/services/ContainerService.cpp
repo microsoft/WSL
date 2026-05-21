@@ -357,7 +357,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+    THROW_IF_FAILED(container.Start(startFlags, nullptr, nullptr)); // TODO: Error message, detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
@@ -391,7 +391,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {

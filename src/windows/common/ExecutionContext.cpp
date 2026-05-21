@@ -386,7 +386,8 @@ ServiceExecutionContext::~ServiceExecutionContext()
     }
 }
 
-COMServiceExecutionContext::COMServiceExecutionContext() : ExecutionContext(Empty)
+COMServiceExecutionContext::COMServiceExecutionContext(IWarningCallback* warningCallback) :
+    ExecutionContext(Empty), m_warningCallback(warningCallback)
 {
 }
 
@@ -422,23 +423,11 @@ bool COMServiceExecutionContext::CanCollectUserErrorMessage()
     return true;
 }
 
-std::atomic<HANDLE> COMServiceExecutionContext::s_warningsPipe{nullptr};
-wil::srwlock COMServiceExecutionContext::s_warningsPipeLock;
-
-void COMServiceExecutionContext::SetWarningsPipe(HANDLE pipe)
-{
-    s_warningsPipe.store(pipe, std::memory_order_release);
-}
-
 bool COMServiceExecutionContext::CollectUserWarning(const std::wstring& warning)
 {
-    auto pipe = s_warningsPipe.load(std::memory_order_acquire);
-    if (pipe != nullptr)
+    if (m_warningCallback != nullptr)
     {
-        // Serialize writes so concurrent warnings don't interleave.
-        auto lock = s_warningsPipeLock.lock_exclusive();
-        LOG_IF_WIN32_BOOL_FALSE(WriteFile(
-            pipe, warning.c_str(), gsl::narrow_cast<DWORD>(warning.size() * sizeof(wchar_t)), nullptr, nullptr));
+        LOG_IF_FAILED(m_warningCallback->OnWarning(warning.c_str()));
         return true;
     }
 

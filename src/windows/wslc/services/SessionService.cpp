@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
+#include "WarningCallback.h"
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
@@ -111,18 +112,12 @@ Session SessionService::CreateDefaultSession()
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    // Create a pipe for streaming warnings from the service to the CLI in real-time.
-    wil::unique_handle pipeRead;
-    wil::unique_handle pipeWrite;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&pipeRead, &pipeWrite, nullptr, 0));
-
-    WSLCSessionSettings settings{};
-    settings.WarningsPipe = wslutil::ToCOMInputHandle(pipeWrite.get());
-
+    // Null Settings = default session with server-determined name and settings.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED(sessionManager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-    return Session(std::move(session), std::move(pipeRead), std::move(pipeWrite));
+    return Session(std::move(session));
 }
 
 int SessionService::Enter(const std::wstring& storagePath, const std::wstring& displayName)

@@ -164,30 +164,22 @@ try
 }
 CATCH_LOG()
 
-void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
-    // Save the warnings pipe before resolving settings (it may be present even with default sessions).
-    WSLCHandle warningsPipe{};
-    if (Settings != nullptr)
-    {
-        warningsPipe = Settings->WarningsPipe;
-    }
-
     // Resolve display name upfront (for both default and custom sessions).
     std::wstring resolvedDisplayName;
-    const bool isDefaultSession = (Settings == nullptr || Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
-    if (isDefaultSession)
+    if (Settings == nullptr)
     {
         // Default session: name determined from token, qualified with username.
         resolvedDisplayName = ResolveDefaultSessionName(tokenInfo);
         Flags = WSLCSessionFlagsOpenExisting | WSLCSessionFlagsPersistent;
-        Settings = nullptr; // Use server-side defaults for all other settings.
     }
     else
     {
+        THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionListEntry{}.DisplayName));
         THROW_HR_IF_MSG(
@@ -277,8 +269,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
         AddSessionProcessToJobObject(factory.get());
 
-        auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
-        sessionSettings.WarningsPipe = warningsPipe;
+        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef));
@@ -418,7 +409,7 @@ void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, nullptr, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
@@ -560,12 +551,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
 }
 CATCH_RETURN();
 

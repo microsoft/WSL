@@ -269,15 +269,6 @@ try
     m_featureFlags = Settings->FeatureFlags;
     m_pluginNotifier = PluginNotifier;
 
-    // Set up the warnings pipe for streaming warnings to the CLI.
-    // The handle is duplicated because COM closes the original when the call completes.
-    if (Settings->WarningsPipe.Type != WSLCHandleTypeUnknown)
-    {
-        const auto warningsPipeHandle = wslutil::FromCOMInputHandle(Settings->WarningsPipe);
-        m_warningsPipe.reset(wslutil::DuplicateHandle(warningsPipeHandle, GENERIC_WRITE | SYNCHRONIZE));
-        wsl::windows::common::COMServiceExecutionContext::SetWarningsPipe(m_warningsPipe.get());
-    }
-
     // Get user token for the current process
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
 
@@ -669,10 +660,16 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
+
+    std::optional<UserCOMCallback> warningComCallback;
+    if (WarningCallback)
+    {
+        warningComCallback = RegisterUserCOMCallback();
+    }
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
@@ -703,10 +700,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
+
+    std::optional<UserCOMCallback> warningComCallback;
+    if (WarningCallback)
+    {
+        warningComCallback = RegisterUserCOMCallback();
+    }
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
@@ -1026,12 +1029,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
 
     auto lock = m_lock.lock_shared();
 
@@ -1045,12 +1048,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
@@ -1499,10 +1502,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
+
+    std::optional<UserCOMCallback> warningComCallback;
+    if (WarningCallback)
+    {
+        warningComCallback = RegisterUserCOMCallback();
+    }
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
@@ -1701,10 +1710,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
+HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWarningCallback* WarningCallback, IWSLCContainer** Container)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
+
+    std::optional<UserCOMCallback> warningComCallback;
+    if (WarningCallback)
+    {
+        warningComCallback = RegisterUserCOMCallback();
+    }
 
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
@@ -2231,10 +2246,16 @@ int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTime
 }
 // Network management.
 
-HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options)
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    COMServiceExecutionContext context(WarningCallback);
+
+    std::optional<UserCOMCallback> warningComCallback;
+    if (WarningCallback)
+    {
+        warningComCallback = RegisterUserCOMCallback();
+    }
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);

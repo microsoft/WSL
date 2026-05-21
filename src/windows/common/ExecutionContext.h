@@ -4,6 +4,8 @@
 
 #include "wslutil.h"
 
+struct IWarningCallback;
+
 namespace wsl::windows::common {
 
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
@@ -211,22 +213,16 @@ public:
     NON_COPYABLE(COMServiceExecutionContext);
     NON_MOVABLE(COMServiceExecutionContext);
 
-    COMServiceExecutionContext();
+    COMServiceExecutionContext(IWarningCallback* warningCallback = nullptr);
     ~COMServiceExecutionContext() override;
 
     bool CanCollectUserErrorMessage() override;
-
-    // Set a process-wide warnings pipe for streaming warnings to the CLI.
-    // The pipe is owned by the caller and must outlive all COMServiceExecutionContext instances.
-    // Must be called before any COM methods are serviced (e.g., during Initialize).
-    static void SetWarningsPipe(HANDLE pipe);
 
 protected:
     bool CollectUserWarning(const std::wstring& warning) override;
 
 private:
-    static std::atomic<HANDLE> s_warningsPipe;
-    static wil::srwlock s_warningsPipeLock;
+    IWarningCallback* m_warningCallback = nullptr;
 };
 
 void EnableContextualizedErrors(bool service, bool useComErrors = false);

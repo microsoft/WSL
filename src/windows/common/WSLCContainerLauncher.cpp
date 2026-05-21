@@ -263,7 +263,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
     }
 
-    result = container.value().Get().Start(Flags, nullptr);
+    result = container.value().Get().Start(Flags, nullptr, nullptr);
 
     return std::make_pair(result, std::move(container));
 }
@@ -382,7 +382,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
-    auto result = Session.CreateContainer(&options, &container);
+    auto result = Session.CreateContainer(&options, nullptr, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLCContainer>>(result, std::optional<RunningWSLCContainer>{});
