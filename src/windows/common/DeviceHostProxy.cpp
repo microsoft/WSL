@@ -30,12 +30,7 @@ DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId
 
     // Create a job object that will terminate device host processes when this proxy is destroyed
     // (i.e., when the VM shuts down).
-    m_jobObject.reset(CreateJobObjectW(nullptr, nullptr));
-    THROW_LAST_ERROR_IF(!m_jobObject);
-
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
-    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(m_jobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    m_jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag)

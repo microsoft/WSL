@@ -80,12 +80,7 @@ WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
 {
     // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
     // when the VM is destroyed.
-    m_processJobObject.reset(CreateJobObjectW(nullptr, nullptr));
-    THROW_LAST_ERROR_IF(!m_processJobObject);
-
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
-    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(m_processJobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId)

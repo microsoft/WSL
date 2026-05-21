@@ -265,12 +265,7 @@ void WSLCVirtualMachine::Initialize()
 
     // Create a job object that will terminate child processes (wslrelay.exe)
     // when the VM is destroyed.
-    m_processJobObject.reset(CreateJobObjectW(nullptr, nullptr));
-    THROW_LAST_ERROR_IF(!m_processJobObject);
-
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
-    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(m_processJobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
     // Start crash dump collection thread.
     auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);

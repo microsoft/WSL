@@ -116,6 +116,8 @@ std::wstring_view ConsumeArgument(_In_ std::wstring_view CommandLine, _In_ std::
 
 void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);
 
+[[nodiscard]] wil::unique_handle CreateKillOnCloseJob();
+
 unique_proc_attribute_list CreateProcThreadAttributeList(_In_ DWORD AttributeCount);
 
 std::vector<gsl::byte> GenerateConfigurationMessage(

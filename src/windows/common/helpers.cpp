@@ -283,6 +283,18 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     return List;
 }
 
+wil::unique_handle wsl::windows::common::helpers::CreateKillOnCloseJob()
+{
+    wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+
+    return job;
+}
+
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,
     _In_ ULONG FixedDrivesBitmap,
