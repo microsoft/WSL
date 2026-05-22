@@ -263,6 +263,10 @@ void WSLCVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
+    // Create a job object that will terminate child processes (wslrelay.exe)
+    // when the VM is destroyed.
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
+
     // Start crash dump collection thread.
     auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
     THROW_LAST_ERROR_IF(!crashDumpSocket);
@@ -870,6 +874,7 @@ void WSLCVirtualMachine::LaunchPortRelay()
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
     process.InheritHandle(m_vmTerminatingEvent.get());
+    process.SetJobObject(m_processJobObject.get());
     process.Start();
 
     readPipe.release();

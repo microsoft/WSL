@@ -2421,6 +2421,16 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Få vist logfiler for en objektbeholder.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Fjern alle stoppede objektbeholdere.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle stoppede objektbeholdere.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Samlet frigjort plads: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern objektbeholdere.</value>
   </data>

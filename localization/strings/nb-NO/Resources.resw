@@ -2265,7 +2265,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
-    <value>Invalid filter: '{}'</value>
+    <value>Ugyldig filter: «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
@@ -2420,6 +2420,16 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Vis logger for en beholder.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Fjern alle beholdere som er stoppet.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle beholdere som er stoppet.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Total frigjort plass: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern beholdere.</value>

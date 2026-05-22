@@ -36,6 +36,7 @@ void GetContainers(CLIExecutionContext& context);
 void InspectContainers(CLIExecutionContext& context);
 void KillContainers(CLIExecutionContext& context);
 void ListContainers(CLIExecutionContext& context);
+void PruneContainers(CLIExecutionContext& context);
 void RemoveContainers(CLIExecutionContext& context);
 void RunContainer(CLIExecutionContext& context);
 void SetContainerOptionsFromArgs(CLIExecutionContext& context);

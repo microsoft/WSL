@@ -34,6 +34,7 @@ Abstract:
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
 #include "ExecutionContext.h"
+#include "helpers.hpp"
 #include "wslutil.h"
 #include "filesystem.hpp"
 
@@ -444,14 +445,7 @@ void WSLCSessionManagerImpl::EnsureJobObjectCreated()
     // Create a job object that will automatically terminate all child processes
     // when the job handle is closed (i.e., when wslservice exits or crashes).
     std::call_once(m_jobObjectInitFlag, [this] {
-        m_sessionJobObject.reset(CreateJobObjectW(nullptr, nullptr));
-        THROW_LAST_ERROR_IF(!m_sessionJobObject);
-
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
-        jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        THROW_IF_WIN32_BOOL_FALSE(
-            SetInformationJobObject(m_sessionJobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
-
+        m_sessionJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
         WSL_LOG("SessionManagerJobObjectCreated", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
     });
 }
