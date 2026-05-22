@@ -39,6 +39,9 @@ endif()
 # # Uncomment to build the C# WSLC sdk
 # set(WSL_BUILD_SDKCS true)
 
+# # Uncomment to configure the WSLC SDK NuGet to only target the current platform
+# set(WSL_NUGET_SINGLE_PLATFORM true)
+
 # # Uncomment to generate a "thin" MSI package which builds and installs faster
 # set(WSL_BUILD_THIN_PACKAGE true)
 
