@@ -269,9 +269,16 @@ void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& p
     {
         if (volume.Mounted)
         {
-            if (SUCCEEDED(LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()))))
+            auto result = parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str());
+            if (SUCCEEDED(result))
             {
                 volume.Mounted = false;
+            }
+            else
+            {
+                LOG_HR(result);
+                EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
+                    volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
             }
         }
     }
@@ -879,7 +886,12 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         {
             m_dockerClient.StopContainer(m_id.c_str(), {}, {});
         }
-        CATCH_LOG();
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(
+                wsl::shared::string::MultiByteToWide(m_id)));
+        }
 
         if (comError.has_value() && comError->Message)
         {
@@ -1711,6 +1723,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Send the request to docker.
     auto result = DockerClient.CreateContainer(request, containerName);
 
+    // Surface any warnings returned by Docker (e.g., deprecated features, configuration issues).
+    for (const auto& warning : result.Warnings)
+    {
+        EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(warning));
+    }
+
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() {
@@ -1871,7 +1889,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
             container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
         }
     }
-    CATCH_LOG();
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+    }
 
     return container;
 }

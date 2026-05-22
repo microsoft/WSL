@@ -426,7 +426,11 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", cmd});
             launcher.Launch(*m_virtualMachine);
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(Localization::MessageWslcSwapInitFailed());
+        }
     }
 
     deleteVhdOnFailure.release();
@@ -597,6 +601,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
                     OperationName,
                     reportedError->c_str(),
                     parsed.errorDetail->message.c_str());
+                EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*reportedError));
             }
 
             reportedError = parsed.errorDetail->message;
@@ -1116,6 +1121,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
                     "Overriding previous error message '%hs' with new message '%hs'",
                     errorMessage->c_str(),
                     parsed.errorDetail->message.c_str());
+                EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*errorMessage));
             }
 
             errorMessage = std::move(parsed.errorDetail->message);
@@ -1127,6 +1133,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         else
         {
             LOG_HR_MSG(E_UNEXPECTED, "Failed to parse import progress: %.*hs", static_cast<int>(buffer.size()), buffer.data());
+            EMIT_USER_WARNING(Localization::MessageWslcImportProgressParseFailed());
         }
     };
 
@@ -2284,15 +2291,21 @@ try
         ipam.Config.emplace().push_back(std::move(ipamConfig));
     }
 
+    docker_schema::CreateNetworkResponse createResult;
     try
     {
-        m_dockerClient->CreateNetwork(request);
+        createResult = m_dockerClient->CreateNetwork(request);
     }
     catch (const DockerHTTPException& e)
     {
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Localization::MessageWslcNetworkAlreadyExists(name), e.StatusCode() == 409);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
+    }
+
+    if (!createResult.Warning.empty())
+    {
+        EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(createResult.Warning));
     }
 
     auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_dockerClient->RemoveNetwork(name); });
@@ -2857,8 +2870,9 @@ void WSLCSession::RecoverExistingContainers()
         }
         catch (...)
         {
-            // Log but don't fail the session startup if a single container fails to recover.
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
+            EMIT_USER_WARNING(
+                Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
         }
     }
 
@@ -2907,7 +2921,11 @@ void WSLCSession::RecoverExistingNetworks()
             auto [_, inserted] = m_networks.insert({network.Name, std::move(entry)});
             WI_VERIFY(inserted);
         }
-        CATCH_LOG_MSG("Failed to recover network: %hs", network.Name.c_str());
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to recover network: %hs", network.Name.c_str());
+            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverNetwork(wsl::shared::string::MultiByteToWide(network.Name)));
+        }
     }
 
     WSL_LOG(
