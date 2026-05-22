@@ -79,6 +79,9 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
 
+    // Swiotlb device-options token sized to fit inside the VM's RAM (empty when too small).
+    std::wstring m_swiotlbConfig;
+
     wil::unique_socket m_listenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;

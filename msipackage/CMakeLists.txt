@@ -32,6 +32,10 @@ foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
 
+# Track wsldevicehost.dll (either from the NuGet package or from a -DWSL_DEVICE_HOST_DLL override)
+# so editing it triggers an MSI rebuild.
+list(APPEND BINARIES_DEPENDENCIES "${WSL_DEVICE_HOST_DLL_PATH}")
+
 if (${WSL_BUILD_THIN_PACKAGE})
     set(COMPRESS_PACKAGE "no")
 else()

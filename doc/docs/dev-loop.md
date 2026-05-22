@@ -137,6 +137,7 @@ Also see:
 
 - `WSL_BUILD_THIN_PACKAGE` to build an even smaller package
 - `WSL_POST_BUILD_COMMAND` to automatically deploy the package during build
+- `WSL_DEVICE_HOST_DLL` to swap in a locally-built `wsldevicehost.dll` instead of the one from the `Microsoft.WSL.DeviceHost` NuGet package
 
 **Code formatting**
 

@@ -56,3 +56,9 @@ endif()
 # #   error - block the commit when formatting issues are found
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
+
+# # Uncomment to replace the wsldevicehost.dll from the Microsoft.WSL.DeviceHost NuGet
+# # package with a locally-built copy. The MSI build will pick up changes to the file
+# # automatically, so you can iterate by rebuilding the dll and then running:
+# #   cmake --build . --target msipackage
+# set(WSL_DEVICE_HOST_DLL "C:/path/to/wsldevicehost.dll")

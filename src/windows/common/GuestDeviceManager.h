@@ -75,6 +75,7 @@ private:
 
     wil::srwlock m_lock;
     std::wstring m_machineId;
+    std::wstring m_vmIdOption;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
 };

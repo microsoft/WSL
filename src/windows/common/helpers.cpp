@@ -762,7 +762,8 @@ try
 }
 CATCH_LOG()
 
-void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder)
+void wsl::windows::common::helpers::AppendCommonKernelCommandLine(
+    _Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ const std::wstring& swiotlbConfig)
 {
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
@@ -772,4 +773,24 @@ void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::w
 
     // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
     kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
+
+    // Reserve a swiotlb bounce buffer for virtio devices.
+    if (!swiotlbConfig.empty())
+    {
+        kernelCmdLine += std::format(L" swiotlb=force hv_pci_swiotlb={}", swiotlbConfig);
+    }
+}
+
+std::wstring wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes)
+{
+    // Skip swiotlb on VMs below 1 GiB; the buffer would be a meaningful chunk of RAM. Users can
+    // still opt in explicitly via experimental.swiotlb in .wslconfig.
+    if (memoryBytes < _1GB)
+    {
+        return {};
+    }
+
+    // 256 MiB base sits below 4 GiB (32-bit PCI BAR limit on ARM64 virtio), below the Hyper-V
+    // low PCI MMIO hole (starts at >= 3 GiB on both x64 and ARM64), and above the kernel image.
+    return L"0x10000000,64M";
 }

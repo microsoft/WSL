@@ -118,6 +118,7 @@ struct VmConfiguration
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
+bool g_KernelSupportsHvPciSwiotlb = false;
 
 int Chroot(const char* Target);
 
@@ -3399,6 +3400,7 @@ try
 
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
+    Message->KernelSupportsHvPciSwiotlb = g_KernelSupportsHvPciSwiotlb;
 
     Channel.SendMessage<LX_INIT_GUEST_CAPABILITIES>(Message.Span());
     return 0;
@@ -3690,6 +3692,15 @@ int main(int Argc, char* Argv[])
     }
 
     if (unsetenv(WSL_ROOT_INIT_ENV))
+    {
+        LOG_ERROR("unsetenv failed {}", errno);
+    }
+
+    // Linux passes unrecognized key=value cmdline parameters to init as env vars,
+    // so seeing hv_pci_swiotlb= in the environment means the kernel didn't consume
+    // it (no WSL swiotlb patch).
+    g_KernelSupportsHvPciSwiotlb = (getenv("hv_pci_swiotlb") == nullptr);
+    if (!g_KernelSupportsHvPciSwiotlb && unsetenv("hv_pci_swiotlb"))
     {
         LOG_ERROR("unsetenv failed {}", errno);
     }

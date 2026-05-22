@@ -127,6 +127,20 @@ find_nuget_package(Microsoft.RemoteDesktop.Client.MSRDC.SessionHost MSRDC /build
 find_nuget_package(Microsoft.Taef TAEF /)
 find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
 find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+
+# Allow developers to swap in a locally-built wsldevicehost.dll without producing a new NuGet.
+# Usage: cmake . -DWSL_DEVICE_HOST_DLL=C:/path/to/wsldevicehost.dll
+set(WSL_DEVICE_HOST_DLL "" CACHE FILEPATH "Optional path to a wsldevicehost.dll that overrides the copy from the Microsoft.WSL.DeviceHost NuGet package.")
+if (WSL_DEVICE_HOST_DLL)
+    if (NOT EXISTS "${WSL_DEVICE_HOST_DLL}")
+        message(FATAL_ERROR "WSL_DEVICE_HOST_DLL='${WSL_DEVICE_HOST_DLL}' does not exist.")
+    endif()
+    message(STATUS "Overriding wsldevicehost.dll with ${WSL_DEVICE_HOST_DLL}")
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_DLL}")
+else()
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
+endif()
+
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)

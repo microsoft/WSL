@@ -134,12 +134,18 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 #endif
 
+    // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
+    // command line, virtiofs shares, and the VirtioProxy virtio-net adapter.
+    // Only needed when a virtio device that requires bounce buffers will be attached.
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    {
+        m_swiotlbConfig = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
+    }
+
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
-
-    // Append common kernel parameters shared between WSL2 and WSLC.
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, m_swiotlbConfig);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -456,7 +462,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbConfig);
     }
     else
     {
@@ -573,11 +579,22 @@ try
     }
     else
     {
+        std::wstring options = ReadOnly ? L"ro" : L"";
+        if (!m_swiotlbConfig.empty())
+        {
+            if (!options.empty())
+            {
+                options += L";";
+            }
+
+            options += std::format(L"swiotlb={}", m_swiotlbConfig);
+        }
+
         it->second = m_guestDeviceManager->AddGuestDevice(
             VIRTIO_FS_DEVICE_ID,
             m_virtioFsClassId,
             shareName.c_str(),
-            ReadOnly ? L"ro" : L"",
+            options.c_str(),
             WindowsPath,
             VIRTIO_FS_FLAGS_TYPE_FILES,
             m_userToken.get());
