@@ -2343,13 +2343,13 @@ Return Value:
 
     try
     {
-        THROW_LAST_ERROR_IF(access(WSL_USER_CGROUP_PATH, F_OK) < 0);
         const auto MiniInitDirectChildPidStr = getenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
         if (MiniInitDirectChildPidStr == nullptr)
         {
             throw RuntimeErrorWithSourceLocation("Missing environment variable: " LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
         }
         unsetenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
+        THROW_LAST_ERROR_IF(access(WSL_USER_CGROUP_PATH, F_OK) < 0);
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
         auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
         THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0 && errno != EEXIST);
