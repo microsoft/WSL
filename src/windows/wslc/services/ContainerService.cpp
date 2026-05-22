@@ -543,4 +543,20 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     THROW_IF_FAILED(container->Stats(&output));
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
 }
+
+PruneContainersResult ContainerService::Prune(Session& session)
+{
+    PruneResult result;
+    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+
+    PruneContainersResult pruneResult;
+    pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;
+    pruneResult.PrunedContainers.reserve(result.result.ContainersCount);
+    for (ULONG i = 0; i < result.result.ContainersCount; i++)
+    {
+        pruneResult.PrunedContainers.push_back(result.result.Containers[i]);
+    }
+
+    return pruneResult;
+}
 } // namespace wsl::windows::wslc::services

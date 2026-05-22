@@ -319,6 +319,10 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
+
+    // Job object that terminates child processes (wslhost.exe, wslrelay.exe)
+    // when the VM shuts down.
+    wil::unique_handle m_processJobObject;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);

@@ -143,7 +143,7 @@ typedef struct _WSLCImageInformation
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
     char Digest[256];
-    ULONGLONG Size;
+    LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
 } WSLCImageInformation;
@@ -322,7 +322,7 @@ typedef struct _WSLCContainerOptions
     WSLCStringArray DnsSearchDomains;
     WSLCStringArray DnsOptions;
 
-    ULONGLONG ShmSize;
+    LONGLONG ShmSize; // Matches Docker's int64 ShmSize; consistent with MemoryBytes/NanoCpus
     WSLCContainerNetwork ContainerNetwork;
     [unique, size_is(TmpfsCount)] const WSLCTmpfsMount* Tmpfs;
     ULONG TmpfsCount;
@@ -636,13 +636,6 @@ typedef struct _WSLCVolumeInformation
     char Driver[WSLC_MAX_VOLUME_DRIVER_LENGTH + 1];
 } WSLCVolumeInformation;
 
-typedef struct _WSLCPruneVolumesResults
-{
-    [unique, size_is(VolumesCount)] WSLCVolumeName* Volumes;
-    ULONG VolumesCount;
-    ULONGLONG SpaceReclaimed;
-} WSLCPruneVolumesResults;
-
 typedef struct _WSLCNetworkOptions
 {
     LPCSTR Name;
@@ -666,13 +659,6 @@ typedef struct _WSLCPruneLabelFilter
     [unique] LPCSTR Value;
     BOOL Present;
 } WSLCPruneLabelFilter;
-
-typedef struct _WSLCPruneVolumesOptions
-{
-    BOOL All; // If TRUE, prune all unused volumes. If FALSE, only anonymous volumes.
-    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
-    ULONG LabelsCount;
-} WSLCPruneVolumesOptions;
 
 typedef struct _WSLCPruneContainersResults
 {
@@ -800,12 +786,12 @@ interface IWSLCSession : IUnknown
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
     HRESULT DeleteVolume([in] LPCSTR Name);
-    HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out] WSLCPruneVolumesResults* Results);
+    HRESULT PruneVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);

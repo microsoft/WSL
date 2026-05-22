@@ -38,7 +38,7 @@ struct ContainerOptions
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
-    std::optional<ULONGLONG> ShmSize{};
+    std::optional<int64_t> ShmSize{};
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
@@ -66,6 +66,12 @@ struct StopContainerOptions
 
     WSLCSignal Signal = WSLCSignalNone;
     LONG Timeout = DefaultTimeout;
+};
+
+struct PruneContainersResult
+{
+    std::vector<std::string> PrunedContainers;
+    ULONGLONG SpaceReclaimed{};
 };
 
 struct KillContainerOptions

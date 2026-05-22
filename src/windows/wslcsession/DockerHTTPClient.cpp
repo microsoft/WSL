@@ -66,9 +66,20 @@ nlohmann::json PruneFiltersToJson(const TFilters& filters)
         }
     }
 
-    if (filters.until.has_value())
+    if constexpr (requires { filters.all; })
     {
-        j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+        if (filters.all.has_value() && filters.all.value())
+        {
+            j["all"] = nlohmann::json::array({"true"});
+        }
+    }
+
+    if constexpr (requires { filters.until; })
+    {
+        if (filters.until.has_value())
+        {
+            j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+        }
     }
 
     if (!filters.presentLabels.empty())
@@ -453,10 +464,29 @@ void DockerHTTPClient::RemoveVolume(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
 }
 
-std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
+std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes(const std::map<std::string, std::vector<std::string>>& filters)
 {
-    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
+    auto url = URL::Create("/volumes");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, url);
     return response.Volumes;
+}
+
+docker_schema::PruneVolumeResult DockerHTTPClient::PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/volumes/prune");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneVolumeResult>(verb::post, url);
 }
 
 docker_schema::CreateNetworkResponse DockerHTTPClient::CreateNetwork(const docker_schema::CreateNetwork& Request)
