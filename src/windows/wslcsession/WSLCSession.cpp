@@ -2810,6 +2810,12 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
     return UserCOMCallback{*this};
 }
 
+bool WSLCSession::IsUserCOMCallbackRegistered()
+{
+    std::lock_guard lock(m_userCOMCallbacksLock);
+    return m_userCOMCallbackThreads.contains(GetCurrentThreadId());
+}
+
 void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
 {
     std::lock_guard lock(m_userCOMCallbacksLock);

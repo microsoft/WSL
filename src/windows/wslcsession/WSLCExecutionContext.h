@@ -31,7 +31,9 @@ protected:
         {
             // Lazily register for COM cancellation on first warning so
             // CancelUserCOMCallbacks() can abort the OnWarning call during session termination.
-            if (!m_comCallback.has_value() && m_session != nullptr)
+            // Skip registration if this thread is already registered (e.g., by IProgressCallback
+            // in StreamImageOperation), since the thread is already cancellable.
+            if (!m_comCallback.has_value() && m_session != nullptr && !m_session->IsUserCOMCallbackRegistered())
             {
                 m_comCallback = m_session->RegisterUserCOMCallback();
             }

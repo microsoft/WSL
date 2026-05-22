@@ -182,6 +182,7 @@ public:
 
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
+    bool IsUserCOMCallbackRegistered();
 
     HANDLE SessionTerminatingEvent() const noexcept
     {
