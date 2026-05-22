@@ -7073,8 +7073,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(out, std::wstring(L"0::/"));
 
-        auto [exists, __] = LxsstuLaunchWslAndCaptureOutput(
-            L"--cd / -- /bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
+        auto [exists, __] =
+            LxsstuLaunchWslAndCaptureOutput(L"--cd / -- /bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
         while (!exists.empty() && (exists.back() == L'\n' || exists.back() == L'\r'))
         {
             exists.pop_back();
