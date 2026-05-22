@@ -24,6 +24,7 @@ class WSLCE2EContainerRunTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
+        EnsureImageIsLoaded(AlpineImage);
         EnsureImageIsLoaded(DebianImage);
         EnsureImageIsLoaded(PythonImage);
 
@@ -41,6 +42,7 @@ class WSLCE2EContainerRunTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureImageIsDeleted(AlpineImage);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
@@ -624,11 +626,20 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNS)
     {
-        auto result =
-            RunWslc(std::format(L"container run --rm --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
-        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+        // With podman+aardvark-dns enabled on the default bridge network,
+        // container /etc/resolv.conf always points at the aardvark gateway;
+        // --dns values become aardvark's upstream forwarders rather than
+        // literal nameserver entries. Verify --dns is honored by routing to
+        // an unreachable TEST-NET (RFC 5737) address — queries must time out,
+        // proving --dns is the exclusive upstream and no fallback to system
+        // DNS occurs.
+        auto result = RunWslc(std::format(
+            L"container run --rm --dns 192.0.2.1 {} sh -c \"nslookup example.com 2>&1\"",
+            AlpineImage.NameAndTag()));
+        auto out = result.Stdout.value_or(L"");
+        VERIFY_IS_TRUE(
+            out.find(L"timed out") != std::wstring::npos ||
+            out.find(L"no servers could be reached") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)
@@ -767,6 +778,7 @@ private:
     const std::wstring HostEnvVariableValue2 = L"wslc-host-env-value2";
 
     // Test images
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& PythonImage = PythonTestImage();
 

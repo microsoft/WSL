@@ -656,14 +656,24 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS)
     {
+        // With podman+aardvark-dns enabled on the default bridge network,
+        // container /etc/resolv.conf always points at the aardvark gateway;
+        // --dns values become aardvark's upstream forwarders rather than
+        // literal nameserver entries. Verify --dns is honored by routing to
+        // an unreachable TEST-NET (RFC 5737) address — queries must time out,
+        // proving --dns is the exclusive upstream and no fallback to system
+        // DNS occurs.
         auto result = RunWslc(std::format(
-            L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
+            L"container create --name {} --dns 192.0.2.1 {} sh -c \"nslookup example.com 2>&1\"",
+            WslcContainerName,
+            AlpineImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
-        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+        auto out = result.Stdout.value_or(L"");
+        VERIFY_IS_TRUE(
+            out.find(L"timed out") != std::wstring::npos ||
+            out.find(L"no servers could be reached") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSSearch)
