@@ -940,8 +940,7 @@ extern "C" UINT __stdcall CalculateWslSettingsProtocolIds(MSIHANDLE install)
     return NOERROR;
 }
 
-static void SetWslServiceStartType(DWORD StartType) noexcept
-try
+static void SetWslServiceStartType(DWORD StartType)
 {
     const wil::unique_schandle manager{OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)};
     THROW_LAST_ERROR_IF(!manager);
@@ -960,7 +959,6 @@ try
     THROW_IF_WIN32_BOOL_FALSE(ChangeServiceConfigW(
         service.get(), SERVICE_NO_CHANGE, StartType, SERVICE_NO_CHANGE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr));
 }
-CATCH_LOG()
 
 extern "C" UINT __stdcall DisableWslService(MSIHANDLE install)
 {
