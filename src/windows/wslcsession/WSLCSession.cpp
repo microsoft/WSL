@@ -701,10 +701,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
@@ -2155,10 +2155,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+HRESULT WSLCSession::PruneVolumes(
+    const WSLCFilter* Filters, ULONG FiltersCount, IWarningCallback* WarningCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
 try
 {
-    WSLCExecutionContext context(this);
+    WSLCExecutionContext context(this, WarningCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Volumes);
     RETURN_HR_IF_NULL(E_POINTER, VolumesCount);

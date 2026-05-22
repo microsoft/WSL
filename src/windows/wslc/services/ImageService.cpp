@@ -178,7 +178,7 @@ void ImageService::Build(
         .Flags = flags,
     };
 
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent, nullptr));
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)

@@ -100,11 +100,7 @@ public:
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(BuildImage)(
-        _In_ const WSLCBuildImageOptions* Options,
-        _In_opt_ IProgressCallback* ProgressCallback,
-        _In_opt_ HANDLE CancelEvent,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
@@ -157,6 +153,7 @@ public:
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
      _In_ ULONG FiltersCount,
+     _In_opt_ IWarningCallback* WarningCallback,
      _Out_ WSLCVolumeName** Volumes,
      _Out_ ULONG* VolumesCount,
      _Out_ ULONGLONG* SpaceReclaimed) override;

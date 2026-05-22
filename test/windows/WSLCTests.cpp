@@ -1367,7 +1367,7 @@ class WSLCTests
         optionsCopy.ContextPath = contextPathStr.c_str();
         optionsCopy.DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get());
 
-        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, callback, nullptr, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, callback, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -1772,7 +1772,7 @@ class WSLCTests
             .Tags = {&tag, 1},
         };
 
-        VERIFY_FAILED(m_defaultSession->BuildImage(&options, callback.Get(), nullptr, nullptr));
+        VERIFY_FAILED(m_defaultSession->BuildImage(&options, callback.Get(), nullptr));
         VERIFY_IS_TRUE(progressOutput.find("build-log-marker") != std::string::npos);
     }
 
@@ -1805,7 +1805,7 @@ class WSLCTests
             .DockerfileHandle = ToCOMInputHandle(readHandle.get()),
             .Tags = {&tag, 1},
         };
-        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-stdin:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-stdin:latest", "wslc-build-stdin-container");
@@ -1877,7 +1877,7 @@ class WSLCTests
     {
         WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = {}, .Tags = {nullptr, 0}};
 
-        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
+        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
     }
 
     WSLC_TEST_METHOD(BuildImageCancel)
@@ -1930,7 +1930,7 @@ class WSLCTests
 
         std::promise<HRESULT> result;
         std::thread buildThread(
-            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get(), nullptr)); });
+            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() { buildThread.join(); });
 
@@ -1993,7 +1993,7 @@ class WSLCTests
             .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
             .Flags = static_cast<WSLCBuildImageFlags>(0x8)};
 
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
     }
 
     WSLC_TEST_METHOD(AnonymousVolumes)
@@ -2057,7 +2057,7 @@ class WSLCTests
             auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
                 ULONGLONG spaceReclaimed = 0;
-                LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, 0, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+                LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, 0, nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
             });
 
             VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 1u);
@@ -2811,7 +2811,7 @@ class WSLCTests
 
         std::promise<HRESULT> buildResult;
         std::thread buildThread(
-            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get(), nullptr)); });
+            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() {
             exitEvent.SetEvent();
@@ -4432,7 +4432,7 @@ class WSLCTests
             wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
             ULONGLONG spaceReclaimed = 0;
             VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
-                filtersPtr, filtersCount, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+                filtersPtr, filtersCount, nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
 
             std::vector<std::string> names;
             for (const auto& n : deleted)
@@ -4572,7 +4572,8 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(
                 E_POINTER,
-                m_defaultSession->PruneVolumes(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+                m_defaultSession->PruneVolumes(
+                    filters, ARRAYSIZE(filters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
         }
 
         // Filter with null Value rejected.
@@ -4584,7 +4585,8 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(
                 E_POINTER,
-                m_defaultSession->PruneVolumes(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+                m_defaultSession->PruneVolumes(
+                    filters, ARRAYSIZE(filters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
         }
     }
 
