@@ -3993,10 +3993,7 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
-    {
-        LOG_ERROR("Failed to mount cgroup2 filesystem: {}", errno);
-    }
+    UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
 
     UtilSetThreadName("mini_init");
 
