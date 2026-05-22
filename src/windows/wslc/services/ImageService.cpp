@@ -14,7 +14,6 @@ Abstract:
 #include "ImageService.h"
 #include "RegistryService.h"
 #include "SessionService.h"
-#include "WarningCallback.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
@@ -179,8 +178,7 @@ void ImageService::Build(
         .Flags = flags,
     };
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent, nullptr));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
@@ -216,20 +214,14 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
     auto source = OpenImageInput(input);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, nullptr));
 }
 
 void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
     auto source = OpenImageInput(input);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     THROW_IF_FAILED(session.Get()->ImportImage(
-        ToCOMInputHandle(source.Handle.Get()),
-        imageName.empty() ? nullptr : imageName.c_str(),
-        nullptr,
-        source.ContentLength,
-        warningCallback.Get()));
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength, nullptr));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
@@ -255,8 +247,7 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 {
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, nullptr));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -287,8 +278,7 @@ void ImageService::Push(wsl::windows::wslc::models::Session& session, const std:
 {
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, nullptr));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)
