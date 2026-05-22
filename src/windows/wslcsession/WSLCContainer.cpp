@@ -214,28 +214,27 @@ std::string ResolveNetworkMode(
     return std::string{mode};
 }
 
-std::vector<std::string> ResolveEndpoints(
+std::map<std::string, EmptyObject> ResolveEndpoints(
     const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
 {
+    std::map<std::string, EmptyObject> resolved;
     if (count == 0)
     {
-        return {};
+        return resolved;
     }
 
     THROW_HR_IF_MSG(E_INVALIDARG, connections == nullptr, "Networks is null with NetworksCount=%lu", count);
 
-    std::vector<std::string> resolved;
-    resolved.reserve(count);
-
-    // Treat the primary mode as already-attached so duplicates with it are rejected too.
-    std::set<std::string_view> seen{resolvedMode};
     for (ULONG i = 0; i < count; i++)
     {
         const char* raw = connections[i].NetworkName;
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
 
-        auto& name = resolved.emplace_back(raw);
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !seen.insert(name).second);
+        std::string name{raw};
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
+
+        auto [it, inserted] = resolved.try_emplace(name);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
 
         if (name != "bridge")
         {
@@ -1573,16 +1572,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
-
-    // Attach the primary and each additional endpoint at create time so Docker connects them all.
-    if (!endpoints.empty())
-    {
-        request.NetworkingConfig.EndpointsConfig[networkMode] = {};
-        for (const auto& n : endpoints)
-        {
-            request.NetworkingConfig.EndpointsConfig[n] = {};
-        }
-    }
+    request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
 
     for (const auto& e : mappedPorts)
     {
@@ -1635,13 +1625,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         "Container was created but primary network '%hs' was not attached",
         networkMode.c_str());
 
-    for (const auto& n : endpoints)
+    for (const auto& [name, _] : request.NetworkingConfig.EndpointsConfig)
     {
         THROW_HR_IF_MSG(
             E_UNEXPECTED,
-            !inspectData.NetworkSettings.Networks.contains(n),
+            !inspectData.NetworkSettings.Networks.contains(name),
             "Container was created but network '%hs' was not attached",
-            n.c_str());
+            name.c_str());
     }
 
     // Wait for the container create event to be delivered on the Docker event stream so that
