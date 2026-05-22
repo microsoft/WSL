@@ -1228,7 +1228,7 @@ try
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             WI_IsAnyFlagSet(static_cast<WSLCListImagesFlags>(Options->Flags), ~WSLCListImagesFlagsValid),
-            "Invalid flags: 0x%x",
+            "Invalid flags: 0x%lx",
             Options->Flags);
 
         all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
