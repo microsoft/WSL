@@ -193,8 +193,6 @@ void VirtioNetworking::RefreshGuestConnection()
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
     }
 
-    appendOption(L"swiotlb", m_swiotlbConfig);
-
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
     {
@@ -217,8 +215,15 @@ void VirtioNetworking::RefreshGuestConnection()
     {
         if (!m_adapterId.has_value())
         {
+            const auto swiotlbOption = m_swiotlbConfig.empty() ? std::wstring{} : std::format(L"swiotlb={}", m_swiotlbConfig);
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
-                VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, c_eth0DeviceName, nullptr, device_options.c_str(), 0, m_userToken.get());
+                VIRTIO_NET_DEVICE_ID,
+                VIRTIO_NET_CLASS_ID,
+                c_eth0DeviceName,
+                swiotlbOption.c_str(),
+                device_options.c_str(),
+                0,
+                m_userToken.get());
         }
         else
         {
@@ -249,13 +254,16 @@ void VirtioNetworking::RefreshGuestConnection()
 void VirtioNetworking::SetupLoopbackDevice()
 {
     std::wstring loopbackOptions = L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55";
-    if (!m_swiotlbConfig.empty())
-    {
-        loopbackOptions += std::format(L";swiotlb={}", m_swiotlbConfig);
-    }
+    const auto swiotlbOption = m_swiotlbConfig.empty() ? std::wstring{} : std::format(L"swiotlb={}", m_swiotlbConfig);
 
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
-        VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, c_loopbackDeviceName, nullptr, loopbackOptions.c_str(), 0, m_userToken.get());
+        VIRTIO_NET_DEVICE_ID,
+        VIRTIO_NET_CLASS_ID,
+        c_loopbackDeviceName,
+        swiotlbOption.c_str(),
+        loopbackOptions.c_str(),
+        0,
+        m_userToken.get());
 
     // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.152, so assign loopback0 an
     // address of 169.254.73.153 with a netmask of 30 so that the only addresses associated with this adapter are

@@ -133,6 +133,20 @@ void DeviceHostProxy::Shutdown()
 {
     {
         auto lock = m_lock.lock_exclusive();
+
+        for (auto& entry : m_fileSystems)
+        {
+            try
+            {
+                wil::com_ptr<IPlan9FileSystem> instance;
+                THROW_IF_FAILED(
+                    m_git->GetInterfaceFromGlobal(entry.Cookie, __uuidof(IPlan9FileSystem), reinterpret_cast<void**>(instance.put())));
+
+                LOG_IF_FAILED(instance->Teardown());
+            }
+            CATCH_LOG()
+        }
+
         m_fileSystems.clear();
         m_shutdown = true;
     }
