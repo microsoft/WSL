@@ -530,7 +530,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         const auto systemDelta =
             static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
 
-        // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behaviour.
+        // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behavior.
         uint32_t onlineCpus = stats.cpu_stats.online_cpus;
         if (onlineCpus == 0)
         {
