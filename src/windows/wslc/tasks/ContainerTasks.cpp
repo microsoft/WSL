@@ -495,32 +495,65 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
     }
 
-    // Build stats as a json array first for later filtering or display either as json or table format.
-    nlohmann::json statsJson = nlohmann::json::array();
+    // Fetch stats for all containers concurrently. The Docker engine blocks for ~1s per
+    // request to collect a valid precpu_stats sample, so issuing all requests in parallel
+    // to mitigate scalability issue with increasing container count.
+    struct StatsResult
+    {
+        std::wstring containerId;
+        std::optional<wsl::windows::common::docker_schema::ContainerStats> stats;
+        wil::ResultException error{S_OK};
+        bool hasError{false};
+    };
+
+    std::vector<std::future<StatsResult>> futures;
+    futures.reserve(containers.size());
     for (const auto& containerId : containers)
     {
-        wsl::windows::common::docker_schema::ContainerStats stats;
-        try
-        {
-            stats = ContainerService::Stats(session, WideToMultiByte(containerId));
-        }
-        catch (const wil::ResultException& ex)
-        {
-            if (!userSpecifiedContainers)
+        futures.push_back(std::async(std::launch::async, [&session, containerId, userSpecifiedContainers]() -> StatsResult {
+            StatsResult result;
+            result.containerId = containerId;
+            try
             {
-                // If the user did not explicitly specify a container then there may be expected
-                // race conditions between listing containers and querying stats.
-                switch (ex.GetErrorCode())
-                {
-                case RPC_E_DISCONNECTED:
-                case WSLC_E_CONTAINER_NOT_FOUND:
-                    continue;
-                }
+                result.stats = ContainerService::Stats(session, WideToMultiByte(containerId));
             }
+            catch (const wil::ResultException& ex)
+            {
+                if (!userSpecifiedContainers)
+                {
+                    switch (ex.GetErrorCode())
+                    {
+                    case RPC_E_DISCONNECTED:
+                    case WSLC_E_CONTAINER_NOT_FOUND:
+                        return result; // stats remains empty, silently skip
+                    }
+                }
 
-            LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
-            throw;
+                result.hasError = true;
+                result.error = ex;
+            }
+            return result;
+        }));
+    }
+
+    // Build stats as a json array first for later filtering or display either as json or table format.
+    nlohmann::json statsJson = nlohmann::json::array();
+    for (auto& future : futures)
+    {
+        auto result = future.get();
+
+        if (result.hasError)
+        {
+            LOG_HR_MSG(result.error.GetErrorCode(), "Failed to get stats for container %ws", result.containerId.c_str());
+            throw result.error;
         }
+
+        if (!result.stats.has_value())
+        {
+            continue;
+        }
+
+        const auto& stats = *result.stats;
 
         // Calculate CPU %
         // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
