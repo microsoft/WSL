@@ -6982,7 +6982,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    void ValidateIsolatedCgroupLayout(bool Systemd)
+    void ValidateIsolatedCgroupLayout(bool systemd)
     {
         constexpr auto secondDistroName = L"cgroup-test-distro";
 
@@ -6999,7 +6999,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistroName, g_testDistroPath)), 0L);
 
         std::optional<decltype(EnableSystemd())> systemdCleanup;
-        if (Systemd)
+        if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
 
