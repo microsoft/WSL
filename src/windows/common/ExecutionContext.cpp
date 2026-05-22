@@ -386,8 +386,7 @@ ServiceExecutionContext::~ServiceExecutionContext()
     }
 }
 
-COMServiceExecutionContext::COMServiceExecutionContext(IWarningCallback* warningCallback) :
-    ExecutionContext(Empty), m_warningCallback(warningCallback)
+COMServiceExecutionContext::COMServiceExecutionContext() : ExecutionContext(Empty)
 {
 }
 
@@ -421,17 +420,6 @@ CATCH_LOG(); // Catch to avoid throwing from a destructor
 bool COMServiceExecutionContext::CanCollectUserErrorMessage()
 {
     return true;
-}
-
-bool COMServiceExecutionContext::CollectUserWarning(const std::wstring& warning)
-{
-    if (m_warningCallback != nullptr)
-    {
-        LOG_IF_FAILED(m_warningCallback->OnWarning(warning.c_str()));
-        return true;
-    }
-
-    return ExecutionContext::CollectUserWarning(warning);
 }
 
 LXSS_ERROR_INFO* ClientExecutionContext::OutError() noexcept

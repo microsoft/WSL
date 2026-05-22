@@ -220,7 +220,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
 {
 
 public:
-    WSLCContainer(WSLCContainerImpl* impl, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+    WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
@@ -245,6 +245,7 @@ public:
     void CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
 
 private:
+    WSLCSession& m_session;
     std::function<void(const WSLCContainerImpl*)> m_onDeleted;
 
     // Cached read-only properties populated by CacheState() so they remain

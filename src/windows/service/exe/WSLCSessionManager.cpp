@@ -272,7 +272,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef));
+        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{

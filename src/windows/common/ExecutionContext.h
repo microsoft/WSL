@@ -4,8 +4,6 @@
 
 #include "wslutil.h"
 
-struct IWarningCallback;
-
 namespace wsl::windows::common {
 
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
@@ -213,16 +211,10 @@ public:
     NON_COPYABLE(COMServiceExecutionContext);
     NON_MOVABLE(COMServiceExecutionContext);
 
-    COMServiceExecutionContext(IWarningCallback* warningCallback = nullptr);
+    COMServiceExecutionContext();
     ~COMServiceExecutionContext() override;
 
     bool CanCollectUserErrorMessage() override;
-
-protected:
-    bool CollectUserWarning(const std::wstring& warning) override;
-
-private:
-    IWarningCallback* m_warningCallback = nullptr;
 };
 
 void EnableContextualizedErrors(bool service, bool useComErrors = false);

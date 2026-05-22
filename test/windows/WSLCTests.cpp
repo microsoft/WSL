@@ -6504,7 +6504,7 @@ class WSLCTests
         options.ContainerNetwork.NetworksCount = 1;
 
         wil::com_ptr<IWSLCContainer> container;
-        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
         VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
         ValidateCOMErrorMessage(L"Target container name is required for container network mode.");
     }
@@ -6622,7 +6622,7 @@ class WSLCTests
         options.ContainerNetwork.NetworksCount = 1;
 
         wil::com_ptr<IWSLCContainer> container;
-        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
         VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
         ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
     }

@@ -19,6 +19,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCContainer.h"
+#include "WSLCExecutionContext.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
@@ -44,6 +45,7 @@ using wsl::windows::service::wslc::WSLCContainer;
 using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -617,7 +619,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
-    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, std::move(onDeleted))),
+    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
@@ -2136,14 +2138,14 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 }
 
-WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
-    COMImplClass<WSLCContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
+WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
+    COMImplClass<WSLCContainerImpl>(impl), m_session(session), m_onDeleted(std::move(OnDeleted))
 {
 }
 
 HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     *Stdin = {};
     *Stdout = {};
@@ -2154,7 +2156,7 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* 
 
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF_NULL(E_POINTER, Result);
 
     *Result = WslcContainerStateInvalid;
@@ -2181,7 +2183,7 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     *Process = nullptr;
 
@@ -2207,7 +2209,7 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     *Process = nullptr;
     return CallImpl(&WSLCContainerImpl::Exec, Options, DetachKeys, Process);
@@ -2215,14 +2217,14 @@ HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys
 
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
 }
 
 HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
@@ -2230,7 +2232,7 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context(WarningCallback);
+    WSLCExecutionContext context(&m_session, WarningCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
@@ -2240,7 +2242,7 @@ CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     *Output = nullptr;
 
@@ -2250,7 +2252,7 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 HRESULT WSLCContainer::Stats(LPSTR* Output)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, Output == nullptr);
 
@@ -2262,7 +2264,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Delete(WSLCDeleteFlags Flags)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
@@ -2293,7 +2295,7 @@ CATCH_LOG();
 
 HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
@@ -2301,7 +2303,7 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
@@ -2316,7 +2318,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     const auto hr = wil::ResultFromException([&] {
         auto [lock, impl] = LockImpl();
@@ -2341,7 +2343,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetName(LPSTR* Name)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
@@ -2404,7 +2406,7 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
 

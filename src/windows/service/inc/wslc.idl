@@ -791,7 +791,8 @@ interface IWSLCSession : IUnknown
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
-        [in] IWSLCPluginNotifier* PluginNotifier);
+        [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
@@ -846,6 +847,7 @@ interface IWSLCSessionFactory : IUnknown
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
         [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback,
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
