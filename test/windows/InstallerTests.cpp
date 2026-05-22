@@ -1299,9 +1299,8 @@ class InstallerTests
         LogInfo("wsl echo OK output: %ls", output.c_str());
         LogInfo("wsl echo OK warnings: %ls", warnings.c_str());
 
-        // The warning message should mention a restart is required.
-        auto combined = output + warnings;
-        VERIFY_IS_TRUE(combined.find(L"restart") != std::wstring::npos);
+        // The reboot-required warning should appear on stderr.
+        VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageUpdateRebootRequired()) != std::wstring::npos);
 
         // Non-distro commands (--version, --list, --shutdown, --update) must keep working
         // even with the marker set — they go through CallMsiPackage but don't reach the

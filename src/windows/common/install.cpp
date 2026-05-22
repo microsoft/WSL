@@ -260,7 +260,7 @@ static constexpr auto c_rebootPendingSubkey = L"MSI\\RebootPending";
 
 void wsl::windows::common::install::SetRebootRequiredMarker()
 {
-    const auto lxssKey = OpenLxssMachineKey(KEY_ALL_ACCESS);
+    const auto lxssKey = OpenLxssMachineKey(KEY_CREATE_SUB_KEY);
     // REG_OPTION_VOLATILE: key is automatically deleted on reboot.
     auto key = CreateKey(lxssKey.get(), c_rebootPendingSubkey, KEY_SET_VALUE, nullptr, REG_OPTION_VOLATILE);
     WriteDword(key.get(), nullptr, L"RebootRequired", 1);
@@ -271,7 +271,7 @@ void wsl::windows::common::install::ClearRebootRequiredMarker()
     // Best-effort. registry::DeleteKey treats ERROR_FILE_NOT_FOUND as a no-op,
     // so this is safe to call on any successful install path even if no marker
     // was previously set.
-    const auto lxssKey = OpenLxssMachineKey(KEY_ALL_ACCESS);
+    const auto lxssKey = OpenLxssMachineKey(KEY_WRITE);
     wsl::windows::common::registry::DeleteKey(lxssKey.get(), c_rebootPendingSubkey);
 }
 
