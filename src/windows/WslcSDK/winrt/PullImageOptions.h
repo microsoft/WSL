@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.PullImageOptions.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct PullImageOptions : PullImageOptionsT<PullImageOptions>
@@ -25,10 +26,21 @@ struct PullImageOptions : PullImageOptionsT<PullImageOptions>
     void Uri(hstring const& value);
     hstring RegistryAuth();
     void RegistryAuth(hstring const& value);
+
+    WslcPullImageOptions ToStruct();
+
+private:
+    std::string m_uri;
+    std::string m_registryAuth;
+
+    std::unique_ptr<WslcPullImageOptions> m_pullImageOptions;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
+
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
 struct PullImageOptions : PullImageOptionsT<PullImageOptions, implementation::PullImageOptions>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
+
+DEFINE_TYPE_HELPERS(PullImageOptions);
