@@ -75,6 +75,11 @@ void SubProcess::SetShowWindow(WORD ShowWindow)
     m_showWindow = ShowWindow;
 }
 
+void SubProcess::SetJobObject(HANDLE JobObject)
+{
+    m_jobObject = JobObject;
+}
+
 wsl::windows::common::helpers::unique_proc_attribute_list SubProcess::BuildProcessAttributes()
 {
     DWORD attributes = 0;
@@ -89,6 +94,11 @@ wsl::windows::common::helpers::unique_proc_attribute_list SubProcess::BuildProce
     }
 
     if (m_pseudoConsole != nullptr)
+    {
+        attributes++;
+    }
+
+    if (m_jobObject != nullptr)
     {
         attributes++;
     }
@@ -121,6 +131,13 @@ wsl::windows::common::helpers::unique_proc_attribute_list SubProcess::BuildProce
     {
         THROW_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(
             list.get(), 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, m_pseudoConsole, sizeof(m_pseudoConsole), nullptr, nullptr));
+    }
+
+    // Job object
+    if (m_jobObject != nullptr)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(
+            list.get(), 0, PROC_THREAD_ATTRIBUTE_JOB_LIST, &m_jobObject, sizeof(m_jobObject), nullptr, nullptr));
     }
 
     return list;

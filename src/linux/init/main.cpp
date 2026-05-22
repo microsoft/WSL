@@ -89,7 +89,6 @@ Abstract:
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
 #define RESOLV_CONF_PATH ETC_PATH "/" RESOLV_CONF_FILE
-#define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
 #define SCSI_DEVICE_PATH "/sys/bus/scsi/devices"
 #define SCSI_DEVICE_NAME_PREFIX "0:0:0:"
 #define SCSI_DEVICE_PREFIX SCSI_DEVICE_PATH "/" SCSI_DEVICE_NAME_PREFIX
@@ -126,8 +125,6 @@ std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
 
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
-
 void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
@@ -149,10 +146,6 @@ std::string GetLunDevicePath(unsigned int Lun);
 int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName);
 
 std::string GetMountTarget(const char* Name);
-
-long long int GetUserCpuTime(void);
-
-ssize_t GetMemoryInUse(void);
 
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags);
 
@@ -272,160 +265,6 @@ Return Value:
 
     return 0;
 }
-
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
-
-/*++
-
-Routine Description:
-
-    This routine configures memory reduction behavior including memory reclaim and compaction.
-
-Arguments:
-
-    Mode - Supplies the memory reclaim mode.
-
-Return Value:
-
-    None.
-
---*/
-
-try
-{
-    //
-    // Create a worker thread to periodically check if the VM is idle and performs memory compaction
-    // and memory reclaim. This ensures that the maximum number of pages can be discarded to the host.
-    //
-
-    std::thread([Mode]() mutable {
-        try
-        {
-            //
-            // Set the thread's scheduling policy to idle.
-            //
-
-            sched_param Parameter{};
-            Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) != 0);
-
-            //
-            // Periodically check if the machine is idle by querying procfs for CPU usage.
-            // Memory compaction will occur if both of the following conditions are true:
-            //     1. The CPU time since the last check is greater than the idle threshold.
-            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
-            //
-
-            double MemoryLow = 1024 * 1024 * 1024;
-            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
-            long long int Start, Stop = 0;
-            auto constexpr SleepDuration = std::chrono::seconds(30);
-            size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
-            long long int ReclaimWindow[20] = {}; // 10 minutes
-            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling = false;
-
-            //
-            // Fall back to drop cache if the required cgroup path is not present.
-            //
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
-            {
-                LOG_WARNING("access({}, W_OK) failed {}, falling back to autoMemoryReclaim = dropcache", RECLAIM_PATH, errno);
-                Mode = LxMiniInitMemoryReclaimModeDropCache;
-            }
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual)
-            {
-                static_assert(COUNT_OF(ReclaimWindow) >= 6);
-                ReclaimWindowLength = 6; // Set to 3 minutes.
-            }
-
-            for (auto i = 1; i < ReclaimWindowLength; i++)
-            {
-                ReclaimWindow[i] = LLONG_MIN;
-            }
-
-            std::this_thread::sleep_for(SleepDuration);
-            for (;;)
-            {
-                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
-                Start = GetUserCpuTime();
-                THROW_LAST_ERROR_IF(Start == -1);
-
-                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
-                {
-                    //
-                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
-                    //
-
-                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
-                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
-                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
-                    {
-                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
-                        {
-                            double MemorySize = GetMemoryInUse();
-                            THROW_LAST_ERROR_IF(MemorySize < 0);
-
-                            if (MemorySize > MemoryHigh)
-                            {
-                                ReclaimIdling = false;
-                            }
-
-                            if (!ReclaimIdling && MemorySize > MemoryLow)
-                            {
-                                double MemoryTargetSize = MemorySize * 0.97;
-                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
-
-                                if (MemoryTargetSize < MemoryLow)
-                                {
-                                    ReclaimIdling = true;
-                                }
-                            }
-                        }
-                        else if (!ReclaimIdling)
-                        {
-                            ReclaimIdling = true;
-                            THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/drop_caches", "1\n") < 0);
-                        }
-                    }
-                    else
-                    {
-                        ReclaimIdling = false;
-                    }
-
-                    ReclaimIndex = LastIndex;
-                    ReclaimWindow[ReclaimIndex] = Start;
-                }
-
-                //
-                // Perform memory compaction if the VM is idle.
-                // This coalesces free pages into larger blocks for more efficient page reporting.
-                //
-
-                if ((Start - Stop) > IdleThreshold)
-                {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    Stop = GetUserCpuTime();
-                    THROW_LAST_ERROR_IF(Stop == -1);
-                    if ((Stop - Start) < IdleThreshold)
-                    {
-                        THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/compact_memory", "1\n") < 0);
-                    }
-                }
-
-                std::this_thread::sleep_until(Target);
-            }
-        }
-        CATCH_LOG()
-    }).detach();
-}
-CATCH_LOG()
 
 wil::unique_fd CreateNetlinkSocket(void)
 
@@ -1036,77 +875,6 @@ try
 
     Buffer[Result] = '\0';
     return atol(Buffer);
-}
-CATCH_RETURN_ERRNO()
-
-long long int GetUserCpuTime(void)
-
-/*++
-
-Routine Description:
-
-    This routine parses /proc/stat to query a summary of all user CPU time.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    The current user CPU counter for all cores.
-
---*/
-
-{
-    wil::unique_fd Fd{open(PROCFS_PATH "/stat", O_RDONLY)};
-    if (!Fd)
-    {
-        LOG_ERROR("open failed {}", errno);
-        return -1;
-    }
-
-    char Buffer[32];
-    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result < 0)
-    {
-        LOG_ERROR("read failed {}", errno);
-        return -1;
-    }
-
-    //
-    // Parse the first line of /proc/stat which is in the format
-    // "cpu  <counter>".
-    //
-
-    Buffer[Result] = '\0';
-    char* Sp1;
-    char* Info = strtok_r(Buffer, " \n", &Sp1);
-    Info = strtok_r(nullptr, " \n", &Sp1);
-    return strtoll(Info, nullptr, 10);
-}
-
-ssize_t GetMemoryInUse(void)
-
-/*++
-
-Routine Description:
-
-    This routine returns the amount memory in use in bytes.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    Total memory - Free memory. Includes that used by cache and buffers.
-
---*/
-try
-{
-    struct sysinfo Info = {};
-    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
-    return Info.totalram - Info.freeram;
 }
 CATCH_RETURN_ERRNO()
 
@@ -3292,7 +3060,7 @@ try
         // Configure memory reclamation.
         //
 
-        ConfigureMemoryReduction(EarlyConfig->MemoryReclaimMode);
+        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.

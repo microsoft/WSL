@@ -78,6 +78,9 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
     m_vmConfig(std::move(VmConfig)), m_traceClient(m_vmConfig.EnableTelemetry)
 {
+    // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
+    // when the VM is destroyed.
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId)
@@ -309,7 +312,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
 
             wsl::windows::common::helpers::LaunchDebugConsole(
-                m_comPipe0.c_str(), !!m_dmesgCollector, m_restrictedToken.get(), logFile ? logFile.get() : nullptr, !m_vmConfig.EnableTelemetry);
+                m_comPipe0.c_str(),
+                !!m_dmesgCollector,
+                m_restrictedToken.get(),
+                logFile ? logFile.get() : nullptr,
+                !m_vmConfig.EnableTelemetry,
+                m_processJobObject.get());
         }
         CATCH_LOG()
     }
@@ -1237,7 +1245,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
-        ConnectPort);
+        ConnectPort,
+        m_processJobObject.get());
 
     WI_ASSERT(!initSocket && !systemDistroSocket);
 
@@ -1639,7 +1648,12 @@ std::wstring WslCoreVm::GenerateConfigJson()
 
         m_comPipe1 = wsl::windows::common::helpers::GetUniquePipeName();
         wsl::windows::common::helpers::LaunchKdRelay(
-            m_comPipe1.c_str(), m_restrictedToken.get(), m_vmConfig.KernelDebugPort, m_terminatingEvent.get(), !m_vmConfig.EnableTelemetry);
+            m_comPipe1.c_str(),
+            m_restrictedToken.get(),
+            m_vmConfig.KernelDebugPort,
+            m_terminatingEvent.get(),
+            !m_vmConfig.EnableTelemetry,
+            m_processJobObject.get());
     }
     else
     {
@@ -1858,7 +1872,8 @@ void WslCoreVm::InitializeGuest()
         // N.B. The relay process is launched at medium integrity level, and its lifetime is tied to the lifetime of the utility VM.
         const auto result = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&]() {
             const auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
-            wsl::windows::common::helpers::LaunchPortRelay(socket.get(), m_runtimeId, m_restrictedToken.get(), !m_vmConfig.EnableTelemetry);
+            wsl::windows::common::helpers::LaunchPortRelay(
+                socket.get(), m_runtimeId, m_restrictedToken.get(), !m_vmConfig.EnableTelemetry, m_processJobObject.get());
         });
 
         if (FAILED(result))

@@ -2428,6 +2428,16 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Affichez les journaux d’un conteneur.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Supprimez tous les conteneurs arrêtés.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Supprime tous les conteneurs arrêtés.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Espace total récupéré : {:.2f} Mo</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Supprimer les conteneurs.</value>
   </data>

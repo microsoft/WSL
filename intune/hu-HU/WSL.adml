@@ -8,7 +8,7 @@
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
         <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->A Windows Subsystem for Linux engedélyezése</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Ha le van tiltva, ez a házirend letiltja a gépen lévő összes felhasználó számára a Windows Subsystem for Linux futó Linux-disztribúciók elérését.</string>
 
         <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->A Windows Subsystem for Linux beérkezett üzenetek mappája verziójának engedélyezése</string>
         <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Ha le van tiltva, ez a házirend letiltja a Windows Subsystem for Linux beérkezett üzenetek mappájának verzióját (választható összetevő). Ha ez a házirend le van tiltva, csak a WSL áruházi verziója használható.</string>

@@ -28,7 +28,8 @@ WslCoreInstance::WslCoreInstance(
     _In_ ULONG FeatureFlags,
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
-    _Out_opt_ ULONG* ConnectPort) :
+    _Out_opt_ ULONG* ConnectPort,
+    _In_opt_ HANDLE JobObject) :
     LxssRunningInstance(IdleTimeout),
     m_featureFlags(FeatureFlags),
     m_instanceId(InstanceId),
@@ -38,7 +39,8 @@ WslCoreInstance::WslCoreInstance(
     m_initializeDrvFs(DrvFsCallback),
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
-    m_socketTimeout(SocketTimeout)
+    m_socketTimeout(SocketTimeout),
+    m_jobObject(JobObject)
 {
     // Establish a communication channel with the init daemon.
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
@@ -125,7 +127,9 @@ WslCoreInstance::WslCoreInstance(
                 DrvFsCallback,
                 systemDistroFeatureFlags,
                 m_socketTimeout,
-                IdleTimeout);
+                IdleTimeout,
+                nullptr,
+                JobObject);
         }
         CATCH_LOG()
     }
@@ -419,7 +423,7 @@ void WslCoreInstance::Initialize()
         {
             const wil::unique_socket socket{wsl::windows::common::hvsocket::Connect(m_runtimeId, response.InteropPort)};
             wil::unique_handle info{wsl::windows::common::helpers::LaunchInteropServer(
-                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get())};
+                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get(), m_jobObject)};
         }
         CATCH_LOG()
     }
