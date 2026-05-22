@@ -6987,7 +6987,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         constexpr auto secondDistroName = L"cgroup-test-distro";
 
         // Ensure no stale state from a previous run.
-        TerminateDistribution();
+        LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
         LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

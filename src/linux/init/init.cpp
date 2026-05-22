@@ -2342,10 +2342,13 @@ Return Value:
     //
 
     const auto DistroCgroupPath = getenv(LX_WSL2_DISTRO_CGROUP_PATH);
-    unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
-    if (DistroCgroupPath != nullptr && access(DistroCgroupPath, F_OK) == 0)
+    if (DistroCgroupPath != nullptr)
     {
-        Config.CgroupPath = DistroCgroupPath;
+        if (access(DistroCgroupPath, F_OK) == 0)
+        {
+            Config.CgroupPath = DistroCgroupPath;
+        }
+        unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
     }
 
     std::vector<gsl::byte> Buffer;
