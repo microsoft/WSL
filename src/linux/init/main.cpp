@@ -3252,7 +3252,14 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+        }
+        else
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, {});
+        }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
