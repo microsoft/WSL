@@ -523,13 +523,23 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
 
         // Calculate CPU %
+        // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
         double cpuPercent = 0.0;
         const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
                               static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
         const auto systemDelta =
             static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
-        const auto onlineCpus = stats.cpu_stats.online_cpus > 0 ? stats.cpu_stats.online_cpus : 1u;
-        if (systemDelta > 0.0 && cpuDelta >= 0.0)
+
+        // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behaviour.
+        uint32_t onlineCpus = stats.cpu_stats.online_cpus;
+        if (onlineCpus == 0)
+        {
+            onlineCpus = stats.cpu_stats.cpu_usage.percpu_usage.has_value()
+                             ? static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size())
+                             : 1u;
+        }
+
+        if (systemDelta > 0.0 && cpuDelta > 0.0)
         {
             cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
         }
