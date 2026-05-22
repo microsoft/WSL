@@ -255,24 +255,19 @@ typedef struct _WSLCUlimit
     LONGLONG Hard;
 } WSLCUlimit;
 
-typedef enum _WSLCContainerNetworkType
+typedef struct _WSLCNetworkConnection
 {
-    WSLCContainerNetworkTypeNone = 0,
-    WSLCContainerNetworkTypeHost = 1,
-    WSLCContainerNetworkTypeBridged = 2,
-    WSLCContainerNetworkTypeCustom = 3
-} WSLCContainerNetworkType;
+    [string] LPCSTR NetworkName;
 
-typedef struct _WSLCNetworkAttachment
-{
-    [unique] LPCSTR NetworkName;
-    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
-} WSLCNetworkAttachment;
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
+} WSLCNetworkConnection;
 
 typedef struct _WSLCContainerNetwork
 {
-    WSLCContainerNetworkType ContainerNetworkType;
-    [unique, size_is(NetworksCount)] const WSLCNetworkAttachment* Networks;
+    [unique, string] LPCSTR NetworkMode;
+
+    [unique, size_is(NetworksCount)] const WSLCNetworkConnection* Networks;
     ULONG NetworksCount;
 } WSLCContainerNetwork;
 

@@ -87,7 +87,7 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerNamedVolume* namedVolumes;
     uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    WSLCContainerNetworkType networking;
+    std::string networking;
     WslcContainerFlags containerFlags;
 
 } WslcContainerOptionsInternal;

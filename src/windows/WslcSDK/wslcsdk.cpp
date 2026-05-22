@@ -99,14 +99,14 @@ WSLCSignal Convert(WslcSignal signal)
     }
 }
 
-WSLCContainerNetworkType Convert(WslcContainerNetworkingMode mode)
+std::string Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
     case WSLC_CONTAINER_NETWORKING_MODE_NONE:
-        return WSLCContainerNetworkTypeNone;
+        return "none";
     case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
-        return WSLCContainerNetworkTypeBridged;
+        return "bridge";
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
@@ -643,7 +643,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = WSLCContainerNetworkTypeNone;
+    internalType->networking = "none";
 
     return S_OK;
 }
@@ -772,7 +772,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
+    // SDK only exposes the network mode (no additional endpoints today).
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networking.c_str();
 
     // TODO: No user access
     // containerOptions.Labels;
