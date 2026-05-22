@@ -2246,6 +2246,46 @@ void ProcessLaunchInitMessage(
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
         //
+        // Set up the per-distro cgroup before potentially forking into two inits.
+        //
+
+        if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
+        {
+            auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
+
+            auto cleanup = wil::scope_exit([&]() {
+                rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir(DistroCgroupPath.c_str());
+            });
+
+            try
+            {
+                bool bootInit = false;
+                {
+                    wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+                    if (File)
+                    {
+                        std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit)};
+                        ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+                    }
+                }
+
+                THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0 && errno != EEXIST);
+
+                if (bootInit)
+                {
+                    THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
+                }
+
+                cleanup.release();
+            }
+            CATCH_LOG();
+        }
+
+        //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
         // N.B. A connection for the system distro must established even if the distro opts out
