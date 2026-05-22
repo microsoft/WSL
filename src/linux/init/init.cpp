@@ -2341,22 +2341,12 @@ Return Value:
     // Get the per-distro cgroup path.
     //
 
-    try
+    const auto DistroCgroupPath = getenv(LX_WSL2_DISTRO_CGROUP_PATH);
+    unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
+    if (DistroCgroupPath != nullptr && access(DistroCgroupPath, F_OK) == 0)
     {
-        const auto MiniInitDirectChildPidStr = getenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-        if (MiniInitDirectChildPidStr == nullptr)
-        {
-            throw RuntimeErrorWithSourceLocation("Missing environment variable: " LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-        }
-        unsetenv(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID);
-        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidStr);
-        auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
-        if (access(DistroCgroupPath.c_str(), F_OK) == 0)
-        {
-            Config.CgroupPath = std::move(DistroCgroupPath);
-        }
+        Config.CgroupPath = DistroCgroupPath;
     }
-    CATCH_LOG();
 
     std::vector<gsl::byte> Buffer;
     if (Config.BootInit)

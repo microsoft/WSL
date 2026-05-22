@@ -158,13 +158,13 @@ void LaunchInit(
     const char* Target,
     bool EnableGuiApps,
     const VmConfiguration& Config,
-    pid_t MiniInitDirectChildPid,
     const char* VmId = nullptr,
     const char* DistributionName = nullptr,
     const char* SharedMemoryRoot = nullptr,
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
-    std::optional<pid_t> DistroInitPid = {});
+    std::optional<pid_t> DistroInitPid = {},
+    const char* DistroCgroupPath = nullptr);
 
 void LaunchSystemDistro(
     int SocketFd,
@@ -176,7 +176,7 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    pid_t SystemInitPid);
+    const char* DistroCgroupPath);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -1422,13 +1422,13 @@ void LaunchInit(
     const char* Target,
     bool EnableGuiApps,
     const VmConfiguration& Config,
-    pid_t MiniInitDirectChildPid,
     const char* VmId,
     const char* DistributionName,
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    std::optional<pid_t> DistroInitPid)
+    std::optional<pid_t> DistroInitPid,
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1465,9 +1465,9 @@ Arguments:
         If this value is a non-empty string, it is passed to init as an
         environment variable.
 
-    MiniInitDirectChildPid - Supplies the pid of the direct child of mini_init. Will be WSLg's init when it's enabled.
-
     DistroInitPid - Supplies the pid of the user distribution's init process.
+
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
 
 Return Value:
 
@@ -1575,7 +1575,7 @@ try
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
-    AddEnvironmentVariable(LX_WSL2_MINI_INIT_DIRECT_CHILD_PID, std::format("{}", MiniInitDirectChildPid).c_str());
+    AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
 
     if (DistroInitPid.has_value())
     {
@@ -1678,7 +1678,7 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    pid_t SystemInitPid)
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1715,7 +1715,7 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
-    SystemInitPid - Supplies the pid of the system distribution's init process.
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
 
 Return Value:
 
@@ -1735,7 +1735,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, SystemInitPid, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath);
     _exit(1);
 }
 catch (...)
@@ -2249,14 +2249,16 @@ void ProcessLaunchInitMessage(
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
 
+        std::string DistroCgroupPath{};
         if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
         {
-            auto DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
+            DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
 
             auto cleanup = wil::scope_exit([&]() {
                 rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
                 rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
                 rmdir(DistroCgroupPath.c_str());
+                DistroCgroupPath.clear();
             });
 
             try
@@ -2360,7 +2362,7 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
                         ChildPid,
-                        MiniInitDirectChildPid);
+                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
                 }
             }
 
@@ -2377,12 +2379,13 @@ void ProcessLaunchInitMessage(
             DISTRO_PATH,
             enableGuiApps,
             Config,
-            MiniInitDirectChildPid,
             wsl::shared::string::FromSpan(Buffer, Message->VmIdOffset),
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
-            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset));
+            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
+            std::nullopt,
+            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
     }
     catch (...)
     {
