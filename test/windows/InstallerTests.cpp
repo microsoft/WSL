@@ -340,6 +340,90 @@ class InstallerTests
         // TODO: check wslsupport, wslapi and p9rdr
     }
 
+    // Remove any PendingFileRenameOperations entries whose source path falls under installPath.
+    // The MSI uses MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT) when a file is locked, leaving stale
+    // entries that prevent a subsequent MSI install from putting the system into a clean state.
+    void ClearPendingFileRenameOperationsForPath(const std::filesystem::path& installPath) const
+    {
+        static constexpr auto c_sessionManagerKey = L"SYSTEM\\CurrentControlSet\\Control\\Session Manager";
+        static constexpr auto c_pendingRenameValue = L"PendingFileRenameOperations";
+
+        auto [key, hr] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, c_sessionManagerKey, KEY_READ | KEY_WRITE);
+        if (FAILED(hr))
+        {
+            return;
+        }
+
+        DWORD size = 0;
+        if (RegGetValueW(key.get(), nullptr, c_pendingRenameValue, RRF_RT_REG_MULTI_SZ, nullptr, nullptr, &size) != ERROR_SUCCESS || size == 0)
+        {
+            return;
+        }
+
+        std::vector<WCHAR> buffer(size / sizeof(WCHAR) + 2);
+        THROW_IF_WIN32_ERROR(RegGetValueW(key.get(), nullptr, c_pendingRenameValue, RRF_RT_REG_MULTI_SZ, nullptr, buffer.data(), &size));
+
+        // Entries are stored as null-separated pairs: <source>\0<dest>\0\0
+        // Sources may carry a \??\ NT-namespace prefix — strip it before comparing.
+        // Normalize: strip trailing separators so the boundary check is unambiguous.
+        auto installPathStr = installPath.wstring();
+        while (!installPathStr.empty() && (installPathStr.back() == L'\\' || installPathStr.back() == L'/'))
+        {
+            installPathStr.pop_back();
+        }
+
+        auto matchesInstallPath = [&installPathStr](std::wstring_view src) {
+            if (wsl::shared::string::StartsWith(src, std::wstring_view{L"\\??\\"}, true))
+            {
+                src = src.substr(4);
+            }
+
+            if (!wsl::shared::string::StartsWith(src, installPathStr, true))
+            {
+                return false;
+            }
+
+            // Require a path separator (or exact match) after the prefix so that
+            // e.g. "C:\Program Files\WSL2" is not matched by "C:\Program Files\WSL".
+            return src.size() == installPathStr.size() || src[installPathStr.size()] == L'\\' || src[installPathStr.size()] == L'/';
+        };
+
+        std::wstring filtered;
+        for (auto* p = buffer.data(); *p != UNICODE_NULL;)
+        {
+            std::wstring src{p};
+            p += src.size() + 1;
+            std::wstring dst{p};
+            p += dst.size() + 1;
+
+            if (!matchesInstallPath(src))
+            {
+                filtered += src;
+                filtered += UNICODE_NULL;
+                filtered += dst;
+                filtered += UNICODE_NULL;
+            }
+        }
+        filtered += UNICODE_NULL; // REG_MULTI_SZ double-null terminator
+
+        if (filtered.size() == 1)
+        {
+            // All matching entries removed; delete the value entirely.
+            auto error = RegDeleteValueW(key.get(), c_pendingRenameValue);
+            THROW_WIN32_IF(error, error != ERROR_SUCCESS && error != ERROR_FILE_NOT_FOUND);
+        }
+        else
+        {
+            THROW_IF_WIN32_ERROR(RegSetValueExW(
+                key.get(),
+                c_pendingRenameValue,
+                0,
+                REG_MULTI_SZ,
+                reinterpret_cast<const BYTE*>(filtered.c_str()),
+                static_cast<DWORD>(filtered.size() * sizeof(WCHAR))));
+        }
+    }
+
     void DeleteProductCode() const
     {
         const auto msiKey = wsl::windows::common::registry::OpenKey(m_lxssKey.get(), L"MSI", KEY_ALL_ACCESS);
@@ -1227,13 +1311,13 @@ class InstallerTests
         LogInfo("wsl --version output: %ls", versionOutput.c_str());
         VERIFY_ARE_EQUAL(versionExitCode, 0L);
 
-        // Clean up: delete the volatile marker and reinstall cleanly.
+        // Clean up: clear any pending file-rename entries left by the locked-file MSI run,
+        // delete the volatile marker, then reinstall so subsequent tests start from a clean state.
+        ClearPendingFileRenameOperationsForPath(m_installedPath);
         wsl::windows::common::registry::DeleteKey(OpenLxssMachineKey(KEY_ALL_ACCESS).get(), L"MSI\\RebootPending");
         VERIFY_IS_FALSE(wsl::windows::common::install::IsRebootRequired());
 
         InstallMsi();
-        // Validate binaries only — distro launches may still fail because MoveFileEx
-        // DELAY_UNTIL_REBOOT entries from the locked-file scenario are still pending.
-        ValidateInstalledVersion();
+        ValidatePackageInstalledProperly();
     }
 };
