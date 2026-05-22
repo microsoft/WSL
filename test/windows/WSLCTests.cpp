@@ -9779,4 +9779,168 @@ class WSLCTests
 
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
+
+    // Helper: COM callback that captures all warnings received.
+    class CapturingWarningCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
+    {
+    public:
+        HRESULT OnWarning(LPCWSTR Message) override
+        {
+            std::lock_guard lock(m_lock);
+            m_warnings.emplace_back(Message);
+            return S_OK;
+        }
+
+        std::vector<std::wstring> GetWarnings()
+        {
+            std::lock_guard lock(m_lock);
+            return m_warnings;
+        }
+
+    private:
+        std::mutex m_lock;
+        std::vector<std::wstring> m_warnings;
+    };
+
+    WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
+    {
+        SKIP_TEST_SERVER();
+
+        constexpr auto c_sessionName = L"warning-container-recovery";
+        auto storagePath = (std::filesystem::current_path() / "test-warning-container-recovery").wstring();
+        auto cleanupDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storagePath, ec);
+        });
+
+        // Phase 1: Create a session and inject a container with a corrupt WSLC metadata label via docker CLI.
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+            auto session = CreateSession(settings);
+
+            // Load a base image so docker create works.
+            LoadTestImage(*session, "hello-world:latest");
+
+            // Create a container with an invalid WSLC metadata label.
+            // RecoverExistingContainers will fail to parse this on the next session.
+            ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/docker", "create", "--label", "wslc.container.metadata=INVALID_JSON", "hello-world:latest"},
+                0);
+
+            session->Terminate();
+        }
+
+        // Phase 2: Create a new session pointing to the same storage with a warning callback.
+        {
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+
+            const auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+            // Verify the warning callback received a container recovery failure warning.
+            auto warnings = warningCallback->GetWarnings();
+            VERIFY_IS_TRUE(warnings.size() >= 1);
+
+            bool foundRecoveryWarning = false;
+            for (const auto& warning : warnings)
+            {
+                if (warning.find(L"recover container") != std::wstring::npos)
+                {
+                    foundRecoveryWarning = true;
+                    break;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundRecoveryWarning);
+
+            session->Terminate();
+        }
+    }
+
+    WSLC_TEST_METHOD(WarningCallbackVolumeRecovery)
+    {
+        SKIP_TEST_SERVER();
+
+        constexpr auto c_sessionName = L"warning-volume-recovery";
+        auto storagePath = (std::filesystem::current_path() / "test-warning-volume-recovery").wstring();
+        auto cleanupDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storagePath, ec);
+        });
+
+        std::string vhdHostPath;
+
+        // Phase 1: Create a session with a VHD volume, then get the VHD path.
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+            auto session = CreateSession(settings);
+
+            // Create a VHD volume.
+            WSLCDriverOption driverOpts[] = {{"SizeBytes", "10485760"}}; // 10MB
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = "wslc-test-warning-recovery";
+            volumeOptions.Driver = "vhd";
+            volumeOptions.DriverOpts = driverOpts;
+            volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+            WSLCVolumeInformation volInfo{};
+            VERIFY_SUCCEEDED(session->CreateVolume(&volumeOptions, &volInfo));
+
+            // Inspect the volume to get the host VHD path.
+            wil::unique_cotaskmem_ansistring inspectOutput;
+            VERIFY_SUCCEEDED(session->InspectVolume("wslc-test-warning-recovery", &inspectOutput));
+            auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(inspectOutput.get());
+            VERIFY_IS_TRUE(inspect.Status.has_value());
+            VERIFY_IS_TRUE(inspect.Status->contains("HostPath"));
+            vhdHostPath = inspect.Status->at("HostPath");
+            VERIFY_IS_FALSE(vhdHostPath.empty());
+
+            session->Terminate();
+        }
+
+        // Phase 2: Delete the VHD file, then restart with a warning callback.
+        VERIFY_IS_TRUE(DeleteFileA(vhdHostPath.c_str()));
+
+        {
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+
+            const auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+            // Verify the warning callback received a volume recovery failure warning.
+            auto warnings = warningCallback->GetWarnings();
+            VERIFY_IS_TRUE(warnings.size() >= 1);
+
+            bool foundRecoveryWarning = false;
+            for (const auto& warning : warnings)
+            {
+                if (warning.find(L"recover volume") != std::wstring::npos)
+                {
+                    foundRecoveryWarning = true;
+                    break;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundRecoveryWarning);
+
+            // Clean up the orphaned volume from Docker's metadata.
+            LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
+
+            session->Terminate();
+        }
+    }
 };
