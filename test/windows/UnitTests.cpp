@@ -7022,8 +7022,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         const std::wstring prefix = L"0::/wsl-user/distro-";
         VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
         VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
-        VERIFY_ARE_NOT_EQUAL(cgroup1, std::wstring(L"0::/"));
-        VERIFY_ARE_NOT_EQUAL(cgroup2, std::wstring(L"0::/"));
         VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
 
         // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
@@ -7033,9 +7031,19 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
         // the one belonging to the distro we just started to perform the check.  The stale cgroups of
         // the two terminated distros must have been removed.
-        auto [out2, _] =
-            LxsstuLaunchWslAndCaptureOutput(L"--cd / -- /bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
-        VERIFY_ARE_EQUAL(out2, std::wstring(L"1\n"));
+        //
+        // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
+        // wsl --terminate returns (it sync()s, drains the cgroup via cgroup.kill, then rmdir's the
+        // subtree). On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
+        // can still be in flight when this check runs, so retry until cleanup completes.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out2, _] = LxsstuLaunchWslAndCaptureOutput(
+                    L"--cd / -- /bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayout)
