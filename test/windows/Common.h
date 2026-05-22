@@ -540,6 +540,7 @@ struct TestConfigDefaults
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
+    std::optional<bool> isolateDistroCgroup;
 };
 
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default = {});

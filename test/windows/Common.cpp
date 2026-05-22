@@ -1604,6 +1604,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
 
+    if (Default.isolateDistroCgroup.has_value())
+    {
+        newConfig += boolOptionToString(L"isolateDistroCgroup", Default.isolateDistroCgroup, true);
+    }
+
     return newConfig;
 }
 

@@ -518,6 +518,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Virtio proxy forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
     message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::VirtioProxy;
     message->DefaultKernel = m_defaultKernel;
+    message->IsolateDistroCgroup = m_vmConfig.IsolateDistroCgroup;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
     message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);

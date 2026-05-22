@@ -3259,6 +3259,11 @@ try
             Config.EnableSafeMode = true;
         }
 
+        if (EarlyConfig->IsolateDistroCgroup && access(CGROUP_MOUNTPOINT "/cgroup.controllers", F_OK) == 0)
+        {
+            SetupWslUserCgroup();
+        }
+
         //
         // Establish the connection for the guest network service.
         //
@@ -4216,10 +4221,6 @@ int main(int Argc, char* Argv[])
     if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
     {
         LOG_ERROR("Failed to mount cgroup2 filesystem: {}", errno);
-    }
-    else
-    {
-        SetupWslUserCgroup();
     }
 
     UtilSetThreadName("mini_init");

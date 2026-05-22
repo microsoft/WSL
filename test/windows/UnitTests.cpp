@@ -6520,6 +6520,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
     WSL2_TEST_METHOD(CGroupv1)
     {
+        // cgroupv1 conflicts with the per-distro cgroup hierarchy
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
         auto expectedMount = [](const char* path, const wchar_t* expected) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
 
@@ -6542,7 +6545,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
 
         // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
-        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+        config.Update(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all", .isolateDistroCgroup = false}));
 
         expectedMount("/sys/fs/cgroup/unified", L"");
         expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
@@ -7054,6 +7057,29 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
     {
         ValidateIsolatedCgroupLayout(true);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutDisabled)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--cd / -- cat /proc/self/cgroup");
+        while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
+        {
+            out.pop_back();
+        }
+
+        LogInfo("cgroup with isolateDistroCgroup=false: %ls", out.c_str());
+
+        VERIFY_ARE_EQUAL(out, std::wstring(L"0::/"));
+
+        auto [exists, __] = LxsstuLaunchWslAndCaptureOutput(
+            L"--cd / -- /bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
+        while (!exists.empty() && (exists.back() == L'\n' || exists.back() == L'\r'))
+        {
+            exists.pop_back();
+        }
+        VERIFY_ARE_EQUAL(exists, std::wstring(L"no"));
     }
 
 }; // namespace UnitTests
