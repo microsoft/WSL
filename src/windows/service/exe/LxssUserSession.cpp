@@ -1878,7 +1878,21 @@ try
 
     auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
 
-    const auto result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
+    WSL_LOG_TELEMETRY(
+        "CompactDistributionBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(configuration.Name.c_str(), "distroName"));
+
+    HRESULT result = E_UNEXPECTED;
+    auto compactDistributionComplete = wil::scope_exit([&] {
+        WSL_LOG_TELEMETRY(
+            "CompactDistributionEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(result, "result"));
+    });
+
+    result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
     if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
     {
         THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageVhdInUse());
