@@ -302,6 +302,9 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversion in progress, this may take a few minutes.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compaction in progress, this may take a few minutes.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>The distribution is already the requested version.</value>
   </data>
