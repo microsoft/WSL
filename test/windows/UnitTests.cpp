@@ -3002,8 +3002,65 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanupName =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        auto getVhdSizeOnDisk = [](const std::filesystem::path& path) {
+            DWORD highPart{};
+            SetLastError(NO_ERROR);
+            const auto lowPart = GetCompressedFileSizeW(path.c_str(), &highPart);
+            THROW_LAST_ERROR_IF(lowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR);
+
+            ULARGE_INTEGER size{};
+            size.LowPart = lowPart;
+            size.HighPart = highPart;
+            return size.QuadPart;
+        };
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --set-sparse false", name));
         VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        constexpr auto minimumCompactionDelta = 64ull * 1024 * 1024;
+        const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+            L"dd if=/dev/urandom of=/root/vhdx-compact-test/nonzero.bin bs=1M count=256 >/dev/null 2>&1 && sync'",
+            name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync && fstrim -v /'", name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeBeforeCompact = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        const auto sizeAfterCompact = getVhdSizeOnDisk(vhdPath);
+        LogInfo(
+            "Compact test VHD size on disk: before write=%llu, after write=%llu, before compact=%llu, after compact=%llu",
+            static_cast<unsigned long long>(sizeBeforeWrite),
+            static_cast<unsigned long long>(sizeAfterWrite),
+            static_cast<unsigned long long>(sizeBeforeCompact),
+            static_cast<unsigned long long>(sizeAfterCompact));
+
+        VERIFY_IS_TRUE(sizeBeforeCompact >= sizeAfterCompact);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeAfterCompact + minimumCompactionDelta);
 
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
