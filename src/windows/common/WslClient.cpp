@@ -959,7 +959,11 @@ int Manage(_In_ std::wstring_view commandLine)
     }
     else if (compact)
     {
-        THROW_IF_FAILED(service.CompactDistribution(&distroGuid));
+        auto progress = wsl::windows::common::ConsoleProgressIndicator(
+            wsl::shared::Localization::MessageCompactionStart(), true);
+        const auto result = service.CompactDistribution(&distroGuid);
+        progress.End();
+        THROW_IF_FAILED(result);
     }
 
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
