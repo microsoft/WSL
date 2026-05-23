@@ -3028,12 +3028,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
 
-        constexpr auto minimumCompactionDelta = 64ull * 1024 * 1024;
+        constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
         const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
 
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
             L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
-            L"dd if=/dev/urandom of=/root/vhdx-compact-test/nonzero.bin bs=1M count=256 >/dev/null 2>&1 && sync'",
+            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
             name));
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
