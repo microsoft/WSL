@@ -223,7 +223,7 @@ inline int ResultFromCaughtException()
 #define THROW_LAST_ERROR() THROW_ERRNO(errno);
 
 #define THROW_INVALID() THROW_ERRNO(EINVAL)
-#define THROW_UNEXCEPTED() THROW_ERRNO(EINVAL)
+#define THROW_UNEXPECTED() THROW_ERRNO(EINVAL)
 #define THROW_INVALID_IF(Condition) THROW_ERRNO_IF(EINVAL, (Condition))
 #define THROW_UNEXPECTED_IF(Condition) THROW_ERRNO_IF(EINVAL, (Condition))
 
@@ -373,6 +373,11 @@ public:
         return fd;
     }
 
+    int* addressof() noexcept
+    {
+        return &m_Fd;
+    }
+
     friend void swap(unique_fd& fd1, unique_fd& fd2)
     {
         std::swap(fd1.m_Fd, fd2.m_Fd);
@@ -437,7 +442,7 @@ public:
     static unique_pipe create(int flags)
     {
         int pipe[2] = {-1, -1};
-        if (pipe2(pipe, flags) < -1)
+        if (pipe2(pipe, flags) < 0)
         {
             THROW_ERRNO(errno);
         }

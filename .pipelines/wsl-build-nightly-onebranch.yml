@@ -11,6 +11,7 @@ schedules:
 variables:
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
   WindowsHostVersion: '1ESWindows2022'
+  ob_sdl_codeSignValidation_excludes: -|**\*.ps1
 
 resources:
   repositories:
@@ -50,3 +51,7 @@ extends:
     - template: test-stage.yml@self
       parameters:
         rs_prerelease_only: false
+
+    - template: nuget-stage.yml@self
+      parameters:
+        isNightly: true

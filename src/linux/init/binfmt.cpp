@@ -174,7 +174,8 @@ try
     // Send the create process message to the interop server.
     //
 
-    channel.SendMessage<LX_INIT_CREATE_NT_PROCESS_UTILITY_VM>(Span);
+    auto transaction = channel.StartTransaction();
+    transaction.Send<LX_INIT_CREATE_NT_PROCESS_UTILITY_VM>(Span);
 
     //
     // Accept connections from the interop server.

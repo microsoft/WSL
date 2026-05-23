@@ -177,7 +177,11 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder | Out-Null
 }
 
+# Collect high-level WSL install log (written by WriteInstallLog() in install.cpp)
 Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
+
+# Collect MSI verbose install log (preserved on failure by wsl --update or WslInstaller service).
+Copy-Item "$env:TEMP\wsl-install-logs.txt" $folder -ErrorAction ignore
 
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
@@ -345,7 +349,7 @@ if ($Dump)
     $dumpFolder = Join-Path (Resolve-Path "$folder") dumps
     New-Item -ItemType "directory" -Path "$dumpFolder"
 
-    $executables = "wsl", "wslservice", "wslhost", "msrdc", "dllhost"
+    $executables = "wsl", "wslservice", "wslhost", "wslcsession", "wslrelay", "wslg", "msrdc", "dllhost"
     foreach($process in Get-Process | Where-Object { $executables -contains $_.ProcessName})
     {
         $dumpFile =  "$dumpFolder/$($process.ProcessName).$($process.Id).dmp"
@@ -369,8 +373,28 @@ if ($Dump)
     }
 }
 
-$logArchive = "$(Resolve-Path $folder).zip"
-Compress-Archive -Path $folder -DestinationPath $logArchive
-Remove-Item $folder -Recurse
+$logArchive = "$(Resolve-Path $folder).tar.gz"
+tar.exe -czf $logArchive $folder
+if ($LASTEXITCODE -eq 0)
+{
+    Remove-Item $folder -Recurse
+    Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+}
+else
+{
+    Remove-Item $logArchive -ErrorAction Ignore
 
-Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    # Fall back to zip if tar fails (e.g. on SKUs that lack tar.exe)
+    $logArchive = "$(Resolve-Path $folder).zip"
+    try
+    {
+        Compress-Archive -Path $folder -DestinationPath $logArchive -Force
+        Remove-Item $folder -Recurse
+        Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    }
+    catch
+    {
+        Remove-Item $logArchive -ErrorAction Ignore
+        Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
+    }
+}

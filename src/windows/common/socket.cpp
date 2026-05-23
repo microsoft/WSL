@@ -20,15 +20,15 @@ Abstract:
 bool wsl::windows::common::socket::CancellableAccept(
     _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
-    relay::MultiHandleWait io;
+    io::MultiHandleWait io;
 
     bool accepted = false;
 
-    io.AddHandle(std::make_unique<relay::SingleAcceptHandle>(ListenSocket, Socket, [&]() { accepted = true; }), relay::MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<io::SingleAcceptHandle>(ListenSocket, Socket, [&]() { accepted = true; }), io::MultiHandleWait::CancelOnCompleted);
 
     if (ExitHandle != nullptr)
     {
-        io.AddHandle(std::make_unique<relay::EventHandle>(ExitHandle), relay::MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::EventHandle>(ExitHandle), io::MultiHandleWait::CancelOnCompleted);
     }
 
     io.Run(std::chrono::milliseconds(Timeout));
@@ -177,7 +177,7 @@ int wsl::windows::common::socket::Send(
         Offset += BytesWritten;
         if (Offset < Buffer.size())
         {
-            WSL_LOG("PartialSocketWrite", TraceLoggingValue(Buffer.size(), "MessagSize"), TraceLoggingValue(Offset, "Offset"));
+            WSL_LOG("PartialSocketWrite", TraceLoggingValue(Buffer.size(), "MessageSize"), TraceLoggingValue(Offset, "Offset"));
         }
     }
 

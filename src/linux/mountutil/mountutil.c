@@ -232,6 +232,7 @@ int MountParseMountInfoLine(char* line, PMOUNT_ENTRY entry)
             {
                 goto ParseMountInfoLineEnd;
             }
+            break;
 
         case MountFieldRoot:
             entry->Root = current;

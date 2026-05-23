@@ -29,8 +29,10 @@ wil::unique_hfile wsl::core::filesystem::CreateFile(
 
 void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed)
 {
-    WI_ASSERT(wsl::windows::common::string::IsPathComponentEqual(
-        std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
+    THROW_HR_IF(
+        E_INVALIDARG,
+        !wsl::windows::common::string::IsPathComponentEqual(
+            std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
     // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)
@@ -64,9 +66,15 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     // N.B. This ensures that HcsGrantVmAccess is able to add the required ACL
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
+
     wil::unique_hfile vhd{};
-    THROW_IF_WIN32_ERROR(
+    auto result = HRESULT_FROM_WIN32(
         ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd));
+    if (FAILED(result))
+    {
+        THROW_HR_WITH_USER_ERROR(
+            result, shared::Localization::MessageFailedToCreateDisk(target, windows::common::wslutil::GetErrorString(result)));
+    }
 }
 
 wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUAL_DISK_ACCESS_MASK Mask)

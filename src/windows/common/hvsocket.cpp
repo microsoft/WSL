@@ -18,8 +18,6 @@ Abstract:
 #include "hvsocket.hpp"
 #pragma hdrstop
 
-#define CONNECT_TIMEOUT (30 * 1000)
-
 namespace {
 void InitializeSocketAddress(_In_ const GUID& VmId, _In_ unsigned long Port, _Out_ PSOCKADDR_HV Address)
 {
@@ -52,7 +50,7 @@ std::optional<wil::unique_socket> wsl::windows::common::hvsocket::CancellableAcc
 }
 
 wil::unique_socket wsl::windows::common::hvsocket::Connect(
-    _In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
+    _In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle, _In_opt_ ULONG Timeout, _In_ const std::source_location& Location)
 {
     OVERLAPPED Overlapped{};
     const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
@@ -79,9 +77,10 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(
         socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
     }
 
-    ULONG Timeout = CONNECT_TIMEOUT;
-    THROW_LAST_ERROR_IF(
-        setsockopt(Socket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECT_TIMEOUT, reinterpret_cast<char*>(&Timeout), sizeof(Timeout)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF_MSG(
+        setsockopt(Socket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECT_TIMEOUT, reinterpret_cast<char*>(&Timeout), sizeof(Timeout)) == SOCKET_ERROR,
+        "Timeout: %lu",
+        Timeout);
 
     SOCKADDR_HV Addr;
     InitializeWildcardSocketAddress(&Addr);
@@ -93,6 +92,9 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(
     {
         socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
     }
+
+    // Mark the socket as connected (required to call shutdown() later).
+    THROW_LAST_ERROR_IF(setsockopt(Socket.get(), SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0) == SOCKET_ERROR);
 
     return Socket;
 }

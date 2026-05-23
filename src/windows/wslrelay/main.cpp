@@ -101,6 +101,12 @@ try
         break;
     }
 
+    case wslrelay::RelayMode::WSLCPortRelay:
+    {
+        wsl::windows::wslrelay::localhost::RunWSLCPortRelay(vmId, port, exitEvent.get());
+        break;
+    }
+
     case wslrelay::RelayMode::KdRelay:
     {
         THROW_HR_IF(E_INVALIDARG, port == 0);

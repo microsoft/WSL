@@ -18,6 +18,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -189,13 +190,13 @@ class InstallerTests
         auto productCode = GetMsiProductCode();
         VERIFY_IS_FALSE(productCode.empty());
 
-        CallMsiExec(std::format(L"/qn /norestart /x {} /L*V {}", productCode, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /x \"{}\" /L*V \"{}\"", productCode, GenerateMsiLogPath()));
     }
 
     void InstallMsi()
     {
         PrepareForMsiOperation();
-        CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", m_msiPath, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /i \"{}\" /L*V \"{}\"", m_msiPath, GenerateMsiLogPath()));
     }
 
     void InstallMsix() const
@@ -378,7 +379,7 @@ class InstallerTests
         if (wsl::shared::string::EndsWith<wchar_t>(installerFile, L".msi"))
         {
             PrepareForMsiOperation();
-            CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", installerFile, GenerateMsiLogPath()));
+            CallMsiExec(std::format(L"/qn /norestart /i \"{}\" /L*V \"{}\"", installerFile, GenerateMsiLogPath()));
         }
         else
         {
@@ -418,6 +419,41 @@ class InstallerTests
         UninstallMsi();
         InstallGitHubRelease(L"2.0.2");
         CallWslUpdateViaMsi();
+    }
+
+    WSLC_TEST_METHOD(WslcSdkVersionDetection)
+    {
+        auto restore = wil::scope_exit([this]() { InstallMsi(); });
+
+        UninstallMsi();
+
+        // Validate that the SDK detects that the WSL package is not installed.
+        WslcComponentFlags flags{};
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        // Validate that the SDK detects that the installed version of WSL is too old.
+        InstallGitHubRelease(L"2.0.2");
+
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        restore.reset();
+
+        // Validate that the SDK supports the current package.
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, 0);
+
+        // TODO: Add test coverage for a more recent version of the package that doesn't support the SDK, if ever needed.
+        // In the meantime, the below block can be commented to manual test this scenario with a manual code change.
+        /*VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+
+        WslcSessionSettings sessionSettings{};
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"should-fail", L"C:\\", &sessionSettings));
+
+        WslcSession session{};
+        VERIFY_ARE_EQUAL(WslcCreateSession(&sessionSettings, &session, nullptr), WSLC_E_SDK_UPDATE_NEEDED);*/
     }
 
     TEST_METHOD(MsrdcPluginKey)
@@ -719,7 +755,7 @@ class InstallerTests
         ValidatePackageInstalledProperly();
     }
 
-    TEST_METHOD(InstallremovesStaleServiceRegistration)
+    TEST_METHOD(InstallRemovesStaleServiceRegistration)
     {
         // Remove the MSI package.
         UninstallMsi();
@@ -896,6 +932,47 @@ class InstallerTests
 
         // Verify that key was unprotected.
         VERIFY_IS_FALSE(SfcIsKeyProtected(HKEY_LOCAL_MACHINE, keyPath, KEY_WOW64_64KEY));
+    }
+
+    void ValidateDcatRegistration()
+    {
+        const auto versionValue =
+            wsl::windows::common::registry::ReadString(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), L"Version");
+        VERIFY_ARE_EQUAL(versionValue, WIDEN(WSL_PACKAGE_VERSION));
+    }
+
+    TEST_METHOD(InstallerRegistersWithDcat)
+    {
+        // Uninstalling should remove the registration
+        UninstallMsi();
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        VERIFY_ARE_EQUAL(
+            wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), KEY_READ).second,
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+
+        // Installing should add the registration
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_IS_TRUE(IsMsixInstalled());
+
+        ValidateDcatRegistration();
+    }
+
+    TEST_METHOD(ServiceRemediatesDcatRegistration)
+    {
+        // Starting the service should create the registration if it is missing
+        StopWslService();
+        VERIFY_ARE_EQUAL(wsl::windows::common::registry::DeleteKey(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY)), true);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list"), 0);
+        ValidateDcatRegistration();
+
+        // Starting the service should fix the registration if needed
+        StopWslService();
+        wsl::windows::common::registry::WriteString(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), L"Version", L"1.0.0");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list"), 0);
+        ValidateDcatRegistration();
     }
 
     void CallWslUpdateViaMsi()

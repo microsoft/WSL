@@ -25,12 +25,13 @@ constexpr auto c_ipStrings = {"ip", "ip6"};
 const char* c_loopbackInterfaceName = "lo";
 
 GnsEngine::GnsEngine(
+    wsl::shared::SocketChannel& channel,
     const NotificationRoutine& notificationRoutine,
     const StatusRoutine& statusRoutine,
     NetworkManager& manager,
     std::optional<int> dnsTunnelingFd,
     const std::string& dnsTunnelingIpAddress) :
-    notificationRoutine(notificationRoutine), statusRoutine(statusRoutine), manager(manager)
+    channel(channel), notificationRoutine(notificationRoutine), statusRoutine(statusRoutine), manager(manager)
 {
     if (dnsTunnelingFd.has_value())
     {
@@ -327,6 +328,7 @@ void GnsEngine::ProcessDNSChange(Interface& interface, const wsl::shared::hns::D
     GNS_LOG_INFO(
         "Setting DNS search to {}: {} on interfaceName {} ", payload.Search.c_str(), content.str().c_str(), interface.Name().c_str());
 
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc", 0755) < 0);
     std::wofstream resolvConf;
     resolvConf.exceptions(std::ofstream::badbit | std::ofstream::failbit);
     resolvConf.open("/etc/resolv.conf", std::ofstream::trunc);
@@ -363,11 +365,11 @@ void GnsEngine::ProcessLinkChange(Interface& interface, const wsl::shared::hns::
     }
 }
 
-std::tuple<bool, int> GnsEngine::ProcessNextMessage()
+std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& transaction)
 {
     int return_value = 0;
 
-    auto payload = notificationRoutine();
+    auto payload = notificationRoutine(transaction);
     if (!payload.has_value())
     {
         GNS_LOG_ERROR("Received empty message, exiting");
@@ -723,22 +725,23 @@ void GnsEngine::run()
 
     while (true)
     {
+        auto transaction = channel.ReceiveTransaction();
         try
         {
             GNS_LOG_INFO("Processing Next Message");
-            auto [should_continue, return_value] = ProcessNextMessage();
+            auto [should_continue, return_value] = ProcessNextMessage(transaction);
             if (!should_continue)
             {
                 break;
             }
 
             GNS_LOG_INFO("Processing Next Message Successful ({:#x})", return_value);
-            statusRoutine(return_value, "");
+            statusRoutine(return_value, "", transaction);
         }
         catch (const std::exception& e)
         {
             GNS_LOG_ERROR("Error while processing message: {}", e.what());
-            statusRoutine(-1, e.what());
+            statusRoutine(-1, e.what(), transaction);
         }
     }
 

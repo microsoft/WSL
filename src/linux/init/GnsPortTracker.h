@@ -1,9 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
-#include <deque>
 #include <map>
-#include <mutex>
 #include <set>
 #include <utility>
 #include <optional>
@@ -17,11 +15,16 @@
 #include "waitablevalue.h"
 #include "SecCompDispatcher.h"
 #include "SocketChannel.h"
+#include "lxinitshared.h"
 
 class GnsPortTracker
 {
 public:
-    GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher);
+    GnsPortTracker(
+        std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+        NetlinkChannel&& netlinkChannel,
+        std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+        LX_MINI_INIT_NETWORKING_MODE networkingMode);
 
     GnsPortTracker(const GnsPortTracker&) = delete;
     GnsPortTracker(GnsPortTracker&&) = delete;
@@ -118,19 +121,32 @@ public:
         std::uint64_t CallId;
     };
 
+private:
+    using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
+
+    struct ActivePorts
+    {
+        std::set<PortAllocation> FullAllocations;
+        ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
+    };
+
     struct PortRefreshResult
     {
-        std::set<PortAllocation> Ports;
+        ActivePorts Ports;
         time_t Timestamp;
         std::function<void()> Resume;
     };
 
-private:
-    void OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp);
+    bool IsMirroredMode() const
+    {
+        return m_networkingMode == LxMiniInitNetworkingModeMirrored;
+    }
+
+    void OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
     void RunPortRefresh();
 
-    std::set<PortAllocation> ListAllocatedPorts();
+    ActivePorts ListAllocatedPorts();
 
     std::optional<BindCall> ReadNextRequest();
 
@@ -146,9 +162,7 @@ private:
 
     static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
 
-    void ResolvePortZeroBind(DeferredPortLookup lookup);
-
-    void RunDeferredResolve();
+    std::optional<PortAllocation> ResolvePortZeroBind(DeferredPortLookup lookup);
 
     void TrackPort(PortAllocation allocation);
 
@@ -162,16 +176,9 @@ private:
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 
+    LX_MINI_INIT_NETWORKING_MODE m_networkingMode;
+
     std::string m_networkNamespace;
-
-    std::mutex m_deferredMutex;
-    std::condition_variable m_deferredCv;
-    std::deque<DeferredPortLookup> m_deferredQueue;
-
-    // Resolved port-0 allocations posted by the background RunDeferredResolve thread
-    // for the main Run() loop to process (keeps SocketChannel access single-threaded).
-    std::mutex m_resolvedMutex;
-    std::deque<PortAllocation> m_resolvedQueue;
 };
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& portAllocation);

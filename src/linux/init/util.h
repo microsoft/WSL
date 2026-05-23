@@ -35,7 +35,8 @@ Abstract:
 
 namespace wsl::shared {
 class SocketChannel;
-}
+class Transaction;
+} // namespace wsl::shared
 
 namespace wsl::linux {
 struct WslDistributionConfig;
@@ -117,7 +118,7 @@ private:
     wil::unique_fd m_InteropSocket;
 };
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1);
+int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1, int SocketFlags = SOCK_CLOEXEC);
 
 int UtilBindVsockAnyPort(struct sockaddr_vm* SocketAddress, int Type);
 
@@ -250,6 +251,8 @@ int UtilMkdir(const char* Path, mode_t Mode);
 
 int UtilMkdirPath(const char* Path, mode_t Mode, bool SkipLast = false);
 
+int UtilMountFile(const char* Source, const char* Destination);
+
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds = {});
 
 int UtilMountOverlayFs(const char* Target, const char* Lower, unsigned long MountFlags = 0, std::optional<std::chrono::seconds> TimeoutSeconds = {});
@@ -312,4 +315,7 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<gsl::byte> Buffer);
+// Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
+void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
+
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);

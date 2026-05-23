@@ -260,7 +260,7 @@
     <EventProvider Id="wlidsvc_WPP" Name="3F8B9EF5-BBD2-4C81-B6C9-DA3CDB72D3C5" />
     <EventProvider Id="wsl_devicehost" Name="9d6c7b9e-2581-4d8a-b8c5-b90b4a17094a"/>
     <EventProvider Id="wslapi" Name="beb94edf-1a7b-5058-0696-ff9e6b1798d1"/>
-    <EventProvider Id="wslaservice" Name="0383CE62-8F86-4766-AFB2-9D66A7FB1E90"/>
+    <EventProvider Id="wslc" Name="0383CE62-8F86-4766-AFB2-9D66A7FB1E90"/>
     <EventProvider Id="wslclient" Name="8cbb7724-7223-5d6f-8137-564dac45104d"/>
 
     <!-- PROFILE: General WSL Tracing (Default, also serves as base for other profiles) -->
@@ -322,7 +322,7 @@
             <EventProviderId Value="vmwp"/>
             <EventProviderId Value="wsl_devicehost"/>
             <EventProviderId Value="wslapi"/>
-            <EventProviderId Value="wslaservice"/>
+            <EventProviderId Value="wslc"/>
             <EventProviderId Value="wslclient"/>
           </EventProviders>
         </EventCollectorId>

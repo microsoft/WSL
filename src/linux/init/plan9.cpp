@@ -157,13 +157,14 @@ try
     std::vector<gsl::byte> Buffer;
     for (;;)
     {
-        auto [Message, _] = channel.ReceiveMessageOrClosed<LX_INIT_STOP_PLAN9_SERVER>();
+        auto transaction = channel.ReceiveTransaction();
+        auto [Message, _] = transaction.ReceiveOrClosed<LX_INIT_STOP_PLAN9_SERVER>();
         if (Message == nullptr)
         {
             _exit(0);
         }
 
-        channel.SendResultMessage<bool>(StopPlan9Server(fileSystem, Message->Force));
+        transaction.SendResultMessage<bool>(StopPlan9Server(fileSystem, Message->Force));
     }
 }
 CATCH_LOG();
@@ -183,7 +184,7 @@ void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, b
     limit.rlim_cur = limit.rlim_max;
     if (setrlimit(RLIMIT_NOFILE, &limit) < 0)
     {
-        LOG_ERROR("setrlimit(RLIMIT_NOFILE, {}lu, {}lu) failed {}", limit.rlim_cur, limit.rlim_max, errno);
+        LOG_ERROR("setrlimit(RLIMIT_NOFILE, {}, {}) failed {}", limit.rlim_cur, limit.rlim_max, errno);
     }
 
     // Open the root.

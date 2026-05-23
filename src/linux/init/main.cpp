@@ -89,7 +89,6 @@ Abstract:
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
 #define RESOLV_CONF_PATH ETC_PATH "/" RESOLV_CONF_FILE
-#define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
 #define SCSI_DEVICE_PATH "/sys/bus/scsi/devices"
 #define SCSI_DEVICE_NAME_PREFIX "0:0:0:"
 #define SCSI_DEVICE_PREFIX SCSI_DEVICE_PATH "/" SCSI_DEVICE_NAME_PREFIX
@@ -122,8 +121,6 @@ std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
 
-void ConfigureMemoryReduction(int PageReportingOrder, LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
-
 void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
@@ -145,10 +142,6 @@ std::string GetLunDevicePath(unsigned int Lun);
 int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName);
 
 std::string GetMountTarget(const char* Name);
-
-long long int GetUserCpuTime(void);
-
-ssize_t GetMemoryInUse(void);
 
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags);
 
@@ -193,7 +186,7 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::SocketChannel& channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -211,7 +204,7 @@ int StartDhcpClient(int DhcpTimeout);
 
 int StartGuestNetworkService(int GnsFd, wil::unique_fd&& DnsTunnelingFd, uint32_t DnsTunnelingIpAddress);
 
-void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type);
+void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type, LX_MINI_INIT_NETWORKING_MODE NetworkingMode);
 
 void StartTimeSyncAgent(void);
 
@@ -265,186 +258,6 @@ Return Value:
     return 0;
 }
 
-void ConfigureMemoryReduction(int PageReportingOrder, LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
-
-/*++
-
-Routine Description:
-
-    This routine sets the page reporting order.
-
-Arguments:
-
-    PageReportingOrder - Supplies the page reporting order. This value determines the size of cold discard hints
-        by using the equation: 2^PageReportingOrder * PAGE_SIZE
-        Example: 2^9 * 4096 = 2MB
-
-    Mode - Supplies the memory reclaim mode.
-
-Return Value:
-
-    None.
-
---*/
-
-try
-{
-    //
-    // Ensure the value falls within a reasonable range (single page to 2MB).
-    //
-
-    if (PageReportingOrder < 0 || PageReportingOrder > 9)
-    {
-        LOG_WARNING("Invalid page_reporting_order {}", PageReportingOrder);
-        PageReportingOrder = 0;
-    }
-    else
-    {
-        WriteToFile("/sys/module/page_reporting/parameters/page_reporting_order", std::to_string(PageReportingOrder).c_str());
-    }
-
-    //
-    // Create a worker thread to periodically check if the VM is idle and performs memory compaction.
-    // This ensures that the maximum number of pages can be discarded to the host.
-    //
-    // N.B. Compaction is not needed if page reporting order is set to single page mode.
-    //
-
-    if (PageReportingOrder == 0 && Mode == LxMiniInitMemoryReclaimModeDisabled)
-    {
-        return;
-    }
-
-    std::thread([PageReportingOrder = PageReportingOrder, Mode = Mode]() mutable {
-        try
-        {
-            //
-            // Set the thread's scheduling policy to idle.
-            //
-
-            sched_param Parameter{};
-            Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) < 0);
-
-            //
-            // Periodically check if the machine is idle by querying procfs for CPU usage.
-            // Memory compaction will occur if both of the following conditions are true:
-            //     1. The CPU time since the last check is greater than the idle threshold.
-            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
-            //
-
-            double MemoryLow = 1024 * 1024 * 1024;
-            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
-            long long int Start, Stop = 0;
-            auto constexpr SleepDuration = std::chrono::seconds(30);
-            size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
-            long long int ReclaimWindow[20] = {}; // 10 minutes
-            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling;
-
-            //
-            // Fall back to drop cache if the required cgroup path is not present.
-            //
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
-            {
-                LOG_WARNING("access({}, W_OK) failed {}, falling back to autoMemoryReclaim = dropcache", RECLAIM_PATH, errno);
-                Mode = LxMiniInitMemoryReclaimModeDropCache;
-            }
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual)
-            {
-                static_assert(COUNT_OF(ReclaimWindow) >= 6);
-                ReclaimWindowLength = 6; // Set to 3 minutes.
-            }
-
-            for (auto i = 1; i < ReclaimWindowLength; i++)
-            {
-                ReclaimWindow[i] = LLONG_MIN;
-            }
-
-            std::this_thread::sleep_for(SleepDuration);
-            for (;;)
-            {
-                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
-                Start = GetUserCpuTime();
-                THROW_LAST_ERROR_IF(Start == -1);
-
-                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
-                {
-                    //
-                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
-                    //
-
-                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
-                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
-                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
-                    {
-                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
-                        {
-                            double MemorySize = GetMemoryInUse();
-                            THROW_LAST_ERROR_IF(MemorySize < 0);
-
-                            if (MemorySize > MemoryHigh)
-                            {
-                                ReclaimIdling = false;
-                            }
-
-                            if (!ReclaimIdling && MemorySize > MemoryLow)
-                            {
-                                double MemoryTargetSize = MemorySize * 0.97;
-                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
-
-                                if (MemoryTargetSize < MemoryLow)
-                                {
-                                    ReclaimIdling = true;
-                                }
-                            }
-                        }
-                        else if (!ReclaimIdling)
-                        {
-                            ReclaimIdling = true;
-                            THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/drop_caches", "1\n") < 0);
-                        }
-                    }
-                    else
-                    {
-                        ReclaimIdling = false;
-                    }
-
-                    ReclaimIndex = LastIndex;
-                    ReclaimWindow[ReclaimIndex] = Start;
-                }
-
-                //
-                // Perform memory compaction if the VM is idle.
-                //
-                // N.B. Memory compaction is not needed if the page reporting order is set to single page (0).
-                //
-
-                if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
-                {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    const long long int Stop = GetUserCpuTime();
-                    THROW_LAST_ERROR_IF(Stop == -1);
-                    if ((Stop - Start) < IdleThreshold)
-                    {
-                        THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/compact_memory", "1\n") < 0);
-                    }
-                }
-
-                std::this_thread::sleep_until(Target);
-            }
-        }
-        CATCH_LOG()
-    }).detach();
-}
-CATCH_LOG()
-
 wil::unique_fd CreateNetlinkSocket(void)
 
 /*++
@@ -471,7 +284,7 @@ Return Value:
         return {};
     }
 
-    struct sockaddr_nl Address;
+    struct sockaddr_nl Address{};
     Address.nl_family = AF_NETLINK;
     if (bind(Fd.get(), (struct sockaddr*)&Address, sizeof(Address)) < 0)
     {
@@ -587,7 +400,7 @@ Return Value:
     std::string content = wsl::shared::string::ReadFile<char, char>(std::format("/sys/block/{}/dev", BlockDeviceName).c_str());
     auto separator = content.find(':');
 
-    if (separator == 0 || separator - 1 >= content.size() || separator == std::string::npos)
+    if (separator == std::string::npos || separator == 0 || separator + 1 == content.size())
     {
         LOG_ERROR("Failed to parse device number '{}' for device '{}'", content.c_str(), BlockDeviceName.c_str());
         THROW_ERRNO(EINVAL);
@@ -1057,77 +870,6 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-long long int GetUserCpuTime(void)
-
-/*++
-
-Routine Description:
-
-    This routine parses /proc/stat to query a summary of all user CPU time.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    The current user CPU counter for all cores.
-
---*/
-
-{
-    wil::unique_fd Fd{open(PROCFS_PATH "/stat", O_RDONLY)};
-    if (!Fd)
-    {
-        LOG_ERROR("open failed {}", errno);
-        return -1;
-    }
-
-    char Buffer[32];
-    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result < 0)
-    {
-        LOG_ERROR("read failed {}", errno);
-        return -1;
-    }
-
-    //
-    // Parse the first line of /proc/stat which is in the format
-    // "cpu  <counter>".
-    //
-
-    Buffer[Result] = '\0';
-    char* Sp1;
-    char* Info = strtok_r(Buffer, " \n", &Sp1);
-    Info = strtok_r(nullptr, " \n", &Sp1);
-    return strtoll(Info, nullptr, 10);
-}
-
-ssize_t GetMemoryInUse(void)
-
-/*++
-
-Routine Description:
-
-    This routine returns the amount memory in use in bytes.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    Total memory - Free memory. Includes that used by cache and buffers.
-
---*/
-try
-{
-    struct sysinfo Info = {};
-    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
-    return Info.totalram - Info.freeram;
-}
-CATCH_RETURN_ERRNO()
-
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags)
 
 /*++
@@ -1327,7 +1069,7 @@ Return Value:
     return (ChildPid < 0) ? -1 : 0;
 }
 
-void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type)
+void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type, LX_MINI_INIT_NETWORKING_MODE NetworkingMode)
 
 /*++
 
@@ -1338,6 +1080,8 @@ Routine Description:
 Arguments:
 
     Type - specifies the type of port tracker (localhost relay or mirrored).
+
+    NetworkingMode - specifies the networking mode (mirrored, virtio, etc.).
 
 Return Value:
 
@@ -1400,7 +1144,8 @@ Return Value:
         [PortTrackerFd = std::move(PortTrackerFd),
          NetlinkSocket = std::move(NetlinkSocket),
          BpfFd = std::move(BpfFd),
-         GuestRelayFd = std::move(GuestRelayFd)]() {
+         GuestRelayFd = std::move(GuestRelayFd),
+         NetworkingMode]() {
             execl(
                 LX_INIT_PATH,
                 LX_INIT_LOCALHOST_RELAY,
@@ -1412,6 +1157,8 @@ Return Value:
                 std::format("{}", NetlinkSocket.get()).c_str(),
                 INIT_PORT_TRACKER_LOCALHOST_RELAY,
                 std::format("{}", GuestRelayFd.get()).c_str(),
+                INIT_PORT_TRACKER_NETWORKING_MODE_ARG,
+                std::format("{}", static_cast<int>(NetworkingMode)).c_str(),
                 NULL);
 
             LOG_ERROR("execl failed {}", errno);
@@ -1507,15 +1254,6 @@ Return Value:
     }
 
     //
-    // Disable rate limiting of user writes to dmesg.
-    //
-
-    if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
-    {
-        return -1;
-    }
-
-    //
     // Set the hostname.
     //
 
@@ -1528,14 +1266,8 @@ Return Value:
     // Create a tmpfs mount for the cross-distro shared mount.
     //
 
-    if (UtilMount(nullptr, CROSS_DISTRO_SHARE_PATH, "tmpfs", 0, nullptr) < 0)
+    if (UtilMount(nullptr, CROSS_DISTRO_SHARE_PATH, "tmpfs", MS_SHARED, nullptr) < 0)
     {
-        return -1;
-    }
-
-    if (mount(nullptr, CROSS_DISTRO_SHARE_PATH, nullptr, MS_SHARED, nullptr) < 0)
-    {
-        LOG_ERROR("mount({}, MS_SHARED) failed {}", CROSS_DISTRO_SHARE_PATH, errno);
         return -1;
     }
 
@@ -1624,11 +1356,12 @@ Return Value:
     }
 
     // Initialize logging to the hvc console device responsible for logging telemetry.
+    // If the device is not present, error messages will be logged to kmesg.
     if (UtilIsUtilityVm())
     {
         devicePath = DEVFS_PATH "/" LX_INIT_HVC_TELEMETRY;
         g_TelemetryFd = TEMP_FAILURE_RETRY(open(devicePath, (O_WRONLY | O_CLOEXEC)));
-        if (g_TelemetryFd < 0)
+        if (g_TelemetryFd < 0 && errno != ENODEV)
         {
             LOG_ERROR("open({}) failed {}", devicePath, errno);
         }
@@ -2523,9 +2256,7 @@ void ProcessLaunchInitMessage(
                 // Create a tmpfs mount for a shared folder between user and system distro.
                 //
 
-                THROW_LAST_ERROR_IF(UtilMount(nullptr, WSLG_PATH, "tmpfs", 0, nullptr) < 0);
-
-                THROW_LAST_ERROR_IF(mount(nullptr, WSLG_PATH, nullptr, MS_SHARED, nullptr) < 0);
+                THROW_LAST_ERROR_IF(UtilMount(nullptr, WSLG_PATH, "tmpfs", MS_SHARED, nullptr) < 0);
 
                 //
                 // Create a directory to store x11 sockets.
@@ -2808,7 +2539,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
     }
 }
 
-int ProcessMountFolderMessage(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer)
+int ProcessMountFolderMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
 
 /*++
 
@@ -2844,7 +2575,7 @@ Return Value:
     }
 
     int Result = MountPlan9(Name, Target, Message->ReadOnly);
-    Channel.SendResultMessage<int32_t>(Result);
+    Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
 
@@ -2967,7 +2698,7 @@ Return Value:
                     return;
                 }
 
-                Target = GetMountTarget(Message->Buffer);
+                Target = GetMountTarget(wsl::shared::string::FromMessageBuffer<LX_MINI_INIT_UNMOUNT_MESSAGE>(Buffer));
 
                 Step = LxMiniInitMountStepUnmount;
                 Result = umount(Target.c_str());
@@ -3163,7 +2894,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
 
 /*++
 
@@ -3173,9 +2904,7 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file descriptor to the socket on which the message was
-        received. This is used for operations that require responses, for example a
-        VHD eject request.
+    Transaction - Supplies the transaction for replying to the message.
 
     Buffer - Supplies the message.
 
@@ -3259,7 +2988,7 @@ try
             return -1;
         }
 
-        Channel.SendResultMessage(EjectScsi(EjectMessage->Lun));
+        Transaction.SendResultMessage(EjectScsi(EjectMessage->Lun));
         return 0;
     }
 
@@ -3303,10 +3032,10 @@ try
         }
 
         //
-        // Configure page reporting and memory reclamation.
+        // Configure memory reclamation.
         //
 
-        ConfigureMemoryReduction(EarlyConfig->PageReportingOrder, EarlyConfig->MemoryReclaimMode);
+        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.
@@ -3434,7 +3163,7 @@ try
         Config.NetworkingMode = NetworkingConfiguration->NetworkingMode;
         if (NetworkingConfiguration->PortTrackerType != LxMiniInitPortTrackerTypeNone)
         {
-            StartPortTracker(NetworkingConfiguration->PortTrackerType);
+            StartPortTracker(NetworkingConfiguration->PortTrackerType, NetworkingConfiguration->NetworkingMode);
         }
 
         if (NetworkingConfiguration->DisableIpv6)
@@ -3495,10 +3224,10 @@ try
         return 0;
 
     case LxMiniInitMountFolder:
-        return ProcessMountFolderMessage(Channel, Buffer);
+        return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Channel, Buffer);
+        return ProcessCreateProcessMessage(Transaction, Buffer);
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3868,6 +3597,8 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
+extern int WSLCEntryPoint(int Argc, char* Argv[]);
+
 void EnableDebugMode(const std::string& Mode)
 {
     if (Mode == "hvsocket")
@@ -3942,6 +3673,16 @@ int main(int Argc, char* Argv[])
     //
     // Determine which entrypoint should be used.
     //
+
+    if (getenv(WSLC_ROOT_INIT_ENV))
+    {
+        if (unsetenv(WSLC_ROOT_INIT_ENV))
+        {
+            LOG_ERROR("unsetenv failed {}", errno);
+        }
+
+        return WSLCEntryPoint(Argc, Argv);
+    }
 
     if (getpid() != 1 || !getenv(WSL_ROOT_INIT_ENV))
     {
@@ -4175,13 +3916,14 @@ int main(int Argc, char* Argv[])
         }
         else if (PollDescriptors[0].revents & POLLIN)
         {
-            auto [Message, Range] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            auto transaction = channel.ReceiveTransaction();
+            auto [Message, Range] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (Message == nullptr)
             {
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(channel, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
             if (Result < 0)
             {
                 goto ErrorExit;

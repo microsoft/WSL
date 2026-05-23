@@ -72,9 +72,11 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
 }
 
 void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+try
 {
     static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
 }
+CATCH_LOG()
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
 {
@@ -164,8 +166,7 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
     return 0;
 }
 
-void VirtioNetworking::RefreshGuestConnection() noexcept
-try
+void VirtioNetworking::RefreshGuestConnection()
 {
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
@@ -179,16 +180,11 @@ try
     };
 
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
-    appendOption(L"client_mac", networkSettings->MacAddress);
-
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
-    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
-
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
-        appendOption(L"gateway_mac_ipv6", networkSettings->GetBestGatewayMacAddress(AF_INET6));
     }
 
     networking::DnsInfo currentDns{};
@@ -211,7 +207,6 @@ try
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
-        m_trackedDeviceOptions = device_options;
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
@@ -225,6 +220,8 @@ try
                 LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, device_options.c_str(), 0));
             }
         }
+
+        m_trackedDeviceOptions = device_options;
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
@@ -240,7 +237,6 @@ try
 
     m_networkSettings = std::move(networkSettings);
 }
-CATCH_LOG();
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
