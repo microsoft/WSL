@@ -271,7 +271,7 @@ Use '{} --help' para obter uma lista de argumentos com suporte.</value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
     <value>Subsistema do Windows para Linux não tem distribuições instaladas.
-Você pode resolve isso instalando uma distribuição com as instruções abaixo:
+Você pode resolver isso instalando uma distribuição com as instruções abaixo:
 
 Use 'wsl.exe --list --online' para listar distribuições disponíveis
 e 'wsl.exe --install &lt;Distro&gt;' para instalar.</value>
@@ -312,7 +312,7 @@ e 'wsl.exe --install &lt;Distro&gt;' para instalar.</value>
     <value>A distribuição já é a versão solicitada.</value>
   </data>
   <data name="MessageVmModeNotSupported" xml:space="preserve">
-    <value>A distribuição Herdada não dá suporte a WSL 2.</value>
+    <value>A distribuição herdada não dá suporte a WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>O WSL2 não pode ser iniciado porque a virtualização não está habilitada nesta máquina.
@@ -663,7 +663,7 @@ Tempo de compilação: {}</value>
     <value>Copyright (c) Microsoft Corporation. Todos os direitos reservados.
 Para informações sobre privacidade deste produto, visite https://aka.ms/privacy.
 
-Uso: wslg.exe [Argumento] [Opções...] [CommandLine]
+Uso: wslg.exe [Argumento] [Opções...] [Linha de comando]
 
 Argumentos:
     --cd &lt;Directory&gt;
@@ -690,7 +690,7 @@ Argumentos:
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
-    <value>Pressionar qualquer tecla para continuar...</value>
+    <value>Pressione qualquer tecla para continuar...</value>
   </data>
   <data name="MessageRequiredParameterMissing" xml:space="preserve">
     <value>O argumento {} não tem um parâmetro necessário.</value>
@@ -710,7 +710,7 @@ Argumentos:
     <value>Verificando se há atualizações.</value>
   </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
-    <value>Esta distribuição só está disponível no Microsoft Store.</value>
+    <value>Esta distribuição só está disponível na Microsoft Store.</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount no ARM64 requer o Windows versão 27653 ou mais recente.</value>
@@ -810,11 +810,11 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigInvalidBoolean" xml:space="preserve">
-    <value>Valor booliano inválido '{}' para a chave '{}' em {}:{}</value>
+    <value>Valor booleano inválido '{}' para a chave '{}' em {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigMacAddress" xml:space="preserve">
-    <value>Endereço mac inválido '{}' para a chave '{}' em {}:{}</value>
+    <value>Endereço MAC inválido '{}' para a chave '{}' em {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
@@ -829,7 +829,7 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
-    <value>Abrir EventViewer</value>
+    <value>Abrir Visualizador de Eventos</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
     <value>Esta distribuição não contém um nome padrão. Use --name para escolher o nome da distribuição.</value>
@@ -852,7 +852,7 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
-    <value>Registros de distribuição herdados não dão suporte ao argumento --version dados.</value>
+    <value>Registros de distribuição herdados não dão suporte ao argumento --version.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
@@ -872,7 +872,7 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionInstalled" xml:space="preserve">
-    <value>Distribuição instalada com êxito. Ele pode ser iniciado por meio de 'wsl.exe -d {}'</value>
+    <value>Distribuição instalada com êxito. Ela pode ser iniciada por meio de 'wsl.exe -d {}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidNumberString" xml:space="preserve">
@@ -945,7 +945,7 @@ Voltando à rede NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
-    <value>Ocorreu um erro inesperado ao tentar resolve configurações de proxy, as configurações de proxy não foram espelhadas em WSL.</value>
+    <value>Ocorreu um erro inesperado ao tentar resolver as configurações de proxy, as configurações de proxy não foram espelhadas no WSL.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
@@ -1065,7 +1065,7 @@ Voltando à rede NAT.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
-    <value>{} não é um booliano válido, &lt;true|false&gt;</value>
+    <value>{} não é um booleano válido, &lt;true|false&gt;</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
@@ -1076,17 +1076,17 @@ Voltando à rede NAT.</value>
     <value>A execução do WSL como sistema local não é suportada.</value>
   </data>
   <data name="MessagePerformanceTip" xml:space="preserve">
-    <value>Dica de Desempenho:</value>
+    <value>Dica de desempenho:</value>
   </data>
   <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
     <value>O uso de uma operação de uso intensivo de E/S, como {} em suas unidades do Windows, terá desempenho ruim. Considere mover seus arquivos de projeto para o sistema de arquivos do Linux para melhorar o desempenho. Clique abaixo para saber mais.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageViewDocs" xml:space="preserve">
-    <value>Exibir Documentos</value>
+    <value>Exibir documentação</value>
   </data>
   <data name="MessageDontShowAgain" xml:space="preserve">
-    <value>Não Mostrar Novamente</value>
+    <value>Não mostrar novamente</value>
   </data>
   <data name="MessageWSL2Crashed" xml:space="preserve">
     <value>A Máquina Virtual WSL2 falhou.</value>
@@ -1123,7 +1123,7 @@ Voltando à rede NAT.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
-    <value>Falha ao instalar {} do Microsoft Store: {}
+    <value>Falha ao instalar {} da Microsoft Store: {}
 Tentando baixar a Web...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1157,7 +1157,7 @@ Código de erro: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageTooManyProcessors" xml:space="preserve">
-    <value>wsl2.processors não podem exceder o número de processadores lógicos no sistema ({} &gt; {})</value>
+    <value>wsl2.processors não pode exceder o número de processadores lógicos no sistema ({} &gt; {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
@@ -1245,7 +1245,7 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
-    <value>Aplicável somente quando wsl2.dnsTunneling é definido como verdadeiro. Quando definido como true, o Windows extrairá a pergunta da solicitação DNS e tentará resolve-la, ignorando os registros desconhecidos.</value>
+    <value>Aplicável somente quando wsl2.dnsTunneling é definido como verdadeiro. Quando definido como true, o Windows extrairá a pergunta da solicitação DNS e tentará resolvê-la, ignorando os registros desconhecidos.</value>
     <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
@@ -1253,7 +1253,7 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Apenas aplicável quando wsl2.dnsTunneling está definido como verdadeiro. Quando definido como verdadeiro, o Windows extrairá a pergunta do pedido DNS e tentará resolve-la, ignorando os registos desconhecidos.</value>
+    <value>Aplicável somente quando wsl2.dnsTunneling está definido como verdadeiro. Quando definido como verdadeiro, o Windows extrairá a pergunta da solicitação DNS e tentará resolvê-la, ignorando os registros desconhecidos.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
@@ -2251,7 +2251,7 @@ Uso:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
-     <value>Falha ao resolve argumentos encaminhados iniciando no argumento: '{}'</value>
+     <value>Falha ao resolver argumentos encaminhados iniciando no argumento: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
@@ -2744,7 +2744,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Argumentos a serem passados para o processo de inicialização do contêiner</value>
   </data>
   <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
-    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <value>Adicionar dispositivos GPU ao contêiner ('all' para passar todas as GPUs)</value>
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
@@ -2889,7 +2889,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Política de  pull de imagem (always|missing|never) (padrão:never)</value>
+    <value>Política de pull de imagem (always|missing|never) (padrão:never)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -2958,7 +2958,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Gerenciar volumes.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
-    <value>Gerencie o ciclo de vida de WSL volumes, incluindo criá-los, inspecioná-los, listá-los e excluí-los.</value>
+    <value>Gerencie o ciclo de vida de volumes do WSL, incluindo criá-los, inspecioná-los, listá-los e excluí-los.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
