@@ -1253,8 +1253,8 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Aplicável somente quando wsl2.dnsTunneling está definido como verdadeiro. Quando definido como verdadeiro, o Windows extrairá a pergunta da solicitação DNS e tentará resolvê-la, ignorando os registros desconhecidos.</value>
-    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
+    <value>Aplicável somente quando wsl2.dnsTunneling está definido como true. Quando definido como true, o Windows extrairá a pergunta da solicitação DNS e tentará resolvê-la, ignorando os registros desconhecidos.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="true"}{Locked="DNS"}.wslconfig property key names and literal config values should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Kernel personalizado</value>
