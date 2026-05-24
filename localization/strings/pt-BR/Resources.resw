@@ -853,7 +853,7 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Registros de distribuição herdados não dão suporte ao argumento --version.</value>
-    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--version"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>A distribuição "{}" é fornecida por um manifesto de substituição.</value>
