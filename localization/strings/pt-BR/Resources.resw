@@ -663,7 +663,7 @@ Tempo de compilação: {}</value>
     <value>Copyright (c) Microsoft Corporation. Todos os direitos reservados.
 Para informações sobre privacidade deste produto, visite https://aka.ms/privacy.
 
-Uso: wslg.exe [Argumento] [Opções...] [Linha de comando]
+Uso: wslg.exe [Argumento] [Opções...] [CommandLine]
 
 Argumentos:
     --cd &lt;Directory&gt;
