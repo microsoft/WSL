@@ -18,6 +18,7 @@ Abstract:
 #include "ImageService.h"
 #include "VolumeService.h"
 #include "ContainerService.h"
+#include "ExecutionContext.h"
 
 namespace wsl::windows::wslc::task {
 
@@ -26,6 +27,20 @@ using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::models;
+
+// Detects podman's name-validation error messages that arrive as E_FAIL
+// (because podman's docker-compat API returns 5xx instead of 400 Bad Request
+// for syntactically invalid references such as uppercase image names).
+// Semantically these mean "the name is not a valid reference, therefore it
+// does not refer to any object of this type" — equivalent to not-found for
+// inspect's lenient lookup. Returning true here lets TryInspect tolerate
+// the error and continue with the next type lookup.
+static bool IsPodmanNameValidationError(const std::wstring& message)
+{
+    return message.find(L"parsing reference") != std::wstring::npos ||
+           message.find(L"normalizing name") != std::wstring::npos ||
+           message.find(L"must be lowercase") != std::wstring::npos;
+}
 
 template <typename TInspectFn>
 static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
@@ -41,6 +56,42 @@ static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
         if (errorCode == notFoundError || errorCode == HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS) || errorCode == E_INVALIDARG)
         {
             return false;
+        }
+
+        // podman-compat quirk: name-validation failures come back as 5xx
+        // (mapped to E_FAIL) instead of 400 Bad Request. Treat as not-found
+        // so root `inspect` retains its docker-era lenient behavior — any
+        // invalid name should yield "Object not found", not a raw E_FAIL.
+        //
+        // The detailed message from podman is on the COM IErrorInfo channel
+        // (set by THROW_DOCKER_USER_ERROR in wslcsession), not on the
+        // wil::ResultException itself, so we peek IErrorInfo here. Peeking
+        // is destructive (GetErrorInfo transfers ownership), so we restore
+        // it via SetErrorInfo when we don't tolerate, to preserve the
+        // outer-most user-facing message.
+        // podman-compat quirk: name-validation failures come back as 5xx
+        // (mapped to E_FAIL) instead of 400 Bad Request. Treat as not-found
+        // so root `inspect` retains its docker-era lenient behavior — any
+        // invalid name should yield "Object not found", not a raw E_FAIL.
+        //
+        // The detailed error text from podman doesn't survive on
+        // wil::ResultException::what() (which carries source-location
+        // info) or on the TLS IErrorInfo (already consumed by wil when
+        // CollectError ran during the throw). It is captured in the
+        // current ExecutionContext's reported error, so pattern-match
+        // there.
+        if (errorCode == E_FAIL)
+        {
+            if (auto* context = wsl::windows::common::ExecutionContext::Current())
+            {
+                const auto& reported = context->ReportedError();
+                if (reported.has_value() && reported->Message.has_value() &&
+                    IsPodmanNameValidationError(*reported->Message))
+                {
+                    LOG_HR_MSG(errorCode, "Tolerating podman name-validation error in inspect");
+                    return false;
+                }
+            }
         }
 
         throw;
