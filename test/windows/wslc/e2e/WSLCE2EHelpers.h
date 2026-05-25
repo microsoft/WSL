@@ -132,6 +132,21 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
+
+// Spins up a sibling container running dnsmasq with a single hardcoded
+// {probeDomain -> probeAnswer} mapping. Used to definitively verify that
+// --dns is honored: only this mock knows the probe answer, so if the
+// system-under-test container queries the probe and gets the answer, it
+// proves --dns routed the query through this mock. The image must be
+// alpine-like (have apk; alpine main repo must be reachable for dnsmasq
+// package install). Blocks up to 30s waiting for dnsmasq to be listening.
+// Returns the mock's container IP (use as --dns value).
+// Caller must call EnsureContainerDoesNotExist(containerName) when done.
+std::wstring StartMockDnsServer(
+    const TestImage& image,
+    const std::wstring& containerName,
+    const std::wstring& probeDomain,
+    const std::wstring& probeAnswer);
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");

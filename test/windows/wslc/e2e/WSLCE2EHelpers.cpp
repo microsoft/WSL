@@ -20,6 +20,9 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>
 #include <wslutil.h>
+#include <chrono>
+#include <regex>
+#include <thread>
 
 extern std::wstring g_testDataPath;
 
@@ -303,6 +306,51 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
+}
+
+std::wstring StartMockDnsServer(
+    const TestImage& image,
+    const std::wstring& containerName,
+    const std::wstring& probeDomain,
+    const std::wstring& probeAnswer)
+{
+    EnsureContainerDoesNotExist(containerName);
+
+    // Start dnsmasq with a single hardcoded mapping. apk add runs first because
+    // alpine ships without dnsmasq; the package is small (~250KB) and cached
+    // by alpine repo. exec replaces sh so dnsmasq is PID 1 in the container.
+    auto start = RunWslc(std::format(
+        L"container run -d --name {} {} sh -c "
+        L"\"apk add --no-cache dnsmasq >/dev/null && "
+        L"exec dnsmasq --no-daemon -k --address=/{}/{}\"",
+        containerName, image.NameAndTag(), probeDomain, probeAnswer));
+    start.Verify({.Stderr = L"", .ExitCode = 0});
+
+    // Poll for dnsmasq readiness — apk add takes a few seconds on first run,
+    // sub-second on cached. 30s budget covers cold-cache pull from corp proxy.
+    bool ready = false;
+    for (int i = 0; i < 60 && !ready; ++i)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        auto check = RunWslc(std::format(
+            L"container exec {} sh -c \"pgrep dnsmasq >/dev/null\"", containerName));
+        if (check.ExitCode.has_value() && check.ExitCode.value() == 0)
+        {
+            ready = true;
+        }
+    }
+    VERIFY_IS_TRUE(ready, L"Mock DNS server (dnsmasq) did not become ready within 30s");
+
+    // Extract container IP via inspect JSON (regex is simpler than full
+    // schema parsing for just one field).
+    auto inspect = RunWslc(std::format(L"container inspect {}", containerName));
+    inspect.Verify({.Stderr = L"", .ExitCode = 0});
+    std::wsmatch match;
+    std::wregex re(LR"RX("IPAddress"\s*:\s*"([0-9.]+)")RX");
+    VERIFY_IS_TRUE(
+        std::regex_search(*inspect.Stdout, match, re),
+        L"Could not extract IPAddress from mock DNS container inspect output");
+    return match[1].str();
 }
 
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers()
