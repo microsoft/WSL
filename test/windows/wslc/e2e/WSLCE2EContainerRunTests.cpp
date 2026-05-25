@@ -629,17 +629,28 @@ class WSLCE2EContainerRunTests
         // With podman+aardvark-dns enabled on the default bridge network,
         // container /etc/resolv.conf always points at the aardvark gateway;
         // --dns values become aardvark's upstream forwarders rather than
-        // literal nameserver entries. Verify --dns is honored by routing to
-        // an unreachable TEST-NET (RFC 5737) address — queries must time out,
-        // proving --dns is the exclusive upstream and no fallback to system
-        // DNS occurs.
+        // literal nameserver entries (which differs from docker's behavior,
+        // making /etc/resolv.conf-content checks unreliable).
+        //
+        // Verify --dns is honored end-to-end by spinning up a controlled DNS
+        // sibling container that answers a unique probe domain with a unique
+        // probe IP, pointing the test container's --dns at it, and asserting
+        // the unique IP comes back. Only the controlled DNS knows this answer
+        // — receiving it definitively proves --dns routed through that server.
+        constexpr auto kMockDnsName = L"wslc-test-mock-dns";
+        constexpr auto kProbeDomain = L"probe.wslc.test";
+        constexpr auto kProbeAnswer = L"10.99.99.99";
+
+        auto mockIp = StartMockDnsServer(AlpineImage, kMockDnsName, kProbeDomain, kProbeAnswer);
+        auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(kMockDnsName); });
+
         auto result = RunWslc(std::format(
-            L"container run --rm --dns 192.0.2.1 {} sh -c \"nslookup example.com 2>&1\"",
-            AlpineImage.NameAndTag()));
-        auto out = result.Stdout.value_or(L"");
+            L"container run --rm --dns {} {} getent hosts {}",
+            mockIp, AlpineImage.NameAndTag(), kProbeDomain));
+
         VERIFY_IS_TRUE(
-            out.find(L"timed out") != std::wstring::npos ||
-            out.find(L"no servers could be reached") != std::wstring::npos);
+            result.Stdout.has_value() &&
+            result.Stdout->find(kProbeAnswer) != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)
