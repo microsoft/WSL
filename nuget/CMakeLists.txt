@@ -22,8 +22,7 @@ function(read_nuspec_fragment var path)
 endfunction()
 
 # C# SDK wrapper DLL — AnyCPU, produced for any TARGET_PLATFORM.
-# Only include it when the C# SDK was actually built (WSL_BUILD_SDKCS).
-if(WSL_BUILD_SDKCS)
+if(WSL_INCLUDE_SDK_CSHARP)
     read_nuspec_fragment(NUGET_SDKCS_FILE "${CMAKE_CURRENT_LIST_DIR}/fragments/wslc-cs.nuspec.in")
 else()
     set(NUGET_SDKCS_FILE "")
