@@ -288,6 +288,7 @@ private:
     bool m_tempDirectoryCreated;
     bool m_enableInboxGpuLibs;
     bool m_defaultKernel = true;
+    bool m_privateKernelModules = false;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
@@ -318,6 +319,10 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
+
+    // Job object that terminates child processes (wslhost.exe, wslrelay.exe)
+    // when the VM shuts down.
+    wil::unique_handle m_processJobObject;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);

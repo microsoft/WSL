@@ -97,7 +97,8 @@ public:
         }
     };
 
-    [[nodiscard]] wil::unique_handle Launch(_In_opt_ HANDLE UserToken, _In_ bool HideWindow, _In_ bool CreateNoWindow = false) const
+    [[nodiscard]] wil::unique_handle Launch(
+        _In_opt_ HANDLE UserToken, _In_ bool HideWindow, _In_ bool CreateNoWindow = false, _In_opt_ HANDLE JobObject = nullptr) const
     {
         // If a user token was provided, create an environment block from the token.
         wsl::windows::common::helpers::unique_environment_block environmentBlock{nullptr};
@@ -125,6 +126,7 @@ public:
 
         process.SetEnvironment(environmentBlock.get());
         process.SetToken(UserToken);
+        process.SetJobObject(JobObject);
 
         // Launch the process.
         return process.Start();
@@ -137,7 +139,13 @@ private:
 };
 
 [[nodiscard]] wil::unique_handle LaunchWslHost(
-    _In_opt_ LPCGUID DistroId, _In_opt_ HANDLE InteropHandle, _In_opt_ HANDLE EventHandle, _In_opt_ HANDLE ParentHandle, _In_opt_ LPCGUID VmId, _In_opt_ HANDLE UserToken)
+    _In_opt_ LPCGUID DistroId,
+    _In_opt_ HANDLE InteropHandle,
+    _In_opt_ HANDLE EventHandle,
+    _In_opt_ HANDLE ParentHandle,
+    _In_opt_ LPCGUID VmId,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ HANDLE JobObject = nullptr)
 {
     // Construct the command line.
     //
@@ -151,7 +159,7 @@ private:
     launcher.AddHandleOption(wslhost::handle_option, InteropHandle);
     launcher.AddHandleOption(wslhost::event_option, EventHandle);
     launcher.AddHandleOption(wslhost::parent_option, ParentHandle);
-    return launcher.Launch(UserToken, true);
+    return launcher.Launch(UserToken, true, false, JobObject);
 }
 
 [[nodiscard]] wil::unique_handle LaunchWslRelay(
@@ -162,7 +170,8 @@ private:
     _In_opt_ std::optional<int> Port,
     _In_opt_ HANDLE ExitEvent,
     _In_opt_ HANDLE UserToken,
-    _In_ LaunchWslRelayFlags Flags)
+    _In_ LaunchWslRelayFlags Flags,
+    _In_opt_ HANDLE JobObject = nullptr)
 {
     // Construct the command line.
     //
@@ -191,7 +200,7 @@ private:
         launcher.AddOption(wslrelay::connect_pipe_option);
     }
 
-    return launcher.Launch(UserToken, WI_IsFlagSet(Flags, LaunchWslRelayFlags::HideWindow));
+    return launcher.Launch(UserToken, WI_IsFlagSet(Flags, LaunchWslRelayFlags::HideWindow), false, JobObject);
 }
 } // namespace
 
@@ -272,6 +281,18 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     THROW_IF_WIN32_BOOL_FALSE(InitializeProcThreadAttributeList(List.get(), AttributeCount, 0, &Size));
 
     return List;
+}
+
+wil::unique_handle wsl::windows::common::helpers::CreateKillOnCloseJob()
+{
+    wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+
+    return job;
 }
 
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
@@ -548,7 +569,7 @@ bool wsl::windows::common::helpers::IsWslSupportInterfacePresent()
 }
 
 void wsl::windows::common::helpers::LaunchDebugConsole(
-    _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry)
+    _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     LaunchWslRelayFlags flags{};
     wil::unique_hfile pipe;
@@ -576,16 +597,24 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     THROW_LAST_ERROR_IF(!pipe);
 
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
-    wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::DebugConsole, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags)};
+    wil::unique_handle info{
+        LaunchWslRelay(wslrelay::RelayMode::DebugConsole, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags, JobObject)};
 }
 
 [[nodiscard]] wil::unique_handle wsl::windows::common::helpers::LaunchInteropServer(
-    _In_opt_ LPCGUID DistroId, _In_ HANDLE InteropHandle, _In_opt_ HANDLE EventHandle, _In_opt_ HANDLE ParentHandle, _In_opt_ LPCGUID VmId, _In_opt_ HANDLE UserToken)
+    _In_opt_ LPCGUID DistroId,
+    _In_ HANDLE InteropHandle,
+    _In_opt_ HANDLE EventHandle,
+    _In_opt_ HANDLE ParentHandle,
+    _In_opt_ LPCGUID VmId,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ HANDLE JobObject)
 {
-    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken);
+    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken, JobObject);
 }
 
-void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry)
+void wsl::windows::common::helpers::LaunchKdRelay(
+    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     // Create a new pipe server. The pipe should be:
     //     Bi-directional: PIPE_ACCESS_DUPLEX
@@ -599,15 +628,17 @@ void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HA
 
     LaunchWslRelayFlags flags = LaunchWslRelayFlags::ConnectPipe;
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
-    wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::KdRelay, nullptr, nullptr, pipe.get(), Port, ExitEvent, UserToken, flags)};
+    wil::unique_handle info{
+        LaunchWslRelay(wslrelay::RelayMode::KdRelay, nullptr, nullptr, pipe.get(), Port, ExitEvent, UserToken, flags, JobObject)};
 }
 
-void wsl::windows::common::helpers::LaunchPortRelay(_In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry)
+void wsl::windows::common::helpers::LaunchPortRelay(
+    _In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     LaunchWslRelayFlags flags{};
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
     wil::unique_handle info{LaunchWslRelay(
-        wslrelay::RelayMode::PortRelay, reinterpret_cast<HANDLE>(Socket), &VmId, nullptr, {}, nullptr, UserToken, flags)};
+        wslrelay::RelayMode::PortRelay, reinterpret_cast<HANDLE>(Socket), &VmId, nullptr, {}, nullptr, UserToken, flags, JobObject)};
 }
 
 void wsl::windows::common::helpers::LaunchWslSettingsOOBE(_In_ HANDLE UserToken)

@@ -14,9 +14,9 @@ Abstract:
 
 #include "IORelay.h"
 
-using wsl::windows::common::relay::DockerIORelayHandle;
-using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::OverlappedIOHandle;
+using wsl::windows::common::io::DockerIORelayHandle;
+using wsl::windows::common::io::MultiHandleWait;
+using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::service::wslc::IORelay;
 
 IORelay::IORelay()
@@ -29,15 +29,15 @@ IORelay::~IORelay()
     Stop();
 }
 
-void IORelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle)
+void IORelay::AddHandle(std::unique_ptr<common::io::OverlappedIOHandle>&& Handle)
 {
-    std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> handles;
+    std::vector<std::unique_ptr<common::io::OverlappedIOHandle>> handles;
     handles.emplace_back(std::move(Handle));
 
     AddHandles(std::move(handles));
 }
 
-void IORelay::AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles)
+void IORelay::AddHandles(std::vector<std::unique_ptr<common::io::OverlappedIOHandle>>&& Handles)
 {
     WI_ASSERT(!m_exit);
 
@@ -73,7 +73,7 @@ try
 {
     common::wslutil::SetThreadDescription(L"IORelay");
 
-    windows::common::relay::MultiHandleWait io;
+    windows::common::io::MultiHandleWait io;
 
     // N.B. All the IO must happen on the thread.
     // If the thread that scheduled the IO exits, the IO is cancelled.
@@ -90,7 +90,7 @@ try
             m_pendingHandles.clear();
         }
 
-        io.AddHandle(std::make_unique<common::relay::EventHandle>(m_refreshEvent.get()), MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<common::io::EventHandle>(m_refreshEvent.get()), MultiHandleWait::CancelOnCompleted);
         io.Run({});
     }
 }

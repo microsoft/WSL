@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName><!-- _locComment_text='{Locked="WSL"}' -->WSL</displayName>
+  <description><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
+
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux’ne izin ver</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Bu ilke devre dışı bırakıldığında, bilgisayardaki tüm kullanıcılar için Windows Subsystem for Linux’nde çalışan Linux dağıtımlarına erişimi engeller.</string>
+
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux’nin kutudan çıkan sürümüne izin ver</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Devre dışı bırakıldığında, bu ilke Windows Subsystem for Linux’nin gelen kutusu sürümünü (isteğe bağlı bileşen) devre dışı bırakır. Bu ilke devre dışı bırakılırsa, yalnızca WSL'nin Store sürümü kullanılabilir.</string>
+
+        <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->WSL1'e izin ver</string>
+        <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Devre dışı olarak ayarlandığında, bu ilke WSL1'i devre dışı bırakır. Devre dışı bırakıldığında yalnızca WSL2 dağıtımları kullanılabilir.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Özel çekirdek yapılandırmasına izin ver</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.kernel) aracılığıyla özel çekirdek yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Özel sistem dağıtım yapılandırmasına izin ver</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.systemDistro) aracılığıyla özel sistem dağıtımı yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Çekirdek komut satırı yapılandırmasına izin ver</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig dosyası (wsl2.kernelCommandLine) aracılığıyla çekirdek komut satırı yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="AllowDebugShell">Hata ayıklama kabuğuna izin ver</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke hata ayıklama kabuğunu (wsl.exe --debug-shell) devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">İç içe sanallaştırmaya izin verin</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.nestedVirtualization) aracılığıyla iç içe sanallaştırma yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Çekirdek hata ayıklaması</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.kernelDebugPort) aracılığıyla çekirdek hata ayıklama yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Özel ağ yapılandırmasına izin ver</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.networkingMode) aracılığıyla özel ağ yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="FirewallUserSettingConfigurable">Kullanıcının güvenlik duvarı yapılandırmasını ayarlamasına izin ver</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Devre dışı olarak ayarlandığında, bu ilke .wslconfig (wsl2.firewall) aracılığıyla güvenlik duvarı yapılandırmasını devre dışı bırakır. Bu ilke yalnızca Store WSL için geçerlidir.</string>
+
+        <string id="AllowDiskMount">Geçiş disk bağlamaya izin ver</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Varsayılan ağ modunu yapılandırın</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment_text='{Locked="WSL2"}' -->Bu ilke, WSL2 için kullanılacak varsayılan ağ modunu belirtir.</string>
+        <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+
+        <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısı</string>
+
+        <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısına izin ver</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Bu ilke, bu makinede WSL kapsayıcısının kullanılıp kullanılamayacağını denetler. Bu özellik etkinleştirildiğinde veya yapılandırılmadığında, kullanıcılar ve Windows uygulamaları WSL aracılığıyla Linux kapsayıcılarını çalıştırabilir. Devre dışı bırakıldığında, WSL kapsayıcısı tüm kullanıcılar için engellenir ve Windows uygulamaları Linux kapsayıcılarını çalıştıramaz. Uyarı: Bu ayarı 'Disabled' olarak belirlemek, Linux kapsayıcılarına bağlı Windows uygulamalarının çalışmamasına neden olabilir.</string>
+
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısı kayıt defterleri için izin listesi</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Etkinleştirildiğinde, WSL kapsayıcısının yalnızca burada listelenen kayıt defterlerinden görüntü çekmesine izin verilir. Bu, hem WSL kapsayıcı CLI'sini hem de WSL kapsayıcı API'sini kullanan tüm uygulamaları etkiler.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Varsayılan Ağ Modu</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">İzin verilen kayıt defterleri</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

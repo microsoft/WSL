@@ -89,6 +89,9 @@ struct ParseArgumentsStateMachine
     // Gets the next positional argument, or nullptr if there is not one.
     const Argument* NextPositional();
 
+    // Returns true if there is a next positional argument available, without advancing the iterator.
+    bool HasNextPositional() const;
+
     const std::vector<Argument>& Arguments() const
     {
         return m_arguments;
@@ -101,6 +104,9 @@ private:
     State ProcessAliasArgument(const std::wstring_view& currArg);
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
+
+    // Advances the given iterator past any positionals that have reached their limit.
+    void AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const;
 
     Invocation& m_invocation;
     ArgMap& m_executionArgs;
