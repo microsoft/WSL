@@ -104,8 +104,8 @@ public:
     void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
-    void AttachToNetwork(const WSLCNetworkAttachment* Attachment);
-    void DetachFromNetwork(LPCSTR NetworkName);
+    void ConnectToNetwork(const WSLCNetworkAttachment* Attachment);
+    void DisconnectFromNetwork(LPCSTR NetworkName);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -238,8 +238,8 @@ public:
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
-    IFACEMETHOD(AttachToNetwork)(_In_ const WSLCNetworkAttachment* Attachment) override;
-    IFACEMETHOD(DetachFromNetwork)(_In_ LPCSTR NetworkName) override;
+    IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkAttachment* Attachment) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
