@@ -3052,7 +3052,6 @@ Return Value:
 
 {
     std::vector<gsl::byte> Buffer;
-    MESSAGE_HEADER* Header{};
     struct sigaction SignalAction;
 
     //
