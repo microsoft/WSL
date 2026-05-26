@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-beholder</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Tillat WSL-beholder</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne policyen styrer om WSL-beholdere kan brukes på denne maskinen. Når den er aktivert eller ikke konfigurert, kan brukere og Windows-apper kjøre Linux-beholdere via WSL. Når den er deaktivert, blokkeres WSL-beholdere for alle brukere, og Windows-apper kan ikke kjøre Linux-beholdere. Advarsel: Hvis denne settes til Disabled, kan Windows-apper som er avhengige av Linux-beholdere, slutte å fungere.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne policyen styrer om WSL-beholdere kan brukes på denne maskinen. Når den er aktivert eller ikke konfigurert, kan brukere og Windows-programmer kjøre Linux-beholdere via WSL. Når den er deaktivert, blokkeres WSL-beholdere for alle brukere, og Windows-apper kan ikke kjøre Linux-beholdere. Advarsel: Hvis denne settes til 'Disabled', kan Windows-apper som er avhengige av Linux-beholdere, slutte å fungere.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Tillatelsesliste for WSL-beholderregistre</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Når dette er aktivert, har WSL-beholderen bare tillatelse til å hente bilder fra registrene som er oppført her. Dette påvirker både CLI for WSL-beholderen og alle programmer som bruker WSL-beholder-API-et.</string>
