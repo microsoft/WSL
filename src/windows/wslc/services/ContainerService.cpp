@@ -509,7 +509,7 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -518,17 +518,20 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
+    WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, tail));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
     wsl::windows::common::io::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(
+        std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+            stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.
