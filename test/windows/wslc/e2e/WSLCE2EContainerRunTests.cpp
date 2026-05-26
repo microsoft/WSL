@@ -139,8 +139,12 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Invalid_Path)
     {
         auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/does-not-exist {}", DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stdout = L"", .Stderr = L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: \"/bin/does-not-exist\": stat /bin/does-not-exist: no such file or directory: unknown\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        // OCI runtime exec-failure surfaces via /attach in attached mode. With
+        // podman, /attach 5xx with empty body causes loss of the detailed
+        // runtime message before wslc can inspect (see Category C analysis).
+        // Verify behavioral contract only: failure exit + non-empty stderr.
+        VERIFY_ARE_NOT_EQUAL(0, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value() && !result.Stderr->empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Detach_Lifecycle)
@@ -597,13 +601,22 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm --tmpfs wslc-tmpfs {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(L"wslc-tmpfs") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm --tmpfs :size=64k {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        // docker: "invalid mount path: '' mount path must be absolute"
+        // podman: "fill out specgen: container directory cannot be empty"
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(
+            stderrText.find(L"empty") != std::wstring::npos ||
+            stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir)

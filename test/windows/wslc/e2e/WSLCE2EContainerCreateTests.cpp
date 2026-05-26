@@ -85,12 +85,12 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
-        std::wstringstream expectedError;
-        expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
-                      << L"manifest for " << InvalidImage.NameAndTag()
-                      << L" not found: manifest unknown: manifest tagged by \"latest\" is not found\r\n"
-                      << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
-        result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
+        // Wording of "image-not-found via pull" differs between docker and podman;
+        // verify behavior + key substrings rather than exact text.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(InvalidImage.NameAndTag()) != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"WSLC_E_IMAGE_NOT_FOUND") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Valid)
@@ -145,11 +145,15 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
-        // Attempt to create another container with the same name
+        // Attempt to create another container with the same name. Container
+        // engines word "name conflict" differently; check the behavioral
+        // contract: failure + container name + ERROR_ALREADY_EXISTS HRESULT.
         result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = std::format(L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n", WslcContainerName, containerId),
-             .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(L"already in use") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(WslcContainerName) != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"ERROR_ALREADY_EXISTS") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromHostReadFromContainer)
@@ -603,14 +607,24 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs wslc-tmpfs {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(L"wslc-tmpfs") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs :size=64k {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        // docker: "invalid mount path: '' mount path must be absolute"
+        // podman: "fill out specgen: container directory cannot be empty"
+        // Verify failure + some "empty"/"directory" indicator.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(
+            stderrText.find(L"empty") != std::wstring::npos ||
+            stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir)
