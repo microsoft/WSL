@@ -72,14 +72,65 @@ void ValidateName(LPCSTR Name, size_t maxLength)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
+// Strips the registry prefix that podman always adds to image references
+// when displaying them, restoring docker-style short names:
+//   localhost/foo:tag         -> foo:tag           (local builds)
+//   docker.io/library/foo:tag -> foo:tag           (Docker Hub official)
+//   docker.io/user/foo:tag    -> user/foo:tag      (Docker Hub user)
+// Other registries (mcr.microsoft.com/..., quay.io/..., etc.) pass through
+// unchanged because their hostname carries meaningful information.
+static std::string StripPodmanRegistryPrefix(std::string_view name)
+{
+    constexpr std::string_view kLocalhost = "localhost/";
+    constexpr std::string_view kDockerLibrary = "docker.io/library/";
+    constexpr std::string_view kDockerIo = "docker.io/";
+
+    if (name.starts_with(kLocalhost)) { return std::string(name.substr(kLocalhost.size())); }
+    if (name.starts_with(kDockerLibrary)) { return std::string(name.substr(kDockerLibrary.size())); }
+    if (name.starts_with(kDockerIo)) { return std::string(name.substr(kDockerIo.size())); }
+    return std::string(name);
+}
+
+// Strips registry prefix from a "repo@sha256:..." digest reference. Only
+// touches the "repo" portion before '@'; the digest itself is preserved.
+static std::string StripPodmanRegistryPrefixFromDigest(std::string_view repoDigest)
+{
+    auto atPos = repoDigest.find('@');
+    if (atPos == std::string_view::npos)
+    {
+        return StripPodmanRegistryPrefix(repoDigest);
+    }
+    return StripPodmanRegistryPrefix(repoDigest.substr(0, atPos)) + std::string(repoDigest.substr(atPos));
+}
+
+template <typename TransformFn>
+static std::optional<std::vector<std::string>> TransformImageRefs(
+    const std::optional<std::vector<std::string>>& source, TransformFn&& fn)
+{
+    if (!source.has_value())
+    {
+        return std::nullopt;
+    }
+    std::vector<std::string> result;
+    result.reserve(source->size());
+    for (const auto& ref : *source) { result.push_back(fn(ref)); }
+    return result;
+}
+
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
 {
     wslc_schema::InspectImage wslcInspect{};
 
     // Direct field mappings
     wslcInspect.Id = dockerInspect.Id;
-    wslcInspect.RepoTags = dockerInspect.RepoTags;
-    wslcInspect.RepoDigests = dockerInspect.RepoDigests;
+    // Strip podman registry prefixes (localhost/, docker.io/library/, docker.io/)
+    // so users see docker-style short names rather than fully-qualified refs.
+    wslcInspect.RepoTags = TransformImageRefs(dockerInspect.RepoTags, [](const std::string& tag) {
+        return StripPodmanRegistryPrefix(tag);
+    });
+    wslcInspect.RepoDigests = TransformImageRefs(dockerInspect.RepoDigests, [](const std::string& d) {
+        return StripPodmanRegistryPrefixFromDigest(d);
+    });
     wslcInspect.Parent = dockerInspect.Parent;
     wslcInspect.Comment = dockerInspect.Comment;
     wslcInspect.Created = dockerInspect.Created;
@@ -1259,7 +1310,11 @@ try
             // Image has tags - create one entry per tag
             for (const auto& tag : e.RepoTags)
             {
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+                // Strip podman registry prefix for the user-facing Image field;
+                // keep the raw tag for digest-map lookup (the map is keyed on
+                // the raw repo names that podman provided).
+                const auto strippedTag = StripPodmanRegistryPrefix(tag);
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, strippedTag.c_str()) != 0);
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
 
                 // Extract repo name from tag (format: "repo:tag")
@@ -1268,7 +1323,10 @@ try
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {
-                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
+                    // Surface the digest with the prefix stripped too so
+                    // displayed digests are consistent with displayed tags.
+                    const auto strippedDigest = StripPodmanRegistryPrefixFromDigest(it->second);
+                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, strippedDigest.c_str()) != 0);
                 }
                 else
                 {
