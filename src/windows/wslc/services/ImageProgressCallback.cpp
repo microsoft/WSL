@@ -134,7 +134,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     }
 
     // Erase any previously written char on that line.
-    line.resize(visibleWdith, L' ');
+    line.resize(visibleWidth, L' ');
 
     return line;
 }
