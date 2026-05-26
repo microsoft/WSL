@@ -6333,9 +6333,13 @@ class WSLCTests
             auto hostContainer = launchContainer("test-connect-host-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
             VERIFY_ARE_EQUAL(E_INVALIDARG, hostContainer.Get().ConnectToNetwork(&attachment));
             ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hostContainer.Get().DisconnectFromNetwork(networkName.c_str()));
+            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
 
             auto noneContainer = launchContainer("test-connect-none-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
             VERIFY_ARE_EQUAL(E_INVALIDARG, noneContainer.Get().ConnectToNetwork(&attachment));
+            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            VERIFY_ARE_EQUAL(E_INVALIDARG, noneContainer.Get().DisconnectFromNetwork(networkName.c_str()));
             ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
         }
 

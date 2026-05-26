@@ -2393,6 +2393,11 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
 
     auto lock = m_lock.lock_shared();
 
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkingMode == WSLCContainerNetworkTypeHost || m_networkingMode == WSLCContainerNetworkTypeNone);
+
     common::docker_schema::DisconnectNetworkRequest request{};
     request.Container = m_id;
 
