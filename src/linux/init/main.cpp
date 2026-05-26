@@ -118,7 +118,6 @@ struct VmConfiguration
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
-bool g_KernelSupportsHvPciSwiotlb = false;
 
 int Chroot(const char* Target);
 
@@ -3392,15 +3391,28 @@ try
     wsl::shared::MessageWriter<LX_INIT_GUEST_CAPABILITIES> Message(LxMiniInitMessageGuestCapabilities);
     Message.WriteString(Version.release);
 
-    //
     // SECCOMP_USER_NOTIF_FLAG_CONTINUE is the latest flag that flow steering needs
     // but there's no way to test for its presence. The assumption is that if seccomp is available
-    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available
-    //
-
+    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available.
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
-    Message->KernelSupportsHvPciSwiotlb = g_KernelSupportsHvPciSwiotlb;
+
+    // Discover the hv_pci swiotlb pool the kernel actually reserved. The WSL kernel patch
+    // publishes the chosen (base, size) under the hv_pci driver in sysfs. An unpatched
+    // kernel won't have these files and we'll leave both fields zero so the host knows
+    // not to forward the swiotlb device-option token to wsldevicehost.
+    Message->HvPciSwiotlbBase = 0;
+    Message->HvPciSwiotlbSize = 0;
+    try
+    {
+        Message->HvPciSwiotlbBase = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_base"), nullptr, 0);
+        Message->HvPciSwiotlbSize = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_size"), nullptr, 0);
+    }
+    catch (...)
+    {
+        Message->HvPciSwiotlbBase = 0;
+        Message->HvPciSwiotlbSize = 0;
+    }
 
     Channel.SendMessage<LX_INIT_GUEST_CAPABILITIES>(Message.Span());
     return 0;
@@ -3692,15 +3704,6 @@ int main(int Argc, char* Argv[])
     }
 
     if (unsetenv(WSL_ROOT_INIT_ENV))
-    {
-        LOG_ERROR("unsetenv failed {}", errno);
-    }
-
-    // Linux passes unrecognized key=value cmdline parameters to init as env vars,
-    // so seeing hv_pci_swiotlb= in the environment means the kernel didn't consume
-    // it (no WSL swiotlb patch).
-    g_KernelSupportsHvPciSwiotlb = (getenv("hv_pci_swiotlb") == nullptr);
-    if (!g_KernelSupportsHvPciSwiotlb && unsetenv("hv_pci_swiotlb"))
     {
         LOG_ERROR("unsetenv failed {}", errno);
     }

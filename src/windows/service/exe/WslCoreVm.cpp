@@ -425,19 +425,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Receive and parse the guest kernel version
     ReadGuestCapabilities();
 
-    // Cache the effective swiotlb configuration. The wsldevicehost device-option token is only
-    // honored by kernels carrying the WSL hv_pci_swiotlb patch; if the running kernel lacks it,
-    // emit a single user warning and leave the cached value empty so all attachment sites skip it.
-    if (!m_vmConfig.SwiotlbConfig.empty())
+    // Cache the effective swiotlb configuration. The kernel picks a valid GPA, allocates the pool,
+    // and publishes the actual (base, size) via sysfs. Only warn when swiotlb was actually
+    // requested via the kernel command line; otherwise the kernel correctly doesn't allocate.
+    if (m_hvPciSwiotlbBase != 0 && m_hvPciSwiotlbSize != 0)
     {
-        if (m_kernelSupportsHvPciSwiotlb)
-        {
-            m_swiotlbConfig = m_vmConfig.SwiotlbConfig;
-        }
-        else
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSwiotlbKernelUnsupported());
-        }
+        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", m_hvPciSwiotlbBase, m_hvPciSwiotlbSize);
+    }
+    else if (m_vmConfig.SwiotlbSizeBytes != 0)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSwiotlbKernelUnsupported());
     }
 
     // Asynchronously add drvfs devices if supported.
@@ -603,7 +600,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 dnsTunnelingSocket.reset();
 
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, m_swiotlbConfig);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, m_swiotlbOption);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1555,7 +1552,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     kernelCmdLine += std::format(L" nr_cpus={}", m_vmConfig.ProcessorCount);
 
     // Append common kernel parameters shared between WSL2 and WSLC.
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder, m_vmConfig.SwiotlbConfig);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder, m_vmConfig.SwiotlbSizeBytes);
 
     if (m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported())
     {
@@ -2175,14 +2172,14 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
     // Append the swiotlb token here so it covers fixed-drive, dynamic add, and remount paths.
     // Duplicate swiotlb tokens are harmless: VirtioFsShare parses options into a map.
     std::wstring effectiveOptions(Options);
-    if (!m_swiotlbConfig.empty())
+    if (!m_swiotlbOption.empty())
     {
         if (!effectiveOptions.empty())
         {
             effectiveOptions += L';';
         }
 
-        effectiveOptions += std::format(L"swiotlb={}", m_swiotlbConfig);
+        effectiveOptions += m_swiotlbOption;
     }
 
     // Check if a matching share already exists.
@@ -2332,11 +2329,13 @@ void WslCoreVm::ReadGuestCapabilities()
     }
 
     m_seccompAvailable = info.SeccompAvailable;
-    m_kernelSupportsHvPciSwiotlb = info.KernelSupportsHvPciSwiotlb;
+    m_hvPciSwiotlbBase = info.HvPciSwiotlbBase;
+    m_hvPciSwiotlbSize = info.HvPciSwiotlbSize;
     WSL_LOG(
         "GuestKernelInfo",
         TraceLoggingValue(m_seccompAvailable, "SeccompAvailable"),
-        TraceLoggingValue(m_kernelSupportsHvPciSwiotlb, "KernelSupportsHvPciSwiotlb"),
+        TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"),
         TraceLoggingValue(std::get<0>(m_kernelVersion), "Version"),
         TraceLoggingValue(std::get<1>(m_kernelVersion), "Revision"),
         TraceLoggingValue(std::get<2>(m_kernelVersion), "Minor"));

@@ -26,7 +26,7 @@ VirtioNetworking::VirtioNetworking(
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
     m_dnsOptions(dnsOptions),
-    m_swiotlbConfig(std::move(swiotlbConfig))
+    m_swiotlbOption(std::move(swiotlbConfig))
 {
 }
 
@@ -215,12 +215,11 @@ void VirtioNetworking::RefreshGuestConnection()
     {
         if (!m_adapterId.has_value())
         {
-            const auto swiotlbOption = m_swiotlbConfig.empty() ? std::wstring{} : std::format(L"swiotlb={}", m_swiotlbConfig);
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
                 VIRTIO_NET_DEVICE_ID,
                 VIRTIO_NET_CLASS_ID,
                 c_eth0DeviceName,
-                swiotlbOption.c_str(),
+                m_swiotlbOption.c_str(),
                 device_options.c_str(),
                 0,
                 m_userToken.get());
@@ -253,15 +252,12 @@ void VirtioNetworking::RefreshGuestConnection()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
-    std::wstring loopbackOptions = L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55";
-    const auto swiotlbOption = m_swiotlbConfig.empty() ? std::wstring{} : std::format(L"swiotlb={}", m_swiotlbConfig);
-
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
         VIRTIO_NET_DEVICE_ID,
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
-        swiotlbOption.c_str(),
-        loopbackOptions.c_str(),
+        m_swiotlbOption.c_str(),
+        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
         0,
         m_userToken.get());
 

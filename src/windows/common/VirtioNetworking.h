@@ -68,7 +68,7 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    std::wstring m_swiotlbConfig;
+    std::wstring m_swiotlbOption;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 

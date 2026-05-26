@@ -479,6 +479,13 @@ interface IWSLCVirtualMachine : IUnknown
     // Removes a previously added filesystem share.
     HRESULT RemoveShare([in] REFGUID ShareId);
 
+    // Configures the swiotlb (bounce buffer) parameters discovered from the guest kernel's
+    // hv_pci sysfs after boot. Subsequent calls to AddShare and ConfigureNetworking will
+    // forward these values to wsldevicehost via the swiotlb device-options token. Passing
+    // zero for both values means the guest kernel does not support hv_pci swiotlb (unpatched
+    // kernel); the token is then omitted.
+    HRESULT SetSwiotlbConfig([in] UINT64 Base, [in] UINT64 Size);
+
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 }

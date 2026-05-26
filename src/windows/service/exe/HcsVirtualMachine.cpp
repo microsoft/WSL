@@ -137,15 +137,16 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
     // command line, virtiofs shares, and the VirtioProxy virtio-net adapter.
     // Only needed when a virtio device that requires bounce buffers will be attached.
+    ULONG64 swiotlbSizeBytes = 0;
     if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        m_swiotlbConfig = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
+        swiotlbSizeBytes = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
     }
 
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, m_swiotlbConfig);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -462,7 +463,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbConfig);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
     }
     else
     {
@@ -580,14 +581,14 @@ try
     else
     {
         std::wstring options = ReadOnly ? L"ro" : L"";
-        if (!m_swiotlbConfig.empty())
+        if (!m_swiotlbOption.empty())
         {
             if (!options.empty())
             {
                 options += L";";
             }
 
-            options += std::format(L"swiotlb={}", m_swiotlbConfig);
+            options += m_swiotlbOption;
         }
 
         it->second = m_guestDeviceManager->AddGuestDevice(
@@ -626,6 +627,26 @@ try
     }
 
     m_shares.erase(it);
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::SetSwiotlbConfig(_In_ UINT64 Base, _In_ UINT64 Size)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    THROW_HR_IF(E_INVALIDARG, !m_swiotlbOption.empty());
+
+    // Cache the effective swiotlb configuration. The kernel picks a valid GPA, allocates the pool,
+    // and publishes the actual (base, size) via sysfs; wslcsession reads them and forwards them here.
+    if (Base != 0 && Size != 0)
+    {
+        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", Base, Size);
+    }
+
+    WSL_LOG("WSLCSwiotlbConfig", TraceLoggingValue(Base, "HvPciSwiotlbBase"), TraceLoggingValue(Size, "HvPciSwiotlbSize"));
 
     return S_OK;
 }

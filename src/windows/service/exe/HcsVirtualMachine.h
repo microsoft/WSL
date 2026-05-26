@@ -44,6 +44,7 @@ public:
     IFACEMETHOD(DetachDisk)(_In_ ULONG Lun) override;
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
+    IFACEMETHOD(SetSwiotlbConfig)(_In_ UINT64 Base, _In_ UINT64 Size) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
 
 private:
@@ -80,7 +81,7 @@ private:
     WSLCNetworkingMode m_networkingMode{};
 
     // Swiotlb device-options token sized to fit inside the VM's RAM (empty when too small).
-    std::wstring m_swiotlbConfig;
+    std::wstring m_swiotlbOption;
 
     wil::unique_socket m_listenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;

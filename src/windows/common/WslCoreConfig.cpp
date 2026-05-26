@@ -64,24 +64,6 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         }
     };
 
-    auto parseSwiotlb = [&](const char* name, const char* value, const wchar_t* fileName, unsigned long fileLine) {
-        // If the value does not conform to the expected format, SWIOTLB customization is disabled.
-        SwiotlbConfig.clear();
-        try
-        {
-            auto wideValue = wsl::shared::string::MultiByteToWide(value);
-            std::wregex swiotlbPattern(L"^(0x[0-9a-fA-F]+,[0-9]+[mk])$", std::regex::icase);
-            if (!std::regex_match(wideValue, swiotlbPattern))
-            {
-                EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidSwiotlb(value, name, fileName, fileLine));
-                return;
-            }
-
-            SwiotlbConfig = std::move(wideValue);
-        }
-        CATCH_LOG()
-    };
-
     ConfigKeyPresence earlyBootLoggingPresent{};
     ConfigKeyPresence macAddressPresent{};
     bool enableFirewall = true;
@@ -144,7 +126,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
-        ConfigKey(ConfigSetting::Experimental::Swiotlb, std::move(parseSwiotlb))};
+        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes))};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)
@@ -458,7 +440,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtio9p, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioFs, false);
-        VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbConfig, std::wstring{});
+        VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbSizeBytes, 0);
 
         if (NetworkingMode == NetworkingMode::VirtioProxy)
         {
@@ -475,9 +457,9 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
-    if (SwiotlbConfig.empty() && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::VirtioProxy)))
+    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::VirtioProxy)))
     {
-        SwiotlbConfig = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
+        SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }
 
     if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)

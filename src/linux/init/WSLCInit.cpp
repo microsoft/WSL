@@ -106,6 +106,31 @@ void HandleMessageImpl(
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_GET_SWIOTLB_CONFIG& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    WSLC_GET_SWIOTLB_CONFIG_RESULT response{};
+    response.Header.MessageType = WSLC_GET_SWIOTLB_CONFIG_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    // Discover the hv_pci swiotlb pool the kernel actually reserved. The WSL kernel patch
+    // publishes the chosen (base, size) under the hv_pci driver in sysfs. An unpatched
+    // kernel won't have these files and we'll leave both fields zero so the host knows
+    // not to forward the swiotlb device-option token to wsldevicehost.
+    try
+    {
+        response.Base = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_base"), nullptr, 0);
+        response.Size = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_size"), nullptr, 0);
+    }
+    catch (...)
+    {
+        response.Base = 0;
+        response.Size = 0;
+    }
+
+    Transaction.Send<WSLC_GET_SWIOTLB_CONFIG_RESULT>(response);
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
@@ -836,7 +861,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_SWIOTLB_CONFIG>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)
