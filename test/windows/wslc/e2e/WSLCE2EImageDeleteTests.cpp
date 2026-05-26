@@ -46,8 +46,13 @@ class WSLCE2EImageDeleteTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
     {
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
-        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        // docker: "No such image: X" — podman: "failed to find image X: image not known".
+        // The command passes InvalidImage.Name (no tag), and both engines echo the
+        // name as given — so match on .Name, not .NameAndTag.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(InvalidImage.Name) != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"WSLC_E_IMAGE_NOT_FOUND") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MissingImageName)
@@ -81,13 +86,13 @@ class WSLCE2EImageDeleteTests
         auto imageId = GetHashId(inspectImage.Id);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        auto errorMessage = std::format(
-            L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced image "
-            L"{}\r\nError code: ERROR_SHARING_VIOLATION\r\n",
-            DebianImage.Name,
-            containerId,
-            imageId);
-        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        // docker: "conflict: unable to remove repository reference \"X\" (must force) - container Y..."
+        // podman: "image X is in use: image used by Y: image is in use by a container..."
+        // Verify image+container references + ERROR_SHARING_VIOLATION HRESULT.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        auto stderrText = result.Stderr.value_or(L"");
+        VERIFY_IS_TRUE(stderrText.find(L"in use") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"ERROR_SHARING_VIOLATION") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)

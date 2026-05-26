@@ -202,11 +202,14 @@ class WSLCE2EContainerListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidKey)
     {
-        // Filter keys are validated by the Docker daemon, which rejects unknown keys.
+        // Filter keys are validated by the container engine, which rejects unknown keys.
+        // docker says "invalid filter 'color'"; podman says "color is an invalid filter".
+        // Check for the keyword + filter name regardless of word ordering.
         const auto result = RunWslc(L"container list --filter color=blue");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'color'"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"color"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_MalformedValue)
@@ -218,11 +221,13 @@ class WSLCE2EContainerListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidStatusValue)
     {
-        // Status values are validated by the Docker daemon, which rejects unknown values.
+        // Status values are validated by the container engine, which rejects unknown values.
+        // Wording differs between engines; check for the bad value + invalid keyword.
         const auto result = RunWslc(L"container list --filter status=bogus");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'status=bogus'"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"bogus"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_Name)

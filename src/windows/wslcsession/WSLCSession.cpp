@@ -1751,14 +1751,39 @@ try
     }
     catch (const DockerHTTPException& e)
     {
+        // Extract the engine's error message regardless of status code.
+        // Historically this branch only read 4xx because docker returned 4xx
+        // for client-side errors (name conflict = 409, etc.). podman's
+        // docker-compat API instead returns 500 for many client-side errors
+        // (name conflict, invalid tmpfs path, invalid filter, ...) but still
+        // includes a meaningful {"message": ...} body. Skipping the message
+        // read for 5xx left users staring at "Unspecified error".
         std::string errorMessage;
-        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        if (e.HasErrorMessage())
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            try
+            {
+                errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            }
+            CATCH_LOG();
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), errorMessage, e.StatusCode() == 409);
+        // Map specific known conditions to specific HRESULTs so callers
+        // (tests, SDK users) can branch on them.
+        if (e.StatusCode() == 404)
+        {
+            THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
+        }
+        if (e.StatusCode() == 409)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), errorMessage);
+        }
+        // podman uses 500 for "name already in use" where docker used 409.
+        // Detect via message keyword so the error class survives the API mapping.
+        if (e.StatusCode() == 500 && errorMessage.find("already in use") != std::string::npos)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), errorMessage);
+        }
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
