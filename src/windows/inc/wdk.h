@@ -49,6 +49,7 @@ Abstract:
 #define FileCaseSensitiveInformation ((FILE_INFORMATION_CLASS)71)
 #define FileFullDirectoryInformation ((FILE_INFORMATION_CLASS)2)
 #define FileStatInformation ((FILE_INFORMATION_CLASS)68)
+#define FileReplaceCompletionInformation ((FILE_INFORMATION_CLASS)61)
 
 #define IO_REPARSE_TAG_LX_SYMLINK (0xA000001D)
 
@@ -101,6 +102,12 @@ typedef enum _FSINFOCLASS
     FileIdBothDirectoryInformation = 37
 } FS_INFORMATION_CLASS,
     *PFS_INFORMATION_CLASS;
+
+struct FILE_COMPLETION_INFORMATION
+{
+    HANDLE Port;
+    PVOID Key;
+};
 
 typedef struct _FILE_FS_DEVICE_INFORMATION
 {                                                           // ntddk nthal
@@ -255,7 +262,33 @@ NTSTATUS
 NTSYSCALLAPI
 NtQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
 
-NTSTATUS NTSYSCALLAPI NtSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
+NTSTATUS
+NTSYSCALLAPI
+NtSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
+
+// Wait completion packets allow the kernel to post a completion packet to an IOCP
+// when an arbitrary kernel object signals, replacing the thread-pool wait pattern
+// (which burns a thread per active wait). These NT APIs are exported from ntdll.dll
+// and are not declared in the public Windows SDK.
+NTSTATUS
+NTSYSCALLAPI
+NtCreateWaitCompletionPacket(_Out_ PHANDLE WaitCompletionPacketHandle, _In_ ACCESS_MASK DesiredAccess, _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes);
+
+NTSTATUS
+NTSYSCALLAPI
+NtAssociateWaitCompletionPacket(
+    _In_ HANDLE WaitCompletionPacketHandle,
+    _In_ HANDLE IoCompletionHandle,
+    _In_ HANDLE TargetObjectHandle,
+    _In_opt_ PVOID KeyContext,
+    _In_opt_ PVOID ApcContext,
+    _In_ NTSTATUS IoStatus,
+    _In_ ULONG_PTR IoStatusInformation,
+    _Out_opt_ PBOOLEAN AlreadySignaled);
+
+NTSTATUS
+NTSYSCALLAPI
+NtCancelWaitCompletionPacket(_In_ HANDLE WaitCompletionPacketHandle, _In_ BOOLEAN RemoveSignaledPacket);
 
 NTSTATUS
 ZwQueryEaFile(

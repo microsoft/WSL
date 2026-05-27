@@ -62,36 +62,19 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
 }
 
-// FileReplaceCompletionInformation (introduced in Windows 8.1) lets us swap or remove
-// the I/O completion port association of a kernel file object. Neither the info class
-// constant nor the FILE_COMPLETION_INFORMATION layout are exposed via the user-mode
-// SDK headers, so they're declared locally.
-constexpr auto c_fileReplaceCompletionInformation = static_cast<FILE_INFORMATION_CLASS>(61);
-
-struct FILE_COMPLETION_INFORMATION
-{
-    HANDLE Port;
-    PVOID Key;
-};
-
 // NTSTATUS codes - winnt.h only exposes a small subset, the rest are in ntstatus.h
 // which conflicts with windows.h. Defined locally to avoid the conflict.
-constexpr NTSTATUS c_statusInvalidInfoClass = static_cast<NTSTATUS>(0xC0000003L);
 constexpr NTSTATUS c_statusObjectTypeMismatch = static_cast<NTSTATUS>(0xC0000024L);
 
 void DetachFromIocp(HANDLE Handle)
 {
     FILE_COMPLETION_INFORMATION info{};
     IO_STATUS_BLOCK iosb{};
-    const NTSTATUS status = NtSetInformationFile(Handle, &iosb, &info, sizeof(info), c_fileReplaceCompletionInformation);
+    auto result = NtSetInformationFile(Handle, &iosb, &info, sizeof(info), FileReplaceCompletionInformation);
 
-    // Best-effort: failures are expected for handles that were never associated, for
-    // objects that aren't kernel file objects (events, console handles, ...), and on
-    // pre-Windows 8.1 systems that don't recognize the info class. The handle is being
-    // destroyed regardless so there's nothing to recover.
-    if (!NT_SUCCESS(status))
+    if (result != STATUS_SUCCESS && result != STATUS_INVALID_PARAMETER)
     {
-        LOG_HR_IF(HRESULT_FROM_NT(status), status != STATUS_INVALID_PARAMETER && status != c_statusObjectTypeMismatch && status != c_statusInvalidInfoClass);
+        THROW_NTSTATUS_MSG(result, "Failed to detach handle from IOCP: Handle=0x%p", Handle);
     }
 }
 
@@ -264,17 +247,46 @@ EventHandle::EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSigna
 {
 }
 
+EventHandle::~EventHandle()
+{
+    // Detach from the IOCP before the wrapped event (and the packet handle) close.
+    // Pass RemoveSignaledPacket=TRUE so that if the kernel has already queued a
+    // completion packet to the IOCP that hasn't been dequeued yet, it's removed -
+    // otherwise the IOCP could deliver a stray packet keyed on a destroyed leaf's
+    // address. Ignore the status: STATUS_SUCCESS (was waiting), STATUS_CANCELLED
+    // (queued packet removed), and STATUS_TOO_LATE (packet already delivered) are
+    // all expected.
+    if (m_waitCompletionPacket)
+    {
+        (void)NtCancelWaitCompletionPacket(m_waitCompletionPacket.get(), TRUE);
+    }
+}
+
 void EventHandle::Schedule()
 {
     State = IOHandleStatus::Pending;
 
-    // If we have been bound to a completion port, (re-)arm the thread pool wait so the
-    // event signal posts a packet to the IOCP. Otherwise the wait simply transitions to
-    // Pending state and a synchronous WaitForMultipleObjects-style consumer is expected
-    // (this branch only matters for direct usage outside of MultiHandleWait::Run).
-    if (m_threadpoolWait)
+    // If we have been bound to a completion port, arm the wait completion packet so
+    // the kernel posts a packet to the IOCP when the event signals. Otherwise the
+    // wait simply transitions to Pending state and a synchronous
+    // WaitForMultipleObjects-style consumer is expected (this branch only matters
+    // for direct usage outside of MultiHandleWait::Run).
+    if (m_waitCompletionPacket)
     {
-        SetThreadpoolWait(m_threadpoolWait.get(), Handle.Get(), nullptr);
+        // The completion packet the kernel delivers will look identical to the
+        // previous PostQueuedCompletionStatus call from the thread-pool callback:
+        // BytesTransferred=0, CompletionKey=m_completionKey, lpOverlapped=nullptr.
+        // MultiHandleWait::Run dispatches by key when lpOverlapped is nullptr.
+        BOOLEAN alreadySignaled = FALSE;
+        THROW_IF_NTSTATUS_FAILED(NtAssociateWaitCompletionPacket(
+            m_waitCompletionPacket.get(),
+            m_iocp,
+            Handle.Get(),
+            reinterpret_cast<PVOID>(m_completionKey),
+            nullptr,
+            STATUS_SUCCESS,
+            0,
+            &alreadySignaled));
     }
 }
 
@@ -286,22 +298,18 @@ void EventHandle::Collect()
 
 std::vector<std::pair<HANDLE, OVERLAPPED*>> EventHandle::Bind(HANDLE Iocp, ULONG_PTR Key)
 {
-    // Events cannot be associated with an IOCP directly. Arm a thread pool wait that
-    // posts a packet to the IOCP via PostQueuedCompletionStatus when the event signals,
-    // then return no kernel handles for MultiHandleWait to bind.
+    // Events cannot be associated with an IOCP directly. Create a wait completion
+    // packet now and have Schedule() associate it later, so the kernel posts a
+    // packet to the IOCP when the event signals without burning a thread pool
+    // thread. Return no kernel handles for MultiHandleWait to bind.
     m_iocp = Iocp;
     m_completionKey = Key;
 
-    m_threadpoolWait.reset(CreateThreadpoolWait(EventHandle::WaitCallback, this, nullptr));
-    THROW_LAST_ERROR_IF(!m_threadpoolWait);
+    HANDLE packet{};
+    THROW_IF_NTSTATUS_FAILED(NtCreateWaitCompletionPacket(&packet, GENERIC_ALL, nullptr));
+    m_waitCompletionPacket.reset(packet);
 
     return {};
-}
-
-void NTAPI EventHandle::WaitCallback(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_WAIT, TP_WAIT_RESULT)
-{
-    auto* self = static_cast<EventHandle*>(Context);
-    LOG_LAST_ERROR_IF(!PostQueuedCompletionStatus(self->m_iocp, 0, self->m_completionKey, nullptr));
 }
 
 // ReadHandle
@@ -1234,8 +1242,8 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // the same docker socket), the kernel-level key is identical for every
         // completion on that handle. Each leaf's I/O carries its own OVERLAPPED, so the
         // pointer is always unambiguous. Fall back to key-based dispatch when OVL is
-        // nullptr (EventHandle posts via PostQueuedCompletionStatus with no OVL, using
-        // the leaf address as key).
+        // nullptr (EventHandle's wait completion packet posts with no OVL, using the
+        // leaf address as key).
         const auto it = std::find_if(m_handles.begin(), m_handles.end(), [key, ovl](const HandleEntry& entry) {
             if (!entry.Handle)
             {

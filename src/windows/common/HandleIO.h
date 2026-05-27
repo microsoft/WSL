@@ -113,8 +113,10 @@ public:
     //
     // Most leaves ignore Iocp/Key and simply return their own (handle, &overlapped)
     // pair. EventHandle wraps an event - which cannot be associated with an IOCP -
-    // and instead uses Iocp/Key to arm a thread pool wait that posts a completion
-    // packet via PostQueuedCompletionStatus, so it returns no pairs.
+    // and instead uses Iocp/Key to set up a wait completion packet
+    // (NtAssociateWaitCompletionPacket) so the kernel posts a completion packet
+    // directly to the IOCP when the event signals, without needing a thread pool
+    // thread; it returns no pairs.
     //
     // Composite handles forward Bind to every sub-handle and concatenate the
     // returned pairs.
@@ -133,18 +135,17 @@ public:
     NON_MOVABLE(EventHandle)
 
     EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
+    ~EventHandle();
     void Schedule() override;
     void Collect() override;
     std::vector<std::pair<HANDLE, OVERLAPPED*>> Bind(HANDLE Iocp, ULONG_PTR Key) override;
 
 private:
-    static void NTAPI WaitCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context, PTP_WAIT Wait, TP_WAIT_RESULT WaitResult);
-
     HandleWrapper Handle;
     std::function<void()> OnSignalled;
     HANDLE m_iocp{};
     ULONG_PTR m_completionKey{};
-    wil::unique_threadpool_wait m_threadpoolWait;
+    wil::unique_handle m_waitCompletionPacket;
 };
 
 class ReadHandle : public OverlappedIOHandle
