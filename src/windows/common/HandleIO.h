@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <concurrent_queue.h>
+
 #define LX_RELAY_BUFFER_SIZE 0x1000
 
 namespace wsl::windows::common::io {
@@ -350,17 +352,6 @@ private:
     size_t RemainingBytes = 0;
 };
 
-namespace details {
-    inline void UnregisterRegisteredWait(HANDLE waitHandle) noexcept
-    {
-        // INVALID_HANDLE_VALUE makes UnregisterWaitEx block until any in-flight wait callback
-        // returns, so resources captured by the callback (Entry, SharedState) can be safely
-        // freed once the unique_any goes out of scope.
-        LOG_LAST_ERROR_IF(!UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE));
-    }
-} // namespace details
-
-using unique_registered_wait = wil::unique_any_handle_null<decltype(&details::UnregisterRegisteredWait), &details::UnregisterRegisteredWait>;
 
 // MultiHandleWait runs a set of OverlappedIOHandle to completion using the system thread
 // pool's wait infrastructure (RegisterWaitForSingleObject) so it can wait for more than
@@ -387,8 +378,7 @@ public:
         NeedNotComplete = 4,
     };
 
-    MultiHandleWait();
-    ~MultiHandleWait();
+    MultiHandleWait() = default;
     MultiHandleWait(MultiHandleWait&&) noexcept = default;
     MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
@@ -399,32 +389,26 @@ public:
 private:
     struct Entry;
 
-    // SharedState is heap-allocated so the address captured by wait callbacks remains
-    // stable when the owning MultiHandleWait is moved.
-    struct SharedState
+    struct WaitState
     {
         wil::srwlock Lock;
         wil::unique_event Notification{wil::EventOptions::None};
         _Guarded_by_(Lock) std::vector<Entry*> Signaled;
     };
 
-    // Entry is the callback context passed to RegisterWaitForSingleObject. Each Entry is
-    // heap-allocated (unique_ptr) so its address - and the OverlappedIOHandle pointer
-    // embedded in it - remains stable across m_handles reallocations.
     struct Entry
     {
         Flags HandleFlags{};
         std::unique_ptr<OverlappedIOHandle> Handle;
-        unique_registered_wait WaitRegistration;
-        SharedState* State{};
+        MultiHandleWait* self;
     };
 
     static void NTAPI WaitCallback(PVOID Context, BOOLEAN TimerOrWaitFired);
-    void RegisterWait(Entry& entry);
-    void UnregisterAllWaits() noexcept;
+
+    concurrency::concurrent_queue<Entry*> m_signaledHandles;
+    wil::unique_event m_handleSignaledEvent{wil::EventOptions::ManualReset};
 
     std::vector<std::unique_ptr<Entry>> m_handles;
-    std::unique_ptr<SharedState> m_state;
     bool m_cancel = false;
 };
 

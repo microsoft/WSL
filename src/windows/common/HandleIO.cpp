@@ -61,6 +61,14 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
 }
 
+inline void UnregisterWait(HANDLE waitHandle) noexcept
+{
+    // INVALID_HANDLE_VALUE makes UnregisterWaitEx block until any in-flight wait callback returns.
+    LOG_LAST_ERROR_IF(!UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE));
+}
+
+using unique_registered_wait = wil::unique_any_handle_null<decltype(&UnregisterWait), &UnregisterWait>;
+
 } // namespace
 
 // HandleWrapper
@@ -914,25 +922,16 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 // MultiHandleWait
 
-MultiHandleWait::MultiHandleWait() : m_state(std::make_unique<SharedState>())
-{
-}
-
-MultiHandleWait::~MultiHandleWait()
-{
-    // Unregister before any other member is destroyed, so the wait callbacks can no longer
-    // fire when m_state is torn down.
-    UnregisterAllWaits();
-}
-
 MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
 {
     if (this != &other)
     {
-        UnregisterAllWaits();
         m_handles = std::move(other.m_handles);
-        m_state = std::move(other.m_state);
+        m_handleSignaledEvent = std::move(other.m_handleSignaledEvent);
         m_cancel = other.m_cancel;
+
+        // N.B. moving a MultiHandleWait() while running is not supported
+        WI_ASSERT(m_signaledHandles.empty());
     }
 
     return *this;
@@ -943,7 +942,7 @@ void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Fl
     auto entry = std::make_unique<Entry>();
     entry->HandleFlags = flags;
     entry->Handle = std::move(handle);
-    entry->State = m_state.get();
+    entry->self = this;
     m_handles.emplace_back(std::move(entry));
 }
 
@@ -954,44 +953,15 @@ void MultiHandleWait::Cancel()
 
 void NTAPI MultiHandleWait::WaitCallback(PVOID Context, BOOLEAN /*TimerOrWaitFired*/)
 {
-    // The callback's sole job is to record which Entry was signaled and wake Run().
-    // Run() does the actual Collect() work on its own thread.
     auto* entry = static_cast<Entry*>(Context);
 
-    auto lock = entry->State->Lock.lock_exclusive();
-    entry->State->Signaled.push_back(entry);
-    entry->State->Notification.SetEvent();
-}
-
-void MultiHandleWait::RegisterWait(Entry& entry)
-{
-    WI_ASSERT(!entry.WaitRegistration);
-
-    // WT_EXECUTEINWAITTHREAD: run the callback directly on the wait thread instead of
-    //     queuing to a worker. The callback is tiny (push to queue + SetEvent), so the
-    //     extra hop would be wasted work.
-    // WT_EXECUTEONLYONCE: fire once per RegisterWaitForSingleObject. Run() re-registers
-    //     after every iteration, so there is no need for the kernel to re-arm.
-    THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
-        entry.WaitRegistration.put(), entry.Handle->GetHandle(), &WaitCallback, &entry, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE));
-}
-
-void MultiHandleWait::UnregisterAllWaits() noexcept
-{
-    // unique_registered_wait's deleter calls UnregisterWaitEx(INVALID_HANDLE_VALUE), which
-    // blocks until any in-flight callback completes. After this loop returns, no callback
-    // is running and no more callbacks can fire until we re-register.
-    for (auto& entry : m_handles)
-    {
-        entry->WaitRegistration.reset();
-    }
+    entry->self->m_signaledHandles.push(entry);
+    entry->self->m_handleSignaledEvent.SetEvent();
 }
 
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
-
-    auto cleanup = wil::scope_exit([&] { UnregisterAllWaits(); });
 
     std::optional<std::chrono::steady_clock::time_point> deadline;
     if (Timeout.has_value())
@@ -999,34 +969,27 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         deadline = std::chrono::steady_clock::now() + Timeout.value();
     }
 
+    std::vector<unique_registered_wait> callbacks;
+
     while (!m_cancel)
     {
-        // Drop every active wait so no callbacks can mutate the queue while we process
-        // state. UnregisterWaitEx(INVALID_HANDLE_VALUE) waits for any in-flight callback,
-        // so once this returns the queue is exclusively ours.
-        UnregisterAllWaits();
+        // Cancel any pending callback.
+        callbacks.clear();
 
         // Move the queue out under the lock. Defensive locking - no callbacks should be
         // running at this point, but it keeps the access pattern obvious.
-        std::vector<Entry*> signaled;
-        {
-            auto lock = m_state->Lock.lock_exclusive();
-            signaled = std::move(m_state->Signaled);
-            m_state->Notification.ResetEvent();
-        }
-
-        // Collect() runs on the Run() thread, preserving the historical contract.
-        for (auto* entry : signaled)
+        Entry* signaledEntry = nullptr;
+        while (m_signaledHandles.try_pop(signaledEntry))
         {
             try
             {
-                entry->Handle->Collect();
+                signaledEntry->Handle->Collect();
             }
             catch (...)
             {
-                if (WI_IsFlagSet(entry->HandleFlags, Flags::IgnoreErrors))
+                if (WI_IsFlagSet(signaledEntry->HandleFlags, Flags::IgnoreErrors))
                 {
-                    entry->Handle.reset();
+                    signaledEntry->Handle.reset();
                     continue;
                 }
 
@@ -1034,8 +997,8 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
         }
 
-        // Walk the handle list: schedule Standby handles, drop Completed ones, and
-        // re-register a wait for every Pending handle so it can fire next iteration.
+        m_handleSignaledEvent.ResetEvent();
+
         bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
@@ -1070,7 +1033,10 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 continue;
             }
 
-            RegisterWait(entry);
+            auto& callback = callbacks.emplace_back();
+
+            THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+                &callback, entry.Handle->GetHandle(), &WaitCallback, &entry, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE));
 
             if (WI_IsFlagClear(entry.HandleFlags, Flags::NeedNotComplete))
             {
@@ -1094,15 +1060,12 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             waitTimeout = static_cast<DWORD>(std::max<long long>(0, milliseconds));
         }
 
-        auto result = WaitForSingleObject(m_state->Notification.get(), waitTimeout);
-        if (result == WAIT_TIMEOUT)
-        {
-            THROW_WIN32(ERROR_TIMEOUT);
-        }
-        else if (result != WAIT_OBJECT_0)
-        {
-            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, m_handles.size());
-        }
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            !m_handleSignaledEvent.wait(waitTimeout),
+            "Timed out waiting for %llu handles. Timeout: %lu",
+            m_handles.size(),
+            waitTimeout);
     }
 
     return !m_cancel;
