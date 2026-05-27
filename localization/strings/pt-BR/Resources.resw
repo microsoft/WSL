@@ -945,7 +945,7 @@ Voltando à rede NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
-    <value>Ocorreu um erro inesperado ao tentar resolver as configurações de proxy, as configurações de proxy não foram espelhadas no WSL.</value>
+    <value>Ocorreu um erro inesperado ao tentar resolver as configurações de proxy. As configurações de proxy não foram espelhadas no WSL.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
