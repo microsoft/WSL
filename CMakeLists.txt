@@ -41,6 +41,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 # BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
 # Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
 option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+option(INCLUDE_OPENVMM "Include OpenVMM build integrations" OFF)
 if (BUNDLE_ONLY)
     if (NOT PACKAGE_VERSION)
         message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
@@ -63,7 +64,8 @@ include(FetchContent)
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/_deps/${TARGET_PLATFORM})
 
-# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson) must be reflected in cgmanifest.json
+# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson, yaml-cpp, boost, protobuf)
+# must be reflected in cgmanifest.json
 
 FetchContent_Declare(GSL
                      URL https://github.com/microsoft/GSL/archive/refs/tags/v4.0.0.tar.gz
@@ -103,6 +105,48 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(boost_headers)
+
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
+
+if (INCLUDE_OPENVMM)
+    FetchContent_Declare(protobuf
+                         URL https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
+                         URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
+
+    FetchContent_MakeAvailable(protobuf)
+    include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
+endif()
+
+# Adds protobuf-generated C++ sources from VMService.proto to the given TARGET.
+# The target must already exist. This function handles code generation, include
+# directories, library linking, and MSVC warning suppression for generated code.
+function(wsl_add_openvmm_proto TARGET)
+    set(_proto_file ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
+    set(_proto_out_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
+    if (NOT EXISTS ${_proto_file})
+        message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${_proto_file}")
+    endif()
+
+    protobuf_generate(
+        TARGET ${TARGET}
+        PROTOS ${_proto_file}
+        IMPORT_DIRS ${WSL_DEVICE_HOST_SOURCE_DIR}/proto ${protobuf_SOURCE_DIR}/src
+        PROTOC_OUT_DIR ${_proto_out_dir}
+    )
+
+    target_include_directories(${TARGET} PRIVATE ${_proto_out_dir})
+    target_link_libraries(${TARGET} protobuf::libprotobuf)
+
+    if (MSVC)
+        set_source_files_properties(
+            ${_proto_out_dir}/VMService.pb.cc
+            TARGET_DIRECTORY ${TARGET}
+            PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
+    endif()
+endfunction()
 
 
 # Import modules

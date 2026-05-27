@@ -84,6 +84,17 @@
                     "hash": "sha256:42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
                 }
             }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "protobuf",
+                    "version": "34.1",
+                    "downloadUrl": "https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz",
+                    "hash": "sha256:e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848"
+                }
+            }
         }
     ]
 }

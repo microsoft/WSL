@@ -422,7 +422,8 @@ typedef enum _WSLCNetworkingMode
 {
     WSLCNetworkingModeNone,
     WSLCNetworkingModeNAT,
-    WSLCNetworkingModeVirtioProxy
+    WSLCNetworkingModeVirtioProxy,
+    WSLCNetworkingModeConsomme
 } WSLCNetworkingMode;
 
 typedef enum _WSLCFeatureFlags
@@ -481,6 +482,19 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    // Connects to a vsock port in the VM. Returns a socket handle.
+    // For HCS VMs, this uses hvsocket (supports overlapped I/O).
+    // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge.
+    // AF_UNIX sockets do not support overlapped I/O
+    HRESULT ConnectToVsockPort([in] ULONG Port, [out, system_handle(sh_socket)] HANDLE* Socket);
+
+    // Accepts a crash dump connection from the VM. Blocks until a crash dump
+    // connection arrives or the VM exits. Returns E_ABORT if the VM exits
+    // before a connection is received.
+    // For HCS VMs, this uses an HV socket listener on the crash dump port.
+    // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge.
+    HRESULT AcceptCrashDumpConnection([out, system_handle(sh_socket)] HANDLE* Socket);
 }
 
 typedef enum _WSLCSessionStorageFlags

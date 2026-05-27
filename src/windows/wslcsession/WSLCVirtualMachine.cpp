@@ -21,6 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
+#include "ConsommeNetworking.h"
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wslc::TypedHandle;
@@ -268,10 +269,10 @@ void WSLCVirtualMachine::Initialize()
     m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
     // Start crash dump collection thread.
-    auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-    THROW_LAST_ERROR_IF(!crashDumpSocket);
-
-    m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
+    // The VM backend handles the listen socket creation (HV socket for HCS,
+    // Unix domain socket for OpenVMM). AcceptCrashDumpConnection blocks until
+    // a connection arrives or the VM exits.
+    m_crashDumpThread = std::thread{[this]() { CollectCrashDumps(); }};
 
     // Establish a socket channel with mini_init in the VM.
     wil::unique_socket socket;
@@ -340,6 +341,39 @@ void WSLCVirtualMachine::ConfigureNetworking()
 {
     if (m_networkingMode == WSLCNetworkingModeNone)
     {
+        return;
+    }
+
+    if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        // Consomme networking: no GNS daemon needed. The VMM provides NAT,
+        // DHCP, and DNS directly via the virtio-net device.
+        //
+        // Send a message to mini_init to configure the guest's network
+        // interface statically. This must happen before containerd/dockerd
+        // start, as they cache DNS from /etc/resolv.conf at launch.
+        auto address = std::format("{}/{}", wsl::core::c_consommeGuestIp, wsl::core::c_consommeSubnetMask);
+
+        wsl::shared::MessageWriter<WSLC_CONFIGURE_NETWORKING> netMessage;
+        netMessage.WriteString(netMessage->InterfaceOffset, wsl::core::c_consommeInterface);
+        netMessage.WriteString(netMessage->AddressOffset, address);
+        netMessage.WriteString(netMessage->GatewayOffset, wsl::core::c_consommeGatewayIp);
+        netMessage.WriteString(netMessage->DnsServerOffset, wsl::core::c_consommeGatewayIp);
+
+        const auto& response = m_initChannel.Transaction<WSLC_CONFIGURE_NETWORKING>(netMessage.Span());
+        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Consomme guest network setup failed: %d", response.Result);
+
+        WSL_LOG("ConsommeConfigureGuestNetwork", TraceLoggingValue(response.Result, "Result"));
+
+        // No ConfigureNetworking COM call needed — ConsommeNetworking is
+        // initialized eagerly in the OpenVmmVirtualMachine constructor
+        // (the system_handle IDL attribute can't marshal INVALID_HANDLE_VALUE).
+
+        // Skip LaunchPortRelay — the relay uses wslrelay.exe which connects
+        // via hvsocket (m_vmId), and OpenVMM/WHP VMs are not registered with
+        // the HvSocket driver. Port forwarding for OpenVMM will need a
+        // different mechanism (e.g. consomme's own NAT port forwarding).
+        // TODO: Implement port forwarding for OpenVMM consomme backend.
         return;
     }
 
@@ -568,7 +602,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_initChannelTimeout);
+    wil::unique_socket socket;
+    THROW_IF_FAILED(m_vm->ConnectToVsockPort(port, reinterpret_cast<HANDLE*>(&socket)));
 
     return std::make_tuple(
         pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), std::vector<HANDLE>(Channel.GetExitEvents())});
@@ -584,7 +619,7 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
     const auto& response = transaction.Receive<WSLC_ACCEPT::TResponse>();
 
     ConnectedSocket socket;
-    socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result, m_vmTerminatingEvent.get(), m_initChannelTimeout);
+    THROW_IF_FAILED(m_vm->ConnectToVsockPort(response.Result, reinterpret_cast<HANDLE*>(&socket.Socket)));
 
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)
@@ -1215,7 +1250,7 @@ wil::unique_socket WSLCVirtualMachine::ConnectUnixSocket(const char* Path)
     return channel.Release();
 }
 
-void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
+void WSLCVirtualMachine::CollectCrashDumps()
 {
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
@@ -1226,18 +1261,20 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     {
         try
         {
-            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
-            if (!socket)
+            wil::unique_socket socket;
+            HRESULT hr = m_vm->AcceptCrashDumpConnection(reinterpret_cast<HANDLE*>(&socket));
+            if (hr == E_ABORT)
             {
                 // VM is exiting.
                 break;
             }
+            THROW_IF_FAILED(hr);
 
             constexpr DWORD timeout = 30 * 1000;
-            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
 
             auto channel = wsl::shared::SocketChannel{
-                std::move(socket.value()), "crash_dump", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
+                std::move(socket), "crash_dump", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;
@@ -1286,7 +1323,29 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             THROW_LAST_ERROR_IF(!file);
 
             transaction.SendResultMessage<std::int32_t>(0);
-            relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            // InterruptableRelay uses overlapped I/O which is not supported on AF_UNIX.
+            // Use a simple blocking recv-to-write loop for sockets in blocking I/O mode.
+            if (channel.IsBlockingIO())
+            {
+                constexpr size_t bufferSize = 65536;
+                std::vector<char> buf(bufferSize);
+                for (;;)
+                {
+                    int bytesRead = ::recv(channel.Socket(), buf.data(), static_cast<int>(buf.size()), 0);
+                    if (bytesRead <= 0)
+                    {
+                        break;
+                    }
+
+                    DWORD bytesWritten{};
+                    THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), buf.data(), static_cast<DWORD>(bytesRead), &bytesWritten, nullptr));
+                }
+            }
+            else
+            {
+                relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+            }
         }
         CATCH_LOG()
     }

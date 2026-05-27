@@ -27,6 +27,13 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
+if (INCLUDE_OPENVMM)
+    set(WSL_DEVICE_HOST_BINARIES wsldevicehost.dll;openvmm.exe)
+    foreach(binary ${WSL_DEVICE_HOST_BINARIES})
+        list(APPEND BINARIES_DEPENDENCIES "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}")
+    endforeach()
+endif()
+
 set(LINUX_BINARIES init;initrd.img)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
