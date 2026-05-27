@@ -354,7 +354,42 @@ struct Image
     int64_t Created{};
     std::string ParentId;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, RepoDigests, Size, Created, ParentId);
+    // Custom serialization (instead of NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT)
+    // because podman's docker-compat /images/json sometimes emits
+    //   "RepoTags": null
+    //   "RepoDigests": null
+    // for images that have no tags or digests, where docker emits [] or omits
+    // the key. nlohmann's default from_json fails on null→vector with
+    // type_error.302 "type must be array, but is null"; treat null/missing
+    // identically as "absent" so callers see a clean empty vector.
+    friend void to_json(nlohmann::json& j, const Image& v)
+    {
+        j = nlohmann::json{
+            {"Id", v.Id},
+            {"RepoTags", v.RepoTags},
+            {"RepoDigests", v.RepoDigests},
+            {"Size", v.Size},
+            {"Created", v.Created},
+            {"ParentId", v.ParentId},
+        };
+    }
+    friend void from_json(const nlohmann::json& j, Image& v)
+    {
+        auto getOpt = [&](const char* key, auto& out) {
+            auto it = j.find(key);
+            if (it != j.end() && !it->is_null())
+            {
+                it->get_to(out);
+            }
+        };
+
+        getOpt("Id", v.Id);
+        getOpt("RepoTags", v.RepoTags);
+        getOpt("RepoDigests", v.RepoDigests);
+        getOpt("Size", v.Size);
+        getOpt("Created", v.Created);
+        getOpt("ParentId", v.ParentId);
+    }
 };
 
 struct DeletedImage
