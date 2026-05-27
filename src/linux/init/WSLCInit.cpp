@@ -127,10 +127,7 @@ int WslcGpuHookEntry()
 try
 {
     // OCI runtime hooks receive the container state as JSON on stdin.
-    const std::string stateJson{std::istreambuf_iterator<char>(std::cin), {}};
-    THROW_ERRNO_IF(EINVAL, stateJson.empty());
-
-    const auto state = nlohmann::json::parse(stateJson);
+    const auto state = nlohmann::json::parse(std::cin);
     const std::filesystem::path bundle = state.at("bundle").get<std::string>();
     THROW_ERRNO_IF(EINVAL, !bundle.is_absolute());
 
@@ -147,15 +144,13 @@ try
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
     THROW_ERRNO_IF(ENOTDIR, !std::filesystem::is_directory(rootfsPath));
 
-    const auto confDir = rootfsPath / "etc/ld.so.conf.d";
-    const auto confPath = confDir / "ld.wsl.conf";
+    THROW_LAST_ERROR_IF(Chroot(rootfsPath.c_str()) < 0);
 
-    THROW_LAST_ERROR_IF(UtilMkdirPath(confDir.c_str(), 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile(confPath.c_str(), LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC | O_NOFOLLOW) < 0);
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
 
-    // chroots into the rootfs and uses the container's own /etc/ld.so.conf chain,
-    // writing /etc/ld.so.cache inside the container.
-    const char* const ldArgv[] = {LDCONFIG_COMMAND, "-r", rootfsPath.c_str(), nullptr};
+    // Run the container's own ldconfig so it updates /etc/ld.so.cache.
+    const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
     return 0;
