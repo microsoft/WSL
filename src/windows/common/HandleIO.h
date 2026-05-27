@@ -350,11 +350,34 @@ private:
     size_t RemainingBytes = 0;
 };
 
+namespace details {
+    inline void UnregisterRegisteredWait(HANDLE waitHandle) noexcept
+    {
+        // INVALID_HANDLE_VALUE makes UnregisterWaitEx block until any in-flight wait callback
+        // returns, so resources captured by the callback (Entry, SharedState) can be safely
+        // freed once the unique_any goes out of scope.
+        LOG_LAST_ERROR_IF(!UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE));
+    }
+} // namespace details
+
+using unique_registered_wait = wil::unique_any_handle_null<decltype(&details::UnregisterRegisteredWait), &details::UnregisterRegisteredWait>;
+
+// MultiHandleWait runs a set of OverlappedIOHandle to completion using the system thread
+// pool's wait infrastructure (RegisterWaitForSingleObject) so it can wait for more than
+// MAXIMUM_WAIT_OBJECTS (64) handles at once.
+//
+// Threading model: the wait callback runs on a thread pool thread and only enqueues the
+// signaled Entry into a queue, then sets a notification event. Run() owns the actual work:
+// it drains the queue and calls Collect() on each signaled handle from the Run() thread,
+// preserving the original guarantee that Schedule() and Collect() execute on the caller's
+// thread. To simplify lifetime management, Run() unregisters every wait at the top of each
+// iteration before processing state, then re-registers a fresh wait for every Pending
+// handle. The first handle to signal wakes Run(), which then processes whatever the
+// callbacks queued before re-arming.
 class MultiHandleWait
 {
 public:
     NON_COPYABLE(MultiHandleWait);
-    DEFAULT_MOVABLE(MultiHandleWait);
 
     enum Flags
     {
@@ -364,14 +387,44 @@ public:
         NeedNotComplete = 4,
     };
 
-    MultiHandleWait() = default;
+    MultiHandleWait();
+    ~MultiHandleWait();
+    MultiHandleWait(MultiHandleWait&&) noexcept = default;
+    MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
 private:
-    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
+    struct Entry;
+
+    // SharedState is heap-allocated so the address captured by wait callbacks remains
+    // stable when the owning MultiHandleWait is moved.
+    struct SharedState
+    {
+        wil::srwlock Lock;
+        wil::unique_event Notification{wil::EventOptions::None};
+        _Guarded_by_(Lock) std::vector<Entry*> Signaled;
+    };
+
+    // Entry is the callback context passed to RegisterWaitForSingleObject. Each Entry is
+    // heap-allocated (unique_ptr) so its address - and the OverlappedIOHandle pointer
+    // embedded in it - remains stable across m_handles reallocations.
+    struct Entry
+    {
+        Flags HandleFlags{};
+        std::unique_ptr<OverlappedIOHandle> Handle;
+        unique_registered_wait WaitRegistration;
+        SharedState* State{};
+    };
+
+    static void NTAPI WaitCallback(PVOID Context, BOOLEAN TimerOrWaitFired);
+    void RegisterWait(Entry& entry);
+    void UnregisterAllWaits() noexcept;
+
+    std::vector<std::unique_ptr<Entry>> m_handles;
+    std::unique_ptr<SharedState> m_state;
     bool m_cancel = false;
 };
 

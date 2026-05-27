@@ -914,9 +914,37 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 // MultiHandleWait
 
+MultiHandleWait::MultiHandleWait() : m_state(std::make_unique<SharedState>())
+{
+}
+
+MultiHandleWait::~MultiHandleWait()
+{
+    // Unregister before any other member is destroyed, so the wait callbacks can no longer
+    // fire when m_state is torn down.
+    UnregisterAllWaits();
+}
+
+MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
+{
+    if (this != &other)
+    {
+        UnregisterAllWaits();
+        m_handles = std::move(other.m_handles);
+        m_state = std::move(other.m_state);
+        m_cancel = other.m_cancel;
+    }
+
+    return *this;
+}
+
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace_back(flags, std::move(handle));
+    auto entry = std::make_unique<Entry>();
+    entry->HandleFlags = flags;
+    entry->Handle = std::move(handle);
+    entry->State = m_state.get();
+    m_handles.emplace_back(std::move(entry));
 }
 
 void MultiHandleWait::Cancel()
@@ -924,122 +952,156 @@ void MultiHandleWait::Cancel()
     m_cancel = true;
 }
 
+void NTAPI MultiHandleWait::WaitCallback(PVOID Context, BOOLEAN /*TimerOrWaitFired*/)
+{
+    // The callback's sole job is to record which Entry was signaled and wake Run().
+    // Run() does the actual Collect() work on its own thread.
+    auto* entry = static_cast<Entry*>(Context);
+
+    auto lock = entry->State->Lock.lock_exclusive();
+    entry->State->Signaled.push_back(entry);
+    entry->State->Notification.SetEvent();
+}
+
+void MultiHandleWait::RegisterWait(Entry& entry)
+{
+    WI_ASSERT(!entry.WaitRegistration);
+
+    // WT_EXECUTEINWAITTHREAD: run the callback directly on the wait thread instead of
+    //     queuing to a worker. The callback is tiny (push to queue + SetEvent), so the
+    //     extra hop would be wasted work.
+    // WT_EXECUTEONLYONCE: fire once per RegisterWaitForSingleObject. Run() re-registers
+    //     after every iteration, so there is no need for the kernel to re-arm.
+    THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+        entry.WaitRegistration.put(), entry.Handle->GetHandle(), &WaitCallback, &entry, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE));
+}
+
+void MultiHandleWait::UnregisterAllWaits() noexcept
+{
+    // unique_registered_wait's deleter calls UnregisterWaitEx(INVALID_HANDLE_VALUE), which
+    // blocks until any in-flight callback completes. After this loop returns, no callback
+    // is running and no more callbacks can fire until we re-register.
+    for (auto& entry : m_handles)
+    {
+        entry->WaitRegistration.reset();
+    }
+}
+
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
 
-    std::optional<std::chrono::steady_clock::time_point> deadline;
+    auto cleanup = wil::scope_exit([&] { UnregisterAllWaits(); });
 
+    std::optional<std::chrono::steady_clock::time_point> deadline;
     if (Timeout.has_value())
     {
         deadline = std::chrono::steady_clock::now() + Timeout.value();
     }
 
-    // Run until all handles are completed.
-
-    while (!m_handles.empty() && !m_cancel)
+    while (!m_cancel)
     {
-        // Schedule IO on each handle until all are either pending, or completed.
-        for (size_t i = 0; i < m_handles.size() && !m_cancel; i++)
+        // Drop every active wait so no callbacks can mutate the queue while we process
+        // state. UnregisterWaitEx(INVALID_HANDLE_VALUE) waits for any in-flight callback,
+        // so once this returns the queue is exclusively ours.
+        UnregisterAllWaits();
+
+        // Move the queue out under the lock. Defensive locking - no callbacks should be
+        // running at this point, but it keeps the access pattern obvious.
+        std::vector<Entry*> signaled;
         {
-            while (m_handles[i].second->GetState() == IOHandleStatus::Standby && !m_cancel)
+            auto lock = m_state->Lock.lock_exclusive();
+            signaled = std::move(m_state->Signaled);
+            m_state->Notification.ResetEvent();
+        }
+
+        // Collect() runs on the Run() thread, preserving the historical contract.
+        for (auto* entry : signaled)
+        {
+            try
             {
-                try
+                entry->Handle->Collect();
+            }
+            catch (...)
+            {
+                if (WI_IsFlagSet(entry->HandleFlags, Flags::IgnoreErrors))
                 {
-                    m_handles[i].second->Schedule();
+                    entry->Handle.reset();
+                    continue;
                 }
-                catch (...)
-                {
-                    if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
-                    {
-                        m_handles[i].second.reset(); // Reset the handle so it can be deleted.
-                        break;
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+
+                throw;
             }
         }
 
-        // Remove completed handles from m_handles.
+        // Walk the handle list: schedule Standby handles, drop Completed ones, and
+        // re-register a wait for every Pending handle so it can fire next iteration.
         bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
-            if (!it->second)
+            auto& entry = **it;
+
+            while (entry.Handle && entry.Handle->GetState() == IOHandleStatus::Standby && !m_cancel)
             {
-                it = m_handles.erase(it);
-            }
-            else if (it->second->GetState() == IOHandleStatus::Completed)
-            {
-                if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
+                try
                 {
-                    m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
+                    entry.Handle->Schedule();
+                }
+                catch (...)
+                {
+                    if (WI_IsFlagSet(entry.HandleFlags, Flags::IgnoreErrors))
+                    {
+                        entry.Handle.reset();
+                        break;
+                    }
+
+                    throw;
+                }
+            }
+
+            if (!entry.Handle || entry.Handle->GetState() == IOHandleStatus::Completed)
+            {
+                if (entry.Handle && WI_IsFlagSet(entry.HandleFlags, Flags::CancelOnCompleted))
+                {
+                    m_cancel = true;
                 }
 
                 it = m_handles.erase(it);
+                continue;
             }
-            else
+
+            RegisterWait(entry);
+
+            if (WI_IsFlagClear(entry.HandleFlags, Flags::NeedNotComplete))
             {
-                // If only NeedNotComplete handles are left, we want to exit Run.
-                if (WI_IsFlagClear(it->first, Flags::NeedNotComplete))
-                {
-                    hasHandleToWaitFor = true;
-                }
-                ++it;
+                hasHandleToWaitFor = true;
             }
+
+            ++it;
         }
 
-        if (!hasHandleToWaitFor || m_cancel)
+        if (m_handles.empty() || !hasHandleToWaitFor || m_cancel)
         {
             break;
-        }
-
-        // Wait for the next operation to complete.
-        std::vector<HANDLE> waitHandles;
-        for (const auto& e : m_handles)
-        {
-            waitHandles.emplace_back(e.second->GetHandle());
         }
 
         DWORD waitTimeout = INFINITE;
         if (deadline.has_value())
         {
-            auto miliseconds =
+            auto milliseconds =
                 std::chrono::duration_cast<std::chrono::milliseconds>(deadline.value() - std::chrono::steady_clock::now()).count();
 
-            waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
+            waitTimeout = static_cast<DWORD>(std::max<long long>(0, milliseconds));
         }
 
-        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
+        auto result = WaitForSingleObject(m_state->Notification.get(), waitTimeout);
         if (result == WAIT_TIMEOUT)
         {
             THROW_WIN32(ERROR_TIMEOUT);
         }
-        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
+        else if (result != WAIT_OBJECT_0)
         {
-            auto index = result - WAIT_OBJECT_0;
-
-            try
-            {
-                m_handles[index].second->Collect();
-            }
-            catch (...)
-            {
-                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
-                {
-                    m_handles.erase(m_handles.begin() + index);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-        }
-        else
-        {
-            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
+            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, m_handles.size());
         }
     }
 
