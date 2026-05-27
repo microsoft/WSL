@@ -434,19 +434,30 @@ private:
         Flags Options;
         std::unique_ptr<OverlappedIOHandle> Handle;
         std::vector<OVERLAPPED*> Overlappeds;
+        // Distinct kernel handles this entry contributed to m_iocpBindings. Used to
+        // decrement the ref count when the entry is removed so the IOCPHandle is
+        // detached before the kernel handle is closed - otherwise the binding would
+        // leak across iterations and a recycled handle value (the OS reuses values of
+        // closed handles for fresh ones) would silently skip CreateIoCompletionPort
+        // and never deliver completions.
+        std::vector<HANDLE> BoundHandles;
     };
+
+    void ReleaseBindings(HandleEntry& entry);
 
 
     wil::unique_handle m_iocp;
     // std::list (rather than std::vector) so iterators held by the schedule loop
     // survive erasures performed by the cleanup pass and processPacket.
     std::list<HandleEntry> m_handles;
-    // One IOCPHandle per unique kernel handle this MultiHandleWait operates on.
-    // Owns the IOCP association lifetime: when m_iocpBindings is destroyed (before
-    // m_handles), each IOCPHandle's destructor detaches its kernel handle so
-    // external consumers (e.g. boost::asio::stream::assign, or a later
-    // MultiHandleWait reusing the same socket) can rebind freely.
-    std::map<HANDLE, IOCPHandle> m_iocpBindings;
+    // One IOCPHandle per unique kernel handle this MultiHandleWait operates on,
+    // along with a reference count of how many entries contributed it. When the
+    // last entry referencing a handle is removed (or the wait itself goes away)
+    // the IOCPHandle is destroyed, which detaches the kernel handle from m_iocp
+    // before it can be closed - so external consumers (e.g. boost::asio, or a
+    // later MultiHandleWait reusing the same socket) can rebind freely, and
+    // recycled handle values cannot collide with stale bindings.
+    std::map<HANDLE, std::pair<IOCPHandle, size_t>> m_iocpBindings;
     bool m_cancel = false;
 };
 

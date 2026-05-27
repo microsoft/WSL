@@ -1032,7 +1032,7 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    HandleEntry entry{flags, std::move(handle), {}};
+    HandleEntry entry{flags, std::move(handle), {}, {}};
 
     // Each leaf reports the kernel handles it operates on along with the OVERLAPPED it
     // will use; we associate every unique kernel handle with our IOCP exactly once
@@ -1043,25 +1043,67 @@ void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Fl
     // PostQueuedCompletionStatus).
     const auto bindings = entry.Handle->Bind(m_iocp.get(), reinterpret_cast<ULONG_PTR>(entry.Handle.get()));
     entry.Overlappeds.reserve(bindings.size());
+
+    // Each unique kernel handle this entry contributes is reference-counted in
+    // m_iocpBindings so the binding is detached before the kernel handle can be
+    // recycled by the OS (which reuses handle values of closed handles); without this
+    // a stale entry would cause a fresh handle with the same numeric value to be
+    // skipped by the try_emplace below and never receive completions.
+    std::vector<HANDLE> contributedHandles;
     for (const auto& [kernelHandle, overlapped] : bindings)
     {
+        entry.Overlappeds.push_back(overlapped);
+
+        if (std::find(entry.BoundHandles.begin(), entry.BoundHandles.end(), kernelHandle) != entry.BoundHandles.end())
+        {
+            continue; // This entry already counted this kernel handle.
+        }
+
         auto [it, inserted] = m_iocpBindings.try_emplace(kernelHandle);
         if (inserted)
         {
             try
             {
-                it->second.Bind(kernelHandle, m_iocp.get(), 0);
+                it->second.first.Bind(kernelHandle, m_iocp.get(), 0);
             }
             catch (...)
             {
                 m_iocpBindings.erase(it);
+
+                // Roll back the partial bindings this entry contributed so far.
+                for (HANDLE rollback : contributedHandles)
+                {
+                    auto rollbackIt = m_iocpBindings.find(rollback);
+                    if (rollbackIt != m_iocpBindings.end() && --rollbackIt->second.second == 0)
+                    {
+                        m_iocpBindings.erase(rollbackIt);
+                    }
+                }
+
                 throw;
             }
         }
-        entry.Overlappeds.push_back(overlapped);
+
+        it->second.second += 1;
+        entry.BoundHandles.push_back(kernelHandle);
+        contributedHandles.push_back(kernelHandle);
     }
 
     m_handles.push_back(std::move(entry));
+}
+
+void MultiHandleWait::ReleaseBindings(HandleEntry& entry)
+{
+    for (HANDLE h : entry.BoundHandles)
+    {
+        auto it = m_iocpBindings.find(h);
+        if (it != m_iocpBindings.end() && --it->second.second == 0)
+        {
+            m_iocpBindings.erase(it);
+        }
+    }
+
+    entry.BoundHandles.clear();
 }
 
 void MultiHandleWait::Cancel()
@@ -1097,6 +1139,10 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 {
                     if (WI_IsFlagSet(it->Options, Flags::IgnoreErrors))
                     {
+                        // Detach the kernel handles from the IOCP (via ReleaseBindings)
+                        // BEFORE destroying the leaf - the leaf's destructor closes its
+                        // handles and detaching after close is undefined behavior.
+                        ReleaseBindings(*it);
                         it->Handle.reset(); // Reset the handle so it can be deleted.
                         break;
                     }
@@ -1114,6 +1160,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         {
             if (!it->Handle)
             {
+                ReleaseBindings(*it);
                 it = m_handles.erase(it);
             }
             else if (it->Handle->GetState() == IOHandleStatus::Completed)
@@ -1123,6 +1170,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                     m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
                 }
 
+                ReleaseBindings(*it);
                 it = m_handles.erase(it);
             }
             else
@@ -1221,9 +1269,13 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         {
             if (WI_IsFlagSet(it->Options, Flags::IgnoreErrors))
             {
-                // Reset the handle (rather than erasing the entry) so we don't invalidate
-                // any iterator the schedule loop above might be holding. The cleanup pass
-                // at the top of the next outer iteration removes entries with !Handle.
+                // Detach the kernel handles from the IOCP (via ReleaseBindings) BEFORE
+                // destroying the leaf - the leaf's destructor closes its handles and
+                // detaching after close is undefined behavior. Reset the handle (rather
+                // than erasing the entry) so we don't invalidate any iterator the
+                // schedule loop above might be holding. The cleanup pass at the top of
+                // the next outer iteration removes entries with !Handle.
+                ReleaseBindings(*it);
                 it->Handle.reset();
             }
             else
