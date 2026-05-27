@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentValidation.h"
+#include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
@@ -59,6 +60,81 @@ std::string FormatBytes(uint64_t bytes)
         // This matches the behaviour of `docker stats`.
         return std::format("{} B", bytes);
     }
+}
+
+nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
+{
+    // Calculate CPU %
+    // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
+    double cpuPercent = 0.0;
+    const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
+                          static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
+    const auto systemDelta =
+        static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
+
+    // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behavior.
+    uint32_t onlineCpus = stats.cpu_stats.online_cpus;
+    if (onlineCpus == 0)
+    {
+        onlineCpus = stats.cpu_stats.cpu_usage.percpu_usage.has_value()
+                         ? static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size())
+                         : 1u;
+    }
+
+    if (systemDelta > 0.0 && cpuDelta > 0.0)
+    {
+        cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
+    }
+
+    // Calculate memory %
+    double memPercent = 0.0;
+    if (stats.memory_stats.limit > 0)
+    {
+        memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
+    }
+
+    // Aggregate network I/O
+    uint64_t netRxBytes = 0;
+    uint64_t netTxBytes = 0;
+    if (stats.networks.has_value())
+    {
+        for (const auto& [iface, netStats] : *stats.networks)
+        {
+            netRxBytes += netStats.rx_bytes;
+            netTxBytes += netStats.tx_bytes;
+        }
+    }
+
+    // Aggregate block I/O
+    uint64_t blkReadBytes = 0;
+    uint64_t blkWriteBytes = 0;
+    if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+    {
+        for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+        {
+            if (_stricmp(entry.op.c_str(), "read") == 0)
+            {
+                blkReadBytes += entry.value;
+            }
+            else if (_stricmp(entry.op.c_str(), "write") == 0)
+            {
+                blkWriteBytes += entry.value;
+            }
+        }
+    }
+
+    const auto& containerName = stats.name.empty() ? stats.id : stats.name;
+
+    return {
+        {"ID", stats.id},
+        {"Name", containerName},
+        {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
+        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemPerc", std::format("{:.2f}%", memPercent)},
+        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"PIDs", stats.pids_stats.current},
+    };
 }
 
 } // namespace
@@ -495,143 +571,39 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
     }
 
-    // Fetch stats for all containers concurrently. The Docker engine blocks for ~1s per
-    // request to collect a valid precpu_stats sample, so issuing all requests in parallel
-    // to mitigate scalability issue with increasing container count.
-    struct StatsResult
-    {
-        std::wstring containerId;
-        std::optional<wsl::windows::common::docker_schema::ContainerStats> stats;
-        wil::ResultException error{S_OK};
-        bool hasError{false};
-    };
-
-    std::vector<std::future<StatsResult>> futures;
-    futures.reserve(containers.size());
-    for (const auto& containerId : containers)
-    {
-        futures.push_back(std::async(std::launch::async, [&session, containerId, userSpecifiedContainers]() -> StatsResult {
-            StatsResult result;
-            result.containerId = containerId;
-            try
-            {
-                result.stats = ContainerService::Stats(session, WideToMultiByte(containerId));
-            }
-            catch (const wil::ResultException& ex)
-            {
-                if (!userSpecifiedContainers)
-                {
-                    switch (ex.GetErrorCode())
-                    {
-                    case RPC_E_DISCONNECTED:
-                    case WSLC_E_CONTAINER_NOT_FOUND:
-                        return result; // stats remains empty, silently skip
-                    }
-                }
-
-                result.hasError = true;
-                result.error = ex;
-            }
-            return result;
-        }));
-    }
-
-    // Build stats as a json array first for later filtering or display either as json or table format.
+    // Fetch stats for all containers concurrently in batches. The Docker engine blocks for ~1s
+    // per request to collect a valid precpu_stats sample, so issuing requests in parallel keeps
+    // wall time proportional to ceil(N / batchSize) rather than N.
     nlohmann::json statsJson = nlohmann::json::array();
-    for (auto& future : futures)
-    {
-        auto result = future.get();
-
-        if (result.hasError)
-        {
-            LOG_HR_MSG(result.error.GetErrorCode(), "Failed to get stats for container %ws", result.containerId.c_str());
-            throw result.error;
-        }
-
-        if (!result.stats.has_value())
-        {
-            continue;
-        }
-
-        const auto& stats = *result.stats;
-
-        // Calculate CPU %
-        // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
-        double cpuPercent = 0.0;
-        const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
-                              static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
-        const auto systemDelta =
-            static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
-
-        // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behavior.
-        uint32_t onlineCpus = stats.cpu_stats.online_cpus;
-        if (onlineCpus == 0)
-        {
-            onlineCpus = stats.cpu_stats.cpu_usage.percpu_usage.has_value()
-                             ? static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size())
-                             : 1u;
-        }
-
-        if (systemDelta > 0.0 && cpuDelta > 0.0)
-        {
-            cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
-        }
-
-        // Calculate memory %
-        double memPercent = 0.0;
-        if (stats.memory_stats.limit > 0)
-        {
-            memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
-        }
-
-        // Aggregate network I/O
-        uint64_t netRxBytes = 0;
-        uint64_t netTxBytes = 0;
-        if (stats.networks.has_value())
-        {
-            for (const auto& [iface, netStats] : *stats.networks)
+    wsl::windows::wslc::ForEachAsync<std::wstring>(
+        containers,
+        // Work
+        [&session](const std::wstring& containerId) {
+            return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
+        },
+        // Success
+        [&](const nlohmann::json& entry) {
+            statsJson.push_back(entry);
+        },
+        // Error
+        [&](const std::wstring& containerId, wil::ResultException error) {
+            if (!userSpecifiedContainers)
             {
-                netRxBytes += netStats.rx_bytes;
-                netTxBytes += netStats.tx_bytes;
-            }
-        }
-
-        // Aggregate block I/O
-        uint64_t blkReadBytes = 0;
-        uint64_t blkWriteBytes = 0;
-        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
-        {
-            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
-            {
-                if (_stricmp(entry.op.c_str(), "read") == 0)
+                switch (error.GetErrorCode())
                 {
-                    blkReadBytes += entry.value;
-                }
-                else if (_stricmp(entry.op.c_str(), "write") == 0)
-                {
-                    blkWriteBytes += entry.value;
+                case RPC_E_DISCONNECTED:
+                case WSLC_E_CONTAINER_NOT_FOUND:
+                    // Container disappeared between list and stats fetch, and
+                    // the user did not specify these containers, so silently skip.
+                    return;
                 }
             }
-        }
 
-        const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-        const auto cpuPercentStr = std::format("{:.2f}%", cpuPercent);
-        const auto memPercentStr = std::format("{:.2f}%", memPercent);
-        const auto memUsage = std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit));
-        const auto netIo = std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes));
-        const auto blkIo = std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes));
-
-        statsJson.push_back({
-            {"ID", stats.id},
-            {"Name", containerName},
-            {"CPUPerc", cpuPercentStr},
-            {"MemUsage", memUsage},
-            {"MemPerc", memPercentStr},
-            {"NetIO", netIo},
-            {"BlockIO", blkIo},
-            {"PIDs", stats.pids_stats.current},
+            // Failure to retrieve a container should stop execution with
+            // no container information displayed.
+            LOG_HR_MSG(error.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
+            throw error;
         });
-    }
 
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
