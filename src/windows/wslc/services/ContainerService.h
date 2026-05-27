@@ -37,5 +37,6 @@ struct ContainerService
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
+    static models::PruneContainersResult Prune(models::Session& session);
 };
 } // namespace wsl::windows::wslc::services

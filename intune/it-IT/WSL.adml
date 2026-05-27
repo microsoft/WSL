@@ -7,11 +7,11 @@
     <stringTable>
         <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Consenti il Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Se impostato su Disabled, questo criterio disabilita l'accesso alle distribuzioni Linux in esecuzione in Windows Subsystem for Linux per tutti gli utenti del computer.</string>
 
-        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Allow the Inbox version of the Windows Subsystem for Linux</string>
-        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Consenti la versione inbox del Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Se impostato su Disabilitato, questo criterio disabilita la versione inbox (componente facoltativo) del Windows Subsystem for Linux. Se questo criterio è disabilitato, è possibile usare solo la versione Store di WSL.</string>
 
         <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Consenti WSL1</string>
         <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Se impostato su Disabilitato, questo criterio disabilita WSL1. Se questa opzione è disabilitata, è possibile usare solo distribuzioni WSL2.</string>
@@ -53,7 +53,7 @@
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Contenitore di WSL</string>
 
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Consenti contenitore di WSL</string>
-        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Questo criterio controlla se il contenitore WSL può essere usato in questo computer. Se è abilitato o non configurato, gli utenti e le applicazioni Windows possono eseguire contenitori Linux tramite WSL. Se è impostato su Disabled, il contenitore WSL è bloccato per tutti gli utenti e le app Windows non possono eseguire contenitori Linux. Avviso: impostando questo criterio su "Disabled", si possono interrompere le app Windows che dipendono da contenitori Linux.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Elenco elementi consentiti per i registri del contenitore WSL</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Quando è abilitato, il contenitore WSL può eseguire il pull delle immagini solo dai registri elencati qui. Questo influisce sia sulla CLI del contenitore WSL sia su tutte le applicazioni che usano l'API del contenitore WSL.</string>
