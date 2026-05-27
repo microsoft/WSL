@@ -124,6 +124,33 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     return info;
 }
 
+bool WSLCVolumes::EnsureVolumeExists(const std::string& Name)
+{
+    if (Name.empty())
+    {
+        return false;
+    }
+
+    auto lock = m_lock.lock_exclusive();
+
+    if (m_volumes.contains(Name))
+    {
+        return false;
+    }
+
+    // Match docker's auto-create-on-container-create semantics: guest driver,
+    // no driver opts, no labels. See header comment for the podman /events
+    // timing rationale.
+    auto volume = WSLCGuestVolumeImpl::Create(Name.c_str(), {}, {}, m_dockerClient);
+
+    auto [it, inserted] = m_volumes.insert({volume->Name(), std::move(volume)});
+    WI_VERIFY(inserted);
+
+    m_expectedEvents.emplace_back(Name, VolumeEvent::Create);
+
+    return true;
+}
+
 void WSLCVolumes::DeleteVolume(LPCSTR Name)
 {
     THROW_HR_IF(E_POINTER, Name == nullptr);
