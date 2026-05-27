@@ -136,7 +136,7 @@ struct InspectImage
     std::string Author;
     std::string Architecture;
     std::string Os;
-    uint64_t Size{};
+    int64_t Size{};
     std::optional<std::map<std::string, std::string>> Metadata;
     std::optional<ImageConfig> Config;
 

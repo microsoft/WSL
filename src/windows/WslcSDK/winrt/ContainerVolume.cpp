@@ -17,32 +17,87 @@ Abstract:
 #include "Microsoft.WSL.Containers.ContainerVolume.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-ContainerVolume::ContainerVolume(hstring const& windowsPath, hstring const& containerPath, bool readOnly)
+
+ContainerVolume::ContainerVolume(hstring const& windowsPath, hstring const& containerPath, bool readOnly) :
+    m_windowsPath(windowsPath), m_containerPath(winrt::to_string(containerPath)), m_readOnly(readOnly)
 {
-    throw hresult_not_implemented();
+    if (windowsPath.empty())
+    {
+        throw hresult_invalid_argument(L"Windows path cannot be empty");
+    }
+
+    if (containerPath.empty())
+    {
+        throw hresult_invalid_argument(L"Container path cannot be empty");
+    }
 }
+
 hstring ContainerVolume::WindowsPath()
 {
-    throw hresult_not_implemented();
+    return hstring(m_windowsPath);
 }
+
 void ContainerVolume::WindowsPath(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_containerVolume)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument(L"Windows path cannot be empty");
+    }
+
+    m_windowsPath = value;
 }
+
 hstring ContainerVolume::ContainerPath()
 {
-    throw hresult_not_implemented();
+    return winrt::to_hstring(m_containerPath);
 }
+
 void ContainerVolume::ContainerPath(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_containerVolume)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument(L"Container path cannot be empty");
+    }
+
+    m_containerPath = winrt::to_string(value);
 }
+
 bool ContainerVolume::ReadOnly()
 {
-    throw hresult_not_implemented();
+    return m_readOnly;
 }
+
 void ContainerVolume::ReadOnly(bool value)
 {
-    throw hresult_not_implemented();
+    if (m_containerVolume)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    m_readOnly = value;
 }
+
+WslcContainerVolume ContainerVolume::ToStruct()
+{
+    if (!m_containerVolume)
+    {
+        m_containerVolume = std::make_unique<WslcContainerVolume>();
+        m_containerVolume->windowsPath = m_windowsPath.c_str();
+        m_containerVolume->containerPath = m_containerPath.c_str();
+        m_containerVolume->readOnly = m_readOnly;
+    }
+
+    return *m_containerVolume;
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

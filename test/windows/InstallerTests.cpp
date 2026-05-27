@@ -190,13 +190,13 @@ class InstallerTests
         auto productCode = GetMsiProductCode();
         VERIFY_IS_FALSE(productCode.empty());
 
-        CallMsiExec(std::format(L"/qn /norestart /x {} /L*V {}", productCode, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /x \"{}\" /L*V \"{}\"", productCode, GenerateMsiLogPath()));
     }
 
     void InstallMsi()
     {
         PrepareForMsiOperation();
-        CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", m_msiPath, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /i \"{}\" /L*V \"{}\"", m_msiPath, GenerateMsiLogPath()));
     }
 
     void InstallMsix() const

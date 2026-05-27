@@ -994,7 +994,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>컴퓨터 정책에 따라 WSL1을 사용할 수 없습니다.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
-    <value>WSL container is disabled by the computer policy.</value>
+    <value>WSL 컨테이너가 컴퓨터 정책에 의해 비활성화되었습니다.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
@@ -2117,6 +2117,19 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 '{}'(이)가 실행 중입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>컨테이너 네트워크 모드에서는 추가 네트워크가 허용되지 않습니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>컨테이너 네트워크 모드에는 대상 컨테이너 이름이 필요합니다.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>'{}' 대상 컨테이너를 찾을 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>컨테이너 '{}'을(를) 찾을 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2257,6 +2270,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 이미지: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>잘못된 필터: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>잘못된 이름: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2278,11 +2295,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
-    <value>Invalid value for option '{}': '{}'</value>
+    <value>'{}' 옵션에 대한 값이 잘못됨: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
-    <value>Unknown option: '{}'</value>
+    <value>알 수 없는 옵션: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2410,6 +2427,16 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>컨테이너에 대한 로그를 봅니다.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>중지된 모든 컨테이너를 제거하세요.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>중지된 모든 컨테이너를 제거하세요.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>회수된 총 공간: {:.2f}MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>컨테이너를 제거합니다.</value>
   </data>
@@ -2430,10 +2457,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너를 시작합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>컨테이너 리소스 사용량 통계를 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>실행 중인 컨테이너의 리소스 사용량(CPU, 메모리, 네트워크 I/O, 블록 I/O 및 PID)의 스냅샷을 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>컨테이너를 중지합니다.</value>
@@ -2699,6 +2726,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>Dockerfile 경로(stdin 읽으려면 "-" 사용)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>제공된 조건에 따라 출력 필터링</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>'-f, --filter' 플래그에 대한 인수 "{}"가 잘못되었습니다: 필터 형식이 잘못되었습니다(name=value 형식이어야 함).</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>로그 출력 따라가기</value>
   </data>
@@ -2724,7 +2757,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>이미지 이름</value>
   </data>
   <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
-    <value>stdin에서 읽으려몀ㄴ 파일 또는 -</value>
+    <value>stdin에서 읽으려면 파일 또는 -</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>이미지가 포함된 tar 보관 파일의 경로를 제공합니다.</value>
@@ -2734,6 +2767,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>레이블 키는 비워 둘 수 없습니다.</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>최근에 생성된 컨테이너 n개 표시(모든 상태 포함)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>가장 최근에 만든 컨테이너 표시(모든 상태 포함)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>컨테이너 호스트 이름</value>
@@ -2948,9 +2987,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>볼륨 이름</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>볼륨 드라이버 이름 지정(기본값 {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>볼륨 드라이버 이름을 지정합니다. 예: 'guest' 또는 'vhd' (기본값: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>드라이버별 옵션 설정</value>
@@ -3002,28 +3041,28 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>컨테이너 ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>이름</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>생성됨</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
-    <value>STATUS</value>
+    <value>상태</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>포트</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>최대 사용량/제한</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
     <value>MEM %</value>
@@ -3032,7 +3071,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>블록 I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

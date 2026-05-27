@@ -988,7 +988,7 @@ Går tilbage til NAT-netværk.</value>
     <value>WSL1 er deaktiveret af computerpolitikken.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
-    <value>WSL container is disabled by the computer policy.</value>
+    <value>WSL-objektbeholderen er deaktiveret af computerpolitikken.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Registreringsdatabasen for objektbeholderafbildningen '{}' er blokeret af computerpolitikken.</value>
@@ -2104,11 +2104,24 @@ Brug:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress is not yet supported.</value>
+    <value>ContainerIpAddress understøttes endnu ikke.</value>
     <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Objektbeholderen "{}" kører.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Yderligere netværk er ikke tilladt med objektbeholdernetværkstilstand.</value>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Porttilknytninger understøttes ikke med objektbeholdernetværkstilstand. Porte ejes af destinationsbeholderen.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Navnet på mål-objektbeholderen er påkrævet for objektbeholder-netværkstilstand.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Rod-objektbeholderen "{}" blev ikke fundet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
@@ -2119,7 +2132,7 @@ Brug:
     <value>Navnet på objektbeholdernetværket er påkrævet for den brugerdefinerede netværkstype.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
-    <value>Network name cannot be empty.</value>
+    <value>Netværksnavnet må ikke være tomt.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Ukendt kommando: '{}'</value>
@@ -2251,6 +2264,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Ugyldigt billede: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Ugyldigt filter: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Ugyldigt navn: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2272,11 +2289,11 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
-    <value>Invalid value for option '{}': '{}'</value>
+    <value>Ugyldig værdi for indstillingen '{}': '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
-    <value>Unknown option: '{}'</value>
+    <value>Ukendt indstilling: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
@@ -2312,7 +2329,7 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
-    <value>Duplicate network: '{}'</value>
+    <value>Duplikeret netværk: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2404,6 +2421,16 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Få vist logfiler for en objektbeholder.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Fjern alle stoppede objektbeholdere.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle stoppede objektbeholdere.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Samlet frigjort plads: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern objektbeholdere.</value>
   </data>
@@ -2424,10 +2451,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Starter en objektbeholder.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
-    <value>Display container resource usage statistics.</value>
+    <value>Vis statistik over ressourceforbrug for objektbeholder.</value>
   </data>
   <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
-    <value>Display a snapshot of a running container's resource usage: CPU, memory, network I/O, block I/O, and PIDs.</value>
+    <value>Vis et øjebliksbillede af en kørende objektbeholders ressourceforbrug: CPU, hukommelse, netværks-I/O, blok-I/O og PID'er.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
     <value>Stop objektbeholdere.</value>
@@ -2693,6 +2720,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Sti til Dockerfile (brug "-" til at læse fra stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Filtrer output baseret på de angivne betingelser</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Ugyldigt argument "{}" for '-f, --filter' flag: forkert format af filter (forventet navn=værdi)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Følg logoutput</value>
   </data>
@@ -2728,6 +2761,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>Mærkatnøglen må ikke være tom</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Vis n senest oprettede objektbeholdere (omfatter alle tilstande)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Vis den senest oprettede objektbeholder (omfatter alle tilstande)</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Navn på objektbeholder-vært</value>
@@ -2942,9 +2981,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Navn på diskenhed</value>
   </data>
-  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Angiv navn på diskenhedsdriveren (standard {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Angiv diskenhedsdrivernavn, f.eks. 'guest' eller 'vhd' (standard: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Angiv driverspecifikke indstillinger</value>
@@ -2996,37 +3035,37 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
-    <value>CONTAINER ID</value>
+    <value>OBJEKTBEHOLDER-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
-    <value>NAME</value>
+    <value>NAVN</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>IMAGE</value>
+    <value>BILLEDE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
-    <value>CREATED</value>
+    <value>OPRETTET</value>
   </data>
   <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
     <value>STATUS</value>
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
-    <value>PORTS</value>
+    <value>PORTE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
-    <value>MEM USAGE / LIMIT</value>
+    <value>HUK.FORBRUG/GRÆNSE</value>
   </data>
   <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
-    <value>MEM %</value>
+    <value>HUK %</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCK I/O</value>
+    <value>BLOKER I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>

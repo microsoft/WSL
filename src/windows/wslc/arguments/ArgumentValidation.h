@@ -63,7 +63,7 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstring& argName);
-ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
+int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});

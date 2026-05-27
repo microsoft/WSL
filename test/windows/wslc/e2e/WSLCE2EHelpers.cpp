@@ -440,7 +440,17 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 
 std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
 {
-    EnsureImageIsLoaded({L"wslc-registry", L"latest", GetTestImagePath("wslc-registry:latest")});
+    // Check if the registry image is already loaded on this session.
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+    THROW_IF_FAILED(session.ListImages(nullptr, &images, images.size_address<ULONG>()));
+
+    bool found = std::ranges::any_of(
+        std::span{images.get(), images.size()}, [](const auto& e) { return std::strcmp(e.Image, "wslc-registry:latest") == 0; });
+
+    if (!found)
+    {
+        LoadTestImage(session, "wslc-registry:latest");
+    }
 
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 

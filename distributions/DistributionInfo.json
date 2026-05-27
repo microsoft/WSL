@@ -110,8 +110,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 16.0",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260218.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.29-Build1.29.wsl",
-                    "Sha256": "0xe0bd5e676a30164f43bbe9a7a0e0999ba9cfa396d030abf9c95122a656ed5c49"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260515.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.74-Build1.74.wsl",
+                    "Sha256": "0xd98c6790a11ce149e37fe7ee276f8093f927a5882a674b1f1912a7f015311650"
                 }
             }
         ],
@@ -136,12 +136,12 @@
                 "FriendlyName": "Debian GNU/Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/7949331/artifacts/raw/Debian_WSL_AMD64_v1.22.0.0.wsl",
-                    "Sha256": "543123ccc5f838e63dac81634fb0223dc8dcaa78fdb981387d625feb1ed168c7"
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9606244/artifacts/raw/Debian_WSL_AMD64_v1.26.0.0.wsl",
+                    "Sha256": "5ec7dc68216e75d1d4d4761474e99d8461a98d316537110314b137122a879e0f"
                 },
                 "Arm64Url": {
-                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/7949331/artifacts/raw/Debian_WSL_ARM64_v1.22.0.0.wsl",
-                    "Sha256": "5701f1add55f8cf3b56528109a6220ae5c89f2189d7ae97b9a4b5302b80e967c"
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/9606244/artifacts/raw/Debian_WSL_ARM64_v1.26.0.0.wsl",
+                    "Sha256": "09120df4fadc36fb2a0f7298e197785e6f599f12aaf95d43cba07a8ac7fb316b"
                 }
             }
         ],
@@ -164,12 +164,12 @@
                 "FriendlyName": "AlmaLinux OS 9",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20260311.0/AlmaLinux-9.7_x64_20260311.0.wsl",
-                    "Sha256": "c7d9c8f9bbe8f52a34d920988d6cea913f0251c457aef55f5ed66cce90561f92"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.8.20260526.0/AlmaLinux-9.8_x64_20260526.0.wsl",
+                    "Sha256": "4a4377d451a4ede509e61ab4e4870f9654bc99beb7a0b40c8b54e71a6752cd8e"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20260311.0/AlmaLinux-9.7_ARM64_20260311.0.wsl",
-                    "Sha256": "e9b5e184aa04e6f72574e2c29cda919d4aaed0c7408dcb81905f6c9391516c7f"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.8.20260526.0/AlmaLinux-9.8_ARM64_20260526.0.wsl",
+                    "Sha256": "b94a298f207782d37c0e2c019e7f95f52a94f933ad702b8479340bcfde68c4b3"
                 }
             },
             {
@@ -177,12 +177,12 @@
                 "FriendlyName": "AlmaLinux OS Kitten 10",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260311.0/AlmaLinux-Kitten-10_x64_20260311.0.wsl",
-                    "Sha256": "b04ab8ae277ca4bbeb70a15381124609ca7f97b8f7c275930b3fd91195c385ad"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260330.0/AlmaLinux-Kitten-10_x64_20260330.0.wsl",
+                    "Sha256": "ada0914f1331fddfa626eaffd2e21288cc35b1c9c7a07d466f488d36b9b90cca"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260311.0/AlmaLinux-Kitten-10_ARM64_20260311.0.wsl",
-                    "Sha256": "d502ab27654fa326888940ebce573dbe5abf7e44f709e67b53030da49572a92f"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260330.0/AlmaLinux-Kitten-10_ARM64_20260330.0.wsl",
+                    "Sha256": "597bd7717d796550f85a3e9307f75fdd73d6c18a71b58898dd43a0dbca3da0fc"
                 }
             },
             {
@@ -190,12 +190,12 @@
                 "FriendlyName": "AlmaLinux OS 10",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20260311.0/AlmaLinux-10.1_x64_20260311.0.wsl",
-                    "Sha256": "6bc470081100ec507d933ee58b467f1903acc07da719ad37532b942439fc16c4"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.2.20260526.0/AlmaLinux-10.2_x64_20260526.0.wsl",
+                    "Sha256": "55e75d87bad292bdb14c8c57bc35aaa5bd253e4f565321dd196c3f25b692be48"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20260311.0/AlmaLinux-10.1_ARM64_20260311.0.wsl",
-                    "Sha256": "2aedea16c5bdbc83b61d78634cc2f6b839435ad9066df1ea1a0bba7ad2fbdc39"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.2.20260526.0/AlmaLinux-10.2_ARM64_20260526.0.wsl",
+                    "Sha256": "d3b3ecc7b58ee3cceaa656de04175e81df2e7969efb2e22aba95c9ff1f430949"
                 }
             }
         ],
@@ -311,16 +311,6 @@
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.5-250708.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux9.5_dm28ctvqnhe9g"
-        },
-        {
-            "Name": "openSUSE-Leap-15.6",
-            "FriendlyName": "openSUSE Leap 15.6",
-            "StoreAppId": "9PDTJHBQRQPF",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_x64.Appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_ARM64.Appx",
-            "PackageFamilyName": "46932SUSE.openSUSELeap15.6_022rs5jcyhyac"
         },
         {
             "Name": "SUSE-Linux-Enterprise-15-SP6",

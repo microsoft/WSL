@@ -187,12 +187,15 @@ def get_adml_entries(path: str) -> tuple[dict, set]:
     """Parse an .adml file.
 
     Returns ({string_id: (value, [locked_tokens])}, {presentation_id, ...}).
-    Locked tokens are extracted from XML comments of the form
-    `<!-- {Locked="..."}{Locked="..."} -->` placed immediately before a
-    `<string>` element. Non-Locked comments are ignored.
+    Locked tokens are extracted from inline comments inside <string> elements:
+      `<string id="X"><!-- _locComment='{Locked="..."}' -->...text...</string>`
+    The whole-string `{Locked}` form is also recognized but contributes no
+    specific tokens to verify. This is the only form honored by the Touchdown
+    POMXML parser; standalone comments preceding a <string> are ignored by
+    Touchdown and so are not recognized here either.
     """
     # Parse with a TreeBuilder that preserves comments so we can associate
-    # {Locked="..."} tokens with the <string> element that follows them.
+    # {Locked="..."} tokens with the <string> element they belong to.
     parser = xml.etree.ElementTree.XMLParser(
         target=xml.etree.ElementTree.TreeBuilder(insert_comments=True))
     root = xml.etree.ElementTree.parse(path, parser=parser).getroot()
@@ -202,17 +205,21 @@ def get_adml_entries(path: str) -> tuple[dict, set]:
         raise RuntimeError(f'error: {path} is missing the required <stringTable> element')
 
     strings = {}
-    pending_tokens = []
     for child in string_table:
-        if child.tag is xml.etree.ElementTree.Comment:
-            pending_tokens.extend(re.findall(r'\{Locked="([^"]*)"\}', child.text or ''))
-        elif child.tag == f'{ADML_NS}string':
-            sid = child.get('id')
-            if sid is not None:
-                strings[sid] = (child.text or '', pending_tokens)
-            pending_tokens = []
-        else:
-            pending_tokens = []
+        if child.tag != f'{ADML_NS}string':
+            continue
+        sid = child.get('id')
+        if sid is None:
+            continue
+        # The string value is the text before the first child, plus the tail of
+        # any inline comment children (which is where the actual visible text
+        # ends up when the comment precedes it inside the <string>).
+        value = (child.text or '') + ''.join((c.tail or '') for c in child)
+        tokens = []
+        for c in child:
+            if c.tag is xml.etree.ElementTree.Comment:
+                tokens.extend(re.findall(r'\{Locked="([^"]*)"\}', c.text or ''))
+        strings[sid] = (value, tokens)
 
     presentation_table = root.find(f'.//{ADML_NS}presentationTable')
     if presentation_table is None:
@@ -269,12 +276,11 @@ def validate_adml(adml_folder: str, baseline_language: str) -> bool:
             result = False
 
         # Note: we intentionally do not enforce that baseline {Locked="..."}
-        # tokens appear in translated ADML strings. The Touchdown pipeline does
-        # not honor `<!-- {Locked="..."} -->` XML comments in .adml files (it
-        # only honors the `<comment>` element used by .resw), so locked tokens
-        # are routinely translated. Failing CI here would block every nightly
-        # localization PR. The baseline check above still catches authoring
-        # mistakes in en-US.
+        # tokens appear in translated ADML strings. Translated locale files
+        # generated before the en-US source migrated to inline _locComment
+        # directives still contain translated tokens; failing CI here would
+        # block every nightly localization PR until those caches refresh. The
+        # baseline check above still catches authoring mistakes in en-US.
         for sid in baseline_ids & set(translated.keys()):
             _, tokens = baseline[sid]
             tvalue, _ = translated[sid]
