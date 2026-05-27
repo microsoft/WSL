@@ -38,6 +38,14 @@ public:
         _In_ std::map<std::string, std::string>&& DriverOpts,
         _In_ std::map<std::string, std::string>&& Labels);
 
+    // Atomically create a guest-driver volume with default options if a volume
+    // with this name does not already exist. Used by the container-create path
+    // to synchronously own named volumes referenced by --volume, bypassing the
+    // podman /events stream which emits volume.create asynchronously (or not
+    // at all) for container-create-driven implicit creates. Returns true if a
+    // new volume was created, false if it already existed.
+    bool EnsureVolumeExists(_In_ const std::string& Name);
+
     void DeleteVolume(_In_ LPCSTR Name);
 
     std::vector<WSLCVolumeInformation> ListVolumes() const;

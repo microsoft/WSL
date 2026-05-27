@@ -48,6 +48,7 @@ using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
+using wsl::windows::service::wslc::WSLCVolumes;
 
 using namespace wsl::windows::common::io;
 using namespace wsl::windows::common::docker_schema;
@@ -407,7 +408,10 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
     return wsl::shared::ToJson(wrapper);
 }
 
-void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::windows::common::docker_schema::CreateContainer& request)
+void ProcessNamedVolumes(
+    const WSLCContainerOptions& containerOptions,
+    wsl::windows::common::docker_schema::CreateContainer& request,
+    WSLCVolumes& volumes)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
 
@@ -416,6 +420,15 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
         const auto& nv = containerOptions.NamedVolumes[i];
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.Name, "NamedVolume at index %lu has null Name", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.ContainerPath, "NamedVolume at index %lu has null ContainerPath", i);
+
+        // Synchronously own this named volume in wslcsession before the
+        // /containers/create call so that subsequent volume operations see a
+        // consistent view. podman's docker-compat /events stream emits
+        // volume.create asynchronously (or not at all) for container-create-
+        // driven implicit creates, which would otherwise leave m_volumes out
+        // of sync with the backend. No-op if the user (or an earlier mount in
+        // this same request) has already created the volume.
+        volumes.EnsureVolumeExists(nv.Name);
 
         wsl::windows::common::docker_schema::Mount mount{};
         mount.Source = std::string(nv.Name);
@@ -1404,6 +1417,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
+    WSLCVolumes& Volumes,
     IORelay& IoRelay)
 {
     common::docker_schema::CreateContainer request;
@@ -1602,7 +1616,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    ProcessNamedVolumes(containerOptions, request);
+    ProcessNamedVolumes(containerOptions, request, Volumes);
 
     // Configure GPU support if requested.
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsGpu))
