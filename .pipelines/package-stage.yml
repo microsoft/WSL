@@ -45,6 +45,7 @@ stages:
           ob_outputDirectory: '$(Build.SourcesDirectory)\out'
           ob_artifactBaseName: 'drop_wsl'
           ob_artifactSuffix: '_package'
+          ob_sdl_codeSignValidation_excludes: -|**\*.ps1
           buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
           buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
 
