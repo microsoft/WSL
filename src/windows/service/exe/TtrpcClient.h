@@ -70,6 +70,12 @@ public:
     // SCSI disk hot-remove: ModifyResource(REMOVE, SCSIDisk { controller, lun }).
     HRESULT DetachScsiDisk(uint32_t controller, uint32_t lun);
 
+    // VirtioFS share hot-add: ModifyResource(ADD, VirtioFSConfig { tag, root_path }).
+    HRESULT AddShare(const std::string& tag, const std::string& rootPath);
+
+    // VirtioFS share hot-remove: ModifyResource(REMOVE, VirtioFSConfig { tag }).
+    HRESULT RemoveShare(const std::string& tag);
+
     // VM configuration for CreateVm.
     struct VmConfig
     {

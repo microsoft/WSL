@@ -239,6 +239,44 @@ try
 }
 CATCH_RETURN()
 
+HRESULT TtrpcClient::AddShare(const std::string& tag, const std::string& rootPath)
+try
+{
+    WSL_LOG(
+        "TtrpcAddShare",
+        TraceLoggingValue(tag.c_str(), "Tag"),
+        TraceLoggingValue(rootPath.c_str(), "RootPath"));
+
+    vmservice::ModifyResourceRequest request;
+    request.set_type(vmservice::ADD);
+
+    auto* virtiofs = request.mutable_virtiofs();
+    virtiofs->set_tag(tag);
+    virtiofs->set_root_path(rootPath);
+
+    google::protobuf::Empty response;
+    return Call(c_serviceName, c_modifyResourceMethod, request, &response);
+}
+CATCH_RETURN()
+
+HRESULT TtrpcClient::RemoveShare(const std::string& tag)
+try
+{
+    WSL_LOG(
+        "TtrpcRemoveShare",
+        TraceLoggingValue(tag.c_str(), "Tag"));
+
+    vmservice::ModifyResourceRequest request;
+    request.set_type(vmservice::REMOVE);
+
+    auto* virtiofs = request.mutable_virtiofs();
+    virtiofs->set_tag(tag);
+
+    google::protobuf::Empty response;
+    return Call(c_serviceName, c_modifyResourceMethod, request, &response);
+}
+CATCH_RETURN()
+
 HRESULT TtrpcClient::CreateVm(const VmConfig& config)
 try
 {

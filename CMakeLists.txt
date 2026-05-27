@@ -171,6 +171,7 @@ find_nuget_package(Microsoft.RemoteDesktop.Client.MSRDC.SessionHost MSRDC /build
 find_nuget_package(Microsoft.Taef TAEF /)
 find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
 find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+set(WSL_DEVICE_HOST_NUGET_DIR "${WSL_DEVICE_HOST_SOURCE_DIR}")
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
@@ -211,6 +212,43 @@ set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
+endif()
+
+# --- Local OpenVMM binary override ---
+# Set OPENVMM_BUILD_DIR to use a locally built openvmm.exe instead of the version
+# from the Microsoft.WSL.DeviceHost NuGet package.  This is useful when iterating
+# on changes that span both the OpenVMM and WSL/WSLC projects.
+#
+# Usage:
+#   cmake . -DINCLUDE_OPENVMM=ON -DOPENVMM_BUILD_DIR="d:/src/openvmm/target/release"
+#
+# Or set in UserConfig.cmake:
+#   set(OPENVMM_BUILD_DIR "d:/src/openvmm/target/release")
+
+set(OPENVMM_BUILD_DIR "" CACHE PATH "Path to directory containing a locally built openvmm.exe (overrides NuGet package)")
+
+if (OPENVMM_BUILD_DIR)
+    if (NOT INCLUDE_OPENVMM)
+        message(WARNING "OPENVMM_BUILD_DIR is set but INCLUDE_OPENVMM is OFF. "
+                        "Pass -DINCLUDE_OPENVMM=ON to use the local openvmm build.")
+    elseif (EXISTS "${OPENVMM_BUILD_DIR}/openvmm.exe")
+        message(STATUS "Using local openvmm build: ${OPENVMM_BUILD_DIR}/openvmm.exe")
+        file(MAKE_DIRECTORY "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}")
+        file(CREATE_LINK "${OPENVMM_BUILD_DIR}/openvmm.exe"
+             "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe" COPY_ON_ERROR)
+
+        # When WSL_DEVICE_HOST_SOURCE_DIR was overridden (e.g. to local_overrides/),
+        # the proto file from the NuGet package is no longer reachable.  Copy it over.
+        if (NOT EXISTS "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto"
+            AND EXISTS "${WSL_DEVICE_HOST_NUGET_DIR}/proto/VMService.proto")
+            file(MAKE_DIRECTORY "${WSL_DEVICE_HOST_SOURCE_DIR}/proto")
+            file(CREATE_LINK "${WSL_DEVICE_HOST_NUGET_DIR}/proto/VMService.proto"
+                 "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto" COPY_ON_ERROR)
+        endif()
+    else()
+        message(WARNING "OPENVMM_BUILD_DIR is set but openvmm.exe was not found at '${OPENVMM_BUILD_DIR}'. "
+                        "Build it first: cargo build -p openvmm")
+    endif()
 endif()
 
 # Optional target configuration

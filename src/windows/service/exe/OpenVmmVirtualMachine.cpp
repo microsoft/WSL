@@ -586,16 +586,26 @@ try
 
     std::lock_guard lock(m_lock);
 
-    // TODO: Requires vmservice.proto extension for Plan9/VirtioFS in ModifyResourceRequest.
+    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
+        "ttrpc client not connected for share add");
+
+    GUID shareIdLocal;
+    THROW_IF_FAILED(CoCreateGuid(&shareIdLocal));
+    auto shareTag = wsl::shared::string::GuidToString<char>(shareIdLocal, wsl::shared::string::None);
+    auto hostPath = wsl::shared::string::WideToMultiByte(WindowsPath);
 
     WSL_LOG(
         "OpenVmmAddShare",
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
         TraceLoggingValue(WindowsPath, "WindowsPath"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
-        TraceLoggingValue("NOT_IMPLEMENTED", "Status"));
+        TraceLoggingValue(shareTag.c_str(), "Tag"));
 
-    return E_NOTIMPL;
+    THROW_IF_FAILED(m_ttrpcClient->AddShare(shareTag, hostPath));
+
+    m_shares.emplace(shareIdLocal, WindowsPath);
+    *ShareId = shareIdLocal;
+    return S_OK;
 }
 CATCH_RETURN()
 
@@ -604,14 +614,23 @@ try
 {
     std::lock_guard lock(m_lock);
 
-    // TODO: Requires vmservice.proto extension. See AddShare.
+    auto it = m_shares.find(ShareId);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_shares.end());
+
+    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
+        "ttrpc client not connected for share remove");
+
+    auto shareTag = wsl::shared::string::GuidToString<char>(it->first, wsl::shared::string::None);
 
     WSL_LOG(
         "OpenVmmRemoveShare",
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
-        TraceLoggingValue("NOT_IMPLEMENTED", "Status"));
+        TraceLoggingValue(shareTag.c_str(), "Tag"));
 
-    return E_NOTIMPL;
+    THROW_IF_FAILED(m_ttrpcClient->RemoveShare(shareTag));
+
+    m_shares.erase(it);
+    return S_OK;
 }
 CATCH_RETURN()
 
