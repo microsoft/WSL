@@ -2828,15 +2828,12 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
     <value>Show timestamps in log output</value>
-    <comment>{Locked="--timestamps"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
     <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
-    <comment>{Locked="--since"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
     <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
-    <comment>{Locked="--until"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
