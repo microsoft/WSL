@@ -3052,7 +3052,6 @@ Return Value:
 
 {
     std::vector<gsl::byte> Buffer;
-    MESSAGE_HEADER* Header{};
     struct sigaction SignalAction;
 
     //
@@ -3102,7 +3101,7 @@ Return Value:
             break;
 
         default:
-            FATAL_ERROR("Unexpected message {}", Header->MessageType);
+            FATAL_ERROR("Unexpected message {}", Message->Header.MessageType);
         }
     }
 
@@ -3207,7 +3206,7 @@ bool StopPlan9Server(bool Force, wsl::linux::WslDistributionConfig& Config)
     LX_INIT_STOP_PLAN9_SERVER Message{};
     Message.Header.MessageType = LxInitMessageStopPlan9Server;
     Message.Header.MessageSize = sizeof(Message);
-    Message.Force = Message.Force;
+    Message.Force = Force;
 
     const auto& Response = Config.Plan9ControlChannel.Transaction(Message);
 
