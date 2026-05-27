@@ -440,6 +440,21 @@ cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFea
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
 //
+// Values discovered from the guest kernel after the VM has booted, forwarded
+// from wslcsession via IWSLCVirtualMachine::ApplyGuestCapabilities. Add new
+// fields here instead of new IDL methods so the interface does not need a new
+// IID for each kernel-published value.
+//
+typedef struct _WSLCGuestCapabilities
+{
+    // (base, size) of the hv_pci swiotlb pool the kernel reserved and
+    // published under /sys/bus/vmbus/drivers/hv_pci/swiotlb_{base,size}.
+    // Both zero means the running kernel does not support hv_pci swiotlb.
+    UINT64 HvPciSwiotlbBase;
+    UINT64 HvPciSwiotlbSize;
+} WSLCGuestCapabilities;
+
+//
 // IWSLCVirtualMachine - Interface representing a single VM instance.
 // Operations are scoped to this VM. The VM ID is stored internally,
 // so only the holder of this interface can operate on the VM.
@@ -478,6 +493,14 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Removes a previously added filesystem share.
     HRESULT RemoveShare([in] REFGUID ShareId);
+
+    // Configures the per-VM state discovered from the guest kernel after boot
+    // (currently the hv_pci swiotlb pool). Subsequent calls to AddShare and
+    // ConfigureNetworking forward these values to wsldevicehost via the
+    // swiotlb device-options token. A capabilities struct whose fields are
+    // all zero means the guest kernel does not support the feature; the
+    // token is then omitted.
+    HRESULT ApplyGuestCapabilities([in] const WSLCGuestCapabilities* Capabilities);
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
