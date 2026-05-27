@@ -2359,6 +2359,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>No WSLC session found in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcSessionStorageMustBeEmpty" xml:space = "preserve" >
+    <value>Cannot use '{}' as session storage because the directory is not empty</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Invalid image tag format: '{}'. Expected format is 'name:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

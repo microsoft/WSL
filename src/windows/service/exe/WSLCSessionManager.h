@@ -187,7 +187,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IFastRundown>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IFastRundown, ISupportErrorInfo>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:
@@ -203,4 +203,7 @@ public:
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
+
+    // ISupportErrorInfo: enables IErrorInfo marshaling across COM boundaries.
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 };

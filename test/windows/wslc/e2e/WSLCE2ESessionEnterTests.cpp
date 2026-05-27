@@ -114,5 +114,28 @@ class WSLCE2ESessionEnterTests
             .ExitCode = 1,
         });
     }
+
+    WSLC_TEST_METHOD(WSLCE2E_SessionEnter_MarkerFileValidation)
+    {
+        // The non-empty-rejection case is covered by WSLCTests::CreateSessionValidation against a
+        // temp directory; reproducing it here would require mutating the shared default storage.
+        const auto storagePath = GetDefaultStoragePath();
+        const auto markerPath = storagePath / L"wslcsession";
+
+        auto createSessionAndExpectMarker = [&]() {
+            auto terminateOnExit = wil::scope_exit([&]() { RunWslc(L"system session terminate"); });
+            RunWslc(L"image ls").Verify({.ExitCode = 0});
+            VERIFY_IS_TRUE(std::filesystem::exists(markerPath));
+        };
+
+        // Default session creation writes the marker file.
+        createSessionAndExpectMarker();
+
+        // Legacy directory auto-upgrade: removing the marker then re-entering recreates it.
+        std::error_code ec;
+        VERIFY_IS_TRUE(std::filesystem::remove(markerPath, ec));
+        VERIFY_IS_FALSE(std::filesystem::exists(markerPath));
+        createSessionAndExpectMarker();
+    }
 };
 } // namespace WSLCE2ETests

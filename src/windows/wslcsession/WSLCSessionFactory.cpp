@@ -37,6 +37,11 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
+    // Establish a COM execution context so any user-error message set during session init
+    // (e.g. by ConfigureStorage's THROW_HR_WITH_USER_ERROR) is serialized to IErrorInfo before
+    // returning to the caller (wslservice -> wslc CLI).
+    wsl::windows::common::COMServiceExecutionContext context;
+
     *Session = nullptr;
     *ServiceRef = nullptr;
 
@@ -66,6 +71,11 @@ try
     return S_OK;
 }
 CATCH_RETURN()
+
+HRESULT wslc::WSLCSessionFactory::InterfaceSupportsErrorInfo(_In_ REFIID riid)
+{
+    return riid == __uuidof(IWSLCSessionFactory) ? S_OK : S_FALSE;
+}
 
 HRESULT wslc::WSLCSessionFactory::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try

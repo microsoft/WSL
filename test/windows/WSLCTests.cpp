@@ -451,6 +451,40 @@ class WSLCTests
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
         }
+
+        // Marker-file scenarios use unique temp paths so the test never touches shared default storage.
+        auto uniqueTempStoragePath = [] {
+            auto path = std::filesystem::temp_directory_path() /
+                        std::format(L"wslc-test-storage-{}-{}", GetCurrentProcessId(), GetTickCount64());
+            std::filesystem::create_directories(path);
+            return path;
+        };
+
+        auto expectMarkerRejection = [&](LPCWSTR name, auto&& populateDir) {
+            const auto storagePath = uniqueTempStoragePath();
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ignored;
+                std::filesystem::remove_all(storagePath, ignored);
+            });
+
+            populateDir(storagePath);
+
+            auto settings = GetDefaultSessionSettings(name);
+            const auto storagePathString = storagePath.wstring();
+            settings.StoragePath = storagePathString.c_str();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the directory is not empty", storagePathString));
+        };
+
+        // Reject non-empty storage directory without the wslcsession marker.
+        expectMarkerRejection(
+            L"storage-not-empty", [](const std::filesystem::path& dir) { std::ofstream{dir / L"userfile.txt"} << "data"; });
+
+        // Reject directory whose marker name is occupied by a sub-directory.
+        expectMarkerRejection(L"marker-is-directory", [](const std::filesystem::path& dir) {
+            std::filesystem::create_directory(dir / L"wslcsession");
+        });
     }
 
     struct VmInfo

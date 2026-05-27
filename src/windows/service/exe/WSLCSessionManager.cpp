@@ -272,7 +272,18 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef));
+        {
+            const auto factoryHr = factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef);
+            if (FAILED(factoryHr))
+            {
+                if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
+                {
+                    THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
+                }
+
+                THROW_IF_FAILED(factoryHr);
+            }
+        }
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
@@ -586,6 +597,11 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     COMServiceExecutionContext context;
 
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
+}
+
+HRESULT WSLCSessionManager::InterfaceSupportsErrorInfo(_In_ REFIID riid)
+{
+    return riid == __uuidof(IWSLCSessionManager) ? S_OK : S_FALSE;
 }
 
 namespace wsl::windows::service::wslc {
