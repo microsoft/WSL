@@ -31,15 +31,18 @@ protected:
         {
             // Lazily register for COM cancellation on first warning so
             // CancelUserCOMCallbacks() can abort the OnWarning call during session termination.
-            // Skip registration if this thread is already registered (e.g., by IProgressCallback
-            // in StreamImageOperation), since the thread is already cancellable.
             if (!m_comCallback.has_value() && m_session != nullptr && !m_session->IsUserCOMCallbackRegistered())
             {
                 m_comCallback = m_session->RegisterUserCOMCallback();
             }
 
-            LOG_IF_FAILED(m_warningCallback->OnWarning(warning.c_str()));
-            return true;
+            auto hr = m_warningCallback->OnWarning(warning.c_str());
+            if (SUCCEEDED(hr) || hr == RPC_E_CALL_CANCELED || hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+            {
+                return true;
+            }
+
+            LOG_HR(hr);
         }
 
         return COMServiceExecutionContext::CollectUserWarning(warning);

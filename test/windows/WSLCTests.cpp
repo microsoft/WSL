@@ -9825,43 +9825,37 @@ class WSLCTests
 
             // Create a container with an invalid WSLC metadata label.
             // RecoverExistingContainers will fail to parse this on the next session.
-            ExpectCommandResult(
+            auto result = ExpectCommandResult(
                 session.get(),
                 {"/usr/bin/docker", "create", "--label", "wslc.container.metadata=INVALID_JSON", "hello-world:latest"},
                 0);
 
-            session->Terminate();
-        }
+            // Capture the container ID from docker create output (stdout, trimmed).
+            auto containerId = result.Output[1];
+            containerId.erase(containerId.find_last_not_of(" \n\r") + 1);
 
-        // Phase 2: Create a new session pointing to the same storage with a warning callback.
-        {
+            session->Terminate();
+
+            // Phase 2: Create a new session pointing to the same storage with a warning callback.
             auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
 
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
-            settings.StoragePath = storagePath.c_str();
+            auto settings2 = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings2.StoragePath = storagePath.c_str();
 
-            const auto sessionManager = OpenSessionManager();
-            wil::com_ptr<IWSLCSession> session;
-            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
-            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+            const auto sessionManager2 = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session2;
+            VERIFY_SUCCEEDED(sessionManager2->CreateSession(&settings2, WSLCSessionFlagsNone, warningCallback.Get(), &session2));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session2.get());
 
-            // Verify the warning callback received a container recovery failure warning.
+            // Verify the warning matches the expected localized message for the corrupt container.
             auto warnings = warningCallback->GetWarnings();
-            VERIFY_IS_TRUE(warnings.size() >= 1);
+            auto expectedWarning = std::format(
+                L"wsl: {}\n",
+                wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
 
-            bool foundRecoveryWarning = false;
-            for (const auto& warning : warnings)
-            {
-                if (warning.find(L"recover container") != std::wstring::npos)
-                {
-                    foundRecoveryWarning = true;
-                    break;
-                }
-            }
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
-            VERIFY_IS_TRUE(foundRecoveryWarning);
-
-            session->Terminate();
+            session2->Terminate();
         }
     }
 
@@ -9921,21 +9915,12 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            // Verify the warning callback received a volume recovery failure warning.
+            // Verify the warning matches the expected localized message for the missing volume.
             auto warnings = warningCallback->GetWarnings();
-            VERIFY_IS_TRUE(warnings.size() >= 1);
+            auto expectedWarning =
+                std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery"));
 
-            bool foundRecoveryWarning = false;
-            for (const auto& warning : warnings)
-            {
-                if (warning.find(L"recover volume") != std::wstring::npos)
-                {
-                    foundRecoveryWarning = true;
-                    break;
-                }
-            }
-
-            VERIFY_IS_TRUE(foundRecoveryWarning);
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
