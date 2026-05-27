@@ -351,20 +351,6 @@ private:
     WriteHandle* ActiveHandle = nullptr;
     size_t RemainingBytes = 0;
 };
-
-
-// MultiHandleWait runs a set of OverlappedIOHandle to completion using the system thread
-// pool's wait infrastructure (RegisterWaitForSingleObject) so it can wait for more than
-// MAXIMUM_WAIT_OBJECTS (64) handles at once.
-//
-// Threading model: the wait callback runs on a thread pool thread and only enqueues the
-// signaled Entry into a queue, then sets a notification event. Run() owns the actual work:
-// it drains the queue and calls Collect() on each signaled handle from the Run() thread,
-// preserving the original guarantee that Schedule() and Collect() execute on the caller's
-// thread. To simplify lifetime management, Run() unregisters every wait at the top of each
-// iteration before processing state, then re-registers a fresh wait for every Pending
-// handle. The first handle to signal wakes Run(), which then processes whatever the
-// callbacks queued before re-arming.
 class MultiHandleWait
 {
 public:

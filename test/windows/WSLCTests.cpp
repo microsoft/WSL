@@ -8338,8 +8338,7 @@ class WSLCTests
         constexpr size_t followerCount = 100;
         static_assert(followerCount > MAXIMUM_WAIT_OBJECTS);
 
-        WSLCContainerLauncher launcher(
-            "debian:latest", "logs-test-many-followers", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+        WSLCContainerLauncher launcher("debian:latest", "logs-test-many-followers", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
         auto container = launcher.Launch(*m_defaultSession);
         auto initProcess = container.GetInitProcess();
 
@@ -8372,9 +8371,7 @@ class WSLCTests
 
         // Wait until every follower has observed the marker before killing the container.
         wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_ABORT, readersReady.load() < followerCount); },
-            std::chrono::milliseconds(100),
-            std::chrono::seconds(120));
+            [&]() { THROW_HR_IF(E_ABORT, readersReady.load() < followerCount); }, std::chrono::milliseconds(100), std::chrono::seconds(120));
 
         // Kill the container so all follow handles are closed.
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
