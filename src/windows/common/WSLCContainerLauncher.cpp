@@ -359,20 +359,20 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
-    std::vector<WSLCNetworkAttachment> networkAttachments;
+    std::vector<WSLCNetworkConnectionOptions> networkConnections;
     if (m_containerNetworkType == WSLCContainerNetworkTypeCustom)
     {
-        networkAttachments.push_back({m_containerNetworkName.c_str(), nullptr});
+        networkConnections.push_back({m_containerNetworkName.c_str(), nullptr});
     }
     for (const auto& e : m_additionalNetworks)
     {
-        networkAttachments.push_back({e.c_str(), nullptr});
+        networkConnections.push_back({e.c_str(), nullptr});
     }
 
-    if (!networkAttachments.empty())
+    if (!networkConnections.empty())
     {
-        options.ContainerNetwork.Networks = networkAttachments.data();
-        options.ContainerNetwork.NetworksCount = static_cast<ULONG>(networkAttachments.size());
+        options.ContainerNetwork.Networks = networkConnections.data();
+        options.ContainerNetwork.NetworksCount = static_cast<ULONG>(networkConnections.size());
     }
 
     options.MemoryBytes = m_memoryBytes;

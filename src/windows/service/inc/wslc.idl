@@ -242,16 +242,16 @@ typedef enum _WSLCContainerNetworkType
     WSLCContainerNetworkTypeCustom = 3
 } WSLCContainerNetworkType;
 
-typedef struct _WSLCNetworkAttachment
+typedef struct _WSLCNetworkConnectionOptions
 {
     [unique] LPCSTR NetworkName;
     [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
-} WSLCNetworkAttachment;
+} WSLCNetworkConnectionOptions;
 
 typedef struct _WSLCContainerNetwork
 {
     WSLCContainerNetworkType ContainerNetworkType;
-    [unique, size_is(NetworksCount)] const WSLCNetworkAttachment* Networks;
+    [unique, size_is(NetworksCount)] const WSLCNetworkConnectionOptions* Networks;
     ULONG NetworksCount;
 } WSLCContainerNetwork;
 
@@ -536,7 +536,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
     HRESULT Stats([out] LPSTR* Output);
-    HRESULT ConnectToNetwork([in] const WSLCNetworkAttachment* Attachment);
+    HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
 }
 

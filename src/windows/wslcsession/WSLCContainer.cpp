@@ -2348,15 +2348,15 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
     *Labels = labelsArray.release();
 }
 
-void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkAttachment* Attachment)
+void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
 {
-    THROW_HR_IF(E_POINTER, Attachment == nullptr);
-    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Attachment->ContainerIpAddress != nullptr);
+    THROW_HR_IF(E_POINTER, Options == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Options->ContainerIpAddress != nullptr);
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Attachment->NetworkName || strlen(Attachment->NetworkName) == 0);
+        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
 
-    const std::string networkName = Attachment->NetworkName;
+    const std::string networkName = Options->NetworkName;
 
     auto lock = m_lock.lock_shared();
 
@@ -2430,11 +2430,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkAttachment* Attachment)
+HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
 try
 {
     COMServiceExecutionContext context;
-    return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Attachment);
+    return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Options);
 }
 CATCH_RETURN();
 

@@ -5855,7 +5855,7 @@ class WSLCTests
         options.Name = "test-custom-network-empty";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
-        WSLCNetworkAttachment emptyNet{};
+        WSLCNetworkConnectionOptions emptyNet{};
         emptyNet.NetworkName = "";
         options.ContainerNetwork.Networks = &emptyNet;
         options.ContainerNetwork.NetworksCount = 1;
@@ -6213,7 +6213,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteNetwork(additionalNetwork.c_str()));
     }
 
-    WSLC_TEST_METHOD(ContainerNetworkAttachmentIpAddressRejectedTest)
+    WSLC_TEST_METHOD(ContainerNetworkIpAddressRejectedTest)
     {
         // ContainerIpAddress is reserved and must be null today.
         LPCSTR args[] = {"sleep", "99999"};
@@ -6223,7 +6223,7 @@ class WSLCTests
         options.Name = "test-network-ip-reserved";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeBridged;
-        WSLCNetworkAttachment netWithIp{};
+        WSLCNetworkConnectionOptions netWithIp{};
         netWithIp.NetworkName = "bridge";
         netWithIp.ContainerIpAddress = "10.0.0.5";
         options.ContainerNetwork.Networks = &netWithIp;
@@ -6248,40 +6248,7 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Container network name is required for custom network type.");
     }
 
-    WSLC_TEST_METHOD(ConnectDisconnectContainerNetworkRoundTripTest)
-    {
-        const std::string networkName = "test-connect-disconnect-net";
-        const std::string containerName = "test-connect-disconnect-ctr";
-
-        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
-
-        WSLCDriverOption opts[] = {{"Subnet", "172.53.0.0/16"}};
-        WSLCNetworkOptions netOpts{};
-        netOpts.Name = networkName.c_str();
-        netOpts.Driver = "bridge";
-        netOpts.DriverOpts = opts;
-        netOpts.DriverOptsCount = ARRAYSIZE(opts);
-        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
-        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
-
-        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeBridged);
-        auto container = launcher.Launch(*m_defaultSession);
-
-        WSLCNetworkAttachment attachment{};
-        attachment.NetworkName = networkName.c_str();
-        VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&attachment));
-
-        auto inspect = container.Inspect();
-        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
-        VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.at(networkName).IPAddress.empty());
-
-        VERIFY_SUCCEEDED(container.Get().DisconnectFromNetwork(networkName.c_str()));
-
-        auto inspectAfter = container.Inspect();
-        VERIFY_IS_FALSE(inspectAfter.NetworkSettings.Networks.contains(networkName));
-    }
-
-    WSLC_TEST_METHOD(ConnectDisconnectContainerValidationTest)
+    WSLC_TEST_METHOD(ConnectDisconnectContainerNetworkTest)
     {
         auto launchContainer = [&](const std::string& name,
                                    WSLCContainerNetworkType type = WSLCContainerNetworkType::WSLCContainerNetworkTypeBridged) {
@@ -6289,68 +6256,89 @@ class WSLCTests
             return launcher.Launch(*m_defaultSession);
         };
 
-        LogInfo("Test: Empty and non-existent network name");
-        {
-            auto container = launchContainer("test-connect-invalid-name");
-
-            WSLCNetworkAttachment attachment{};
-            attachment.NetworkName = "";
-            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().ConnectToNetwork(&attachment));
-            ValidateCOMErrorMessage(L"Network name cannot be empty.");
-
-            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().DisconnectFromNetwork(""));
-            ValidateCOMErrorMessage(L"Network name cannot be empty.");
-
-            const std::string nonExistentNetwork = "nonexistent-network";
-            const auto expectedError =
-                std::format(L"Network not found: '{}'", std::wstring(nonExistentNetwork.begin(), nonExistentNetwork.end()));
-
-            attachment.NetworkName = nonExistentNetwork.c_str();
-            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, container.Get().ConnectToNetwork(&attachment));
-            ValidateCOMErrorMessage(expectedError.c_str());
-
-            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, container.Get().DisconnectFromNetwork(nonExistentNetwork.c_str()));
-            ValidateCOMErrorMessage(expectedError.c_str());
-        }
-
-        LogInfo("Test: Host and none mode rejection");
-        {
-            const std::string networkName = "test-connect-mode-net";
-            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
-
-            WSLCDriverOption opts[] = {{"Subnet", "172.52.0.0/16"}};
+        auto createNetwork = [&](const std::string& name, const char* subnet) {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(name.c_str()));
+            WSLCDriverOption opts[] = {{"Subnet", subnet}};
             WSLCNetworkOptions netOpts{};
-            netOpts.Name = networkName.c_str();
+            netOpts.Name = name.c_str();
             netOpts.Driver = "bridge";
             netOpts.DriverOpts = opts;
             netOpts.DriverOptsCount = ARRAYSIZE(opts);
             VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts));
+        };
+
+        // Verifies both ConnectToNetwork and DisconnectFromNetwork reject with the same error for the given network name.
+        auto expectBothReject = [&](auto& container, LPCSTR networkName, HRESULT hr, LPCWSTR message) {
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName;
+            VERIFY_ARE_EQUAL(hr, container.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessage(message);
+            VERIFY_ARE_EQUAL(hr, container.Get().DisconnectFromNetwork(networkName));
+            ValidateCOMErrorMessage(message);
+        };
+
+        // Round-trip: connect to a network, verify via inspect, then disconnect.
+        {
+            const std::string networkName = "test-connect-disconnect-net";
+            createNetwork(networkName, "172.53.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            WSLCNetworkAttachment attachment{};
-            attachment.NetworkName = networkName.c_str();
+            auto container = launchContainer("test-connect-disconnect-ctr");
 
-            auto hostContainer = launchContainer("test-connect-host-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, hostContainer.Get().ConnectToNetwork(&attachment));
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
-            VERIFY_ARE_EQUAL(E_INVALIDARG, hostContainer.Get().DisconnectFromNetwork(networkName.c_str()));
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
 
-            auto noneContainer = launchContainer("test-connect-none-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, noneContainer.Get().ConnectToNetwork(&attachment));
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
-            VERIFY_ARE_EQUAL(E_INVALIDARG, noneContainer.Get().DisconnectFromNetwork(networkName.c_str()));
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.at(networkName).IPAddress.empty());
+
+            VERIFY_SUCCEEDED(container.Get().DisconnectFromNetwork(networkName.c_str()));
+
+            auto inspectAfter = container.Inspect();
+            VERIFY_IS_FALSE(inspectAfter.NetworkSettings.Networks.contains(networkName));
+            VERIFY_IS_TRUE(inspectAfter.NetworkSettings.Networks.contains("bridge"));
         }
 
-        LogInfo("Test: ContainerIpAddress not supported");
+        // Empty and non-existent network name.
+        {
+            auto container = launchContainer("test-connect-invalid-name");
+
+            expectBothReject(container, "", E_INVALIDARG, L"Network name cannot be empty.");
+
+            const std::string nonExistentNetwork = "nonexistent-network";
+            const auto expectedError =
+                std::format(L"Network not found: '{}'", std::wstring(nonExistentNetwork.begin(), nonExistentNetwork.end()));
+            expectBothReject(container, nonExistentNetwork.c_str(), WSLC_E_NETWORK_NOT_FOUND, expectedError.c_str());
+        }
+
+        // Host and none mode rejection.
+        {
+            const std::string networkName = "test-connect-mode-net";
+            createNetwork(networkName, "172.52.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto expectModeRejection = [&](const std::string& name, WSLCContainerNetworkType type) {
+                auto container = launchContainer(name, type);
+                expectBothReject(
+                    container,
+                    networkName.c_str(),
+                    E_INVALIDARG,
+                    L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            };
+
+            expectModeRejection("test-connect-host-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
+            expectModeRejection("test-connect-none-ctr", WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
+        }
+
+        // ContainerIpAddress not supported.
         {
             auto container = launchContainer("test-connect-ip-ctr");
 
-            WSLCNetworkAttachment attachment{};
-            attachment.NetworkName = "bridge";
-            attachment.ContainerIpAddress = "10.0.0.5";
-            VERIFY_ARE_EQUAL(E_NOTIMPL, container.Get().ConnectToNetwork(&attachment));
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = "bridge";
+            options.ContainerIpAddress = "10.0.0.5";
+            VERIFY_ARE_EQUAL(E_NOTIMPL, container.Get().ConnectToNetwork(&options));
             ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
         }
     }
@@ -6389,7 +6377,7 @@ class WSLCTests
         options.Name = "test-container-mode-no-target";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
-        WSLCNetworkAttachment emptyTarget{};
+        WSLCNetworkConnectionOptions emptyTarget{};
         emptyTarget.NetworkName = "container:";
         options.ContainerNetwork.Networks = &emptyTarget;
         options.ContainerNetwork.NetworksCount = 1;
@@ -6506,7 +6494,7 @@ class WSLCTests
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
         const std::string containerNetName = "container:" + containerAName;
-        WSLCNetworkAttachment netWithIp{};
+        WSLCNetworkConnectionOptions netWithIp{};
         netWithIp.NetworkName = containerNetName.c_str();
         netWithIp.ContainerIpAddress = "10.0.0.5";
         options.ContainerNetwork.Networks = &netWithIp;
@@ -6517,6 +6505,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
         ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
     }
+
     WSLC_TEST_METHOD(ContainerInspect)
     {
         // Helper to verify port mappings.
