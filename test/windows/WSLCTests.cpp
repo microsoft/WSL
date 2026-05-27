@@ -918,6 +918,16 @@ class WSLCTests
             // Note: Pulled images from registry should have digests, locally built may not
         }
 
+        LogInfo("Test: Invalid flags are rejected");
+        {
+            constexpr auto c_invalidFlags = static_cast<WSLCListImagesFlags>(0x4 | 0x8);
+
+            WSLCListImagesOptions options{.Flags = c_invalidFlags, .Filters = nullptr, .FiltersCount = 0};
+            wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+        }
+
         LogInfo("Test: Before/Since filters");
         {
             // Get all images to find their IDs and creation times
