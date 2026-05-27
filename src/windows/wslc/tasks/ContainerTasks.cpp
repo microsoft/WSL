@@ -67,10 +67,9 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     // Calculate CPU %
     // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
     double cpuPercent = 0.0;
-    const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
-                          static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
-    const auto systemDelta =
-        static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
+    const auto cpuDelta =
+        static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) - static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
+    const auto systemDelta = static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
 
     // When online_cpus is 0 (older API responses), fall back to percpu_usage array length — matches Docker CLI behavior.
     uint32_t onlineCpus = stats.cpu_stats.online_cpus;
@@ -582,9 +581,7 @@ void ShowContainerStats(CLIExecutionContext& context)
             return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
         },
         // Success
-        [&](const nlohmann::json& entry) {
-            statsJson.push_back(entry);
-        },
+        [&](const nlohmann::json& entry) { statsJson.push_back(entry); },
         // Error
         [&](const std::wstring& containerId, wil::ResultException error) {
             if (!userSpecifiedContainers)
