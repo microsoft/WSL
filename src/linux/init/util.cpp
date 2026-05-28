@@ -3326,6 +3326,22 @@ std::string UtilReadFileContent(std::string_view path)
     return {std::istreambuf_iterator<char>(file), {}};
 }
 
+HvPciSwiotlbPool UtilReadHvPciSwiotlbPool()
+{
+    HvPciSwiotlbPool pool{};
+    try
+    {
+        pool.Base = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_base"), nullptr, 0);
+        pool.Size = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_size"), nullptr, 0);
+    }
+    catch (...)
+    {
+        pool = {};
+    }
+
+    return pool;
+}
+
 uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
 {
     uint16_t LinuxAddressFamily = AF_UNSPEC;

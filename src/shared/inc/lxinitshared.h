@@ -403,6 +403,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCWatchProcesses,
     LxMessageWSLCProcessExited,
     LxMessageWSLCUnixConnect,
+    LxMessageWSLCGetGuestCapabilities,
+    LxMessageWSLCGetGuestCapabilitiesResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -513,6 +515,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCWatchProcesses)
         X(LxMessageWSLCProcessExited)
         X(LxMessageWSLCUnixConnect)
+        X(LxMessageWSLCGetGuestCapabilities)
+        X(LxMessageWSLCGetGuestCapabilitiesResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1430,9 +1434,11 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header;
     bool SeccompAvailable;
+    uint64_t HvPciSwiotlbBase;
+    uint64_t HvPciSwiotlbSize;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), BUFFER_FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1834,6 +1840,29 @@ struct WSLC_UNIX_CONNECT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES_RESULT
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilitiesResult;
+
+    MESSAGE_HEADER Header{};
+    uint64_t HvPciSwiotlbBase{};
+    uint64_t HvPciSwiotlbSize{};
+
+    PRETTY_PRINT(FIELD(Header), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilities;
+    using TResponse = WSLC_GET_GUEST_CAPABILITIES_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_GET_GUEST_CAPABILITIES);
+
+    MESSAGE_HEADER Header{};
+
+    PRETTY_PRINT(FIELD(Header));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

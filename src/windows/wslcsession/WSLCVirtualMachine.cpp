@@ -298,6 +298,11 @@ void WSLCVirtualMachine::Initialize()
     const auto modulesDevice = GetVhdDevicePath(1);
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
+    // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
+    // to the service so virtio device-options (virtiofs shares, VirtioProxy networking) can include
+    // the swiotlb token.
+    ReadGuestCapabilities();
+
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
@@ -398,6 +403,28 @@ void WSLCVirtualMachine::ConfigureNetworking()
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
+}
+
+void WSLCVirtualMachine::ReadGuestCapabilities()
+{
+    WSLC_GET_GUEST_CAPABILITIES message{};
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
+
+    m_hvPciSwiotlbBase = response.HvPciSwiotlbBase;
+    m_hvPciSwiotlbSize = response.HvPciSwiotlbSize;
+
+    WSL_LOG(
+        "WSLCReadGuestCapabilities",
+        TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
+
+    // Forward the values to the service so AddShare and ConfigureNetworking can include the
+    // swiotlb device-options token. Passing zero for both means the guest kernel does not
+    // support hv_pci swiotlb; the service then omits the token.
+    WSLCGuestCapabilities capabilities{};
+    capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
+    capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
+    THROW_IF_FAILED(m_vm->ApplyGuestCapabilities(&capabilities));
 }
 
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
