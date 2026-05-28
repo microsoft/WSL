@@ -192,7 +192,10 @@ void EnsureSessionMarker(const std::filesystem::path& StoragePath, bool IsExisti
         {
             // New session into an existing directory: require it to be empty.
             const bool empty = std::filesystem::is_empty(StoragePath, ec);
-            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
+            if (ec)
+            {
+                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
+            }
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
         }
     }
@@ -329,10 +332,8 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
-    // Pre-validate the storage path and stamp the marker file before any VM resources
-    // are created. The check must run before errorCleanup is established because
-    // Terminate()'s cleanup of partially-initialized state can overwrite the current
-    // error context during stack unwinding, swallowing the user-facing message.
+    // Validate the storage path before creating VM resources so rejection errors
+    // propagate cleanly (Terminate()'s cleanup can overwrite the error context).
     if (Settings->StoragePath != nullptr)
     {
         std::filesystem::path storagePath{Settings->StoragePath};
@@ -421,9 +422,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         return;
     }
 
-    // N.B. The storage path is validated and the marker file is stamped earlier in
-    // Initialize(), before errorCleanup is established. This is required so user-facing
-    // rejection errors propagate cleanly to the caller.
+    // Storage path validation and marker stamping are done in Initialize().
     std::filesystem::path storagePath{Settings.StoragePath};
     m_storageVhdPath = storagePath / "storage.vhdx";
 
