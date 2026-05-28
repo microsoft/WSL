@@ -922,6 +922,11 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 // MultiHandleWait
 
+MultiHandleWait::MultiHandleWait(MultiHandleWait&& other) noexcept
+{
+    *this = std::move(other);
+}
+
 MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
 {
     if (this != &other)

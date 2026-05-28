@@ -365,7 +365,7 @@ public:
     };
 
     MultiHandleWait() = default;
-    MultiHandleWait(MultiHandleWait&&) noexcept = default;
+    MultiHandleWait(MultiHandleWait&&) noexcept;
     MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
