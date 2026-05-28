@@ -2549,7 +2549,6 @@ try
     std::lock_guard networksLock(m_networksLock);
 
     m_containers.clear();
-    m_volumes.reset();
     m_networks.clear();
 
     // Stop the IO relay.
@@ -2564,9 +2563,6 @@ try
         std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
         m_allocatedPorts.clear();
     }
-
-    m_eventTracker.reset();
-    m_dockerClient.reset();
 
     // Check if the VM has already exited (e.g., killed externally).
     // If so, skip operations that require a live VM to avoid unnecessary waits.
@@ -2596,6 +2592,13 @@ try
                 WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
             }
 
+            // Detach VHD volumes while the VM is still alive and the init channel
+            // is usable (OnSessionTerminated removed the session-terminating event
+            // from the channel's exit events). This ensures the guest unmounts and
+            // flushes data to disk before the VM is destroyed.
+            // N.B. dockerd has exited by this point, so no container can be using the volumes.
+            m_volumes.reset();
+
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
             try
             {
@@ -2603,7 +2606,17 @@ try
             }
             CATCH_LOG();
         }
+        else
+        {
+            m_volumes.reset();
+        }
     }
+
+    // If the VM was already dead or never created, volumes may not have been reset above.
+    m_volumes.reset();
+
+    m_eventTracker.reset();
+    m_dockerClient.reset();
 
     m_dockerdProcess.reset();
     m_containerdProcess.reset();

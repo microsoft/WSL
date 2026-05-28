@@ -495,6 +495,14 @@ interface IWSLCVirtualMachine : IUnknown
     // For HCS VMs, this uses an HV socket listener on the crash dump port.
     // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge.
     HRESULT AcceptCrashDumpConnection([out, system_handle(sh_socket)] HANDLE* Socket);
+
+    // Maps a host port to a guest port via the VMM's built-in port forwarding.
+    // For OpenVMM consomme VMs, this creates a host-side listener in the VMM.
+    // For HCS VMs, returns E_NOTIMPL (port relay is used instead).
+    HRESULT MapPort([in] int Family, [in] unsigned short HostPort, [in] unsigned short GuestPort);
+
+    // Unmaps a previously mapped host port.
+    HRESULT UnmapPort([in] int Family, [in] unsigned short HostPort, [in] unsigned short GuestPort);
 }
 
 typedef enum _WSLCSessionStorageFlags

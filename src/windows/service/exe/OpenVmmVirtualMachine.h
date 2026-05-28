@@ -24,6 +24,8 @@ Abstract:
 #include "Dmesg.h"
 #include <filesystem>
 #include <map>
+#include <set>
+#include <tuple>
 #include <bitset>
 
 #define MAX_VHD_COUNT 254
@@ -48,6 +50,8 @@ public:
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(ConnectToVsockPort)(_In_ ULONG Port, _Out_ HANDLE* Socket) override;
     IFACEMETHOD(AcceptCrashDumpConnection)(_Out_ HANDLE* Socket) override;
+    IFACEMETHOD(MapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
+    IFACEMETHOD(UnmapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
 
 private:
     struct DiskInfo
@@ -143,12 +147,20 @@ private:
     // Shares: key is ShareId, value is Windows path.
     std::map<GUID, std::wstring, wsl::windows::common::helpers::GuidLess> m_shares;
 
+    // Bound ports: tracks (Family, HostPort, GuestPort) tuples.
+    // Same-family duplicates return ERROR_ALREADY_EXISTS (matching wslrelay behavior).
+    // Cross-family calls return S_OK since the dual-stack socket covers both.
+    std::set<std::tuple<int, unsigned short, unsigned short>> m_boundPorts;
+
     // Networking engine (ConsommeNetworking for the OpenVMM backend).
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     // ttrpc client for runtime VM management (disk hot-add/remove etc.).
     std::filesystem::path m_ttrpcSocketPath;
     std::unique_ptr<TtrpcClient> m_ttrpcClient;
+
+    // Termination callback to invoke when the VM exits.
+    wil::com_ptr<ITerminationCallback> m_terminationCallback;
 
     // Dmesg collector for early boot and virtio serial console output.
     std::shared_ptr<DmesgCollector> m_dmesgCollector;

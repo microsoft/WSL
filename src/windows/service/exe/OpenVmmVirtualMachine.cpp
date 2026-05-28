@@ -46,12 +46,17 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
     // Disable features not yet supported by the OpenVMM backend.
     WI_ClearFlag(m_featureFlags, WslcFeatureFlagsGPU);
-    WI_ClearFlag(m_featureFlags, WslcFeatureFlagsVirtioFs);
 
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_cpuCount = Settings->CpuCount;
     m_memoryMb = Settings->MemoryMb;
+
+    // Configure termination callback
+    if (Settings->TerminationCallback)
+    {
+        m_terminationCallback = Settings->TerminationCallback;
+    }
 
     // Resolve paths for kernel, initrd, and root VHD.
     auto basePath = wslutil::GetBasePath();
@@ -134,12 +139,14 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
         dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
-    // REVIEW: Can we always enable earlycon?
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", true /* earlycon */, std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
-    // Earlycon captures kernel output via COM1 before the hvc0 driver loads.
-    m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
+    {
+        // Earlycon captures kernel output via COM1 before the hvc0 driver loads.
+        m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+    }
 
     m_kernelCmdLine += L" console=hvc0 debug";
 
@@ -310,10 +317,13 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
     }
 
     // COM1 (port 0) — earlycon output before hvc0 loads.
-    config.SerialPorts.push_back({
-        .Port = 0,
-        .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
-    });
+    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
+    {
+        config.SerialPorts.push_back({
+            .Port = 0,
+            .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
+        });
+    }
 
     // Virtio console (/dev/hvc0) — primary console after boot.
     config.VirtioConsolePath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->VirtioConsoleName());
@@ -415,6 +425,13 @@ void OpenVmmVirtualMachine::WatchProcessExit()
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
 
     m_vmExitEvent.SetEvent();
+
+    if (m_terminationCallback)
+    {
+        auto reason = (exitCode == 0) ? WSLCVirtualMachineTerminationReasonShutdown : WSLCVirtualMachineTerminationReasonCrashed;
+        auto details = std::format(L"openvmm process exited with code {}", exitCode);
+        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, details.c_str()));
+    }
 }
 
 OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
@@ -424,15 +441,12 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // Signal termination to any pending operations.
     m_vmExitEvent.SetEvent();
 
-    // TeardownVM releases all VM resources and unblocks WaitVM.
     if (m_ttrpcClient)
     {
-        LOG_IF_FAILED(m_ttrpcClient->TeardownVm());
-        m_ttrpcClient->Disconnect();
-        m_ttrpcClient.reset();
+        LOG_IF_FAILED(m_ttrpcClient->QuitVm());
     }
 
-    // Wait up to 5 seconds for graceful exit, then force-terminate.
+    // Wait for graceful exit, then force-terminate.
     if (m_processHandle)
     {
         if (WaitForSingleObject(m_processHandle.get(), c_processTerminationTimeoutMs) == WAIT_TIMEOUT)
@@ -441,6 +455,9 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
             TerminateProcess(m_processHandle.get(), 1);
         }
     }
+
+    // Clean up the ttrpc client now that the process has exited.
+    m_ttrpcClient.reset();
 
     if (m_processWatchThread.joinable())
     {
@@ -461,18 +478,11 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     }
     DeleteFileW(m_crashDumpListenPath.c_str());
 
-    try
-    {
-        if (std::filesystem::exists(m_vsockPath))
-        {
-            std::filesystem::remove(m_vsockPath);
-        }
-        if (std::filesystem::exists(m_ttrpcSocketPath))
-        {
-            std::filesystem::remove(m_ttrpcSocketPath);
-        }
-    }
-    CATCH_LOG()
+    // Best-effort cleanup of socket files. Use DeleteFileW instead of
+    // std::filesystem to avoid exceptions — the files may still be held
+    // briefly by the OS after force-terminating the openvmm process.
+    DeleteFileW(m_vsockPath.c_str());
+    DeleteFileW(m_ttrpcSocketPath.c_str());
 }
 
 bool OpenVmmVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
@@ -535,6 +545,8 @@ HRESULT OpenVmmVirtualMachine::AttachDisk(_In_ LPCWSTR Path, _In_ BOOL ReadOnly,
 try
 {
     RETURN_HR_IF(E_POINTER, Path == nullptr || Lun == nullptr);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !std::filesystem::exists(Path), "Disk path does not exist: '%ls'", Path);
 
     std::lock_guard lock(m_lock);
 
@@ -583,6 +595,8 @@ HRESULT OpenVmmVirtualMachine::AddShare(_In_ LPCWSTR WindowsPath, _In_ BOOL Read
 try
 {
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || ShareId == nullptr);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(WindowsPath), "Path is not a directory: '%ls'", WindowsPath);
 
     std::lock_guard lock(m_lock);
 
@@ -601,7 +615,7 @@ try
         TraceLoggingValue(ReadOnly, "ReadOnly"),
         TraceLoggingValue(shareTag.c_str(), "Tag"));
 
-    THROW_IF_FAILED(m_ttrpcClient->AddShare(shareTag, hostPath));
+    THROW_IF_FAILED(m_ttrpcClient->AddShare(shareTag, hostPath, ReadOnly));
 
     m_shares.emplace(shareIdLocal, WindowsPath);
     *ShareId = shareIdLocal;
@@ -722,6 +736,72 @@ try
     // SocketChannel should use blocking I/O mode since AF_UNIX on Windows
     // does not support overlapped I/O.
     *Socket = reinterpret_cast<HANDLE>(unixSock);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::MapPort(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    auto key = std::make_tuple(Family, HostPort, GuestPort);
+    if (m_boundPorts.contains(key))
+    {
+        return HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+    }
+
+    // Mirror the wslrelay localhost relay limit (see localhost.cpp): the relay's
+    // AcceptThread uses WaitForMultipleObjects, which supports at most
+    // MAXIMUM_WAIT_OBJECTS (64) handles, with one reserved for the exit event.
+    // Reject the mapping if adding it would exceed the limit.
+    constexpr size_t c_maxPorts = MAXIMUM_WAIT_OBJECTS - 1;
+    if (m_boundPorts.size() >= c_maxPorts)
+    {
+        return HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES);
+    }
+
+    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
+        "ttrpc client not connected for port bind");
+
+    WSL_LOG(
+        "OpenVmmMapPort",
+        TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
+        TraceLoggingValue(HostPort, "HostPort"),
+        TraceLoggingValue(GuestPort, "GuestPort"),
+        TraceLoggingValue(Family, "Family"));
+
+    THROW_IF_FAILED(m_ttrpcClient->BindPort(HostPort, GuestPort, true, Family));
+
+    m_boundPorts.insert(key);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::UnmapPort(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    auto key = std::make_tuple(Family, HostPort, GuestPort);
+    if (!m_boundPorts.contains(key))
+    {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+
+    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
+        "ttrpc client not connected for port unbind");
+
+    WSL_LOG(
+        "OpenVmmUnmapPort",
+        TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
+        TraceLoggingValue(HostPort, "HostPort"),
+        TraceLoggingValue(GuestPort, "GuestPort"),
+        TraceLoggingValue(Family, "Family"));
+
+    THROW_IF_FAILED(m_ttrpcClient->UnbindPort(HostPort, GuestPort, true, Family));
+
+    m_boundPorts.erase(key);
     return S_OK;
 }
 CATCH_RETURN()

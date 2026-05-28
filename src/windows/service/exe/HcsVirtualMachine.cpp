@@ -815,3 +815,19 @@ try
     return S_OK;
 }
 CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::MapPort(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort)
+{
+    UNREFERENCED_PARAMETER(Family);
+    UNREFERENCED_PARAMETER(HostPort);
+    UNREFERENCED_PARAMETER(GuestPort);
+    return E_NOTIMPL;
+}
+
+HRESULT HcsVirtualMachine::UnmapPort(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort)
+{
+    UNREFERENCED_PARAMETER(Family);
+    UNREFERENCED_PARAMETER(HostPort);
+    UNREFERENCED_PARAMETER(GuestPort);
+    return E_NOTIMPL;
+}

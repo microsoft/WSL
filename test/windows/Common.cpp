@@ -2961,7 +2961,12 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     if (retry)
     {
         wsl::shared::retry::RetryWithTimeout<void>(sendRequest, std::chrono::milliseconds(500), std::chrono::seconds(30), [&]() {
-            return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE);
+            auto hr = wil::ResultFromCaughtException();
+            // WININET_E_INVALID_SERVER_RESPONSE: returned by the HCS/wslrelay backend when the
+            // guest service is not yet listening.
+            // WININET_E_CONNECTION_RESET: returned by the OpenVMM/Consomme backend when the
+            // guest kernel RSTs the connection because the service hasn't started listening yet.
+            return hr == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE) || hr == WININET_E_CONNECTION_RESET;
         });
     }
     else

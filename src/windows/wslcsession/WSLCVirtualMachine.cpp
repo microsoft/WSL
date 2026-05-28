@@ -263,6 +263,8 @@ WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const 
 void WSLCVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
+    
+    THROW_IF_FAILED(m_vm->GetTerminationEvent(&m_vmExitedEvent));
 
     // Start crash dump collection thread.
     // The VM backend handles the listen socket creation (HV socket for HCS,
@@ -308,19 +310,51 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
 
     m_vmTerminatingEvent.SetEvent();
 
-    m_initChannel.Close();
-
-    // Terminate the VM.
-    m_vm.reset();
-
-    if (m_processExitThread.joinable())
+    // Tell the guest to halt by killing PID 1 (mini_init). The kernel
+    // command line includes panic=-1, so a PID 1 death causes an immediate
+    // kernel panic and halt. This allows the openvmm VM worker to observe
+    // the guest halt and exit cleanly, avoiding a force-terminate.
+    try
     {
-        m_processExitThread.join();
+        Signal(1, 9 /* SIGKILL */);
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION_MSG("Failed to signal PID 1 for guest halt");
     }
 
+    m_initChannel.Close();
+
+    // Signal the VM exit event to unblock any pending AcceptCrashDumpConnection
+    // COM calls. The crash dump thread may hold an in-flight cross-process COM
+    // call to AcceptCrashDumpConnection, which blocks waiting for the VM exit
+    // event. COM prevents the server object from being destroyed while calls
+    // are pending, so releasing m_vm without unblocking this call first would
+    // deadlock. Signaling the event makes AcceptCrashDumpConnection return
+    // E_ABORT, allowing the crash dump thread to exit cleanly.
+    if (m_vmExitedEvent)
+    {
+        m_vmExitedEvent.SetEvent();
+    }
+
+    // Join the crash dump thread first — it makes cross-process COM calls to
+    // the VM backend. Once joined, no in-flight COM calls remain and the
+    // VM COM reference can be released without deadlock.
     if (m_crashDumpThread.joinable())
     {
         m_crashDumpThread.join();
+    }
+
+    // Release the VM COM reference. This triggers the server-side destructor
+    // which terminates the openvmm process, breaking all socket connections
+    // (including the process exit thread's vsock channel).
+    m_vm.reset();
+
+    // Join the process exit thread after the VM is destroyed — it reads from
+    // a vsock channel that gets disconnected when the VM dies.
+    if (m_processExitThread.joinable())
+    {
+        m_processExitThread.join();
     }
 
     // Clear the state of all remaining processes now that the VM has exited.
@@ -965,6 +999,17 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
 
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
+            "Unsupported port mapping for consomme mode: %hs, protocol: %i",
+            Mapping.BindingAddressString().c_str(),
+            Mapping.Protocol);
+
+        THROW_IF_FAILED(m_vm->MapPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port()));
+    }
     else
     {
         THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
@@ -990,6 +1035,10 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
         // TODO: Switch to using the native virtionet relay.
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        THROW_IF_FAILED(m_vm->UnmapPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port()));
+    }
     else
     {
         THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
@@ -1007,6 +1056,8 @@ HRESULT WSLCVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In
 try
 {
     std::filesystem::path path(WindowsPath);
+    auto absolute = path.is_absolute();
+    WSL_LOG("MountWindowsFolder", TraceLoggingValue(WindowsPath, "WindowsPath"), TraceLoggingValue(LinuxPath, "LinuxPath"), TraceLoggingValue(static_cast<ULONG>(Flags), "Flags"), TraceLoggingValue(absolute, "IsAbsolute"));
     THROW_HR_IF_MSG(E_INVALIDARG, !path.is_absolute(), "Path is not absolute: '%ls'", WindowsPath);
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);

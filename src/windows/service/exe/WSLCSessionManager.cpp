@@ -281,7 +281,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         {
             openVmmSettings = *Settings;
             WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsGPU);
-            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+            WI_SetFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
             WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
             // OpenVMM provides networking via its built-in consomme backend.

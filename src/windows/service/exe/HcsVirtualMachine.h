@@ -47,6 +47,8 @@ public:
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(ConnectToVsockPort)(_In_ ULONG Port, _Out_ HANDLE* Socket) override;
     IFACEMETHOD(AcceptCrashDumpConnection)(_Out_ HANDLE* Socket) override;
+    IFACEMETHOD(MapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
+    IFACEMETHOD(UnmapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
 
 private:
     struct DiskInfo

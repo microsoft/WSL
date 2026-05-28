@@ -239,13 +239,14 @@ try
 }
 CATCH_RETURN()
 
-HRESULT TtrpcClient::AddShare(const std::string& tag, const std::string& rootPath)
+HRESULT TtrpcClient::AddShare(const std::string& tag, const std::string& rootPath, bool readOnly)
 try
 {
     WSL_LOG(
         "TtrpcAddShare",
         TraceLoggingValue(tag.c_str(), "Tag"),
-        TraceLoggingValue(rootPath.c_str(), "RootPath"));
+        TraceLoggingValue(rootPath.c_str(), "RootPath"),
+        TraceLoggingValue(readOnly, "ReadOnly"));
 
     vmservice::ModifyResourceRequest request;
     request.set_type(vmservice::ADD);
@@ -253,6 +254,7 @@ try
     auto* virtiofs = request.mutable_virtiofs();
     virtiofs->set_tag(tag);
     virtiofs->set_root_path(rootPath);
+    virtiofs->set_read_only(readOnly);
 
     google::protobuf::Empty response;
     return Call(c_serviceName, c_modifyResourceMethod, request, &response);
@@ -271,6 +273,62 @@ try
 
     auto* virtiofs = request.mutable_virtiofs();
     virtiofs->set_tag(tag);
+
+    google::protobuf::Empty response;
+    return Call(c_serviceName, c_modifyResourceMethod, request, &response);
+}
+CATCH_RETURN()
+
+HRESULT TtrpcClient::BindPort(uint16_t hostPort, uint16_t guestPort, bool tcp, int family)
+try
+{
+    auto hostAddress = (family == AF_INET6) ? "::1" : "127.0.0.1";
+
+    WSL_LOG(
+        "TtrpcBindPort",
+        TraceLoggingValue(hostPort, "HostPort"),
+        TraceLoggingValue(guestPort, "GuestPort"),
+        TraceLoggingValue(tcp, "Tcp"),
+        TraceLoggingValue(hostAddress, "HostAddress"));
+
+    vmservice::ModifyResourceRequest request;
+    request.set_type(vmservice::UPDATE);
+
+    auto* nic = request.mutable_nic_config();
+    auto* consomme = nic->mutable_consomme();
+    auto* port = consomme->add_ports();
+    port->set_host_port(hostPort);
+    port->set_guest_port(guestPort);
+    port->set_protocol(tcp ? vmservice::TCP : vmservice::UDP);
+    port->set_host_address(hostAddress);
+
+    google::protobuf::Empty response;
+    return Call(c_serviceName, c_modifyResourceMethod, request, &response);
+}
+CATCH_RETURN()
+
+HRESULT TtrpcClient::UnbindPort(uint16_t hostPort, uint16_t guestPort, bool tcp, int family)
+try
+{
+    auto hostAddress = (family == AF_INET6) ? "::1" : "127.0.0.1";
+
+    WSL_LOG(
+        "TtrpcUnbindPort",
+        TraceLoggingValue(hostPort, "HostPort"),
+        TraceLoggingValue(guestPort, "GuestPort"),
+        TraceLoggingValue(tcp, "Tcp"),
+        TraceLoggingValue(hostAddress, "HostAddress"));
+
+    vmservice::ModifyResourceRequest request;
+    request.set_type(vmservice::REMOVE);
+
+    auto* nic = request.mutable_nic_config();
+    auto* consomme = nic->mutable_consomme();
+    auto* port = consomme->add_ports();
+    port->set_host_port(hostPort);
+    port->set_guest_port(guestPort);
+    port->set_protocol(tcp ? vmservice::TCP : vmservice::UDP);
+    port->set_host_address(hostAddress);
 
     google::protobuf::Empty response;
     return Call(c_serviceName, c_modifyResourceMethod, request, &response);
@@ -370,6 +428,34 @@ try
     google::protobuf::Empty request;
     google::protobuf::Empty response;
     return Call(c_serviceName, c_teardownVmMethod, request, &response);
+}
+CATCH_RETURN()
+
+HRESULT TtrpcClient::QuitVm()
+try
+{
+    WSL_LOG("TtrpcQuitVm");
+
+    google::protobuf::Empty request;
+    std::vector<uint8_t> requestPayload;
+    RETURN_IF_FAILED(SerializeMessage(request, requestPayload));
+
+    std::lock_guard lock(m_lock);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_CONNECTED), m_socket == INVALID_SOCKET);
+
+    auto ttrpcPayload = TtrpcEnvelopeCodec::EncodeRequestEnvelope(c_serviceName, c_quitVmMethod, requestPayload);
+
+    detail::TtrpcMessageHeader header{};
+    TtrpcEnvelopeCodec::WriteBigEndian32(header.Length, static_cast<uint32_t>(ttrpcPayload.size()));
+    TtrpcEnvelopeCodec::WriteBigEndian32(header.StreamId, m_nextStreamId);
+    header.MessageType = TtrpcEnvelopeCodec::c_messageTypeRequest;
+    header.Flags = 0;
+    m_nextStreamId += 2;
+
+    RETURN_IF_FAILED(SendAll(&header, sizeof(header)));
+    RETURN_IF_FAILED(SendAll(ttrpcPayload.data(), ttrpcPayload.size()));
+
+    return S_OK;
 }
 CATCH_RETURN()
 

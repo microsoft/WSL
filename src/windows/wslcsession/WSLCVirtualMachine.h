@@ -230,6 +230,7 @@ private:
     std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_vmExitedEvent;
     HANDLE m_sessionTerminatingEvent{};
 
     wsl::shared::SocketChannel m_initChannel;

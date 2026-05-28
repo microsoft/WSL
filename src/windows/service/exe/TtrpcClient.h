@@ -70,11 +70,19 @@ public:
     // SCSI disk hot-remove: ModifyResource(REMOVE, SCSIDisk { controller, lun }).
     HRESULT DetachScsiDisk(uint32_t controller, uint32_t lun);
 
-    // VirtioFS share hot-add: ModifyResource(ADD, VirtioFSConfig { tag, root_path }).
-    HRESULT AddShare(const std::string& tag, const std::string& rootPath);
+    // VirtioFS share hot-add: ModifyResource(ADD, VirtioFSConfig { tag, root_path, read_only }).
+    HRESULT AddShare(const std::string& tag, const std::string& rootPath, bool readOnly);
 
     // VirtioFS share hot-remove: ModifyResource(REMOVE, VirtioFSConfig { tag }).
     HRESULT RemoveShare(const std::string& tag);
+
+    // Consomme port bind: ModifyResource(UPDATE, NicConfig { consomme { ports } }).
+    // Creates a host-side listener in OpenVMM's consomme NAT and forwards to the guest port.
+    // family is AF_INET or AF_INET6.
+    HRESULT BindPort(uint16_t hostPort, uint16_t guestPort, bool tcp, int family);
+
+    // Consomme port unbind: ModifyResource(REMOVE, NicConfig { consomme { ports } }).
+    HRESULT UnbindPort(uint16_t hostPort, uint16_t guestPort, bool tcp, int family);
 
     // VM configuration for CreateVm.
     struct VmConfig
@@ -128,6 +136,10 @@ public:
     // TeardownVM: release all VM resources and unblock the WaitVM call.
     HRESULT TeardownVm();
 
+    // Quit: tear down the VM and exit the openvmm process.
+    // Fire-and-forget — sends the request without waiting for a response.
+    HRESULT QuitVm();
+
 private:
     // ttrpc service and method names (from vmservice.proto).
     static constexpr char c_serviceName[] = "vmservice.VM";
@@ -135,6 +147,7 @@ private:
     static constexpr char c_resumeVmMethod[] = "ResumeVM";
     static constexpr char c_waitVmMethod[] = "WaitVM";
     static constexpr char c_teardownVmMethod[] = "TeardownVM";
+    static constexpr char c_quitVmMethod[] = "Quit";
     static constexpr char c_modifyResourceMethod[] = "ModifyResource";
 
     // Send a ttrpc request payload and wait for the response payload.
