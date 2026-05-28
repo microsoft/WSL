@@ -29,13 +29,9 @@ namespace wsl::windows::wslc {
 // This keeps wall time proportional to ceil(N / batchSize) rather than N for operations
 // that have inherent per-item latency (e.g. network or IPC calls).
 //
-// COM threading note: worker threads created by std::async are not guaranteed to have
-// COM initialized. Callers whose onWork callback uses COM interfaces must ensure those
-// interfaces are free-threaded (agile / FtmBase) and that the process has an active MTA
-// (e.g. via CoIncrementMTAUsage or RO_INIT_MULTITHREADED) so that cross-thread calls are
-// valid without per-thread CoInitializeEx. The WSLC session interfaces (IWSLCSession,
-// IWSLCContainer) implement FtmBase and the wslc process initializes the MTA, satisfying
-// this requirement.
+// Note: worker threads have no guaranteed per-thread initialization (e.g. COM). Callers
+// whose onWork requires per-thread setup (such as CoInitializeEx) are responsible for
+// performing it at the start of the onWork lambda.
 //
 // TWork   : TItem -> TResult                              (called concurrently)
 // TSuccess: TResult -> void                               (called serially)

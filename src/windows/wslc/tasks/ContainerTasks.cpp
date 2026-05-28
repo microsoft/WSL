@@ -72,7 +72,13 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     const auto systemDelta = static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
     if (systemDelta > 0.0 && cpuDelta > 0.0)
     {
-        cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(stats.cpu_stats.online_cpus) * 100.0;
+        uint32_t onlineCpus = stats.cpu_stats.online_cpus;
+        if (onlineCpus == 0 && stats.cpu_stats.cpu_usage.percpu_usage.has_value())
+        {
+            onlineCpus = static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size());
+        }
+
+        cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
     }
 
     // Calculate memory %
@@ -566,13 +572,15 @@ void ShowContainerStats(CLIExecutionContext& context)
     nlohmann::json statsJson = nlohmann::json::array();
     wsl::windows::wslc::ForEachAsync<std::wstring>(
         containers,
-        // Work
+        // Work to be done for each container ID on a separate thread.
         [&session](const std::wstring& containerId) {
+            // ContainerService::Stats makes COM calls, so we must ensure COM is initialized on this thread.
+            auto comCleanup = wil::CoInitializeEx(COINIT_MULTITHREADED);
             return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
         },
-        // Success
+        // On Success
         [&](const nlohmann::json& entry) { statsJson.push_back(entry); },
-        // Error
+        // On Error
         [&](const std::wstring& containerId, wil::ResultException error) {
             if (!userSpecifiedContainers)
             {
@@ -590,7 +598,9 @@ void ShowContainerStats(CLIExecutionContext& context)
             // no container information displayed.
             LOG_HR_MSG(error.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
             throw error;
-        });
+        },
+        10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
+    );
 
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
