@@ -82,7 +82,7 @@ IOCallback::~IOCallback()
 try
 {
     Cancel();
-        Complete();
+    Complete();
 }
 CATCH_LOG();
 
