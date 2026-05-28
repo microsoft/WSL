@@ -106,6 +106,23 @@ void HandleMessageImpl(
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel,
+    wsl::shared::Transaction& Transaction,
+    const WSLC_GET_GUEST_CAPABILITIES& Message,
+    const gsl::span<gsl::byte>& Buffer)
+{
+    WSLC_GET_GUEST_CAPABILITIES_RESULT response{};
+    response.Header.MessageType = WSLC_GET_GUEST_CAPABILITIES_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    auto pool = UtilReadHvPciSwiotlbPool();
+    response.HvPciSwiotlbBase = pool.Base;
+    response.HvPciSwiotlbSize = pool.Size;
+
+    Transaction.Send<WSLC_GET_GUEST_CAPABILITIES_RESULT>(response);
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
@@ -836,7 +853,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

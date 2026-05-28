@@ -345,51 +345,87 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
-    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    WSL2_TEST_METHOD(BinfmtStatusIsLocked)
     {
-        // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        //
+        // Validates the protection mechanism for the cross-distro binfmt wipe bug.
+        //
+        // Fix: per-distro init bind-mounts a read-only file over
+        // /proc/sys/fs/binfmt_misc/status before exec'ing the distro's init
+        // (see LockBinfmtStatusReadOnly in src/linux/init/init.cpp). systemd-shutdown's
+        // disable_binfmt() writes "-1" to that file to clear the kernel-global
+        // binfmt_misc table at shutdown; with the bind-mount in place the write
+        // fails with EROFS so the entries shared with other running distros
+        // survive. Per-entry operations (registering new entries via /register,
+        // unregistering individual entries via the entry file) are unaffected.
+        //
 
-        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
-            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
-        });
-
+        // Default: bind-mount must be in place.
         {
-            // Enable systemd (restarts distro).
+            // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+            // VM teardown that bumped value persists across distro restarts and
+            // breaks later tests like ResourceLimits that assume the kernel default.
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd();
 
-            auto validateBinfmt = []() {
-                // Validate that WSL's binfmt interpreter is still in place.
-                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
-            };
+            // /status is its own mount point.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
-            validateBinfmt();
+            // Reading /status returns the lock-file content ("enabled\n") so
+            // callers that just check whether binfmt_misc is enabled still get a
+            // sensible answer.
+            {
+                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+            }
 
-            // Validate that this still works after restarting the distribution.
-            TerminateDistribution();
-            validateBinfmt();
+            // Direct write to /status — the wipe vector — must fail with EROFS.
+            // The shell's redirection error ("cannot create ...: Read-only file
+            // system") goes to the shell's stderr when the `>` open fails.
+            {
+                auto [_, err] = LxsstuLaunchWslAndCaptureOutput(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status; exit 0'");
+                VERIFY_IS_TRUE(err.find(L"Read-only file system") != std::wstring::npos);
+            }
 
-            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // WSLInterop survives the failed wipe attempt.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // Runtime registration via /register still works (we only block /status).
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
-            // Validate that the unit is regenerated after a daemon-reload.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload && systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
+            // cascade into later tests. Always remove it on scope exit.
+            auto cleanupTestEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+                LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt 2>/dev/null || true'");
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+
+            // Per-entry unregister (writing -1 to the entry file, not /status) still works.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt'"), 0L);
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+            cleanupTestEntry.release();
+
+            // Interop still works.
+            {
+                auto [cmd, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
+            }
         }
 
+        // protectBinfmt=false: bind-mount must NOT be installed (kill switch).
+        // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
+        // then terminates it; that termination invokes systemd-shutdown's
+        // disable_binfmt() which wipes the kernel-global table because
+        // protectBinfmt=false leaves /status writable. WslShutdown registered
+        // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
+        // after the wipe, so the next test starts a fresh VM where mini_init
+        // re-registers WSLInterop.
         {
-            // Enable systemd (restarts distro).
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
-            // Validate that WSL's binfmt interpreter is overridden
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
         }
     }
 
@@ -411,6 +447,73 @@ class UnitTests
         // Verify that a new WSL command succeeds (the distro restarts cleanly).
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
         VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
+    WSL2_TEST_METHOD(BinfmtSurvivesDistroTermination)
+    {
+        //
+        // Regression test for the "Exec format error" bug: binfmt_misc registrations
+        // (most importantly WSLInterop) must survive when a peer systemd-enabled distro
+        // terminates. Before this fix, systemd-shutdown's disable_binfmt() wrote `-1`
+        // to /proc/sys/fs/binfmt_misc/status, which clears the entire binfmt_misc
+        // entry table. binfmt_misc itself is a single kernel-global registry — it is
+        // not isolated per distro — so that one write wiped WSLInterop for every
+        // running distro and broke Windows interop everywhere.
+        //
+
+        constexpr auto peerDistroName = L"binfmt-peer-test";
+
+        // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+        // VM teardown that bumped value persists across distro restarts and
+        // breaks later tests like ResourceLimits that assume the kernel default.
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+
+        // Enable systemd on the primary test distro.
+        auto cleanupSystemd = EnableSystemd();
+
+        // Import a second distro from the same tarball as the test distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+
+        auto cleanupPeer =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+        // Enable systemd in the peer distro (no helper exists for non-test distros).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+
+        // Terminate so the config takes effect on next start.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop works in both distros (this also starts the peer with systemd).
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo alive");
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
+
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo alive", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
+
+        // Terminate the peer distro — this triggers systemd shutdown. Without
+        // the fix, systemd-shutdown's disable_binfmt() would clear the kernel-
+        // global binfmt_misc table for every running distro.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop still works in the primary distro.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo survived");
+            VERIFY_ARE_EQUAL(out, L"survived\r\n");
+        }
+
+        // Verify the binfmt entry still exists and carries the F (fix-binary) flag.
+        // The F flag is required so the kernel resolves the interpreter at
+        // registration time, making the entry independent of mount-namespace state.
+        {
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+        }
     }
 
     TEST_METHOD(Dup)
@@ -2127,6 +2230,17 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(
             L"[experimental]\nignoredPorts=65536",
             std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:22\r\n", wslConfigPath));
+
+        // Verify experimental.swiotlb parsing and validation.
+        //
+        // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently.
+        validateWarnings(L"[experimental]\nswiotlb=64M", L"");
+        validateWarnings(L"[experimental]\nswiotlb=4096K", L"");
+
+        // Malformed values are rejected by the parser; only the parser warning is reported.
+        validateWarnings(
+            L"[experimental]\nswiotlb=garbage",
+            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:22\r\n", wslConfigPath));
 
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");
