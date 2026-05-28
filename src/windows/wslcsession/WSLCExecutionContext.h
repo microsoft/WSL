@@ -29,11 +29,10 @@ protected:
     {
         if (m_warningCallback != nullptr)
         {
-            // Lazily register for COM cancellation on first warning so
-            // CancelUserCOMCallbacks() can abort the OnWarning call during session termination.
-            if (!m_comCallback.has_value() && m_session != nullptr && !m_session->IsUserCOMCallbackRegistered())
+            std::unique_ptr<UserCOMCallback> comCallback;
+            if (m_session != nullptr)
             {
-                m_comCallback = m_session->RegisterUserCOMCallback();
+                comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
             }
 
             auto hr = m_warningCallback->OnWarning(warning.c_str());
@@ -51,7 +50,6 @@ protected:
 private:
     WSLCSession* m_session = nullptr;
     IWarningCallback* m_warningCallback = nullptr;
-    std::optional<UserCOMCallback> m_comCallback;
 };
 
 } // namespace wsl::windows::service::wslc

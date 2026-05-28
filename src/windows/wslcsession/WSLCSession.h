@@ -182,7 +182,6 @@ public:
 
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
-    bool IsUserCOMCallbackRegistered();
 
     HANDLE SessionTerminatingEvent() const noexcept
     {
@@ -265,7 +264,7 @@ private:
 
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
     std::recursive_mutex m_userCOMCallbacksLock;
-    __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
+    __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

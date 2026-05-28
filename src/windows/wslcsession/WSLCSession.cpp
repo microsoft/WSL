@@ -2804,16 +2804,20 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
 
     THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
 
-    auto [_, inserted] = m_userCOMCallbackThreads.insert(GetCurrentThreadId());
-    WI_VERIFY(inserted);
+    auto threadId = GetCurrentThreadId();
+    auto it = m_userCOMCallbackThreads.find(threadId);
+    WI_VERIFY(it == m_userCOMCallbackThreads.end() || it->second > 0);
+
+    if (it == m_userCOMCallbackThreads.end())
+    {
+        m_userCOMCallbackThreads.insert({threadId, 1});
+    }
+    else
+    {
+        it->second++;
+    }
 
     return UserCOMCallback{*this};
-}
-
-bool WSLCSession::IsUserCOMCallbackRegistered()
-{
-    std::lock_guard lock(m_userCOMCallbacksLock);
-    return m_userCOMCallbackThreads.contains(GetCurrentThreadId());
 }
 
 void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
@@ -2821,14 +2825,21 @@ void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
     std::lock_guard lock(m_userCOMCallbacksLock);
 
     auto it = m_userCOMCallbackThreads.find(ThreadId);
-    WI_VERIFY(it != m_userCOMCallbackThreads.end());
+    WI_VERIFY(it != m_userCOMCallbackThreads.end() && it->second > 0);
 
-    m_userCOMCallbackThreads.erase(it);
+    if (it->second > 1)
+    {
+        it->second--;
+    }
+    else
+    {
+        m_userCOMCallbackThreads.erase(it);
+    }
 }
 
 void WSLCSession::CancelUserCOMCallbacks()
 {
-    for (auto threadId : m_userCOMCallbackThreads)
+    for (auto threadId : std::views::keys(m_userCOMCallbackThreads))
     {
         LOG_IF_FAILED(CoCancelCall(threadId, 0));
     }
