@@ -584,8 +584,10 @@ struct BuildKitStatus
 {
     std::string id;
     std::string vertex;
+    int64_t current{};
+    int64_t total{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex, current, total);
 };
 
 struct BuildKitLog
