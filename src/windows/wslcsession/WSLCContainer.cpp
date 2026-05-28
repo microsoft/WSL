@@ -361,9 +361,14 @@ DockerNetworkMode ParseDockerNetworkMode(const std::string& mode)
 
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
-    // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
-    // We only need epoch seconds; the trailing fractional component and "Z" are left
-    // unread, which std::chrono::parse does not treat as a failure.
+    // Docker timestamps are UTC ISO 8601 with a trailing 'Z', e.g.
+    // "2026-03-05T10:30:00.123456789Z". Require the 'Z' suffix so a non-UTC
+    // offset like "+05:00" is rejected rather than silently treated as UTC.
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, timestamp.empty() || timestamp.back() != 'Z', "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    // chrono::parse leaves the trailing fractional component (if any) and the 'Z'
+    // unread; that is not treated as a parse failure.
     std::chrono::sys_seconds utcSeconds;
     std::istringstream stream(timestamp);
     stream >> std::chrono::parse("%FT%H:%M:%S", utcSeconds);
