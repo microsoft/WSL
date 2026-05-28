@@ -6946,6 +6946,94 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    TEST_METHOD(MultiHandleWaitAboveMaximumWaitObjects)
+    {
+        // Validate that MultiHandleWait can wait on more than MAXIMUM_WAIT_OBJECTS (64) handles.
+        constexpr size_t handleCount = 100;
+        static_assert(handleCount > MAXIMUM_WAIT_OBJECTS);
+
+        // Scenario 1: signal every event before Run(); all callbacks must fire and Run() must return.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            for (auto& e : events)
+            {
+                e.SetEvent();
+            }
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
+        }
+
+        // Scenario 2: signal events one at a time from another thread while Run() processes them.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            std::thread signaller([&events]() {
+                for (auto& e : events)
+                {
+                    e.SetEvent();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            signaller.join();
+
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
+        }
+    }
+
     TEST_METHOD(SocketChannel)
     {
         // Read exactly `size` bytes from a raw socket into the destination buffer.

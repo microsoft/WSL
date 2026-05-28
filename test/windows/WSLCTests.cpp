@@ -8333,6 +8333,57 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerLogsManyConcurrentFollowers)
+    {
+        constexpr size_t followerCount = 100;
+        static_assert(followerCount > MAXIMUM_WAIT_OBJECTS);
+
+        WSLCContainerLauncher launcher("debian:latest", "logs-test-many-followers", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+
+        auto containerStdin = initProcess.GetStdHandle(0);
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "OK\n", 3, nullptr, nullptr));
+
+        std::atomic<size_t> readersReady{0};
+        std::atomic<size_t> readersSucceeded{0};
+        std::vector<std::thread> threads;
+        threads.reserve(followerCount);
+
+        for (size_t i = 0; i < followerCount; ++i)
+        {
+            threads.emplace_back([&]() {
+                try
+                {
+                    COMOutputHandle stdoutHandle{};
+                    COMOutputHandle stderrHandle{};
+                    VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsFollow, &stdoutHandle, &stderrHandle, 0, 0, 0));
+
+                    PartialHandleRead reader(stdoutHandle.Get());
+                    reader.Expect("OK\n");
+                    readersReady.fetch_add(1);
+                    reader.ExpectClosed();
+                    readersSucceeded.fetch_add(1);
+                }
+                CATCH_LOG();
+            });
+        }
+
+        // Wait until every follower has observed the marker before killing the container.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, readersReady.load() < followerCount); }, std::chrono::milliseconds(100), std::chrono::seconds(120));
+
+        // Kill the container so all follow handles are closed.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        for (auto& t : threads)
+        {
+            t.join();
+        }
+
+        VERIFY_ARE_EQUAL(readersSucceeded.load(), followerCount);
+    }
+
     WSLC_TEST_METHOD(ContainerLabels)
     {
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
