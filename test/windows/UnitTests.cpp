@@ -6842,14 +6842,17 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
         // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
         // that HRESULT instead, and the OnMessage callback must not be invoked.
-        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK) {
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK, std::optional<std::vector<gsl::byte>> pendingBytes = {}) {
             std::vector<gsl::byte> buffer;
             bool callbackInvoked = false;
             std::vector<gsl::byte> message;
 
             wsl::windows::common::io::MultiHandleWait io;
             io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                wsl::windows::common::io::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                wsl::windows::common::io::HandleWrapper{std::move(server)},
+                buffer,
+                pendingBytes,
+                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
                     callbackInvoked = true;
                     message.assign(received.begin(), received.end());
                 }));
@@ -6943,6 +6946,136 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             client.reset();
 
             readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 6: PendingBytes carries a complete header-only message left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset(); // close the peer; we should still complete from PendingBytes alone.
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 77;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::vector<gsl::byte> pendingBytes(headerBytes, headerBytes + sizeof(header));
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 7: PendingBytes carries a complete message with a body left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            constexpr size_t bodySize = 32;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 81;
+            header->TransactionStep = 3;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i ^ 0xA5);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.end());
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 8: PendingBytes carries only part of a header. The reader must fill in the
+        // rest of the header (and the body) from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 48;
+            constexpr size_t prebufferedBytes = 6; // less than sizeof(MESSAGE_HEADER) = 16
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 91;
+            header->TransactionStep = 4;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(0xC3);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 9: PendingBytes carries the full header plus part of the body. The reader
+        // must read the remaining body bytes from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 64;
+            constexpr size_t prebufferedBodyBytes = 12;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 92;
+            header->TransactionStep = 5;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+
+            const size_t prebufferedBytes = sizeof(MESSAGE_HEADER) + prebufferedBodyBytes;
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 10: PendingBytes contains an invalid (too-small) message size. The
+        // constructor should detect this and throw E_UNEXPECTED without invoking OnMessage.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header) - 1; // invalid: smaller than the header itself
+            header.TransactionId = 99;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::optional<std::vector<gsl::byte>> pendingBytes{std::vector<gsl::byte>{headerBytes, headerBytes + sizeof(header)}};
+
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            const auto hr = wil::ResultFromException([&]() {
+                wsl::windows::common::io::MultiHandleWait io;
+                io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)},
+                    buffer,
+                    pendingBytes,
+                    [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
+                io.Run(std::chrono::seconds(60));
+            });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+            VERIFY_IS_FALSE(callbackInvoked);
         }
     }
 
