@@ -1132,6 +1132,14 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p를 사용할 수 없습니다. vsock 전송을 사용하여 9p로 대체합니다.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>wsl2.virtio를 사용하지 않도록 설정하면 VirtioProxy 네트워킹이 지원되지 않습니다. networkingMode {}(으)로 대체합니다.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>실행 중인 커널에 virtio 장치 성능을 크게 향상시키는 패치가 없습니다. 이 최적화를 사용하도록 설정하려면 최신 WSL 커널로 업데이트하세요.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL 설치가 손상된 것 같습니다(오류 코드: {}).
 아무 키나 눌러 WSL을 복구하거나 CTRL-C 취소하세요.

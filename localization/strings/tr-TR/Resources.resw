@@ -1126,6 +1126,14 @@ Web'den indirme deneniyor...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p devre dışı bırakıldı, vsock aktarımıyla 9p'ye geri dönülüyor.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy ağı, wsl2.virtio devre dışı bırakıldığında desteklenmez; networkingMode {} moduna geri dönülüyor.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL yüklemesi bozulmuş gibi görünüyor (Hata kodu: {}).
 WSL'yi onarmak için herhangi bir tuşa basın veya CTRL-C tuşlarına basın.
