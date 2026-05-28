@@ -55,6 +55,9 @@ _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       L
 _(File,           "file",                L"f",              Kind::Value,       Localization::WSLCCLI_FileArgDescription()) \
 _(Filter,         "filter",              L"f",              Kind::Value,       Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,         "follow",              L"f",              Kind::Flag,        Localization::WSLCCLI_FollowArgDescription()) \
+_(Timestamps,     "timestamps",          L"t",              Kind::Flag,        Localization::WSLCCLI_TimestampsArgDescription()) \
+_(Since,          "since",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SinceArgDescription()) \
+_(Until,          "until",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_UntilArgDescription()) \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
 _(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \

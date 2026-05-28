@@ -2826,6 +2826,15 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Antal linjer, der skal vises fra slutningen af logfilerne</value>
   </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Show timestamps in log output</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny billedreference i formatet image-name[:tag]</value>
   </data>
