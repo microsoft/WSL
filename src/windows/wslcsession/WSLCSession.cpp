@@ -257,6 +257,63 @@ try
 }
 CATCH_RETURN();
 
+namespace {
+
+    // Zero-byte sentinel written at the root of a session storage directory so we can
+    // distinguish a directory we own from one the user is using for something else.
+    constexpr auto c_sessionMarkerFile = L"wslcsession";
+
+    // Validates StoragePath and stamps the marker if needed.
+    // IsExistingStorage = true when a session VHD was just attached (legacy directories
+    // pre-dating the marker are tolerated and upgraded). When false the directory must
+    // be empty or non-existent so we never overwrite unrelated user files.
+    void EnsureSessionMarker(const std::filesystem::path& StoragePath, bool IsExistingStorage)
+    {
+        const auto markerPath = StoragePath / c_sessionMarkerFile;
+
+        const auto markerAttrs = GetFileAttributesW(markerPath.c_str());
+        if (markerAttrs != INVALID_FILE_ATTRIBUTES)
+        {
+            // A directory at the marker name means the storage path is used for something else.
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()),
+                WI_IsFlagSet(markerAttrs, FILE_ATTRIBUTE_DIRECTORY));
+
+            return;
+        }
+
+        std::error_code ec;
+        const bool isDir = std::filesystem::is_directory(StoragePath, ec);
+
+        // is_directory sets ec when the path does not exist (ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND).
+        // That is the normal case for new sessions — only throw on unexpected errors.
+        if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+        {
+            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_directory failed for %ls", StoragePath.c_str());
+        }
+
+        if (isDir)
+        {
+            if (!IsExistingStorage)
+            {
+                // New session into an existing directory: require it to be empty.
+                const bool empty = std::filesystem::is_empty(StoragePath, ec);
+                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
+            }
+        }
+        else
+        {
+            std::filesystem::create_directories(StoragePath);
+        }
+
+        wil::unique_hfile marker{CreateFileW(markerPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF_MSG(!marker, "Failed to create marker file: %ls", markerPath.c_str());
+    }
+
+} // namespace
+
 HRESULT WSLCSession::Initialize(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier)
 try
 {
@@ -277,6 +334,27 @@ try
         TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
+
+    // Pre-validate the storage path and stamp the marker file before any VM resources
+    // are created. The check must run before errorCleanup is established because
+    // Terminate()'s cleanup of partially-initialized state can overwrite the current
+    // error context during stack unwinding, swallowing the user-facing message.
+    if (Settings->StoragePath != nullptr)
+    {
+        std::filesystem::path storagePath{Settings->StoragePath};
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings->StoragePath), !storagePath.is_absolute());
+
+        std::error_code ec;
+        const bool vhdExists = std::filesystem::exists(storagePath / L"storage.vhdx", ec);
+
+        // Reject up-front if the caller forbade creating new storage and there is no VHD to attach.
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath),
+            !vhdExists && WI_IsFlagSet(Settings->StorageFlags, WSLCSessionStorageFlagsNoCreate));
+
+        EnsureSessionMarker(storagePath, /*IsExistingStorage=*/vhdExists);
+    }
 
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
@@ -340,63 +418,6 @@ void WSLCSession::SetDestructionCallback(std::function<void()>&& callback)
     m_destructionCallback = std::move(callback);
 }
 
-namespace {
-
-    // Zero-byte sentinel written at the root of a session storage directory so we can
-    // distinguish a directory we own from one the user is using for something else.
-    constexpr auto c_sessionMarkerFile = L"wslcsession";
-
-    // Validates StoragePath and stamps the marker if needed.
-    // IsExistingStorage = true when a session VHD was just attached (legacy directories
-    // pre-dating the marker are tolerated and upgraded). When false the directory must
-    // be empty or non-existent so we never overwrite unrelated user files.
-    void EnsureSessionMarker(const std::filesystem::path& StoragePath, bool IsExistingStorage)
-    {
-        const auto markerPath = StoragePath / c_sessionMarkerFile;
-
-        const auto markerAttrs = GetFileAttributesW(markerPath.c_str());
-        if (markerAttrs != INVALID_FILE_ATTRIBUTES)
-        {
-            // A directory at the marker name means the storage path is used for something else.
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()),
-                WI_IsFlagSet(markerAttrs, FILE_ATTRIBUTE_DIRECTORY));
-
-            return;
-        }
-
-        std::error_code ec;
-        const bool isDir = std::filesystem::is_directory(StoragePath, ec);
-
-        // is_directory sets ec when the path does not exist (ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND).
-        // That is the normal case for new sessions — only throw on unexpected errors.
-        if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
-        {
-            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_directory failed for %ls", StoragePath.c_str());
-        }
-
-        if (isDir)
-        {
-            if (!IsExistingStorage)
-            {
-                // New session into an existing directory: require it to be empty.
-                const bool empty = std::filesystem::is_empty(StoragePath, ec);
-                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
-                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
-            }
-        }
-        else
-        {
-            std::filesystem::create_directories(StoragePath);
-        }
-
-        wil::unique_hfile marker{CreateFileW(markerPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF_MSG(!marker, "Failed to create marker file: %ls", markerPath.c_str());
-    }
-
-} // namespace
-
 void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid)
 {
     if (Settings.StoragePath == nullptr)
@@ -406,9 +427,10 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         return;
     }
 
+    // N.B. The storage path is validated and the marker file is stamped earlier in
+    // Initialize(), before errorCleanup is established. This is required so user-facing
+    // rejection errors propagate cleanly to the caller.
     std::filesystem::path storagePath{Settings.StoragePath};
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings.StoragePath), !storagePath.is_absolute());
-
     m_storageVhdPath = storagePath / "storage.vhdx";
 
     std::string diskDevice;
@@ -438,14 +460,6 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             "Failed to attach vhd: %ls",
             m_storageVhdPath.c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
-            Localization::MessageWslcSessionStorageNotFound(Settings.StoragePath),
-            WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
-
-        // Validate the directory is safe to claim and stamp the marker before creating the VHD.
-        EnsureSessionMarker(storagePath, /*IsExistingStorage=*/false);
-
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
@@ -457,11 +471,6 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
         // Then format it.
         m_virtualMachine->Ext4Format(diskDevice);
-    }
-    else
-    {
-        // Stamp the marker for legacy directories created before the marker convention.
-        EnsureSessionMarker(storagePath, /*IsExistingStorage=*/true);
     }
 
     // Mount the device to /root.
