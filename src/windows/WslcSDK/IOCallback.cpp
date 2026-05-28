@@ -81,15 +81,20 @@ IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallba
 IOCallback::~IOCallback()
 {
     Cancel();
-    if (m_thread.joinable())
-    {
-        m_thread.join();
-    }
+    Complete();
 }
 
 void IOCallback::Cancel()
 {
     m_cancelEvent.SetEvent();
+}
+
+void IOCallback::Complete()
+{
+    if (m_thread.joinable())
+    {
+        m_thread.join();
+    }
 }
 
 bool IOCallback::HasIOCallback(const WslcContainerProcessOptionsInternal* options)
