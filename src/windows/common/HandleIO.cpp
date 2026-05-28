@@ -930,6 +930,11 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
         m_handleSignaledEvent = std::move(other.m_handleSignaledEvent);
         m_cancel = other.m_cancel;
 
+        for (auto& entry : m_handles)
+        {
+            entry->self = this;
+        }
+
         // N.B. moving a MultiHandleWait() while running is not supported
         WI_ASSERT(m_signaledHandles.empty());
     }

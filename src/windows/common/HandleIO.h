@@ -373,15 +373,6 @@ public:
     void Cancel();
 
 private:
-    struct Entry;
-
-    struct WaitState
-    {
-        wil::srwlock Lock;
-        wil::unique_event Notification{wil::EventOptions::None};
-        _Guarded_by_(Lock) std::vector<Entry*> Signaled;
-    };
-
     struct Entry
     {
         Flags HandleFlags{};
