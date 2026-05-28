@@ -19,6 +19,15 @@ namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::string::MultiByteToWide;
 
+namespace {
+    constexpr std::wstring_view c_escapeMoveCursorUpAndClear = L"\033[{}A\033[J";
+    constexpr std::wstring_view c_escapeBrightGreen = L"\033[92m";
+    constexpr std::wstring_view c_escapeResetAttributes = L"\033[0m";
+    constexpr std::wstring_view c_escapeHideCursorDim = L"\033[?25l\033[2m";
+    constexpr std::wstring_view c_escapeClearLineAndNewline = L"\033[K\n";
+    constexpr std::wstring_view c_escapeUndimShowCursor = L"\033[22m\033[?25h";
+} // namespace
+
 BuildImageCallback::~BuildImageCallback()
 try
 {
@@ -58,13 +67,23 @@ void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(L"\033[{}A\033[J", m_displayedLines));
+        WriteTerminal(std::format(c_escapeMoveCursorUpAndClear, m_displayedLines));
         m_displayedLines = 0;
     }
 
     m_lines.clear();
     m_pendingLine.clear();
     m_pullLines.clear();
+}
+
+void BuildImageCallback::RedrawIfNeeded()
+{
+    auto now = std::chrono::steady_clock::now();
+    if (now - m_lastRedraw >= c_redrawInterval)
+    {
+        Redraw();
+        m_lastRedraw = now;
+    }
 }
 
 HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
@@ -101,13 +120,7 @@ try
     if (isPullProgress)
     {
         m_pullLines[id] = status;
-
-        auto now = std::chrono::steady_clock::now();
-        if (now - m_lastRedraw >= c_redrawInterval)
-        {
-            Redraw();
-            m_lastRedraw = now;
-        }
+        RedrawIfNeeded();
 
         return S_OK;
     }
@@ -143,11 +156,9 @@ try
                 {
                     // Flush a throttled redraw before clearing so \r-based progress
                     // updates are visible even when batched in a single OnProgress call.
-                    auto now = std::chrono::steady_clock::now();
-                    if (!m_pendingLine.empty() && now - m_lastRedraw >= c_redrawInterval)
+                    if (!m_pendingLine.empty())
                     {
-                        Redraw();
-                        m_lastRedraw = now;
+                        RedrawIfNeeded();
                     }
                     m_pendingLine.clear();
                 }
@@ -161,12 +172,7 @@ try
         // Throttle redraws to avoid blocking the server's IO loop with console writes
         // during rapid output. Lines accumulate in the deque immediately; the display
         // catches up at ~20fps.
-        auto now = std::chrono::steady_clock::now();
-        if (now - m_lastRedraw >= c_redrawInterval)
-        {
-            Redraw();
-            m_lastRedraw = now;
-        }
+        RedrawIfNeeded();
 
         return S_OK;
     }
@@ -178,7 +184,7 @@ try
     const auto newlines = wide.substr(bodyLength);
     wide.resize(bodyLength);
 
-    WriteTerminal(std::format(L"\033[92m{}\033[0m{}", wide, newlines));
+    WriteTerminal(std::format(L"{}{}{}{}", c_escapeBrightGreen, wide, c_escapeResetAttributes, newlines));
     return S_OK;
 }
 CATCH_RETURN();
@@ -208,14 +214,14 @@ void BuildImageCallback::Redraw()
     // during the redraw so the user doesn't see it bouncing through the cursor movement,
     // then show it again at the final position. The dim attribute (\033[2m) renders the
     // scrolling lines de-emphasized regardless of the user's theme.
-    std::wstring buffer = L"\033[?25l\033[2m";
+    std::wstring buffer{c_escapeHideCursorDim};
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
     // previous one (e.g. when \r clears the pending line without a replacement).
     if (m_displayedLines > 0)
     {
-        buffer += std::format(L"\033[{}A\033[J", m_displayedLines);
+        buffer += std::format(c_escapeMoveCursorUpAndClear, m_displayedLines);
     }
 
     auto appendLine = [&](const std::string& line) {
@@ -225,7 +231,7 @@ void BuildImageCallback::Redraw()
             wline.resize(consoleWidth);
         }
         buffer += wline;
-        buffer += L"\033[K\n";
+        buffer += c_escapeClearLineAndNewline;
     };
 
     // Print completed lines (skip older ones if we need room for the pending line).
@@ -251,7 +257,7 @@ void BuildImageCallback::Redraw()
         appendLine(line);
     }
 
-    buffer += L"\033[22m\033[?25h";
+    buffer += c_escapeUndimShowCursor;
 
     WriteTerminal(buffer);
     m_displayedLines = displayCount;
