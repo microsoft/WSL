@@ -9589,6 +9589,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(
                 m_defaultSession->PruneImages(&bogus, 1, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
                 E_INVALIDARG);
+            ValidateCOMErrorMessageContains(L"invalid filter 'bogus'");
 
             // Null filter key - rejected by ParseKeyMultiValuePairs at the boundary.
             WSLCFilter nullKey{.Key = nullptr, .Value = "x"};
