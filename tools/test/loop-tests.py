@@ -4,6 +4,7 @@ Usage:
     python loop-tests.py <iterations> [-- <test.bat args>...]
 """
 
+import atexit
 import re
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ _ERASE_LINE = f"{_CSI}2K"       # EL  - erase the entire current line
 _CURSOR_COL_1 = f"{_CSI}G"      # CHA - move cursor to column 1 (1-based)
 _HIDE_CURSOR = f"{_CSI}?25l"    # DECTCEM - hide the cursor
 _SHOW_CURSOR = f"{_CSI}?25h"    # DECTCEM - show the cursor
+_SGR_RESET = f"{_CSI}0m"        # SGR   - reset all attributes (colors, bold, ...)
 # Reset the current line: move cursor home then erase, so the next write
 # starts from a clean slate regardless of what was there before.
 _RESET_LINE = _CURSOR_COL_1 + _ERASE_LINE
@@ -51,6 +53,7 @@ class StatusLine:
         self._enabled = sys.stdout.isatty()
         self._cursor_hidden = False
         self._thread = threading.Thread(target=self._loop, daemon=True)
+        atexit.register(self._safe_restore)
 
     def start(self) -> None:
         self._thread.start()
@@ -61,6 +64,7 @@ class StatusLine:
         with self._lock:
             self._clear_locked()
             self._restore_cursor_locked()
+        self._safe_restore()
 
     def begin_iteration(self, iteration: int) -> None:
         with self._lock:
@@ -133,31 +137,26 @@ class StatusLine:
             sys.stdout.flush()
             self._cursor_hidden = False
 
+    def _safe_restore(self) -> None:
+        if not self._enabled:
+            return
+        sys.stdout.write(_SHOW_CURSOR + _SGR_RESET)
+        sys.stdout.flush()
 
-def _run_wpr(args: list[str]) -> bool:
-    """Invoke wpr. Returns True on success; on failure prints a brief notice (without wpr's output)."""
 
+def _run_wpr(args: list[str]) -> None:
+    """Invoke wpr; raises subprocess.CalledProcessError on non-zero exit."""
 
     si = subprocess.STARTUPINFO()
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = subprocess.SW_HIDE # 0
+    si.wShowWindow = subprocess.SW_HIDE  # 0
 
-
-    result = subprocess.run(
+    subprocess.run(
         ["wpr", *args],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NEW_CONSOLE,
-        startupinfo = si
+        startupinfo=si,
+        check=True,
     )
-    if result.returncode == 0:
-        return True
-    click.secho(
-        f"\n$ wpr {' '.join(args)} (exit {result.returncode})",
-        fg="yellow",
-        err=True,
-    )
-    return False
 
 
 def _timestamp_prefix() -> str:
@@ -214,15 +213,8 @@ def _run_iteration(
     # Start ETL trace before launching tests.
     etl_started = False
     if wprp is not None:
-        if _run_wpr(["-start", str(wprp), "-filemode"]):
-            etl_started = True
-        else:
-            with status.pause():
-                click.secho(
-                    f"Iteration {iteration}: failed to start ETL trace; continuing without trace.",
-                    fg="yellow",
-                    err=True,
-                )
+        _run_wpr(["-start", str(wprp), "-filemode"])
+        etl_started = True
 
     cmd = [str(test_bat), *test_args]
     return_code = 1
@@ -326,13 +318,28 @@ def _cancel_active_trace() -> None:
     default=str(DEFAULT_WPRP),
     type=click.Path(dir_okay=False),
     show_default=True,
-    help="ETL profile passed to `wpr -start`.",
+    help="ETL profile passed to `wpr -start` (passed verbatim; wpr validates it).",
 )
 @click.option(
     "--no-etl",
     is_flag=True,
     default=False,
     help="Skip ETL tracing (useful when wpr is not available or not needed).",
+)
+@click.option(
+    "--platform",
+    "platform_",
+    type=click.Choice(["x64", "arm64"], case_sensitive=False),
+    default="x64",
+    show_default=True,
+    help="Target platform subfolder under bin/ where test.bat lives.",
+)
+@click.option(
+    "--target",
+    type=click.Choice(["Debug", "Release"], case_sensitive=False),
+    default="Debug",
+    show_default=True,
+    help="Build configuration subfolder under bin/<platform>/ where test.bat lives.",
 )
 @click.option(
     "--stop-on-failure/--continue-on-failure",
@@ -352,10 +359,14 @@ def main(
     output_dir: str,
     wprp: str,
     no_etl: bool,
+    platform_: str,
+    target: str,
     stop_on_failure: bool,
     keep_success_logs: bool,
 ) -> None:
-    test_bat_path = REPO_ROOT / "bin" / "x64" / "Debug" / "test.bat"
+    platform_ = platform_.lower()
+    target = target.capitalize()
+    test_bat_path = REPO_ROOT / "bin" / platform_ / target / "test.bat"
 
     if not test_bat_path.is_file():
         raise click.ClickException(f"test.bat not found at: {test_bat_path}")
@@ -363,10 +374,6 @@ def main(
     wprp_path: Path | None = None
     if not no_etl:
         wprp_path = Path(wprp).resolve()
-        if not wprp_path.is_file():
-            raise click.ClickException(
-                f"ETL profile not found at: {wprp_path} (pass --no-etl to skip tracing)."
-            )
 
     base_dir = Path(output_dir).resolve()
     run_dir = base_dir / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
