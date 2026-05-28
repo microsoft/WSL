@@ -584,7 +584,7 @@ ReadSocketMessageHandle::~ReadSocketMessageHandle()
         if (pendingSize > 0)
         {
             WI_ASSERT(pendingSize <= Buffer.size());
-            PendingBytes = {Buffer.begin(), Buffer.begin() + pendingSize};
+            PendingBytes.assign(Buffer.begin(), Buffer.begin() + pendingSize);
 
             WSL_LOG(
                 "CanceledMessageRead", TraceLoggingValue(pendingSize, "TotalBytes"), TraceLoggingValue(Socket.Get(), "Socket"));
@@ -687,7 +687,7 @@ void ReadSocketMessageHandle::Schedule()
     // Process previously received bytes, if any.
     if (BytesRemaining == 0 && !ProcessChunk())
     {
-        return; // Message has been fully received, not need to schedule a receive.
+        return; // Message has been fully received, no need to schedule a receive.
     }
 
     ScheduleRecv();
