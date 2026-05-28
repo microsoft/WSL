@@ -1132,6 +1132,14 @@ Tentativo di download web...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p è disabilitato. Verrà eseguito il fallback a 9p con il trasporto VSOCK.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy networking is not supported when wsl2.virtio is disabled; falling back to networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>L'installazione di WSL sembra danneggiata (codice di errore: {}).
 Premere un tasto qualsiasi per ripristinare WSL oppure CTRL-C per annullare.

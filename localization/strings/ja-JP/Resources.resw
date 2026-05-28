@@ -1132,6 +1132,14 @@ Web ダウンロード... を試行しています</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p は無効です。vsock トランスポートを使用して 9p にフォールバックします。</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>wsl2.virtio が無効になっている場合、VirtioProxy ネットワークはサポートされません。networkingMode {} にフォールバックします。</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>実行中のカーネルには、virtio デバイスのパフォーマンスを大幅に向上させるパッチがありません。この最適化を有効にするには、より新しい WSL カーネルに更新してください。</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL インストールが壊れている可能性があります (エラー コード: {})。
 WSL を修復するには任意のキーを押すか、取り消すには CTRL-C。
