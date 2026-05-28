@@ -79,10 +79,12 @@ IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallba
 }
 
 IOCallback::~IOCallback()
+try
 {
     Cancel();
-    Complete();
+        Complete();
 }
+CATCH_LOG();
 
 void IOCallback::Cancel()
 {
@@ -91,10 +93,20 @@ void IOCallback::Cancel()
 
 void IOCallback::Complete()
 {
-    if (m_thread.joinable())
-    {
-        m_thread.join();
-    }
+    // Complete can be called by multiple threads. Make sure that it's only ever called onced since join() is not thread safe.
+    std::call_once(m_join, [this]() {
+        if (m_thread.joinable())
+        {
+            THROW_HR_IF(ERROR_INVALID_HANDLE_STATE, IsOnIOCallbackThread());
+
+            m_thread.join();
+        }
+    });
+}
+
+bool IOCallback::IsOnIOCallbackThread() const noexcept
+{
+    return m_thread.get_id() == std::this_thread::get_id();
 }
 
 bool IOCallback::HasIOCallback(const WslcContainerProcessOptionsInternal* options)

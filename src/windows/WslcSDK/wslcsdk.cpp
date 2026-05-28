@@ -616,17 +616,24 @@ CATCH_RETURN();
 STDAPI WslcReleaseContainer(_In_ WslcContainer container)
 try
 {
+    // Reject release attempts originating from the container's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(container);
+        auto ioCallback = peek->ioCallbacks.load();
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), ioCallback && ioCallback->IsOnIOCallbackThread());
+    }
+
     auto internalType = CheckAndGetInternalTypeUniquePointer(container);
     auto ioCallback = internalType->ioCallbacks.load();
     if (ioCallback)
     {
-        // If the container has an IO callback registered, and the container is exited, wait until the IO callback has processed all IO.
+        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
         try
         {
             WSLCContainerState state{};
             THROW_IF_FAILED(internalType->container->GetState(&state));
 
-            if (state == WslcContainerStateExited)
+            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
             {
                 ioCallback->Complete();
             }
@@ -641,10 +648,18 @@ CATCH_RETURN();
 STDAPI WslcReleaseProcess(_In_ WslcProcess process)
 try
 {
+    // Reject release attempts originating from the process's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(process);
+        if (peek->ioCallbacks && peek->ioCallbacks->IsOnIOCallbackThread())
+        {
+            RETURN_HR(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        }
+    }
+
     auto internalType = CheckAndGetInternalTypeUniquePointer(process);
     if (internalType->ioCallbacks)
     {
-
         // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
         // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
 
