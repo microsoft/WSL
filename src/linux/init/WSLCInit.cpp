@@ -142,9 +142,8 @@ try
 
     rootfsPath = std::filesystem::canonical(rootfsPath);
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
-    THROW_ERRNO_IF(ENOTDIR, !std::filesystem::is_directory(rootfsPath));
 
-    THROW_LAST_ERROR_IF(Chroot(rootfsPath.c_str()) < 0);
+    THROW_LAST_ERROR_IF(chroot(rootfsPath.c_str()) < 0);
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
     THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
