@@ -976,8 +976,6 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // Cancel any pending callback.
         callbacks.clear();
 
-        // Move the queue out under the lock. Defensive locking - no callbacks should be
-        // running at this point, but it keeps the access pattern obvious.
         Entry* signaledEntry = nullptr;
         while (m_signaledHandles.try_pop(signaledEntry))
         {
