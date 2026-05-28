@@ -647,13 +647,6 @@ typedef struct _WSLCNetworkInformation
     char Driver[64];
 } WSLCNetworkInformation;
 
-typedef struct _WSLCPruneLabelFilter
-{
-    LPCSTR Key;
-    [unique] LPCSTR Value;
-    BOOL Present;
-} WSLCPruneLabelFilter;
-
 typedef struct _WSLCPruneContainersResults
 {
     [unique, size_is(ContainersCount)] WSLCContainerId* Containers;
