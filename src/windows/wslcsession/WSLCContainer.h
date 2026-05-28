@@ -127,11 +127,6 @@ public:
         return m_containerFlags;
     }
 
-    WSLCContainerNetworkType NetworkMode() const noexcept
-    {
-        return m_networkingMode;
-    }
-
     static std::unique_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
         const std::string& Name,

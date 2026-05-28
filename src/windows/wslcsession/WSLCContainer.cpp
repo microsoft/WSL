@@ -2356,8 +2356,6 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
 
-    const std::string networkName = Options->NetworkName;
-
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
@@ -2365,23 +2363,24 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
         Localization::MessageWslcAdditionalNetworksRequirePrimary(),
         m_networkingMode == WSLCContainerNetworkTypeHost || m_networkingMode == WSLCContainerNetworkTypeNone);
 
-    common::docker_schema::ConnectNetworkRequest request{};
+    common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
 
     try
     {
-        m_dockerClient.ConnectContainerToNetwork(networkName, request);
+        m_dockerClient.ConnectContainerToNetwork(Options->NetworkName, request);
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), networkName.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(Options->NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), Options->NetworkName);
     }
 
     WSL_LOG(
         "ContainerConnectedToNetwork",
         TraceLoggingValue(m_id.c_str(), "ContainerId"),
-        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+        TraceLoggingValue(Options->NetworkName, "NetworkName"));
 }
 
 void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
@@ -2389,8 +2388,6 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
     THROW_HR_IF(E_POINTER, NetworkName == nullptr);
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkName) == 0);
 
-    const std::string networkName = NetworkName;
-
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
@@ -2398,23 +2395,23 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
         Localization::MessageWslcAdditionalNetworksRequirePrimary(),
         m_networkingMode == WSLCContainerNetworkTypeHost || m_networkingMode == WSLCContainerNetworkTypeNone);
 
-    common::docker_schema::DisconnectNetworkRequest request{};
+    common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
 
     try
     {
-        m_dockerClient.DisconnectContainerFromNetwork(networkName, request);
+        m_dockerClient.DisconnectContainerFromNetwork(NetworkName, request);
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), networkName.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), NetworkName);
     }
 
     WSL_LOG(
         "ContainerDisconnectedFromNetwork",
         TraceLoggingValue(m_id.c_str(), "ContainerId"),
-        TraceLoggingValue(networkName.c_str(), "NetworkName"));
+        TraceLoggingValue(NetworkName, "NetworkName"));
 }
 
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)

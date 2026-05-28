@@ -469,12 +469,12 @@ void DockerHTTPClient::RemoveNetwork(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/networks/{}", Name));
 }
 
-void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ConnectNetworkRequest& Request)
+void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
 {
     Transaction(verb::post, URL::Create("/networks/{}/connect", NetworkName), Request);
 }
 
-void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::DisconnectNetworkRequest& Request)
+void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
 {
     Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
 }
