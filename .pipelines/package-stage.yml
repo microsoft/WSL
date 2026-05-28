@@ -45,6 +45,7 @@ stages:
           ob_outputDirectory: '$(Build.SourcesDirectory)\out'
           ob_artifactBaseName: 'drop_wsl'
           ob_artifactSuffix: '_package'
+          ob_sdl_codeSignValidation_excludes: -|**\*.ps1
           buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
           buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
 
@@ -98,7 +99,7 @@ stages:
             displayName: "CMake configure (bundle-only)"
             inputs:
               workingDirectory: "."
-              cmakeArgs: . -DBUNDLE_ONLY=TRUE -DCMAKE_BUILD_TYPE=Release -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION)
+              cmakeArgs: . -DBUNDLE_ONLY=TRUE -DCMAKE_BUILD_TYPE=Release -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DWSL_INCLUDE_SDK_CSHARP=true
 
           - script: cmake --build . --config Release --target bundle -- -m
             displayName: Create msixbundle
