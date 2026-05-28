@@ -514,7 +514,15 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
 
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
-    auto address = std::format("127.0.0.1:{}", port);
+    // Use "localhost:<port>" rather than the IP literal "127.0.0.1:<port>" so
+    // login/push/pull go through podman's docker-compat /auth fast-path that
+    // recognises only the literal "localhost:" prefix as insecure
+    // (containers/podman pkg/api/handlers/compat/auth.go). Loopback IPv4/IPv6
+    // literals otherwise fall through to default-HTTPS handling and fail the
+    // TLS handshake against this plain-HTTP test registry. "localhost" is the
+    // convention podman's own apiv2 suite uses (test/apiv2/60-auth.at) and
+    // the wider container-tooling ecosystem (kind, minikube, k3d) recommends.
+    auto address = std::format("localhost:{}", port);
     auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
 
     int expectedCode = username.empty() ? 200 : 401;
