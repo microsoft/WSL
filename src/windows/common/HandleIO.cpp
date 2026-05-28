@@ -38,7 +38,8 @@ DWORD CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     {
         if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
         {
-            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
+            DWORD flagsReturned{};
+            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, &flagsReturned))
             {
                 auto error = WSAGetLastError();
                 LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && error != WSAECONNRESET);
@@ -531,7 +532,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 ReadSocketMessageHandle::ReadSocketMessageHandle(
     HandleWrapper&& MovedSocket,
     std::vector<gsl::byte>& Buffer,
-    std::optional<std::vector<gsl::byte>>& PendingBytes,
+    std::vector<gsl::byte>& PendingBytes,
     std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
     Socket(std::move(MovedSocket)), Buffer(Buffer), PendingBytes(PendingBytes), OnMessage(std::move(OnMessage))
 {
@@ -542,20 +543,20 @@ ReadSocketMessageHandle::ReadSocketMessageHandle(
         Buffer.resize(sizeof(MESSAGE_HEADER));
     }
 
-    if (!PendingBytes.has_value())
+    if (PendingBytes.empty())
     {
         return;
     }
 
     // If bytes from a previously cancelled transaction are passed, process them now.
-    if (Buffer.size() < PendingBytes->size())
+    if (Buffer.size() < PendingBytes.size())
     {
-        Buffer.resize(PendingBytes->size());
+        Buffer.resize(PendingBytes.size());
     }
 
-    std::copy(PendingBytes->begin(), PendingBytes->end(), Buffer.begin());
-
-    CurrentOffset = PendingBytes->size();
+    std::copy(PendingBytes.begin(), PendingBytes.end(), Buffer.begin());
+    CurrentOffset = PendingBytes.size();
+    PendingBytes.clear();
 
     if (CurrentOffset < sizeof(MESSAGE_HEADER))
     {
@@ -569,24 +570,24 @@ ReadSocketMessageHandle::ReadSocketMessageHandle(
 
 ReadSocketMessageHandle::~ReadSocketMessageHandle()
 {
-    if (State == IOHandleStatus::Completed)
+    if (State != IOHandleStatus::Completed)
     {
-        PendingBytes.reset();
-    }
-    else if (State == IOHandleStatus::Pending)
-    {
-        // Cancel the pending receive and move any bytes already buffered for the in-flight message into PendingBytes
-        const auto socket = reinterpret_cast<SOCKET>(Socket.Get());
-        auto receivedBytes = CancelPendingIo(socket, Overlapped);
+        auto pendingSize = CurrentOffset;
 
-        const auto totalBytes = CurrentOffset + receivedBytes;
-        if (totalBytes > 0)
+        if (State == IOHandleStatus::Pending)
         {
-            WI_ASSERT(totalBytes <= Buffer.size());
-            Buffer.resize(totalBytes);
-            PendingBytes.emplace(std::move(Buffer));
+            // Cancel the pending receive and move any bytes already buffered for the in-flight message into PendingBytes
+            const auto socket = reinterpret_cast<SOCKET>(Socket.Get());
+            pendingSize += CancelPendingIo(socket, Overlapped);
+        }
 
-            WSL_LOG("CanceledMessageRead", TraceLoggingValue(totalBytes, "TotalBytes"), TraceLoggingValue(socket, "Socket"));
+        if (pendingSize > 0)
+        {
+            WI_ASSERT(pendingSize <= Buffer.size());
+            PendingBytes = {Buffer.begin(), Buffer.begin() + pendingSize};
+
+            WSL_LOG(
+                "CanceledMessageRead", TraceLoggingValue(pendingSize, "TotalBytes"), TraceLoggingValue(Socket.Get(), "Socket"));
         }
     }
 }
@@ -663,7 +664,10 @@ bool ReadSocketMessageHandle::ProcessChunk()
         }
 
         ReadingHeader = false;
-        BytesRemaining = messageSize - CurrentOffset;
+        if (CurrentOffset < messageSize)
+        {
+            BytesRemaining = messageSize - CurrentOffset;
+        }
 
         if (BytesRemaining > 0)
         {
@@ -680,14 +684,10 @@ void ReadSocketMessageHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
 
-    // If a previous receive on this socket was aborted while bytes were already in our
-    // application buffer (see destructor), drain those chunks before issuing a new WSARecv.
-    while (State == IOHandleStatus::Standby && BytesRemaining == 0)
+    // Process previously received bytes, if any.
+    if (BytesRemaining == 0 && !ProcessChunk())
     {
-        if (!ProcessChunk())
-        {
-            return;
-        }
+        return; // Message has been fully received, not need to schedule a receive.
     }
 
     ScheduleRecv();

@@ -181,7 +181,7 @@ public:
     ReadSocketMessageHandle(
         HandleWrapper&& Socket,
         std::vector<gsl::byte>& Buffer,
-        std::optional<std::vector<gsl::byte>>& PendingBytes,
+        std::vector<gsl::byte>& PendingBytes,
         std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
     ~ReadSocketMessageHandle();
 
@@ -196,7 +196,7 @@ private:
 
     HandleWrapper Socket;
     std::vector<gsl::byte>& Buffer;
-    std::optional<std::vector<gsl::byte>>& PendingBytes;
+    std::vector<gsl::byte>& PendingBytes;
     std::function<void(const gsl::span<gsl::byte>& Message)> OnMessage;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};

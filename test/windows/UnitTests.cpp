@@ -6842,7 +6842,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
         // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
         // that HRESULT instead, and the OnMessage callback must not be invoked.
-        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK, std::optional<std::vector<gsl::byte>> pendingBytes = {}) {
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK, std::vector<gsl::byte> pendingBytes = {}) {
             std::vector<gsl::byte> buffer;
             bool callbackInvoked = false;
             std::vector<gsl::byte> message;
@@ -7049,7 +7049,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
 
         // Scenario 10: PendingBytes contains an invalid (too-small) message size. The
-        // constructor should detect this and throw E_UNEXPECTED without invoking OnMessage.
+        // IO should detect this and throw E_UNEXPECTED without invoking OnMessage.
         {
             auto [client, server] = MakeSocketPair();
             client.reset();
@@ -7061,7 +7061,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             header.TransactionStep = 1;
 
             const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
-            std::optional<std::vector<gsl::byte>> pendingBytes{std::vector<gsl::byte>{headerBytes, headerBytes + sizeof(header)}};
+            std::vector<gsl::byte> pendingBytes{headerBytes, headerBytes + sizeof(header)};
 
             std::vector<gsl::byte> buffer;
             bool callbackInvoked = false;

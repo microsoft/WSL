@@ -110,6 +110,7 @@ public:
 
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
+        m_pendingBytes = std::move(other.m_pendingBytes);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -722,7 +723,7 @@ private:
 #ifdef WIN32
 
     std::vector<HANDLE> m_exitEvents;
-    std::optional<std::vector<gsl::byte>> m_pendingBytes;
+    std::vector<gsl::byte> m_pendingBytes;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;
