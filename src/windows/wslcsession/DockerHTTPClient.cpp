@@ -53,47 +53,6 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
     return true;
 }
-template <typename TFilters>
-nlohmann::json PruneFiltersToJson(const TFilters& filters)
-{
-    nlohmann::json j;
-
-    if constexpr (requires { filters.dangling; })
-    {
-        if (filters.dangling.has_value())
-        {
-            j["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
-        }
-    }
-
-    if constexpr (requires { filters.all; })
-    {
-        if (filters.all.has_value() && filters.all.value())
-        {
-            j["all"] = nlohmann::json::array({"true"});
-        }
-    }
-
-    if constexpr (requires { filters.until; })
-    {
-        if (filters.until.has_value())
-        {
-            j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
-        }
-    }
-
-    if (!filters.presentLabels.empty())
-    {
-        j["label"] = filters.presentLabels;
-    }
-
-    if (!filters.absentLabels.empty())
-    {
-        j["label!"] = filters.absentLabels;
-    }
-
-    return j;
-}
 
 } // namespace
 
@@ -231,43 +190,16 @@ std::string DockerHTTPClient::Authenticate(const std::string& serverAddress, con
     return response.IdentityToken.value_or("");
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/json");
 
     url.SetParameter("all", all);
     url.SetParameter("digests", digests);
 
-    // Build filters JSON if any filters are set
-    nlohmann::json filtersJson;
-
-    if (filters.reference.has_value())
+    if (!filters.empty())
     {
-        filtersJson["reference"] = nlohmann::json::array({filters.reference.value()});
-    }
-
-    if (filters.before.has_value())
-    {
-        filtersJson["before"] = nlohmann::json::array({filters.before.value()});
-    }
-
-    if (filters.since.has_value())
-    {
-        filtersJson["since"] = nlohmann::json::array({filters.since.value()});
-    }
-
-    if (filters.dangling.has_value())
-    {
-        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
-    }
-
-    if (!filters.labels.empty())
-    {
-        filtersJson["label"] = filters.labels;
-    }
-
-    if (!filtersJson.empty())
-    {
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 
@@ -295,13 +227,13 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
-docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesFilters& filters)
+docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/prune");
 
-    auto filtersJson = PruneFiltersToJson(filters);
-    if (!filtersJson.empty())
+    if (!filters.empty())
     {
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 
