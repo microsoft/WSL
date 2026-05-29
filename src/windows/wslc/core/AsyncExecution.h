@@ -37,19 +37,37 @@ namespace detail {
         bool hasError{false};
     };
 
-    // Holds all state for one thread pool worker. Owned via shared_ptr so the memory
-    // remains valid if ForEachAsync unwinds while a work item is still running.
-    template <typename TItem, typename TWork, typename TResult>
+    // SharedContext holds state that must remain valid for the full lifetime of any running
+    // callback, including after WorkerPool is destroyed on the timeout path. Owned via
+    // shared_ptr and referenced by every SharedWorker.
+    template <typename TWork>
+    struct SharedContext
+    {
+        NON_COPYABLE(SharedContext);
+        NON_MOVABLE(SharedContext);
+
+        TWork onWork;
+        wil::unique_event cancelEvent;
+
+        explicit SharedContext(TWork onWork_) : onWork(std::move(onWork_))
+        {
+            cancelEvent.create(wil::EventOptions::ManualReset);
+        }
+    };
+
+    // Holds per-worker state. Each Launch heap-allocates a shared_ptr<SharedWorker> as the
+    // thread pool callback context, giving the callback shared ownership and ensuring this
+    // memory is not freed while a callback is still running.
+    template <typename TWork, typename TItem, typename TResult>
     struct SharedWorker
     {
         WorkerResult<TItem, TResult> workerResult;
-        TWork* onWork{nullptr};
-        HANDLE cancelHandle{nullptr};
+        std::shared_ptr<SharedContext<TWork>> context;
         wil::unique_event done;
         wil::unique_threadpool_work work;
     };
 
-    // Manages a fixed pool of SharedWorkers and a shared cancellation event.
+    // Manages a fixed pool of SharedWorkers.
     template <typename TItem, typename TWork, typename TSuccess, typename TError>
     struct WorkerPool
     {
@@ -57,32 +75,28 @@ namespace detail {
         NON_MOVABLE(WorkerPool);
 
         using TResult = decltype(std::declval<TWork>()(std::declval<TItem>(), std::declval<HANDLE>()));
-        using TSharedWorker = SharedWorker<TItem, TWork, TResult>;
+        using TSharedWorker = SharedWorker<TWork, TItem, TResult>;
+        using TSharedContext = SharedContext<TWork>;
 
         std::vector<std::shared_ptr<TSharedWorker>> workers;
         std::vector<HANDLE> doneHandles;
-        wil::unique_event cancelEvent;
+        std::shared_ptr<TSharedContext> context;
         std::chrono::milliseconds timeout;
         DWORD cancelDrainMs{};
 
-        WorkerPool(size_t poolSize, TWork& onWork, std::chrono::milliseconds timeout_, std::chrono::milliseconds cancelDrainTimeout) :
-            timeout(timeout_), cancelDrainMs(static_cast<DWORD>(cancelDrainTimeout.count()))
+        WorkerPool(size_t workerCount, TWork onWork, std::chrono::milliseconds timeout_, std::chrono::milliseconds cancelDrainTimeout) :
+            context(std::make_shared<TSharedContext>(std::move(onWork))),
+            timeout(timeout_),
+            cancelDrainMs(static_cast<DWORD>(cancelDrainTimeout.count()))
         {
-            cancelEvent.create(wil::EventOptions::ManualReset);
+            workers.reserve(workerCount);
+            doneHandles.reserve(workerCount);
 
-            workers.reserve(poolSize);
-            doneHandles.reserve(poolSize);
-
-            for (size_t i = 0; i < poolSize; ++i)
+            for (size_t i = 0; i < workerCount; ++i)
             {
                 auto worker = std::make_shared<TSharedWorker>();
                 worker->done.create(wil::EventOptions::ManualReset);
-                worker->onWork = &onWork;
-                worker->cancelHandle = cancelEvent.get();
-
-                // Work item is created once per worker and reused for each dispatched item.
-                worker->work.reset(::CreateThreadpoolWork(ThreadPoolCallback, worker.get(), nullptr));
-                THROW_LAST_ERROR_IF(!worker->work);
+                worker->context = context;
 
                 doneHandles.push_back(worker->done.get());
                 workers.push_back(std::move(worker));
@@ -95,6 +109,19 @@ namespace detail {
             worker->workerResult = WorkerResult<TItem, TResult>{};
             worker->workerResult.item = item;
             worker->done.ResetEvent();
+
+            // Heap-allocate a shared_ptr as the callback context. The callback takes ownership,
+            // keeping the worker and its SharedContext alive for the full duration of the callback
+            // regardless of WorkerPool lifetime. Re-create the work item each launch so the
+            // context pointer is fresh.
+            auto* ctx = new std::shared_ptr<TSharedWorker>(worker);
+            worker->work.reset(::CreateThreadpoolWork(ThreadPoolCallback, ctx, nullptr));
+            if (!worker->work)
+            {
+                delete ctx;
+                THROW_LAST_ERROR();
+            }
+
             ::SubmitThreadpoolWork(worker->work.get());
         }
 
@@ -104,6 +131,7 @@ namespace detail {
 
             // Ensure the callback has fully returned before reading results.
             ::WaitForThreadpoolWorkCallbacks(worker->work.get(), FALSE);
+
             if (worker->workerResult.hasError)
             {
                 onError(worker->workerResult.item, worker->workerResult.error);
@@ -115,15 +143,15 @@ namespace detail {
         }
 
         // Signals cancellation, waits up to cancelDrainMs for workers to exit, then throws ERROR_TIMEOUT.
-        // Workers that do not exit within cancelDrainMs are abandoned - they retain shared_ptr ownership
-        // of their state. onWork implementations must check the cancel event at natural checkpoints and
-        // exit promptly.
+        // Workers that do not exit within cancelDrainMs are abandoned. Each running callback holds a
+        // shared_ptr to its SharedWorker and SharedContext, so neither is freed while the callback runs.
+        // onWork implementations must check the cancel event at natural checkpoints and exit promptly.
         //
         // Note: TerminateThread() is not used - it skips C++ destructors, leaves user-mode locks
         // permanently held (causing deadlocks), and corrupts COM apartment state.
         [[noreturn]] void CancelAndThrow(size_t remainingItems)
         {
-            cancelEvent.SetEvent();
+            context->cancelEvent.SetEvent();
 
             ::WaitForMultipleObjects(static_cast<DWORD>(doneHandles.size()), doneHandles.data(), TRUE, cancelDrainMs);
 
@@ -135,13 +163,16 @@ namespace detail {
         }
 
         // Thread pool callback - invoked on a pool thread for each submitted work item.
+        // Takes ownership of the heap-allocated shared_ptr<TSharedWorker> passed as context,
+        // ensuring the worker and its SharedContext remain alive for the duration of this call.
         static void CALLBACK ThreadPoolCallback(PTP_CALLBACK_INSTANCE, void* context, PTP_WORK) noexcept
         {
-            auto& worker = *static_cast<TSharedWorker*>(context);
+            const std::unique_ptr<std::shared_ptr<TSharedWorker>> owner(static_cast<std::shared_ptr<TSharedWorker>*>(context));
+            auto& worker = **owner;
 
             try
             {
-                worker.workerResult.result = (*worker.onWork)(worker.workerResult.item, worker.cancelHandle);
+                worker.workerResult.result = worker.context->onWork(worker.workerResult.item, worker.context->cancelEvent.get());
             }
             catch (const wil::ResultException& ex)
             {
@@ -185,6 +216,7 @@ void ForEachAsync(
 {
     THROW_HR_IF(E_INVALIDARG, poolSize == 0);
     THROW_HR_IF(E_INVALIDARG, poolSize > MAXIMUM_WAIT_OBJECTS);
+
     if (items.empty())
     {
         return;
@@ -193,7 +225,7 @@ void ForEachAsync(
     const DWORD timeoutMs = (timeout == std::chrono::milliseconds::max()) ? INFINITE : static_cast<DWORD>(timeout.count());
     const size_t workerCount = std::min(poolSize, items.size());
 
-    detail::WorkerPool<TItem, TWork, TSuccess, TError> pool{workerCount, onWork, timeout, cancelDrainTimeout};
+    detail::WorkerPool<TItem, TWork, TSuccess, TError> pool{workerCount, std::move(onWork), timeout, cancelDrainTimeout};
 
     // Fill the pool - submit one item per worker to saturate all workers immediately.
     size_t nextItem = 0;
@@ -215,6 +247,7 @@ void ForEachAsync(
         }
 
         THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+
         const size_t workerIndex = waitResult - WAIT_OBJECT_0;
         pool.Drain(workerIndex, onSuccess, onError);
         pool.Launch(workerIndex, items[nextItem++]);
@@ -222,12 +255,14 @@ void ForEachAsync(
 
     // Wait for all in-flight workers to finish and collect their final results.
     const DWORD finalWait = ::WaitForMultipleObjects(static_cast<DWORD>(workerCount), pool.doneHandles.data(), TRUE, timeoutMs);
+
     if (finalWait == WAIT_TIMEOUT)
     {
         pool.CancelAndThrow(0);
     }
 
     THROW_LAST_ERROR_IF(finalWait == WAIT_FAILED);
+
     for (size_t i = 0; i < workerCount; ++i)
     {
         pool.Drain(i, onSuccess, onError);
