@@ -93,11 +93,11 @@ void IOCallback::Cancel()
 
 void IOCallback::Complete()
 {
-    // Complete can be called by multiple threads. Make sure that it's only ever called onced since join() is not thread safe.
+    // Complete can be called by multiple threads. Make sure that it's only ever called once since join() is not thread safe.
     std::call_once(m_join, [this]() {
         if (m_thread.joinable())
         {
-            THROW_HR_IF(ERROR_INVALID_HANDLE_STATE, IsOnIOCallbackThread());
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), IsOnIOCallbackThread());
 
             m_thread.join();
         }
