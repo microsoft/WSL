@@ -81,7 +81,7 @@ the project (see caveat below).
 ```powershell
 $org="https://dev.azure.com/GlobalCollaborationService"
 $proj="Global Collaboration Service Project"
-$area="Global Collaboration Service Project\C and AI\Unspecified"   # working area path, see Permissions gotcha
+$area="Global Collaboration Service Project\Global\Windows"   # working area path, see Permissions gotcha
 $desc="Community es-ES localization PR. PR: https://github.com/microsoft/WSL/pull/14109 ..."
 az boards work-item create --org $org --project $proj --type "Bug" `
   --title "WSL: Review community es-ES localization PR (GitHub #14109)" `
@@ -102,13 +102,15 @@ az boards work-item create --org $org --project $proj --type "Bug" `
 - **`az.cmd` eats `&` in URLs.** When using `az rest`, never put `&` (multiple query params) in
   `--uri` on Windows — cmd truncates the URL there. Pass `api-version` via the **Accept header**
   instead: `--headers "Accept=application/json;api-version=7.1"`, keeping at most one `?param` in the URI.
-- **Permissions are area-path-scoped.** Creating work items requires explicit rights on the *specific area
-  path*, not the project as a whole. A `@ntdev.microsoft.com` identity may be denied at the project root and
-  most area paths (`TF237111: ... does not have permissions to save work items under the specified area
-  path`) while still being allowed under `Global Collaboration Service Project\C and AI\Unspecified` — which
-  is the working area path used for the bugs above. Always set `System.AreaPath` (or `--area`) to that path.
-  To probe a path without creating anything, POST with `?validateOnly=true`. If your identity lacks rights
-  everywhere, create the bug through the web template link above.
+- **Permissions are area-path-scoped, and the path matters.** Creating work items requires explicit rights on
+  the *specific area path*, not the project as a whole. The correct, durable path for WSL localization bugs is
+  `Global Collaboration Service Project\Global\Windows` (confirmed against existing manually-filed WSL loc
+  bugs). Always set `System.AreaPath` (or `--area`) to that path. A `@ntdev.microsoft.com` identity is denied
+  at the project root and most other paths (`TF237111: ... does not have permissions to save work items under
+  the specified area path`). Do NOT file under `...\C and AI\Unspecified`: an identity may briefly appear to
+  have access there, but bugs filed there get cleaned up and the access is not stable. To probe a path without
+  creating anything, POST with `?validateOnly=true`. If your identity lacks rights everywhere, create the bug
+  through the web template link above.
 - **`System.Description` is required, separately from repro steps.** The Bug type rejects a create with
   `TF401320: Rule Error for field Description ... Required, InvalidEmpty` unless `System.Description` is set.
   Set both `System.Description` and `Microsoft.VSTS.TCM.ReproSteps` (the same body is fine). When POSTing a
