@@ -2842,13 +2842,13 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Número de linhas a serem mostradas a partir do final dos logs</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Mostrar carimbos de data e hora na saída do log</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Mostrar logs desde o carimbo de data e hora (por exemplo, segundos da época Unix)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Mostrar logs antes do carimbo de data e hora (por exemplo, segundos da época Unix)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nova referência de imagem no formato image-name[:tag]</value>

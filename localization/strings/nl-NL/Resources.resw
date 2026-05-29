@@ -1131,7 +1131,7 @@ Poging tot downloaden van web...</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>De actieve kernel mist een patch die de prestaties van virtio-apparaten aanzienlijk verbetert. Werk bij naar een recentere WSL-kernel om deze optimalisatie in te schakelen.</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
