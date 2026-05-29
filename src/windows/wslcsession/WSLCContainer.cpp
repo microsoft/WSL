@@ -362,17 +362,23 @@ DockerNetworkMode ParseDockerNetworkMode(const std::string& mode)
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
     // Docker timestamps are UTC ISO 8601 with a trailing 'Z', e.g.
-    // "2026-03-05T10:30:00.123456789Z". Require the 'Z' suffix so a non-UTC
-    // offset like "+05:00" is rejected rather than silently treated as UTC.
-    THROW_HR_IF_MSG(
-        E_INVALIDARG, timestamp.empty() || timestamp.back() != 'Z', "Failed to parse timestamp '%hs'", timestamp.c_str());
-
-    // chrono::parse leaves the trailing fractional component (if any) and the 'Z'
-    // unread; that is not treated as a parse failure.
+    // "2026-03-05T10:30:00.123456789Z". Parse the date/time then verify the
+    // unconsumed tail is either "Z" or ".<digits>Z" so non-UTC offsets like
+    // "+05:00" and other malformed suffixes are rejected.
     std::chrono::sys_seconds utcSeconds;
     std::istringstream stream(timestamp);
     stream >> std::chrono::parse("%FT%H:%M:%S", utcSeconds);
-    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    bool valid = !stream.fail();
+    if (valid)
+    {
+        const auto pos = stream.tellg();
+        const std::string_view tail = (pos < 0) ? std::string_view{} : std::string_view{timestamp}.substr(static_cast<std::size_t>(pos));
+        const bool fractional = tail.size() >= 3 && tail.front() == '.' && tail.back() == 'Z' &&
+                                std::all_of(tail.begin() + 1, tail.end() - 1, [](char c) { return c >= '0' && c <= '9'; });
+        valid = (tail == "Z") || fractional;
+    }
+    THROW_HR_IF_MSG(E_INVALIDARG, !valid, "Failed to parse timestamp '%hs'", timestamp.c_str());
 
     return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
 }
