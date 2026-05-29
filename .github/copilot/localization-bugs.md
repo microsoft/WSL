@@ -1,0 +1,112 @@
+## Creating Localization Tracking Bugs (GCS Azure DevOps)
+
+Community-submitted localization PRs (edits to `localization/strings/<locale>/Resources.resw`, or
+brand-new locale files) are reviewed/incorporated by the Microsoft Global Collaboration Service (GCS)
+localization pipeline, **not** merged directly from GitHub. To route one for review, file a tracking
+**Bug** in the GCS Azure DevOps project.
+
+### Coordinates
+
+| | |
+|---|---|
+| Org | `https://dev.azure.com/GlobalCollaborationService` |
+| Project | `Global Collaboration Service Project` |
+| Process | `GCS_Agile` |
+| Work item type | `Bug` |
+| Web "create from template" link | `https://dev.azure.com/GlobalCollaborationService/Global%20Collaboration%20Service%20Project/_workitems/create/Bug?templateId=b97df4d3-4106-4099-a3a9-1782b5891bec` |
+
+### Required fields (and known-good values for a community loc PR)
+
+The Bug type has several required custom picklist fields. Values that work for "community translation PR
+needs review":
+
+| Field (reference name) | Value |
+|---|---|
+| `System.Title` | `WSL: Review community <locale> localization PR (GitHub #<PR>)` |
+| `System.Description` / `Microsoft.VSTS.TCM.ReproSteps` | PR link + scope + action (see below) |
+| `Custom.IssueType` | `Incorrect Translation` |
+| `Custom.ProductArea` | `Software` |
+| `Custom.How_Found` | `Community` |
+| `Custom.Severity_Impact` | `S3 - Medium` (field default) |
+| `Microsoft.VSTS.Common.ValueArea` | `Business` (field default) |
+| `Custom.HaveyouattachedEnglishandlocalizedscreenshots` | `No` (allowed: `Yes`/`No`; no default — must be set) |
+| `Custom.Language` | picklist — see mapping below (the WSL locale code is **not** accepted) |
+
+Other required custom flags (`Custom.BugBlocked`, `Custom.XLanguage`,
+`Custom.OverrideMaxStringsThreshold`, `Custom.SkipSourceAudioFilesValidation`,
+`Custom.DidCopilotrespondinthesamelanguage`, `Custom.Copilotattachallfiles`) default to `0` and
+auto-fill; leave them unset.
+
+### `Custom.Language` mapping (picklist values, not locale codes)
+
+`Custom.Language` is a 148-value picklist keyed by display name. Map the WSL `Resources.resw` locale
+folder to the picklist value:
+
+| WSL locale | `Custom.Language` value |
+|---|---|
+| `es-ES` | `Spanish (Spain, International Sort)` |
+| `zh-CN` | `Chinese (Simplified) - PRC` |
+| `el-GR` | `Greek (Greece)` |
+
+For other locales, list the allowed values and match by display name:
+
+```powershell
+$org="https://dev.azure.com/GlobalCollaborationService"
+$projEnc="Global%20Collaboration%20Service%20Project"
+$res="499b84ac-1321-427f-aa17-267ca6975798"   # Azure DevOps AAD resource id
+az rest --method get --resource $res `
+  --uri "$org/$projEnc/_apis/wit/workitemtypes/Bug/fields/Custom.Language?`$expand=all" `
+  --headers "Accept=application/json;api-version=7.1-preview.3" |
+  ConvertFrom-Json | Select-Object -ExpandProperty allowedValues
+```
+
+### Suggested description body
+
+```
+Community-submitted localization PR on GitHub microsoft/WSL needs review by the loc pipeline.
+
+PR: https://github.com/microsoft/WSL/pull/<PR>
+Language: <locale>
+Scope: <edits to existing | brand-new> localization/strings/<locale>/Resources.resw (+A/-B, 1 file).
+Action: validate placeholder/locked-token parity vs en-US (tools/devops/validate-localization.py),
+then incorporate or advise. New locales additionally need build registration, not just a file drop.
+```
+
+### Creating via CLI (`az boards`)
+
+Requires the `azure-devops` az extension and an identity with **create/edit work item** permission in
+the project (see caveat below).
+
+```powershell
+$org="https://dev.azure.com/GlobalCollaborationService"
+$proj="Global Collaboration Service Project"
+$desc="Community es-ES localization PR. PR: https://github.com/microsoft/WSL/pull/14109 ..."
+az boards work-item create --org $org --project $proj --type "Bug" `
+  --title "WSL: Review community es-ES localization PR (GitHub #14109)" `
+  --area "$proj" --description $desc `
+  --fields "Microsoft.VSTS.TCM.ReproSteps=$desc" `
+           "Custom.Language=Spanish (Spain, International Sort)" `
+           "Custom.IssueType=Incorrect Translation" `
+           "Custom.ProductArea=Software" `
+           "Custom.How_Found=Community" `
+           "Custom.Severity_Impact=S3 - Medium" `
+           "Microsoft.VSTS.Common.ValueArea=Business" `
+           "Custom.HaveyouattachedEnglishandlocalizedscreenshots=No"
+```
+
+### Gotchas
+
+- **`az.cmd` eats `&` in URLs.** When using `az rest`, never put `&` (multiple query params) in
+  `--uri` on Windows — cmd truncates the URL there. Pass `api-version` via the **Accept header**
+  instead: `--headers "Accept=application/json;api-version=7.1"`, keeping at most one `?param` in the URI.
+- **Permissions.** Creating work items requires explicit rights in the GCS project. A `@ntdev.microsoft.com`
+  identity may be denied at every area path (`TF237111: ... does not have permissions to save work items
+  under the specified area path`), even though the same person can create via the web template using a
+  different (e.g. `@microsoft.com`) identity. To probe without creating anything, POST with
+  `?validateOnly=true`. If the CLI identity lacks rights, create the bug through the web template link above.
+- **Picklist discovery.** Field allowed-values often don't expand through the plain field endpoint; use
+  `?$expand=all` on `.../workitemtypes/Bug/fields/<ref>` as shown above.
+
+### After creating
+
+Cross-link the systems: paste the ADO Bug ID into the GitHub PR (and vice-versa) so reviewers can find both.

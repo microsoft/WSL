@@ -104,6 +104,7 @@ Some older files use the block format (`/*++ Copyright (c) Microsoft. All rights
 - Use `EMIT_USER_WARNING(Localization::MessageXxx(...))` for non-fatal config warnings
 - All new user-facing strings must have entries in `localization/strings/en-US/Resources.resw`
 - In Resources.resw comments, use `{Locked="..."}` to prevent translation of `.wslconfig` property key names
+- Community localization PRs are tracked via Bugs in the GCS Azure DevOps project, not merged directly. See `.github/copilot/localization-bugs.md` for the project coordinates, required fields, and `az boards` workflow.
 
 ### Telemetry and Logging
 
