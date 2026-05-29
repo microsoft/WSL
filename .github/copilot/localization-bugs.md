@@ -117,7 +117,22 @@ az boards work-item create --org $org --project $proj --type "Bug" `
   JSON-patch document via `az rest`, use newline-to-`<br>` so the HTML-rendered fields keep their line breaks.
 - **Picklist discovery.** Field allowed-values often don't expand through the plain field endpoint; use
   `?$expand=all` on `.../workitemtypes/Bug/fields/<ref>` as shown above.
+- **"Not found" can mean "no access," not "doesn't exist."** WIQL and `GET .../workitems/<id>` honor ACLs:
+  a `CreatedBy=@me` query returning zero rows, or `TF401232: Work item <id> does not exist, or you do not
+  have permissions to read it`, often just means your identity can't read that area path. Don't assume the
+  bug was deleted. A gap in sequential work-item IDs is a tell that items were created but are now invisible
+  to you (e.g. filed under a path whose access got revoked, then reaped) - which is exactly why you should
+  stick to the durable `Global\Windows` path above.
+- **Read the bug back after creating it.** Immediately `GET` each new work item id (or open the URL) to
+  confirm it's actually persisted and readable under your identity. A create that "succeeds" against a flaky
+  area path can vanish later; a read-back catches that while you can still re-file.
+- **Non-ASCII gets mangled, and `az` errors poison `ConvertFrom-Json`.** Locale content (Turkish, Greek, CJK)
+  comes back cp1252-garbled unless you set `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8` first.
+  Also, `az` prints errors to the stream, so piping straight into `ConvertFrom-Json` throws on any failure;
+  capture with `Out-String` and parse, or check `$LASTEXITCODE`. Pass JSON-patch bodies via `--body "@file"`
+  (content type `application/json-patch+json`) rather than inline to dodge quoting hell.
 
 ### After creating
 
 Cross-link the systems: paste the ADO Bug ID into the GitHub PR (and vice-versa) so reviewers can find both.
+Then read each new bug back (see gotcha above) to confirm it persisted under `Global\Windows`.
