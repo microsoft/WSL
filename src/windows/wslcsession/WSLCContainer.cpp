@@ -1148,11 +1148,6 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         request.DetachKeys = DetachKeys;
     }
 
-    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsGpu))
-    {
-        ConfigureLdPathForGpu(request.Env);
-    }
-
     try
     {
         auto result = m_dockerClient.CreateExec(m_id, request);
@@ -1540,17 +1535,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             !virtualMachine.FeatureEnabled(WslcFeatureFlagsGPU),
             "WSLCContainerFlagsGpu requires GPU support enabled on the session");
 
-        if (!request.HostConfig.Binds.has_value())
-        {
-            request.HostConfig.Binds = std::vector<std::string>{};
-        }
-
-        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuLibrariesPath));
-        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuDriversPath));
-
-        request.HostConfig.Devices = {{"/dev/dxg", "/dev/dxg", "rwm"}};
-
-        ConfigureLdPathForGpu(request.Env);
+        // Request the WSL GPU device via CDI.
+        request.HostConfig.DeviceRequests = std::vector<common::docker_schema::DeviceRequest>{{"cdi", {LX_WSLC_GPU_CDI_DEVICE}}};
     }
 
     // Prepare port mappings from container options.

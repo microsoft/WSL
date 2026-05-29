@@ -2835,13 +2835,13 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Antal linjer, der skal vises fra slutningen af logfilerne</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Vis tidsstempler i logoutput</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logfiler siden tidsstempel (f.eks. unix epokesekunder)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logfiler før tidsstempel (f.eks. unix epoch-sekunder)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny billedreference i formatet image-name[:tag]</value>

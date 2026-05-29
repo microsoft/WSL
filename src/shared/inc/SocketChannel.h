@@ -110,6 +110,7 @@ public:
 
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
+        m_pendingBytes = std::move(other.m_pendingBytes);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -636,9 +637,8 @@ private:
         auto io = CreateIO();
 
         gsl::span<gsl::byte> message;
-
         io.AddHandle(std::make_unique<windows::common::io::ReadSocketMessageHandle>(
-            m_socket.get(), m_buffer, [&message](auto& received) { message = received; }));
+            m_socket.get(), m_buffer, m_pendingBytes, [&message](auto& received) { message = received; }));
 
         io.Run(TimeoutToMilliseconds(timeout));
 
@@ -723,6 +723,7 @@ private:
 #ifdef WIN32
 
     std::vector<HANDLE> m_exitEvents;
+    std::vector<gsl::byte> m_pendingBytes;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;

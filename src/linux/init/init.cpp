@@ -164,6 +164,8 @@ wil::unique_fd UnmarshalConsoleFromServer(int MessageFd, LXBUS_IPC_CONSOLE_ID Co
 
 int WslInitWatcher(int Argc, char** Argv);
 
+int WslcGpuHookEntry();
+
 int WslEntryPoint(int Argc, char* Argv[])
 {
     //
@@ -229,6 +231,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSL_INIT_WATCHER) == 0)
         {
             ExitCode = WslInitWatcher(Argc, Argv);
+        }
+        else if (strcmp(BaseName, LX_INIT_WSLC_GPU_HOOK) == 0)
+        {
+            ExitCode = WslcGpuHookEntry();
         }
         else
         {

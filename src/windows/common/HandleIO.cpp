@@ -31,14 +31,15 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     return Offset;
 }
 
-void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
+DWORD CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
 {
     DWORD bytesTransferred{};
-    if (CancelIoEx((HANDLE)Handle, &Overlapped))
+    if (CancelIoEx((HANDLE)Handle, &Overlapped) || GetLastError() == ERROR_NOT_FOUND)
     {
         if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
         {
-            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
+            DWORD flagsReturned{};
+            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, &flagsReturned))
             {
                 auto error = WSAGetLastError();
                 LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && error != WSAECONNRESET);
@@ -56,10 +57,19 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
     else
     {
-        // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        LOG_LAST_ERROR_MSG("Unexpected error while cancelling IO on handle: 0x%p", (void*)Handle);
     }
+
+    return bytesTransferred;
 }
+
+inline void UnregisterWait(HANDLE waitHandle) noexcept
+{
+    // INVALID_HANDLE_VALUE makes UnregisterWaitEx block until any in-flight wait callback returns.
+    LOG_LAST_ERROR_IF(!UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE));
+}
+
+using unique_registered_wait = wil::unique_any_handle_null<decltype(&UnregisterWait), &UnregisterWait>;
 
 } // namespace
 
@@ -520,8 +530,11 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 // ReadSocketMessageHandle
 
 ReadSocketMessageHandle::ReadSocketMessageHandle(
-    HandleWrapper&& MovedSocket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
-    Socket(std::move(MovedSocket)), Buffer(Buffer), OnMessage(std::move(OnMessage))
+    HandleWrapper&& MovedSocket,
+    std::vector<gsl::byte>& Buffer,
+    std::vector<gsl::byte>& PendingBytes,
+    std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
+    Socket(std::move(MovedSocket)), Buffer(Buffer), PendingBytes(PendingBytes), OnMessage(std::move(OnMessage))
 {
     Overlapped.hEvent = Event.get();
 
@@ -529,13 +542,53 @@ ReadSocketMessageHandle::ReadSocketMessageHandle(
     {
         Buffer.resize(sizeof(MESSAGE_HEADER));
     }
+
+    if (PendingBytes.empty())
+    {
+        return;
+    }
+
+    // If bytes from a previously cancelled transaction are passed, process them now.
+    if (Buffer.size() < PendingBytes.size())
+    {
+        Buffer.resize(PendingBytes.size());
+    }
+
+    std::copy(PendingBytes.begin(), PendingBytes.end(), Buffer.begin());
+    CurrentOffset = PendingBytes.size();
+    PendingBytes.clear();
+
+    if (CurrentOffset < sizeof(MESSAGE_HEADER))
+    {
+        BytesRemaining = sizeof(MESSAGE_HEADER) - CurrentOffset;
+    }
+    else
+    {
+        BytesRemaining = 0;
+    }
 }
 
 ReadSocketMessageHandle::~ReadSocketMessageHandle()
 {
-    if (State == IOHandleStatus::Pending)
+    if (State != IOHandleStatus::Completed)
     {
-        CancelPendingIo((SOCKET)Socket.Get(), Overlapped);
+        auto pendingSize = CurrentOffset;
+
+        if (State == IOHandleStatus::Pending)
+        {
+            // Cancel the pending receive and move any bytes already buffered for the in-flight message into PendingBytes
+            const auto socket = reinterpret_cast<SOCKET>(Socket.Get());
+            pendingSize += CancelPendingIo(socket, Overlapped);
+        }
+
+        if (pendingSize > 0)
+        {
+            WI_ASSERT(pendingSize <= Buffer.size());
+            PendingBytes.assign(Buffer.begin(), Buffer.begin() + pendingSize);
+
+            WSL_LOG(
+                "CanceledMessageRead", TraceLoggingValue(pendingSize, "TotalBytes"), TraceLoggingValue(Socket.Get(), "Socket"));
+        }
     }
 }
 
@@ -593,19 +646,17 @@ void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
         return;
     }
 
+    ProcessChunk();
+}
+
+bool ReadSocketMessageHandle::ProcessChunk()
+{
+    const auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
+
     if (ReadingHeader)
     {
-        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
-
         THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER), "Unexpected message size: %u", messageSize);
         THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024, "Message size too large: %u", messageSize);
-
-        if (messageSize == sizeof(MESSAGE_HEADER))
-        {
-            OnMessage(gsl::make_span(Buffer.data(), messageSize));
-            State = IOHandleStatus::Completed;
-            return;
-        }
 
         if (Buffer.size() < messageSize)
         {
@@ -613,20 +664,32 @@ void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
         }
 
         ReadingHeader = false;
-        CurrentOffset = sizeof(MESSAGE_HEADER);
-        BytesRemaining = messageSize - sizeof(MESSAGE_HEADER);
+        if (CurrentOffset < messageSize)
+        {
+            BytesRemaining = messageSize - CurrentOffset;
+        }
+
+        if (BytesRemaining > 0)
+        {
+            return true;
+        }
     }
-    else
-    {
-        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
-        OnMessage(gsl::make_span(Buffer.data(), messageSize));
-        State = IOHandleStatus::Completed;
-    }
+
+    OnMessage(gsl::make_span(Buffer.data(), messageSize));
+    State = IOHandleStatus::Completed;
+    return false;
 }
 
 void ReadSocketMessageHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+
+    // Process previously received bytes, if any.
+    if (BytesRemaining == 0 && !ProcessChunk())
+    {
+        return; // Message has been fully received, no need to schedule a receive.
+    }
+
     ScheduleRecv();
 }
 
@@ -914,9 +977,38 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 
 // MultiHandleWait
 
+MultiHandleWait::MultiHandleWait(MultiHandleWait&& other) noexcept
+{
+    *this = std::move(other);
+}
+
+MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
+{
+    if (this != &other)
+    {
+        m_handles = std::move(other.m_handles);
+        m_handleSignaledEvent = std::move(other.m_handleSignaledEvent);
+        m_cancel = other.m_cancel;
+
+        for (auto& entry : m_handles)
+        {
+            entry->self = this;
+        }
+
+        // N.B. moving a MultiHandleWait() while running is not supported
+        WI_ASSERT(m_signaledHandles.empty());
+    }
+
+    return *this;
+}
+
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace_back(flags, std::move(handle));
+    auto entry = std::make_unique<Entry>();
+    entry->HandleFlags = flags;
+    entry->Handle = std::move(handle);
+    entry->self = this;
+    m_handles.emplace_back(std::move(entry));
 }
 
 void MultiHandleWait::Cancel()
@@ -924,123 +1016,119 @@ void MultiHandleWait::Cancel()
     m_cancel = true;
 }
 
+void NTAPI MultiHandleWait::WaitCallback(PVOID Context, BOOLEAN /*TimerOrWaitFired*/)
+{
+    auto* entry = static_cast<Entry*>(Context);
+
+    entry->self->m_signaledHandles.push(entry);
+    entry->self->m_handleSignaledEvent.SetEvent();
+}
+
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
 
     std::optional<std::chrono::steady_clock::time_point> deadline;
-
     if (Timeout.has_value())
     {
         deadline = std::chrono::steady_clock::now() + Timeout.value();
     }
 
-    // Run until all handles are completed.
+    std::vector<unique_registered_wait> callbacks;
 
-    while (!m_handles.empty() && !m_cancel)
+    while (!m_cancel)
     {
-        // Schedule IO on each handle until all are either pending, or completed.
-        for (size_t i = 0; i < m_handles.size() && !m_cancel; i++)
+        // Cancel any pending callback.
+        callbacks.clear();
+
+        Entry* signaledEntry = nullptr;
+        while (m_signaledHandles.try_pop(signaledEntry))
         {
-            while (m_handles[i].second->GetState() == IOHandleStatus::Standby && !m_cancel)
+            try
             {
-                try
+                signaledEntry->Handle->Collect();
+            }
+            catch (...)
+            {
+                if (WI_IsFlagSet(signaledEntry->HandleFlags, Flags::IgnoreErrors))
                 {
-                    m_handles[i].second->Schedule();
+                    signaledEntry->Handle.reset();
+                    continue;
                 }
-                catch (...)
-                {
-                    if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
-                    {
-                        m_handles[i].second.reset(); // Reset the handle so it can be deleted.
-                        break;
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+
+                throw;
             }
         }
 
-        // Remove completed handles from m_handles.
+        m_handleSignaledEvent.ResetEvent();
+
         bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
-            if (!it->second)
+            auto& entry = **it;
+
+            while (entry.Handle && entry.Handle->GetState() == IOHandleStatus::Standby && !m_cancel)
             {
-                it = m_handles.erase(it);
-            }
-            else if (it->second->GetState() == IOHandleStatus::Completed)
-            {
-                if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
+                try
                 {
-                    m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
+                    entry.Handle->Schedule();
+                }
+                catch (...)
+                {
+                    if (WI_IsFlagSet(entry.HandleFlags, Flags::IgnoreErrors))
+                    {
+                        entry.Handle.reset();
+                        break;
+                    }
+
+                    throw;
+                }
+            }
+
+            if (!entry.Handle || entry.Handle->GetState() == IOHandleStatus::Completed)
+            {
+                if (entry.Handle && WI_IsFlagSet(entry.HandleFlags, Flags::CancelOnCompleted))
+                {
+                    m_cancel = true;
                 }
 
                 it = m_handles.erase(it);
+                continue;
             }
-            else
+
+            auto& callback = callbacks.emplace_back();
+
+            THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+                &callback, entry.Handle->GetHandle(), &WaitCallback, &entry, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE));
+
+            if (WI_IsFlagClear(entry.HandleFlags, Flags::NeedNotComplete))
             {
-                // If only NeedNotComplete handles are left, we want to exit Run.
-                if (WI_IsFlagClear(it->first, Flags::NeedNotComplete))
-                {
-                    hasHandleToWaitFor = true;
-                }
-                ++it;
+                hasHandleToWaitFor = true;
             }
+
+            ++it;
         }
 
-        if (!hasHandleToWaitFor || m_cancel)
+        if (m_handles.empty() || !hasHandleToWaitFor || m_cancel)
         {
             break;
-        }
-
-        // Wait for the next operation to complete.
-        std::vector<HANDLE> waitHandles;
-        for (const auto& e : m_handles)
-        {
-            waitHandles.emplace_back(e.second->GetHandle());
         }
 
         DWORD waitTimeout = INFINITE;
         if (deadline.has_value())
         {
-            auto miliseconds =
+            auto milliseconds =
                 std::chrono::duration_cast<std::chrono::milliseconds>(deadline.value() - std::chrono::steady_clock::now()).count();
 
-            waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
+            waitTimeout = static_cast<DWORD>(std::max<long long>(0, milliseconds));
         }
 
-        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
-        if (result == WAIT_TIMEOUT)
-        {
-            THROW_WIN32(ERROR_TIMEOUT);
-        }
-        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
-        {
-            auto index = result - WAIT_OBJECT_0;
-
-            try
-            {
-                m_handles[index].second->Collect();
-            }
-            catch (...)
-            {
-                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
-                {
-                    m_handles.erase(m_handles.begin() + index);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-        }
-        else
-        {
-            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
-        }
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            !m_handleSignaledEvent.wait(waitTimeout),
+            "Timed out waiting for %llu handles. Timeout: %lu",
+            m_handles.size(),
+            waitTimeout);
     }
 
     return !m_cancel;
