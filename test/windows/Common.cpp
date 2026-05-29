@@ -17,6 +17,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "LxssDynamicFunction.h"
+#include "filesystem.hpp"
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
@@ -69,6 +70,7 @@ static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
+bool g_useOpenVmm = false; // True when Backend=openvmm is passed to te.exe
 static wil::unique_mta_usage_cookie g_mtaCookie;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
@@ -1390,6 +1392,54 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+WslcSettingsChange::WslcSettingsChange(const std::string& YamlContent)
+{
+    m_settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+
+    m_fileExisted = std::filesystem::exists(m_settingsPath);
+    if (m_fileExisted)
+    {
+        std::ifstream existing(m_settingsPath);
+        m_originalContent = std::string{std::istreambuf_iterator<char>(existing), {}};
+    }
+
+    std::filesystem::create_directories(m_settingsPath.parent_path());
+    std::ofstream out(m_settingsPath, std::ios::trunc);
+    THROW_HR_IF(E_FAIL, !out.good());
+    out << YamlContent;
+}
+
+WslcSettingsChange::WslcSettingsChange(WslcSettingsChange&& other)
+    : m_settingsPath(std::move(other.m_settingsPath)),
+      m_originalContent(std::move(other.m_originalContent)),
+      m_fileExisted(other.m_fileExisted)
+{
+    other.m_fileExisted = false;
+    other.m_originalContent.reset();
+}
+
+WslcSettingsChange::~WslcSettingsChange()
+{
+    if (m_settingsPath.empty())
+    {
+        return;
+    }
+
+    if (m_fileExisted && m_originalContent.has_value())
+    {
+        std::ofstream out(m_settingsPath, std::ios::trunc);
+        if (out.good())
+        {
+            out << m_originalContent.value();
+        }
+    }
+    else if (!m_fileExisted)
+    {
+        std::error_code ec;
+        std::filesystem::remove(m_settingsPath, ec);
+    }
+}
+
 std::wstring ReadFileContent(const std::string& Path)
 {
     std::ifstream configRead(Path);
@@ -2093,6 +2143,19 @@ Return Value:
     g_testDistroPath = getTestParam(L"DistroPath");
 
     g_testDataPath = getTestParam(L"TestDataPath");
+
+    // Read optional Backend parameter (hcs or openvmm). Default is hcs.
+    const auto backend = getOptionalTestParam(L"Backend");
+    if (backend.has_value() && _wcsicmp(backend->c_str(), L"openvmm") == 0)
+    {
+        g_useOpenVmm = true;
+        LogInfo("Backend: OpenVMM");
+    }
+    else
+    {
+        g_useOpenVmm = false;
+        LogInfo("Backend: HCS");
+    }
 
     const auto setupScript = getOptionalTestParam(L"SetupScript");
     if (!setupScript.has_value())

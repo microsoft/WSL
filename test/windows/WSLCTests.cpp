@@ -36,6 +36,7 @@ using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
+extern bool g_useOpenVmm;
 
 class WSLCTests
 {
@@ -46,10 +47,14 @@ class WSLCTests
     WSLCSessionSettings m_defaultSessionSettings{};
     wil::com_ptr<IWSLCSession> m_defaultSession;
     static inline auto c_testSessionName = L"wslc-test";
+    std::optional<WslcSettingsChange> m_settingsChange;
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
+
+        // Configure the VMM backend via settings.yaml before creating any sessions.
+        m_settingsChange.emplace(std::format("session:\n  openVmm: {}\n", g_useOpenVmm ? "true" : "false"));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
         m_storagePath = std::filesystem::current_path() / "test-storage";
@@ -102,6 +107,9 @@ class WSLCTests
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
         m_defaultSession.reset();
+
+        // Restore original settings.yaml.
+        m_settingsChange.reset();
 
         // Keep the VHD when running in -f mode, to speed up subsequent test runs.
         if (!g_fastTestRun && !m_storagePath.empty())

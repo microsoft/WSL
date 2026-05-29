@@ -105,6 +105,30 @@ using namespace std::chrono_literals;
         return; \
     }
 
+//
+// Backend-specific skip macros for HCS vs OpenVMM testing.
+// g_useOpenVmm is set from the "Backend" TAEF runtime parameter.
+//
+extern bool g_useOpenVmm;
+
+#define SKIP_TEST_OPENVMM() \
+    { \
+        if (g_useOpenVmm) \
+        { \
+            LogSkipped("This test is skipped for the OpenVMM backend"); \
+            return; \
+        } \
+    }
+
+#define SKIP_TEST_HCS() \
+    { \
+        if (!g_useOpenVmm) \
+        { \
+            LogSkipped("This test is skipped for the HCS backend"); \
+            return; \
+        } \
+    }
+
 #define WSL_SETTINGS_TEST() \
     if constexpr (!WSL_BUILD_WSL_SETTINGS) \
     { \
@@ -186,6 +210,28 @@ public:
 
 private:
     std::optional<std::wstring> m_originalContent;
+};
+
+//
+// RAII Wrapper for WSLC settings.yaml changes.
+// Writes the given YAML content to %LOCALAPPDATA%\wslc\settings.yaml
+// and restores the original content (or removes the file) on destruction.
+//
+class WslcSettingsChange
+{
+public:
+    WslcSettingsChange(const std::string& YamlContent);
+    ~WslcSettingsChange();
+
+    WslcSettingsChange(const WslcSettingsChange&) = delete;
+    WslcSettingsChange(WslcSettingsChange&& other);
+    const WslcSettingsChange& operator=(WslcSettingsChange&&) = delete;
+    const WslcSettingsChange& operator=(WslcSettingsChange&) = delete;
+
+private:
+    std::filesystem::path m_settingsPath;
+    std::optional<std::string> m_originalContent;
+    bool m_fileExisted = false;
 };
 
 template <typename T>
