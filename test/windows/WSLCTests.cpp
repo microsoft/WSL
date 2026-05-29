@@ -6038,19 +6038,67 @@ class WSLCTests
     {
         // Empty entry in the Networks array must be rejected.
         LPCSTR args[] = {"sleep", "99999"};
-        LPCSTR emptyName = "";
+        WSLCNetworkConnection emptyConnection{};
+        emptyConnection.NetworkName = ""; // empty name — should be rejected
 
         WSLCContainerOptions options{};
         options.Image = "debian:latest";
         options.Name = "test-custom-network-empty";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
-        options.ContainerNetwork.Networks = &emptyName;
+        options.ContainerNetwork.Networks = &emptyConnection;
         options.ContainerNetwork.NetworksCount = 1;
 
         wil::com_ptr<IWSLCContainer> container;
         auto hr = m_defaultSession->CreateContainer(&options, &container);
         VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
         ValidateCOMErrorMessageContains(L"Network name");
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsNotImplementedTest)
+    {
+        // Per-endpoint Settings (Aliases, IPAMConfig, etc.) are reserved for a future PR.
+        // Until that lands, any non-empty Settings payload must be rejected with E_NOTIMPL
+        // so callers don't silently lose data.
+        const std::string networkName = "custom-net-settings";
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        LPCSTR args[] = {"sleep", "99999"};
+        KeyValuePair settings[] = {{"Aliases", "my-alias"}};
+        WSLCNetworkConnection connection{};
+        connection.NetworkName = networkName.c_str();
+        connection.Settings = settings;
+        connection.SettingsCount = ARRAYSIZE(settings);
+
+        WSLCContainerOptions options{};
+        options.Image = "debian:latest";
+        options.Name = "test-endpoint-settings";
+        options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+        options.ContainerNetwork.NetworkMode = "bridge";
+        options.ContainerNetwork.Networks = &connection;
+        options.ContainerNetwork.NetworksCount = 1;
+
+        wil::com_ptr<IWSLCContainer> container;
+        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
+        ValidateCOMErrorMessage(L"Endpoint settings are not yet supported (network 'custom-net-settings').");
+    }
+
+    WSLC_TEST_METHOD(ContainerUnsupportedColonNetworkModeRejectedTest)
+    {
+        // Only `container:` is a recognized colon-prefixed mode. Anything else
+        // (`service:foo`, `ns:bar`, ...) must be rejected at the WSLC layer rather
+        // than being passed through to Docker or interpreted as a user-defined name.
+        WSLCContainerLauncher launcher("debian:latest", "test-unsupported-colon", {"sleep", "99999"}, {}, std::string("service:foo"));
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+        ValidateCOMErrorMessageContains(L"service:foo");
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkMultipleContainersTest)
@@ -6830,7 +6878,8 @@ class WSLCTests
 
     void RunPortMappingsTest(IWSLCSession& session, std::string containerNetworkType)
     {
-        LogInfo("Container network type: %hs", containerNetworkType.c_str());
+        WEX::Logging::Log::Comment(
+            std::format(L"Container network type: {}", wsl::shared::string::MultiByteToWide(containerNetworkType)).c_str());
 
         auto expectBoundPorts = [&](RunningWSLCContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
             auto ports = Container.Inspect().Ports;
@@ -7059,7 +7108,7 @@ class WSLCTests
                 options.Image = "python:3.12-alpine";
                 options.Ports = &port;
                 options.PortsCount = 1;
-                options.ContainerNetwork.ContainerNetworkType = containerNetworkType;
+                options.ContainerNetwork.NetworkMode = containerNetworkType.c_str();
 
                 wil::com_ptr<IWSLCContainer> container;
                 VERIFY_ARE_EQUAL(session.CreateContainer(&options, &container), E_INVALIDARG);

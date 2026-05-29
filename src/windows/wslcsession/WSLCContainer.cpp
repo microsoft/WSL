@@ -162,9 +162,33 @@ std::optional<std::string> ParseContainerTarget(std::string_view mode)
     return std::string{mode.substr(c_containerNetworkPrefix.size())};
 }
 
-bool NetworkModeAllocatesVmPorts(std::string_view mode)
+bool IsHostMode(std::string_view mode) noexcept
 {
-    return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
+    return mode == "host";
+}
+
+bool IsNoneMode(std::string_view mode) noexcept
+{
+    return mode == "none";
+}
+
+bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
+{
+    return !IsHostMode(mode) && !IsNoneMode(mode) && !mode.starts_with(c_containerNetworkPrefix);
+}
+
+// Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed
+// modes (`service:`, `ns:`, ...) as special, but WSLC only supports `container:`. Surface the
+// rejection here so both Create() and Open() recovery paths share the same gate.
+void RejectUnsupportedColonSyntax(std::string_view mode)
+{
+    if (mode.starts_with(c_containerNetworkPrefix))
+    {
+        return;
+    }
+
+    const auto colon = mode.find(':');
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
 }
 
 std::string ResolveNetworkMode(
@@ -172,9 +196,16 @@ std::string ResolveNetworkMode(
 {
     const std::string_view mode = (networkMode == nullptr || *networkMode == '\0') ? std::string_view{"bridge"} : networkMode;
 
-    // host/none/container: own the entire netns and cannot have endpoints attached.
+    // Reject `service:foo` and similar unsupported colon-prefixed modes before any further processing.
+    RejectUnsupportedColonSyntax(mode);
+
+    // host/none own the entire netns and cannot have additional endpoints.
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcExclusiveNetworkMustBeAlone(), !NetworkModeAllocatesVmPorts(mode) && hasEndpoints);
+        E_INVALIDARG, Localization::MessageWslcHostNoneNoAdditionalNetworks(), (IsHostMode(mode) || IsNoneMode(mode)) && hasEndpoints);
+
+    // container: shares the target's netns and cannot have additional endpoints.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcContainerModeNoAdditionalNetworks(), mode.starts_with(c_containerNetworkPrefix) && hasEndpoints);
 
     if (mode == "host")
     {
@@ -242,8 +273,9 @@ std::map<std::string, EmptyObject> ResolveEndpoints(
                 WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
         }
 
-        // Per-endpoint Settings are reserved for future use (IPAddress, Aliases, ...).
-        // No keys are interpreted today.
+        // Per-endpoint Settings are reserved for future use (IPAddress, Aliases, ...). No keys
+        // are interpreted today, so reject any non-empty payload rather than silently dropping it.
+        THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(name), connections[i].SettingsCount > 0);
     }
     return resolved;
 }
@@ -1574,6 +1606,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.HostConfig.NetworkMode = networkMode;
     request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
 
+    // Docker API v1.44 (Docker 25.x) requires the primary network to be present in EndpointsConfig
+    // when EndpointsConfig is non-empty. Insert it so Docker attaches all networks at create time.
+    if (!request.NetworkingConfig.EndpointsConfig.empty() && NetworkModeAllocatesVmPorts(networkMode))
+    {
+        request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+    }
+
     for (const auto& e : mappedPorts)
     {
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
@@ -1619,18 +1658,30 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Post-create verification: confirm every requested network is actually attached.
     // If Docker rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
-    THROW_HR_IF_MSG(
-        E_UNEXPECTED,
-        !inspectData.NetworkSettings.Networks.contains(networkMode),
-        "Container was created but primary network '%hs' was not attached",
-        networkMode.c_str());
-
-    for (const auto& [name, _] : request.NetworkingConfig.EndpointsConfig)
+    // container:<id> mode shares the target's netns, so the mode string is not a network name and
+    // won't appear in NetworkSettings.Networks. Skip the check for that mode.
+    if (!networkMode.starts_with(c_containerNetworkPrefix))
     {
         THROW_HR_IF_MSG(
             E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(networkMode),
+            "Container was created but primary network '%hs' was not attached",
+            networkMode.c_str());
+    }
+
+    for (const auto& [name, _] : request.NetworkingConfig.EndpointsConfig)
+    {
+        // The primary network was auto-inserted into EndpointsConfig for Docker v1.44 compat
+        // and is already verified above. Only check explicitly-requested additional networks here.
+        if (name == networkMode)
+        {
+            continue;
+        }
+
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
             !inspectData.NetworkSettings.Networks.contains(name),
-            "Container was created but network '%hs' was not attached",
+            "Container was created but requested network '%hs' was not attached",
             name.c_str());
     }
 
@@ -1709,6 +1760,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     // Docker treats empty NetworkMode as the default (bridge).
     std::string networkMode = dockerContainer.HostConfig.NetworkMode.empty() ? std::string{"bridge"} : dockerContainer.HostConfig.NetworkMode;
+
+    // Mirror Create()'s validation on recovery: refuse to take ownership of a container whose mode
+    // we never could have produced (e.g. `service:foo`), instead of silently letting downstream
+    // string comparisons accept it.
+    RejectUnsupportedColonSyntax(networkMode);
+
     const bool allocateVmPorts = NetworkModeAllocatesVmPorts(networkMode);
 
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
@@ -1954,7 +2011,7 @@ void WSLCContainerImpl::UnmapPorts()
 
         try
         {
-            if (m_networkMode == "host")
+            if (IsHostMode(m_networkMode))
             {
                 e.VmMapping.VmPort.reset();
             }

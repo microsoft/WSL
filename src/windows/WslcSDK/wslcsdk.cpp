@@ -99,7 +99,7 @@ WSLCSignal Convert(WslcSignal signal)
     }
 }
 
-std::string Convert(WslcContainerNetworkingMode mode)
+PCSTR Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
@@ -773,7 +773,7 @@ try
     }
 
     // SDK only exposes the network mode (no additional endpoints today).
-    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networking.c_str();
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networking;
 
     // TODO: No user access
     // containerOptions.Labels;

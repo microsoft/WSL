@@ -2332,12 +2332,21 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Network '{}' already exists.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcExclusiveNetworkMustBeAlone" xml:space="preserve">
-    <value>Network mode 'host', 'none', and 'container:&lt;name&gt;' cannot be combined with any other network.</value>
-    <comment>{Locked="host"}{Locked="none"}{Locked="container:&lt;name&gt;"}Command line arguments, file names and string inserts should not be translated</comment>
+
+  <data name="MessageWslcHostNoneNoAdditionalNetworks" xml:space="preserve">
+    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Unsupported network mode: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplicate network: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Endpoint settings are not yet supported (network '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >
