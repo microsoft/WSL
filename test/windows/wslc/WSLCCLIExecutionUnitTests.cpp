@@ -420,7 +420,7 @@ class ForEachAsyncUnitTests
 
         ForEachAsync<int>(
             items,
-            [](int item) { return item * 2; },
+            [](int item, HANDLE /*cancelHandle*/) { return item * 2; },
             [&](int result) { results.push_back(result); },
             [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); });
 
@@ -439,7 +439,7 @@ class ForEachAsyncUnitTests
 
         ForEachAsync<int>(
             items,
-            [](int item) -> int {
+            [](int item, HANDLE /*cancelHandle*/) -> int {
                 if (item == 2)
                 {
                     THROW_HR(E_FAIL);
@@ -454,6 +454,20 @@ class ForEachAsyncUnitTests
         VERIFY_ARE_EQUAL(2u, succeededItems.size());
     }
 
+    TEST_METHOD(ForEachAsync_AllItemsFailInvokesErrorForEach)
+    {
+        const std::vector<int> items = {1, 2, 3, 4, 5};
+        std::atomic<int> errorCount{0};
+
+        ForEachAsync<int>(
+            items,
+            [](int /*item*/, HANDLE /*cancelHandle*/) -> int { THROW_HR(E_FAIL); },
+            [](int /*result*/) { VERIFY_FAIL(L"Unexpected success callback"); },
+            [&](int /*item*/, wil::ResultException /*error*/) { ++errorCount; });
+
+        VERIFY_ARE_EQUAL(static_cast<int>(items.size()), errorCount.load());
+    }
+
     TEST_METHOD(ForEachAsync_EmptyInputProducesNoCallbacks)
     {
         const std::vector<int> items;
@@ -462,7 +476,7 @@ class ForEachAsyncUnitTests
 
         ForEachAsync<int>(
             items,
-            [](int item) { return item; },
+            [](int item, HANDLE /*cancelHandle*/) { return item; },
             [&](int /*result*/) { successCalled = true; },
             [&](int /*item*/, wil::ResultException /*error*/) { errorCalled = true; });
 
@@ -470,23 +484,109 @@ class ForEachAsyncUnitTests
         VERIFY_IS_FALSE(errorCalled);
     }
 
-    TEST_METHOD(ForEachAsync_BatchSizeOfOneProcessesAllItems)
+    TEST_METHOD(ForEachAsync_PoolSizeOfOneProcessesAllItems)
     {
         const std::vector<int> items = {10, 20, 30, 40, 50};
         std::vector<int> results;
 
         ForEachAsync<int>(
             items,
-            [](int item) { return item; },
+            [](int item, HANDLE /*cancelHandle*/) { return item; },
             [&](int result) { results.push_back(result); },
             [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
-            /*batchSize=*/1);
+            /*poolSize=*/1);
 
         VERIFY_ARE_EQUAL(items.size(), results.size());
         for (int item : items)
         {
             VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item) != results.end());
         }
+    }
+
+    TEST_METHOD(ForEachAsync_PoolSizeLargerThanItemCountIsHandled)
+    {
+        // When poolSize > items.size(), the pool is clamped to items.size().
+        // All items must still be processed without error.
+        const std::vector<int> items = {1, 2, 3};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item, HANDLE /*cancelHandle*/) { return item; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            /*poolSize=*/64);
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_ItemsExceedingPoolSizeAreAllProcessed)
+    {
+        // Core regression for the optimization: items beyond poolSize must be dispatched
+        // once earlier workers complete - not silently dropped.
+        const std::vector<int> items = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item, HANDLE /*cancelHandle*/) { return item; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            /*poolSize=*/3);
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_SuccessAndErrorCallbacksAreInvokedSerially)
+    {
+        // onSuccess and onError are documented as serial. Verify this using a non-atomic
+        // depth counter - concurrent calls would race and produce depth > 1.
+        const std::vector<int> items = {1, 2, 3, 4, 5, 6, 7, 8};
+        int callbackDepth = 0;
+
+        ForEachAsync<int>(
+            items,
+            [](int item, HANDLE /*cancelHandle*/) { return item; },
+            [&](int /*result*/) {
+                ++callbackDepth;
+                VERIFY_ARE_EQUAL(1, callbackDepth);
+                --callbackDepth;
+            },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            /*poolSize=*/8);
+    }
+
+    TEST_METHOD(ForEachAsync_InvalidPoolSizeThrows)
+    {
+        const std::vector<int> items = {1};
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int item, HANDLE /*cancelHandle*/) { return item; },
+                [](int /*result*/) {},
+                [](int /*item*/, wil::ResultException /*error*/) {},
+                /*poolSize=*/0),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == E_INVALIDARG; });
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int item, HANDLE /*cancelHandle*/) { return item; },
+                [](int /*result*/) {},
+                [](int /*item*/, wil::ResultException /*error*/) {},
+                /*poolSize=*/MAXIMUM_WAIT_OBJECTS + 1),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == E_INVALIDARG; });
     }
 
     TEST_METHOD(ForEachAsync_ErrorInOnErrorPropagatesThrow)
@@ -496,11 +596,69 @@ class ForEachAsyncUnitTests
         VERIFY_THROWS_SPECIFIC(
             ForEachAsync<int>(
                 items,
-                [](int /*item*/) -> int { THROW_HR(E_ACCESSDENIED); },
+                [](int /*item*/, HANDLE /*cancelHandle*/) -> int { THROW_HR(E_ACCESSDENIED); },
                 [](int /*result*/) {},
                 [](int /*item*/, wil::ResultException error) { throw error; }),
             wil::ResultException,
             [](const wil::ResultException& ex) { return ex.GetErrorCode() == E_ACCESSDENIED; });
+    }
+
+    TEST_METHOD(ForEachAsync_TimeoutThrowsErrorTimeout)
+    {
+        // Workers block cooperatively on the cancel handle until the timeout fires.
+        // The drain is near-instant since workers exit as soon as the handle is signalled.
+        const std::vector<int> items = {1, 2, 3};
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int /*item*/, HANDLE cancelHandle) -> int {
+                    WaitForSingleObject(cancelHandle, INFINITE);
+                    THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
+                },
+                [](int /*result*/) { VERIFY_FAIL(L"Unexpected success callback"); },
+                [](int /*item*/, wil::ResultException error) {
+                    // Suppress expected cancellations - ForEachAsync surfaces ERROR_TIMEOUT.
+                    if (error.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_CANCELLED))
+                    {
+                        throw error;
+                    }
+                },
+                /*poolSize=*/10,
+                /*timeout=*/std::chrono::milliseconds(500),
+                /*cancelDrainTimeout=*/std::chrono::milliseconds(500)),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_TIMEOUT); });
+    }
+
+    TEST_METHOD(ForEachAsync_CancelHandleStopsWorkCooperatively)
+    {
+        // Verify that a timeout produces ERROR_TIMEOUT and that workers which observe the
+        // cancel handle exit cleanly within the drain window. The exact number of workers
+        // dispatched before the timeout is not asserted - it is scheduler-dependent and
+        // would be a source of flakiness under load.
+        const std::vector<int> items = {1, 2, 3, 4, 5};
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int /*item*/, HANDLE cancelHandle) -> int {
+                    WaitForSingleObject(cancelHandle, INFINITE);
+                    THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
+                },
+                [](int /*result*/) { VERIFY_FAIL(L"Unexpected success callback"); },
+                [](int /*item*/, wil::ResultException error) {
+                    // Suppress expected cancellations - ForEachAsync surfaces ERROR_TIMEOUT.
+                    if (error.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_CANCELLED))
+                    {
+                        throw error;
+                    }
+                },
+                /*poolSize=*/2,
+                /*timeout=*/std::chrono::milliseconds(500),
+                /*cancelDrainTimeout=*/std::chrono::milliseconds(500)),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_TIMEOUT); });
     }
 };
 
