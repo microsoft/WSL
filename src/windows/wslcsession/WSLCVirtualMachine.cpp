@@ -1248,6 +1248,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
 
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
     const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-crashes";
 
     while (!m_vmTerminatingEvent.is_signaled())
