@@ -207,12 +207,12 @@ std::string ResolveNetworkMode(
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcContainerModeNoAdditionalNetworks(), mode.starts_with(c_containerNetworkPrefix) && hasEndpoints);
 
-    if (mode == "host")
+    if (IsHostMode(mode))
     {
         return "host";
     }
 
-    if (mode == "none")
+    if (IsNoneMode(mode))
     {
         THROW_HR_IF_MSG(E_INVALIDARG, hasRequestedPorts, "Port mappings are not supported without networking");
         return "none";
