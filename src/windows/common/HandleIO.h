@@ -178,7 +178,11 @@ public:
     NON_COPYABLE(ReadSocketMessageHandle);
     NON_MOVABLE(ReadSocketMessageHandle);
 
-    ReadSocketMessageHandle(HandleWrapper&& Socket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
+    ReadSocketMessageHandle(
+        HandleWrapper&& Socket,
+        std::vector<gsl::byte>& Buffer,
+        std::vector<gsl::byte>& PendingBytes,
+        std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
     ~ReadSocketMessageHandle();
 
     void Schedule() override;
@@ -188,9 +192,11 @@ public:
 private:
     void ScheduleRecv();
     void ProcessRecvResult(DWORD BytesRead);
+    bool ProcessChunk();
 
     HandleWrapper Socket;
     std::vector<gsl::byte>& Buffer;
+    std::vector<gsl::byte>& PendingBytes;
     std::function<void(const gsl::span<gsl::byte>& Message)> OnMessage;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};

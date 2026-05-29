@@ -18,6 +18,7 @@ Abstract:
 
 #include "SessionModel.h"
 
+#include "AsyncExecution.h"
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
@@ -407,4 +408,100 @@ class WSLCCLIExecutionUnitTests
         }
     }
 };
+
+class ForEachAsyncUnitTests
+{
+    WSLC_TEST_CLASS(ForEachAsyncUnitTests)
+
+    TEST_METHOD(ForEachAsync_SuccessCallbackInvokedForAllItems)
+    {
+        const std::vector<int> items = {1, 2, 3, 4, 5};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item * 2; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); });
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item * 2) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_ErrorCallbackInvokedOnFailure)
+    {
+        const std::vector<int> items = {1, 2, 3};
+        std::vector<int> failedItems;
+        std::vector<int> succeededItems;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) -> int {
+                if (item == 2)
+                {
+                    THROW_HR(E_FAIL);
+                }
+                return item;
+            },
+            [&](int result) { succeededItems.push_back(result); },
+            [&](int item, wil::ResultException /*error*/) { failedItems.push_back(item); });
+
+        VERIFY_ARE_EQUAL(1u, failedItems.size());
+        VERIFY_ARE_EQUAL(2, failedItems[0]);
+        VERIFY_ARE_EQUAL(2u, succeededItems.size());
+    }
+
+    TEST_METHOD(ForEachAsync_EmptyInputProducesNoCallbacks)
+    {
+        const std::vector<int> items;
+        bool successCalled = false;
+        bool errorCalled = false;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item; },
+            [&](int /*result*/) { successCalled = true; },
+            [&](int /*item*/, wil::ResultException /*error*/) { errorCalled = true; });
+
+        VERIFY_IS_FALSE(successCalled);
+        VERIFY_IS_FALSE(errorCalled);
+    }
+
+    TEST_METHOD(ForEachAsync_BatchSizeOfOneProcessesAllItems)
+    {
+        const std::vector<int> items = {10, 20, 30, 40, 50};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            /*batchSize=*/1);
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_ErrorInOnErrorPropagatesThrow)
+    {
+        const std::vector<int> items = {1};
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int /*item*/) -> int { THROW_HR(E_ACCESSDENIED); },
+                [](int /*result*/) {},
+                [](int /*item*/, wil::ResultException error) { throw error; }),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == E_ACCESSDENIED; });
+    }
+};
+
 } // namespace WSLCCLIExecutionUnitTests

@@ -340,7 +340,10 @@ docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string
 {
     auto url = URL::Create("/containers/{}/stats", Id);
     url.SetParameter("stream", false);
-    url.SetParameter("one-shot", true);
+
+    // Intentionally omit one-shot=true: the Docker engine blocks internally for ~1s
+    // to collect a prior sample, and returns a single response with both cpu_stats and
+    // precpu_stats correctly populated — giving a valid delta for CPU % calculation.
     return Transaction<EmptyRequest, docker_schema::ContainerStats>(verb::get, url);
 }
 
