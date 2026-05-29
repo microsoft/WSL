@@ -827,10 +827,10 @@ try
         return "  [" + name + "] ";
     };
 
-    auto reportProgress = [&](const std::string& message, const char* id = "") {
+    auto reportProgress = [&](const std::string& message, const char* id = "", ULONGLONG current = 0, ULONGLONG total = 0) {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, current, total));
         }
     };
 
@@ -924,8 +924,21 @@ try
 
         for (const auto& entry : status.statuses)
         {
-            if (auto it = digestToStageName.find(entry.vertex);
-                it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
+            auto it = digestToStageName.find(entry.vertex);
+            if (it == digestToStageName.end() || entry.id.empty())
+            {
+                continue;
+            }
+
+            if (entry.total > 0)
+            {
+                auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
+                auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
+                auto current = wsl::shared::string::FormatBytes(currentBytes);
+                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
+            }
+            else if (reportedSteps.insert(entry.id).second)
             {
                 flushLine();
                 reportProgress(logPrefix(it->second) + entry.id + "\n");

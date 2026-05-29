@@ -3379,17 +3379,6 @@ class WSLCTests
 
         auto session = CreateSession(settings);
 
-        // Validate that the GPU is correctly configured for containers init process.
-        {
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-container-init-gpu", {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"});
-            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
-
-            auto container = launcher.Launch(*session);
-
-            ValidateContainerOutput(container, {{1, "/usr/lib/wsl/lib\n"}}, 0);
-        }
-
         // Validate that GPU resources are available inside a container when WSLCContainerFlagsGpu is set.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-gpu", {"sleep", "99999"});
@@ -3405,8 +3394,8 @@ class WSLCTests
                 ValidateProcessOutput(process, expectedOutput, exitCode);
             };
 
-            // Validate that /dev/dxg is available as a character device.
-            expect({"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
+            // Validate that /dev/dxg is available as a character device with read/write permissions.
+            expect({"/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg"}, 0);
 
             // Validate that the GPU library directory is mounted and contains libraries.
             expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/lib && ls /usr/lib/wsl/lib | grep -q ."}, 0);
@@ -3418,15 +3407,9 @@ class WSLCTests
             expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
             expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
 
-            // Validate that LD_LIBRARY_PATH is set to include the GPU library path.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
-
-            // Validate that exec with a pre-existing LD_LIBRARY_PATH appends the GPU path.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path"});
-
-            // Validate that exec with a trailing colon in LD_LIBRARY_PATH doesn't produce a double colon.
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path:"});
-            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH="});
+            // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
+            expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
+            expect({"/bin/sh", "-c", "ldconfig -p | grep -q ' => /usr/lib/wsl/lib/'"}, 0);
         }
 
         // Validate that containers without the GPU flag do not have GPU resources.
@@ -8331,6 +8314,57 @@ class WSLCTests
             COMOutputHandle stderrHandle{};
             VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x4), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerLogsManyConcurrentFollowers)
+    {
+        constexpr size_t followerCount = 100;
+        static_assert(followerCount > MAXIMUM_WAIT_OBJECTS);
+
+        WSLCContainerLauncher launcher("debian:latest", "logs-test-many-followers", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+
+        auto containerStdin = initProcess.GetStdHandle(0);
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "OK\n", 3, nullptr, nullptr));
+
+        std::atomic<size_t> readersReady{0};
+        std::atomic<size_t> readersSucceeded{0};
+        std::vector<std::thread> threads;
+        threads.reserve(followerCount);
+
+        for (size_t i = 0; i < followerCount; ++i)
+        {
+            threads.emplace_back([&]() {
+                try
+                {
+                    COMOutputHandle stdoutHandle{};
+                    COMOutputHandle stderrHandle{};
+                    VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsFollow, &stdoutHandle, &stderrHandle, 0, 0, 0));
+
+                    PartialHandleRead reader(stdoutHandle.Get());
+                    reader.Expect("OK\n");
+                    readersReady.fetch_add(1);
+                    reader.ExpectClosed();
+                    readersSucceeded.fetch_add(1);
+                }
+                CATCH_LOG();
+            });
+        }
+
+        // Wait until every follower has observed the marker before killing the container.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, readersReady.load() < followerCount); }, std::chrono::milliseconds(100), std::chrono::seconds(120));
+
+        // Kill the container so all follow handles are closed.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        for (auto& t : threads)
+        {
+            t.join();
+        }
+
+        VERIFY_ARE_EQUAL(readersSucceeded.load(), followerCount);
     }
 
     WSLC_TEST_METHOD(ContainerLabels)

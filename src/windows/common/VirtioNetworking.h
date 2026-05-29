@@ -22,7 +22,13 @@ DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    VirtioNetworking(
+        GnsChannel&& gnsChannel,
+        VirtioNetworkingFlags flags,
+        LPCWSTR dnsOptions,
+        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+        wil::shared_handle userToken,
+        std::wstring swiotlbConfig);
 
     ~VirtioNetworking();
 
@@ -62,6 +68,7 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
+    std::wstring m_swiotlbOption;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 

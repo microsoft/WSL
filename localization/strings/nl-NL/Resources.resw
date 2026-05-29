@@ -1126,6 +1126,14 @@ Poging tot downloaden van web...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p is uitgeschakeld en valt terug naar 9p met vsock-transport.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy netwerken wordt niet ondersteund wanneer wsl2.virtio is uitgeschakeld; terugvallen op networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL-installatie lijkt beschadigd te zijn (foutcode: {}).
 Druk op een toets om WSL te herstellen of CTRL-C om te annuleren.
@@ -2825,6 +2833,15 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Aantal regels dat moet worden weergegeven vanaf het einde van de logboeken</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Show timestamps in log output</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>

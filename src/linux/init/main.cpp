@@ -65,7 +65,7 @@ Abstract:
 #include "SocketChannel.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
-#define BINFMT_REGISTER_STRING ":" LX_INIT_BINFMT_NAME ":M::MZ::" LX_INIT_PATH ":FP\n"
+#define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
 #define BINFMT_PATH PROCFS_PATH "/sys/fs/binfmt_misc"
 #define CHRONY_CONF_PATH ETC_PATH "/chrony.conf"
 #define CHRONYD_PATH "/sbin/chronyd"
@@ -3466,14 +3466,15 @@ try
     wsl::shared::MessageWriter<LX_INIT_GUEST_CAPABILITIES> Message(LxMiniInitMessageGuestCapabilities);
     Message.WriteString(Version.release);
 
-    //
     // SECCOMP_USER_NOTIF_FLAG_CONTINUE is the latest flag that flow steering needs
     // but there's no way to test for its presence. The assumption is that if seccomp is available
-    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available
-    //
-
+    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available.
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
+
+    auto pool = UtilReadHvPciSwiotlbPool();
+    Message->HvPciSwiotlbBase = pool.Base;
+    Message->HvPciSwiotlbSize = pool.Size;
 
     Channel.SendMessage<LX_INIT_GUEST_CAPABILITIES>(Message.Span());
     return 0;

@@ -175,6 +175,11 @@ private:
     // Initial setup during Connect()
     void ConfigureNetworking();
 
+    // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
+    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
+    // can include the swiotlb token. Called after the root filesystem is mounted.
+    void ReadGuestCapabilities();
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
@@ -229,6 +234,10 @@ private:
 
     wsl::shared::SocketChannel m_initChannel;
     DWORD m_initChannelTimeout = 30 * 1000;
+
+    // Swiotlb pool reserved by the guest kernel (zero when the kernel lacks the WSL patch).
+    uint64_t m_hvPciSwiotlbBase = 0;
+    uint64_t m_hvPciSwiotlbSize = 0;
 
     // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
     // Declared before the port relay pipes so it is destroyed after them: any remaining
