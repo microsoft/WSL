@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <concurrent_queue.h>
+
 #define LX_RELAY_BUFFER_SIZE 0x1000
 
 namespace wsl::windows::common::io {
@@ -176,7 +178,11 @@ public:
     NON_COPYABLE(ReadSocketMessageHandle);
     NON_MOVABLE(ReadSocketMessageHandle);
 
-    ReadSocketMessageHandle(HandleWrapper&& Socket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
+    ReadSocketMessageHandle(
+        HandleWrapper&& Socket,
+        std::vector<gsl::byte>& Buffer,
+        std::vector<gsl::byte>& PendingBytes,
+        std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
     ~ReadSocketMessageHandle();
 
     void Schedule() override;
@@ -186,9 +192,11 @@ public:
 private:
     void ScheduleRecv();
     void ProcessRecvResult(DWORD BytesRead);
+    bool ProcessChunk();
 
     HandleWrapper Socket;
     std::vector<gsl::byte>& Buffer;
+    std::vector<gsl::byte>& PendingBytes;
     std::function<void(const gsl::span<gsl::byte>& Message)> OnMessage;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
@@ -349,12 +357,10 @@ private:
     WriteHandle* ActiveHandle = nullptr;
     size_t RemainingBytes = 0;
 };
-
 class MultiHandleWait
 {
 public:
     NON_COPYABLE(MultiHandleWait);
-    DEFAULT_MOVABLE(MultiHandleWait);
 
     enum Flags
     {
@@ -365,13 +371,27 @@ public:
     };
 
     MultiHandleWait() = default;
+    MultiHandleWait(MultiHandleWait&&) noexcept;
+    MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
 private:
-    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
+    struct Entry
+    {
+        Flags HandleFlags{};
+        std::unique_ptr<OverlappedIOHandle> Handle;
+        MultiHandleWait* self;
+    };
+
+    static void NTAPI WaitCallback(PVOID Context, BOOLEAN TimerOrWaitFired);
+
+    concurrency::concurrent_queue<Entry*> m_signaledHandles;
+    wil::unique_event m_handleSignaledEvent{wil::EventOptions::ManualReset};
+
+    std::vector<std::unique_ptr<Entry>> m_handles;
     bool m_cancel = false;
 };
 

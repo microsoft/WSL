@@ -299,15 +299,11 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
 
 wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
 {
-    WSLCPruneImagesOptions options{};
-    if (all)
-    {
-        WI_SetFlag(options.Flags, WSLCPruneImagesFlagsDanglingFalse);
-    }
+    WSLCFilter filter{.Key = "dangling", .Value = all ? "false" : "true"};
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     ULONGLONG spaceReclaimed = 0;
-    THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+    THROW_IF_FAILED(session.Get()->PruneImages(&filter, 1, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;

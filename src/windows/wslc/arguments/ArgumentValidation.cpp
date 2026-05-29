@@ -57,6 +57,14 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
+    case ArgType::Since:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Since>(), m_name);
+        break;
+
+    case ArgType::Until:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Until>(), m_name);
+        break;
+
     case ArgType::Last:
         validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::Last>(), m_name);
         break;
