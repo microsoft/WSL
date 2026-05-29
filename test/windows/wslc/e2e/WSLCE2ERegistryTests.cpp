@@ -30,9 +30,17 @@ namespace {
 
     void VerifyAuthFailure(const WSLCExecutionResult& result)
     {
+        // docker emits "no basic auth credentials"; podman emits
+        // "authentication required". Both are semantically equivalent
+        // 401-style auth-challenge errors. Match either so the contract
+        // (push/pull without saved creds must fail with an auth error)
+        // holds across both engines.
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"no basic auth credentials") != std::wstring::npos);
+        const auto& stderr_ = *result.Stderr;
+        VERIFY_IS_TRUE(
+            stderr_.find(L"no basic auth credentials") != std::wstring::npos ||
+            stderr_.find(L"authentication required") != std::wstring::npos);
     }
 
     void VerifyLogoutSucceeds(const std::wstring& registryAddress)
