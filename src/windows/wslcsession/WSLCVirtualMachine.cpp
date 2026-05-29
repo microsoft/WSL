@@ -254,6 +254,7 @@ WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const 
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
+    m_crashDumpCallback(Settings->CrashDumpCallback),
     m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
@@ -1273,10 +1274,14 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
             const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
+            const auto crashPid = message.Pid;
+            const auto crashSignal = message.Signal;
+            const auto crashTimestamp = message.Timestamp;
+
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
-            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, crashTimestamp, crashPid, process, crashSignal, dumpExtension);
 
             std::replace_if(
                 filename.begin(),
@@ -1289,8 +1294,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             WSL_LOG(
                 "WSLCLinuxCrash",
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
-                TraceLoggingValue(message.Pid, "Pid"),
-                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(crashPid, "Pid"),
+                TraceLoggingValue(crashSignal, "Signal"),
                 TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
@@ -1314,6 +1319,13 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            // Invoke the crash dump callback (if any) now that the dump file has been fully
+            // written. Failures in the callback are logged but do not interrupt crash collection.
+            if (m_crashDumpCallback)
+            {
+                LOG_IF_FAILED(m_crashDumpCallback->OnCrashDump(fullPath.c_str(), process.c_str(), crashPid, crashSignal, crashTimestamp));
+            }
         }
         CATCH_LOG()
     }

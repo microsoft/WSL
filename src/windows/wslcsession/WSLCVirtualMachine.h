@@ -219,6 +219,9 @@ private:
 
     std::string m_rootVhdType;
 
+    // Optional callback invoked after a crash dump is successfully written.
+    wil::com_ptr<ICrashDumpCallback> m_crashDumpCallback;
+
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
 

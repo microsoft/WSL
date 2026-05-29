@@ -108,6 +108,21 @@ interface ITerminationCallback : IUnknown
 };
 
 [
+    uuid(8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801),
+    pointer_default(unique),
+    object
+]
+interface ICrashDumpCallback : IUnknown
+{
+    HRESULT OnCrashDump(
+        [in, string] LPCWSTR DumpPath,
+        [in, unique, string] LPCSTR ProcessName,
+        [in] ULONGLONG Pid,
+        [in] ULONG Signal,
+        [in] ULONGLONG Timestamp);
+};
+
+[
     uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
     pointer_default(unique),
     object
@@ -526,6 +541,7 @@ typedef struct _WSLCSessionSettings {
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
+    [unique] ICrashDumpCallback* CrashDumpCallback;
 } WSLCSessionSettings;
 
 typedef enum _WSLCLogsFlags
@@ -716,6 +732,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
+    [unique] ICrashDumpCallback* CrashDumpCallback;
 } WSLCSessionInitSettings;
 
 [

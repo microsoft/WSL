@@ -18,6 +18,7 @@ Abstract:
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
+#include "CrashDumpCallback.h"
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
@@ -440,6 +441,12 @@ try
         result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
+    auto crashDumpCallback = CrashDumpCallback::CreateIf(internalType);
+    if (crashDumpCallback)
+    {
+        result->crashDumpCallback.attach(crashDumpCallback.as<ICrashDumpCallback>().detach());
+        runtimeSettings.CrashDumpCallback = crashDumpCallback.get();
+    }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
@@ -599,6 +606,20 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcSetSessionSettingsCrashDumpCallback(
+    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionCrashDumpCallback crashDumpCallback, _In_opt_ PVOID crashDumpContext)
+try
+{
+    auto internalType = CheckAndGetInternalType(sessionSettings);
+    RETURN_HR_IF(E_INVALIDARG, crashDumpCallback == nullptr && crashDumpContext != nullptr);
+
+    internalType->crashDumpCallback = crashDumpCallback;
+    internalType->crashDumpCallbackContext = crashDumpContext;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcReleaseSession(_In_ WslcSession session)
 try
 {
@@ -608,6 +629,7 @@ try
     // the termination callback ends up being invoked by session destruction.
     internalType->session.reset();
     internalType->terminationCallback.reset();
+    internalType->crashDumpCallback.reset();
 
     return S_OK;
 }

@@ -42,7 +42,7 @@ EXTERN_C_START
 #define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 88
+#define WSLC_SESSION_OPTIONS_SIZE 104
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -125,6 +125,17 @@ typedef enum WslcSessionTerminationReason
 
 typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
+typedef struct WslcSessionCrashDumpInfo
+{
+    _Field_z_ PCWSTR dumpPath;
+    _Field_z_ PCSTR processName;
+    uint64_t pid;
+    uint32_t signal;
+    uint64_t timestamp;
+} WslcSessionCrashDumpInfo;
+
+typedef __callback void(CALLBACK* WslcSessionCrashDumpCallback)(_In_ const WslcSessionCrashDumpInfo* info, _In_opt_ PVOID context);
+
 STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -141,6 +152,9 @@ STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSetti
 // Pass in Null for callback to clear the termination callback
 STDAPI WslcSetSessionSettingsTerminationCallback(
     _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext);
+
+STDAPI WslcSetSessionSettingsCrashDumpCallback(
+    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionCrashDumpCallback crashDumpCallback, _In_opt_ PVOID crashDumpContext);
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);

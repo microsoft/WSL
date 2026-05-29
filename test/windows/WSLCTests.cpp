@@ -2753,6 +2753,61 @@ class WSLCTests
         VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
+    WSLC_TEST_METHOD(CrashDumpCallback)
+    {
+        class DECLSPEC_UUID("8C5A7B14-9D26-4FAE-AB31-7E5BC23F4802") CallbackInstance
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback, IFastRundown>
+        {
+        public:
+            struct Invocation
+            {
+                std::wstring DumpPath;
+                std::string ProcessName;
+                ULONGLONG Pid;
+                ULONG Signal;
+                ULONGLONG Timestamp;
+            };
+
+            CallbackInstance(std::function<void(Invocation)>&& callback) : m_callback(std::move(callback))
+            {
+            }
+
+            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+            {
+                m_callback(Invocation{
+                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                return S_OK;
+            }
+
+        private:
+            std::function<void(Invocation)> m_callback;
+        };
+
+        std::promise<CallbackInstance::Invocation> promise;
+
+        CallbackInstance callback{[&](CallbackInstance::Invocation invocation) { promise.set_value(std::move(invocation)); }};
+
+        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"crash-dump-callback-test");
+        sessionSettings.CrashDumpCallback = &callback;
+
+        auto session = CreateSession(sessionSettings);
+
+        // Trigger a Linux process crash. The shell exits with 128 + SIGSEGV.
+        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "kill -SEGV $$"}, 128 + WSLCSignalSIGSEGV);
+
+        auto future = promise.get_future();
+        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
+
+        auto invocation = future.get();
+        VERIFY_IS_FALSE(invocation.DumpPath.empty());
+        VERIFY_IS_TRUE(std::filesystem::exists(invocation.DumpPath));
+        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
+        VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
+        VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
+    }
+
     WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
     {
         SKIP_TEST_SERVER();

@@ -21,6 +21,7 @@ WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
+WslcSetSessionSettingsCrashDumpCallback
  
 WslcTerminateSession
 WslcSessionAuthenticate

@@ -35,6 +35,9 @@ typedef struct WslcSessionOptionsInternal
     WslcSessionFeatureFlags featureFlags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
+
+    WslcSessionCrashDumpCallback crashDumpCallback;
+    PVOID crashDumpCallbackContext;
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
@@ -108,6 +111,7 @@ struct WslcSessionImpl
 {
     wil::com_ptr<IWSLCSession> session;
     wil::com_ptr<ITerminationCallback> terminationCallback;
+    wil::com_ptr<ICrashDumpCallback> crashDumpCallback;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
