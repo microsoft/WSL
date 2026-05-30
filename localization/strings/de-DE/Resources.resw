@@ -2841,13 +2841,13 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Anzahl der Zeilen, die vom Ende der Protokolle angezeigt werden sollen</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Zeitstempel in der Protokollausgabe anzeigen</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Protokolle seit dem Zeitstempel anzeigen (z. B. Unix-Epochensekunden)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Protokolle vor dem Zeitstempel anzeigen (z. B. Unix-Epoche-Sekunden)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Neue Bildreferenz im Format image-name[:tag]</value>
