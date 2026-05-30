@@ -575,7 +575,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         // Work to be done for each container ID on a separate thread.
         // cancelHandle is signalled if the overall operation times out, check it before
         // the blocking Stats call so we exit cooperatively without waiting a full ~1s sample.
-        [&session, userSpecifiedContainers](const std::wstring& containerId, HANDLE cancelHandle) {
+        [session, userSpecifiedContainers](const std::wstring& containerId, HANDLE cancelHandle) {
             if (::WaitForSingleObject(cancelHandle, 0) == WAIT_OBJECT_0)
             {
                 THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
