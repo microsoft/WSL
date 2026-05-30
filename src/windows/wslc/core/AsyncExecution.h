@@ -37,7 +37,7 @@ namespace detail {
         {
         }
 
-        TItem item;
+        std::optional<TItem> item;
         std::optional<TResult> result;
         wil::ResultException error{S_OK};
         bool hasError{false};
@@ -142,7 +142,7 @@ namespace detail {
 
             if (worker->workerResult.hasError)
             {
-                onError(worker->workerResult.item, worker->workerResult.error);
+                onError(*worker->workerResult.item, worker->workerResult.error);
             }
             else if (worker->workerResult.result.has_value())
             {
@@ -180,7 +180,7 @@ namespace detail {
 
             try
             {
-                worker.workerResult.result = worker.context->onWork(worker.workerResult.item, worker.context->cancelEvent.get());
+                worker.workerResult.result = worker.context->onWork(*worker.workerResult.item, worker.context->cancelEvent.get());
             }
             catch (const wil::ResultException& ex)
             {
@@ -190,7 +190,7 @@ namespace detail {
             catch (...)
             {
                 worker.workerResult.hasError = true;
-                worker.workerResult.error = wil::ResultException{wil::details::ResultFromCaughtException()};
+                worker.workerResult.error = wil::ResultException{wil::ResultFromCaughtException()};
             }
 
             worker.done.SetEvent();
