@@ -105,12 +105,20 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         bar.append(L">");
         bar.resize(c_progressBarWidth, L' ');
 
-        line = std::format(
-            L"{}: {} [{}] {}/{}", id, status, bar, wsl::shared::string::FormatBytes(current), wsl::shared::string::FormatBytes(total));
+        // Docker's reported total is an estimate of the compressed layer size, so the actual bytes
+        // transferred can exceed it. Drop the total in that case to avoid displaying a count over 100%.
+        auto progress = wsl::shared::string::FormatBytes(current);
+
+        if (current <= total)
+        {
+            progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
+        }
+
+        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}s", id, status, current);
+        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
     }
     else
     {
