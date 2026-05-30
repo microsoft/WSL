@@ -149,7 +149,7 @@ std::vector<SessionInformation> SessionService::List()
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    wil::unique_cotaskmem_array_ptr<WSLCSessionInformation> sessions;
+    wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
     THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
     for (size_t i = 0; i < sessions.size(); ++i)
     {

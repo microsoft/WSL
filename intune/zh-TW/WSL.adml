@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName><!-- _locComment_text='{Locked="WSL"}' -->WSL</displayName>
+  <description><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
+
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->允許 Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->當設定為停用時，此原則會停用該電腦上所有使用者對 Windows Subsystem for Linux 中執行的 Linux 發行版本的存取權。</string>
+
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->允許 Windows Subsystem for Linux 的收件匣版本</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->設定為停用時，此原則會停用 Windows Subsystem for Linux 的內建版本 (選用元件)。如果停用此原則，則只能使用 WSL 的市集版本。</string>
+
+        <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->允許 WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->設定為停用時，此原則會停用 WSL1。停用時，只能使用 WSL2 發佈。</string>
+
+        <string id="CustomKernelUserSettingConfigurable">允許自訂核心組態</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernel) 停用自訂核心設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">允許自訂系統發行版組態</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.systemDistro) 停用自訂系統發行版設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">允許核心命令列設定</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernelCommandLine) 停用核心命令列設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="AllowDebugShell">允許偵錯殼層</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->設定為停用時，此原則會停用偵錯殼層 (wsl.exe --debug-shell)。此原則僅適用於 Store WSL。</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">允許巢狀虛擬化</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.nestedVirtualization) 停用巢狀虛擬化設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="KernelDebugUserSettingConfigurable">允許核心偵錯</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.kernelDebugPort) 停用核心偵錯設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">允許自訂網路設定</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.networkingMode) 停用自訂網路設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="FirewallUserSettingConfigurable">允許使用者設定防火牆設定</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->設定為停用時，此原則會透過 .wslconfig (wsl2.firewall) 停用防火牆設定。此原則僅適用於 Store WSL。</string>
+
+        <string id="AllowDiskMount">允許直通磁碟掛載</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">設定預設網路模式</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment_text='{Locked="WSL2"}' -->此原則指定要用於 WSL2 的預設網路模式。</string>
+        <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+
+        <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL 容器</string>
+
+        <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->允許 WSL 容器</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->此原則會控制是否可在此電腦上使用 WSL 容器。啟用或未設定時，使用者和 Windows 應用程式可以透過 WSL 執行 Linux 容器。設定為停用時，系統會針對所有使用者封鎖 WSL 容器，且 Windows 應用程式無法執行 Linux 容器。警告: 將此設定為「Disabled」可能會中斷依賴 Linux 容器的 Windows 應用程式。</string>
+
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL 容器登錄的允許清單</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->啟用時，只允許 WSL 容器從此處列出的登錄提取映像。這會影響 WSL 容器 CLI 以及所有使用 WSL 容器 API 的應用程式。</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">預設網路模式</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">允許的登錄</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

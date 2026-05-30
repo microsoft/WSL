@@ -35,6 +35,8 @@ std::map<std::wstring, wil::unique_hkey> EnumKeys(_In_ HKEY Key, _In_ DWORD Subk
 
 std::vector<std::pair<std::wstring, DWORD>> EnumValues(_In_ HKEY Key);
 
+std::map<std::wstring, std::wstring> EnumStringValues(_In_ HKEY Key);
+
 DWORD GetMachinePolicyValue(_In_ LPCWSTR Name, HKEY lxssKey);
 
 bool IsKeyVolatile(_In_ HKEY Key);

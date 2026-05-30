@@ -12,7 +12,7 @@
 .PARAMETER TestDataPath
     Path to test data folder. Defaults to ".\test_data".
 .PARAMETER Package
-    Path to the wsl.msix package to install. Defaults to ".\wsl.msix".
+    Path to the wsl.msix package to install. Defaults to ".\installer.msix".
 .PARAMETER UnitTestsPath
     Path to the linux/unit_tests directory to copy and install the unit tests.
 .PARAMETER PullRequest
@@ -70,33 +70,26 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
     }
 }
 
-# If the user provided a /name: or /select: filter, don't add automatic version filtering.
-$HasUserSelection = $false
-foreach ($arg in $TeArgs)
-{
-    if ($arg -like '/name:*' -or $arg -like '/select:*' -or $arg -like '-name:*' -or $arg -like '-select:*')
-    {
-        $HasUserSelection = $true
-        break
-    }
-}
-
 $teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath", "/p:TestDataPath=$TestDataPath",
     "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
 
-if (-not $HasUserSelection)
-{
-    $teArgList += "/select:`"@WSLVersion='$Version' or not(@WSLVersion='*')`""
-}
-
-$teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
-
 if ($AttachDebugger)
 {
+    $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
     # /inproc is always added above, so attach directly to TE.exe.
     Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
     Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
+
+    $teProcess | Wait-Process
+    exit $teProcess.ExitCode
+}
+else
+{
+    te.exe $teArgList
+    if ($LASTEXITCODE -ne 0)
+    {
+        exit $LASTEXITCODE
+    }
 }
 
-$teProcess | Wait-Process
-exit $teProcess.ExitCode

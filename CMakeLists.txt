@@ -158,6 +158,9 @@ find_nuget_package(Microsoft.Windows.SDK.NET.Ref WINDOWS_SDK_DOTNET /)
 find_nuget_package(Microsoft.Xaml.Behaviors.WinUI.Managed XAML_BEHAVIORS /)
 find_nuget_package(WinUIEx WINUIEX /)
 
+# WSLC C# API packages
+find_nuget_package(Microsoft.Windows.CsWinRT CSWINRT /)
+
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
@@ -172,8 +175,8 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-if (NOT DEFINED WSL_BUILD_SDKCS)
-    set(WSL_BUILD_SDKCS false)
+if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
+    set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
 find_commit_hash(COMMIT_HASH)
@@ -535,10 +538,6 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
-
-if (WSL_BUILD_SDKCS)
-    add_subdirectory(src/windows/WslcSDK/csharp)
-endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

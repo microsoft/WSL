@@ -57,6 +57,22 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
+    case ArgType::Since:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Since>(), m_name);
+        break;
+
+    case ArgType::Until:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Until>(), m_name);
+        break;
+
+    case ArgType::Last:
+        validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::Last>(), m_name);
+        break;
+
+    case ArgType::Filter:
+        validation::ValidateFilter(execArgs.GetAll<ArgType::Filter>());
+        break;
+
     case ArgType::Gpus:
         validation::ValidateGpus(execArgs.GetAll<ArgType::Gpus>(), m_name);
         break;
@@ -112,6 +128,19 @@ void ValidateVolumeMount(const std::vector<std::wstring>& values)
     for (const auto& value : values)
     {
         std::ignore = models::VolumeMount::Parse(value);
+    }
+}
+
+// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
+// the runtime validates the key and value for specific objects.
+void ValidateFilter(const std::vector<std::wstring>& values)
+{
+    for (const auto& value : values)
+    {
+        if (value.find(L'=') == std::wstring::npos)
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
+        }
     }
 }
 
@@ -227,7 +256,7 @@ void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstr
     }
 }
 
-ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
+int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
     auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
     if (!parsed.has_value())
@@ -235,7 +264,7 @@ ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring&
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return parsed.value();
+    return static_cast<int64_t>(parsed.value());
 }
 
 } // namespace wsl::windows::wslc::validation

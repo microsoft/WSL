@@ -37,7 +37,7 @@ parameters:
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage;wslcsdkcs"
-        pattern: "wsl.msi,wslcsdkcs.dll"
+        pattern: "wsl.msi,wslcsdkcs.dll,Microsoft.WSL.Containers.winmd"
 
   - name: pool
     type: string
@@ -104,7 +104,7 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
-          - script: python tools/devops/validate-localization.py localization/strings en-US
+          - script: python tools/devops/validate-localization.py
             displayName: Validate localization resources
 
           - script: python tools\devops\validate-copyright-headers.py src

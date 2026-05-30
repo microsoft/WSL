@@ -29,7 +29,10 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All),
+        Argument::Create(ArgType::Filter, false, NO_LIMIT),
         Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::Last),
+        Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
         Argument::Create(ArgType::Session),
@@ -46,18 +49,6 @@ std::wstring ContainerListCommand::LongDescription() const
     return Localization::WSLCCLI_ContainerListLongDesc();
 }
 
-void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
-}
-
 // clang-format off
 void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
@@ -67,4 +58,12 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
         << ListContainers;
 }
 // clang-format on
+
+void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+{
+    if (execArgs.Contains(ArgType::Last) && execArgs.Contains(ArgType::Latest))
+    {
+        throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"));
+    }
+}
 } // namespace wsl::windows::wslc

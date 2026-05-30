@@ -20,6 +20,7 @@ Abstract:
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
+#include <filesystem>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -337,9 +338,17 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    // Reserve the CID file (fails if it already exists) before creating the container so a
+    // container isn't created when the caller-requested path can't be written. The file is
+    // removed automatically if we don't reach Commit() below.
+    CidFile cidFile(runOptions.CidFile);
+
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions);
     auto& container = runningContainer.Get();
+
+    WSLCContainerId containerId{};
+    THROW_IF_FAILED(container.GetId(containerId));
 
     // Start the created container
     WSLCContainerStartFlags startFlags{};
@@ -348,6 +357,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
+    cidFile.Commit(containerId);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
@@ -356,19 +366,19 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
         return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
     }
 
-    WSLCContainerId containerId{};
-    THROW_IF_FAILED(container.GetId(containerId));
     PrintMessage(L"%hs", stdout, containerId);
     return 0;
 }
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    CidFile cidFile(runOptions.CidFile);
     auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
     THROW_IF_FAILED(container.GetId(id));
+    cidFile.Commit(id);
     return {.Id = id};
 }
 
@@ -416,12 +426,28 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
     THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
 }
 
-std::vector<ContainerInformation> ContainerService::List(Session& session)
+std::vector<ContainerInformation> ContainerService::List(
+    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    std::vector<ContainerInformation> result;
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    WSLCListContainersOptions options{};
+    options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
+    options.Limit = limit;
+    options.Filters = filterEntries.data();
+    options.FiltersCount = static_cast<ULONG>(filterEntries.size());
+
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
     wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+    THROW_IF_FAILED(
+        session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+    std::vector<ContainerInformation> result;
 
     for (const auto& current : containers)
     {
@@ -479,7 +505,7 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -488,20 +514,46 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
+    WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, tail));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
-    wsl::windows::common::relay::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+    wsl::windows::common::io::MultiHandleWait io;
+    io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
         stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+        io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
             stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.
     io.Run({});
+}
+
+wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Session& session, const std::string& id)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(container->Stats(&output));
+    return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+}
+
+PruneContainersResult ContainerService::Prune(Session& session)
+{
+    PruneResult result;
+    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+
+    PruneContainersResult pruneResult;
+    pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;
+    pruneResult.PrunedContainers.reserve(result.result.ContainersCount);
+    for (ULONG i = 0; i < result.result.ContainersCount; i++)
+    {
+        pruneResult.PrunedContainers.push_back(result.result.Containers[i]);
+    }
+
+    return pruneResult;
 }
 } // namespace wsl::windows::wslc::services

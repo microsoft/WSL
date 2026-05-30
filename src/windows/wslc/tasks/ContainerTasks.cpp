@@ -13,10 +13,12 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentValidation.h"
+#include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
+#include "ImageModel.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
@@ -31,6 +33,106 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+
+namespace {
+
+std::string FormatBytes(uint64_t bytes)
+{
+    constexpr uint64_t c_kib = 1024;
+    constexpr uint64_t c_mib = 1024 * c_kib;
+    constexpr uint64_t c_gib = 1024 * c_mib;
+
+    if (bytes >= c_gib)
+    {
+        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
+    }
+    else if (bytes >= c_mib)
+    {
+        return std::format("{:.2f} MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
+    }
+    else if (bytes >= c_kib)
+    {
+        return std::format("{:.2f} KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
+    }
+    else
+    {
+        // Bytes are always whole numbers, so decimal places are intentionally omitted here.
+        // This matches the behaviour of `docker stats`.
+        return std::format("{} B", bytes);
+    }
+}
+
+nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
+{
+    // Calculate CPU %
+    // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
+    double cpuPercent = 0.0;
+    const auto cpuDelta =
+        static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) - static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
+    const auto systemDelta = static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
+    if (systemDelta > 0.0 && cpuDelta > 0.0)
+    {
+        uint32_t onlineCpus = stats.cpu_stats.online_cpus;
+        if (onlineCpus == 0 && stats.cpu_stats.cpu_usage.percpu_usage.has_value())
+        {
+            onlineCpus = static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size());
+        }
+
+        cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
+    }
+
+    // Calculate memory %
+    double memPercent = 0.0;
+    if (stats.memory_stats.limit > 0)
+    {
+        memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
+    }
+
+    // Aggregate network I/O
+    uint64_t netRxBytes = 0;
+    uint64_t netTxBytes = 0;
+    if (stats.networks.has_value())
+    {
+        for (const auto& [iface, netStats] : *stats.networks)
+        {
+            netRxBytes += netStats.rx_bytes;
+            netTxBytes += netStats.tx_bytes;
+        }
+    }
+
+    // Aggregate block I/O
+    uint64_t blkReadBytes = 0;
+    uint64_t blkWriteBytes = 0;
+    if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+    {
+        for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+        {
+            if (_stricmp(entry.op.c_str(), "read") == 0)
+            {
+                blkReadBytes += entry.value;
+            }
+            else if (_stricmp(entry.op.c_str(), "write") == 0)
+            {
+                blkWriteBytes += entry.value;
+            }
+        }
+    }
+
+    const auto& containerName = stats.name.empty() ? stats.id : stats.name;
+
+    return {
+        {"ID", stats.id},
+        {"Name", containerName},
+        {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
+        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemPerc", std::format("{:.2f}%", memPercent)},
+        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"PIDs", stats.pids_stats.current},
+    };
+}
+
+} // namespace
 
 namespace wsl::windows::wslc::task {
 
@@ -82,7 +184,33 @@ void GetContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Containers>(ContainerService::List(session));
+
+    int limit = -1;
+
+    if (context.Args.Contains(ArgType::Last))
+    {
+        limit = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::Last>(), L"--last");
+    }
+    else if (context.Args.Contains(ArgType::Latest))
+    {
+        limit = 1;
+    }
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.Contains(ArgType::All), limit, filters));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -130,14 +258,8 @@ void ListContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Containers));
     auto& containers = context.Data.Get<Data::Containers>();
 
-    // Filter by running state if --all is not specified
-    if (!context.Args.Contains(ArgType::All))
-    {
-        auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLCContainerState::WslcContainerStateRunning;
-        };
-        containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
-    }
+    // Note: --all and --filter status= are honored by the Docker daemon when
+    // GetContainers ran; no post-filtering needed here.
 
     if (context.Args.Contains(ArgType::Quiet))
     {
@@ -170,15 +292,20 @@ void ListContainers(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table =
-            trunc ? wsl::windows::wslc::TableOutput<6>(
-                        {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
-                          {L"NAME", {Config::NoLimit, 20, true}},
-                          {L"IMAGE", {Config::NoLimit, 20, false}},
-                          {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
-                          {L"STATUS", {Config::NoLimit, Config::NoLimit, false}},
-                          {L"PORTS", {Config::NoLimit, Config::NoLimit, false}}}})
-                  : wsl::windows::wslc::TableOutput<6>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS", L"PORTS"});
+        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
+                                   {Localization::WSLCCLI_TableHeaderImage(), {Config::NoLimit, 20, false}},
+                                   {Localization::WSLCCLI_TableHeaderCreated(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderStatus(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<6>(
+                                 {Localization::WSLCCLI_TableHeaderContainerId(),
+                                  Localization::WSLCCLI_TableHeaderName(),
+                                  Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCreated(),
+                                  Localization::WSLCCLI_TableHeaderStatus(),
+                                  Localization::WSLCCLI_TableHeaderPorts()});
 
         // Add each container as a row
         for (const auto& container : containers)
@@ -225,6 +352,11 @@ void RunContainer(CLIExecutionContext& context)
 void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 {
     ContainerOptions options;
+
+    if (context.Args.Contains(ArgType::CIDFile))
+    {
+        options.CidFile = context.Args.Get<ArgType::CIDFile>();
+    }
 
     if (context.Args.Contains(ArgType::Name))
     {
@@ -409,6 +541,127 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 
+void ShowContainerStats(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    auto containers = context.Args.GetAll<ArgType::ContainerId>();
+
+    // If any are specified we use those, otherwise we show all containers.
+    const bool userSpecifiedContainers = !containers.empty();
+    if (!userSpecifiedContainers)
+    {
+        GetContainers(context);
+        const auto& allContainers = context.Data.Get<Data::Containers>();
+        for (const auto& container : allContainers)
+        {
+            // Skip non-running containers unless --all is specified.
+            if (!context.Args.Contains(ArgType::All) && container.State != WSLCContainerState::WslcContainerStateRunning)
+            {
+                continue;
+            }
+
+            containers.push_back(MultiByteToWide(container.Id));
+        }
+    }
+
+    // Fetch stats for all containers concurrently in batches. The Docker engine blocks for ~1s
+    // per request to collect a valid precpu_stats sample, so issuing requests in parallel keeps
+    // wall time proportional to ceil(N / batchSize) rather than N.
+    nlohmann::json statsJson = nlohmann::json::array();
+    wsl::windows::wslc::ForEachAsync<std::wstring>(
+        containers,
+        // Work to be done for each container ID on a separate thread.
+        [&session](const std::wstring& containerId) {
+            // ContainerService::Stats makes COM calls, so we must ensure COM is initialized on this thread.
+            auto comCleanup = wil::CoInitializeEx(COINIT_MULTITHREADED);
+            return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
+        },
+        // On Success
+        [&](const nlohmann::json& entry) { statsJson.push_back(entry); },
+        // On Error
+        [&](const std::wstring& containerId, wil::ResultException error) {
+            if (!userSpecifiedContainers)
+            {
+                switch (error.GetErrorCode())
+                {
+                case RPC_E_DISCONNECTED:
+                case WSLC_E_CONTAINER_NOT_FOUND:
+                    // Container disappeared between list and stats fetch, and
+                    // the user did not specify these containers, so silently skip.
+                    return;
+                }
+            }
+
+            // Failure to retrieve a container should stop execution with
+            // no container information displayed.
+            LOG_HR_MSG(error.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
+            throw error;
+        },
+        10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
+    );
+
+    FormatType format = FormatType::Table; // Default is table
+    if (context.Args.Contains(ArgType::Format))
+    {
+        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+    }
+
+    switch (format)
+    {
+    case FormatType::Json:
+    {
+        PrintMessage(MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)));
+        break;
+    }
+    case FormatType::Table:
+    {
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
+                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderNetIo(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderPids(), {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<8>(
+                                 {Localization::WSLCCLI_TableHeaderContainerId(),
+                                  Localization::WSLCCLI_TableHeaderName(),
+                                  Localization::WSLCCLI_TableHeaderCpuPercent(),
+                                  Localization::WSLCCLI_TableHeaderMemUsageLimit(),
+                                  Localization::WSLCCLI_TableHeaderMemPercent(),
+                                  Localization::WSLCCLI_TableHeaderNetIo(),
+                                  Localization::WSLCCLI_TableHeaderBlockIo(),
+                                  Localization::WSLCCLI_TableHeaderPids()});
+
+        for (const auto& entry : statsJson)
+        {
+            const auto id = entry["ID"].get<std::string>();
+            table.OutputLine({
+                MultiByteToWide(trunc ? TruncateId(id) : id),
+                MultiByteToWide(entry["Name"].get<std::string>()),
+                MultiByteToWide(entry["CPUPerc"].get<std::string>()),
+                MultiByteToWide(entry["MemUsage"].get<std::string>()),
+                MultiByteToWide(entry["MemPerc"].get<std::string>()),
+                MultiByteToWide(entry["NetIO"].get<std::string>()),
+                MultiByteToWide(entry["BlockIO"].get<std::string>()),
+                std::to_wstring(entry["PIDs"].get<uint64_t>()),
+            });
+        }
+
+        table.Complete();
+        break;
+    }
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
 void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -445,6 +698,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
     bool follow = context.Args.Contains(ArgType::Follow);
+    bool timestamps = context.Args.Contains(ArgType::Timestamps);
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))
@@ -452,6 +706,34 @@ void ViewContainerLogs(CLIExecutionContext& context)
         tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
     }
 
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow, tail);
+    ULONGLONG since = 0;
+    if (context.Args.Contains(ArgType::Since))
+    {
+        since = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Since>());
+    }
+
+    ULONGLONG until = 0;
+    if (context.Args.Contains(ArgType::Until))
+    {
+        until = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Until>());
+    }
+
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
+}
+
+void PruneContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    auto result = ContainerService::Prune(session);
+
+    for (const auto& containerId : result.PrunedContainers)
+    {
+        PrintMessage(MultiByteToWide(containerId));
+    }
+
+    PrintMessage(L"");
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task

@@ -37,7 +37,11 @@ enum class PluginTestType
     InitPidIsDifferent,
     FailToRegisterUnregisterDistro,
     RunDistroCommand,
-    GetUsername
+    GetUsername,
+    WslcSuccess,
+    WslcSessionRejected,
+    WslcContainerRejected,
+    WslcImagePull
 };
 
 constexpr auto c_testType = L"TestType";

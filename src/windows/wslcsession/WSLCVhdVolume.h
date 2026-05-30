@@ -69,6 +69,11 @@ public:
     {
         return WSLCVhdVolumeDriver;
     }
+    const std::map<std::string, std::string>& Labels() const noexcept override
+    {
+        return m_labels;
+    }
+
     void Delete() override;
     std::string Inspect() const override;
     WSLCVolumeInformation GetVolumeInformation() const override;
@@ -78,7 +83,7 @@ public:
         return m_virtualMachinePath;
     }
 
-    void OnDeleted();
+    void OnDeleted() override;
 
 private:
     void Detach();

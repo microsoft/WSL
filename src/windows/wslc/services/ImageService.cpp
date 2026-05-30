@@ -16,6 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
+#include <relay.hpp>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -69,6 +70,40 @@ std::string GetServerFromImage(const std::string& image)
     auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
     auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
     return server;
+}
+
+struct InputSource
+{
+    InputSource(wsl::windows::common::relay::HandleWrapper&& handle, ULONGLONG contentLength) :
+        Handle(std::move(handle)), ContentLength(contentLength)
+    {
+    }
+
+    wsl::windows::common::relay::HandleWrapper Handle;
+    ULONGLONG ContentLength = 0;
+};
+
+wsl::windows::common::relay::HandleWrapper OpenInputHandle(const std::wstring& input)
+{
+    if (input == L"-")
+    {
+        return wsl::windows::common::relay::HandleWrapper(GetStdHandle(STD_INPUT_HANDLE));
+    }
+
+    wil::unique_hfile file(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    THROW_LAST_ERROR_IF(!file);
+
+    return wsl::windows::common::relay::HandleWrapper(std::move(file));
+}
+
+InputSource OpenImageInput(const std::wstring& input)
+{
+    auto handle = OpenInputHandle(input);
+
+    LARGE_INTEGER fileSize{};
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcImportPipeNotSupported(), !GetFileSizeEx(handle.Get(), &fileSize));
+
+    return InputSource{std::move(handle), static_cast<ULONGLONG>(fileSize.QuadPart)};
 }
 
 } // namespace
@@ -146,11 +181,24 @@ void ImageService::Build(
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 }
 
-std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
+std::vector<ImageInformation> ImageService::List(
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    WSLCListImagesOptions options{};
+    options.Flags = WSLCListImagesFlagsNone;
+    options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
+    options.FiltersCount = static_cast<ULONG>(filterEntries.size());
+
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
+    THROW_IF_FAILED(session.Get()->ListImages(&options, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
@@ -178,13 +226,15 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
-    wil::unique_hfile imageFile{CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-    THROW_LAST_ERROR_IF(!imageFile);
+    auto source = OpenImageInput(input);
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength));
+}
 
-    LARGE_INTEGER fileSize{};
-    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+{
+    auto source = OpenImageInput(input);
+    THROW_IF_FAILED(session.Get()->ImportImage(
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
@@ -260,17 +310,31 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
 }
 
-wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
+wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(
+    wsl::windows::wslc::models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    WSLCPruneImagesOptions options{};
-    if (all)
+    // The --all flag is translated into a `dangling` filter. Skip the implicit
+    // filter if the caller already supplied an explicit `dangling` filter so the
+    // user's value wins (matching docker's behavior).
+    const bool hasExplicitDangling =
+        std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "dangling"; });
+
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size() + (hasExplicitDangling ? 0 : 1));
+    if (!hasExplicitDangling)
     {
-        WI_SetFlag(options.Flags, WSLCPruneImagesFlagsDanglingFalse);
+        filterEntries.push_back({.Key = "dangling", .Value = all ? "false" : "true"});
+    }
+
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     ULONGLONG spaceReclaimed = 0;
-    THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+    THROW_IF_FAILED(session.Get()->PruneImages(
+        filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;

@@ -62,6 +62,7 @@ public:
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
+    void AddAdditionalNetwork(const std::string& Name);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session);
     RunningWSLCContainer Create(IWSLCSession& Session);
@@ -72,7 +73,7 @@ public:
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
-    void SetShmSize(ULONGLONG ShmSize);
+    void SetShmSize(int64_t ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetContainerNetworkName(std::string&& Name);
     void SetHostname(std::string&& Hostname);
@@ -80,6 +81,9 @@ public:
     void SetDnsServers(std::vector<std::string>&& DnsServers);
     void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
+    void SetMemoryLimit(std::int64_t Bytes);
+    void SetNanoCpus(std::int64_t NanoCpus);
+    void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
     using WSLCProcessLauncher::SetUser;
@@ -98,18 +102,23 @@ private:
     std::string m_containerNetworkName;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
-    ULONGLONG m_shmSize = 0;
+    int64_t m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
+    std::vector<std::string> m_additionalNetworks;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
     std::vector<WSLCTmpfsMount> m_tmpfsMounts;
     std::deque<std::string> m_tmpfsContainerPaths;
     std::deque<std::string> m_tmpfsOptions;
+    std::int64_t m_memoryBytes = 0;
+    std::int64_t m_nanoCpus = 0;
+    std::vector<WSLCUlimit> m_ulimits;
+    std::deque<std::string> m_ulimitNames;
 };
 } // namespace wsl::windows::common

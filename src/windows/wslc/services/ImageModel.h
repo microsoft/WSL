@@ -23,7 +23,7 @@ struct ImageInformation
     std::optional<std::string> Tag;
     std::string Id;
     LONGLONG Created{};
-    ULONGLONG Size{};
+    int64_t Size{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };

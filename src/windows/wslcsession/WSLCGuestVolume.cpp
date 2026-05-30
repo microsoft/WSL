@@ -61,10 +61,6 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
 {
     ValidateDriverOpts(DriverOpts);
 
-    WSLCVolumeMetadata metadata;
-    metadata.Driver = WSLCGuestVolumeDriver;
-    metadata.DriverOpts = DriverOpts;
-
     docker_schema::CreateVolume request{};
     if (Name != nullptr && Name[0] != '\0')
     {
@@ -72,7 +68,6 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
     }
     request.Driver = "local";
     request.DriverOpts = DriverOpts;
-    request.Labels = {{WSLCVolumeMetadataLabel, wsl::shared::ToJson(metadata)}};
 
     // Merge user labels into the Docker volume labels.
     for (const auto& [key, value] : Labels)
@@ -92,14 +87,6 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
 
 std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::windows::common::docker_schema::Volume& Volume, DockerHTTPClient& DockerClient)
 {
-    THROW_HR_IF(E_INVALIDARG, !Volume.Labels.has_value());
-
-    auto metadataIt = Volume.Labels->find(WSLCVolumeMetadataLabel);
-    THROW_HR_IF(E_INVALIDARG, metadataIt == Volume.Labels->end());
-
-    auto metadata = wsl::shared::FromJson<WSLCVolumeMetadata>(metadataIt->second.c_str());
-    THROW_HR_IF(E_INVALIDARG, metadata.Driver != WSLCGuestVolumeDriver);
-
     THROW_HR_IF(E_INVALIDARG, Volume.Driver != "local");
 
     if (Volume.Options.has_value())
@@ -107,20 +94,11 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::window
         ValidateDriverOpts(Volume.Options.value());
     }
 
-    // Extract user labels (all labels except our internal metadata label).
-    std::map<std::string, std::string> userLabels;
-    for (const auto& [key, value] : *Volume.Labels)
-    {
-        if (key != WSLCVolumeMetadataLabel)
-        {
-            userLabels[key] = value;
-        }
-    }
+    std::map<std::string, std::string> driverOpts = Volume.Options.value_or(std::map<std::string, std::string>{});
+    std::map<std::string, std::string> labels = Volume.Labels.value_or(std::map<std::string, std::string>{});
 
-    auto volume = std::make_unique<WSLCGuestVolumeImpl>(
-        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::move(metadata.DriverOpts), std::move(userLabels), DockerClient);
-
-    return volume;
+    return std::make_unique<WSLCGuestVolumeImpl>(
+        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::move(driverOpts), std::move(labels), DockerClient);
 }
 
 void WSLCGuestVolumeImpl::Delete()
