@@ -2835,13 +2835,13 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Aantal regels dat moet worden weergegeven vanaf het einde van de logboeken</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Tijdstempels weergeven in logboekuitvoer</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Logboeken sinds tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Logboeken vóór tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>

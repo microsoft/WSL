@@ -2841,10 +2841,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Numero di righe da visualizzare dalla fine dei log</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Visualizza i timestamp nell'output di log</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Visualizza i log dal timestamp (ad es. secondi periodo)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
     <value>Mostra i log prima del timestamp (ad esempio, secondi del periodo UNIX)</value>
