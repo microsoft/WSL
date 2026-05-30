@@ -104,6 +104,12 @@ namespace detail {
             {
                 auto worker = std::make_shared<TSharedWorker>();
                 worker->done.create(wil::EventOptions::ManualReset);
+
+                // Start signaled so that unstarted worker slots never block a
+                // WaitForMultipleObjects over the whole pool (e.g. in CancelAndDrainInFlight).
+                // Launch resets the event before submitting, ThreadPoolCallback sets it on exit.
+                worker->done.SetEvent();
+
                 worker->context = context;
 
                 doneHandles.push_back(worker->done.get());
@@ -114,9 +120,16 @@ namespace detail {
         void Launch(size_t workerIndex, const TItem& item)
         {
             auto& worker = workers[workerIndex];
-            worker->workerResult = WorkerResult<TItem, TResult>{};
-            worker->workerResult.item = item;
+
+            // Reset first so the slot appears busy. Re-signal on any failure so that
+            // CancelAndDrainInFlight does not block on a slot that was never submitted.
             worker->done.ResetEvent();
+            auto signalOnFail = wil::scope_exit([&worker] { worker->done.SetEvent(); });
+
+            worker->workerResult.item.emplace(item);
+            worker->workerResult.result.reset();
+            worker->workerResult.error = wil::ResultException{S_OK};
+            worker->workerResult.hasError = false;
 
             // Heap-allocate a shared_ptr as the callback context. The callback takes ownership,
             // keeping the worker and its SharedContext alive for the full duration of the callback
@@ -131,6 +144,7 @@ namespace detail {
             }
 
             ::SubmitThreadpoolWork(worker->work.get());
+            signalOnFail.release();
         }
 
         void Drain(size_t workerIndex, TSuccess& onSuccess, TError& onError)
@@ -148,6 +162,15 @@ namespace detail {
             {
                 onSuccess(*worker->workerResult.result);
             }
+        }
+
+        // Signals cancellation and waits up to cancelDrainMs for all in-flight workers to exit.
+        // Unstarted worker slots have their done events pre-signaled so they never block.
+        // Called noexcept from the scope_exit error guard in ForEachAsync.
+        void CancelAndDrainInFlight() noexcept
+        {
+            context->cancelEvent.SetEvent();
+            ::WaitForMultipleObjects(static_cast<DWORD>(doneHandles.size()), doneHandles.data(), TRUE, cancelDrainMs);
         }
 
         // Signals cancellation, waits up to cancelDrainMs for workers to exit, then throws ERROR_TIMEOUT.
@@ -180,7 +203,7 @@ namespace detail {
 
             try
             {
-                worker.workerResult.result = worker.context->onWork(*worker.workerResult.item, worker.context->cancelEvent.get());
+                worker.workerResult.result.emplace(worker.context->onWork(*worker.workerResult.item, worker.context->cancelEvent.get()));
             }
             catch (const wil::ResultException& ex)
             {
@@ -207,6 +230,10 @@ namespace detail {
 // checkpoints using WaitForSingleObject(cancel, 0), returning early if it is set.
 // On timeout, the event is signalled and ForEachAsync waits up to cancelDrainTimeout
 // for workers to exit before throwing HRESULT_FROM_WIN32(ERROR_TIMEOUT).
+//
+// If onSuccess, onError, or Launch throw, the cancel event is signalled and ForEachAsync
+// waits up to cancelDrainTimeout for any in-flight workers to exit before rethrowing.
+// This guarantees no background thread pool callbacks outlive the ForEachAsync call.
 //
 // poolSize must not exceed MAXIMUM_WAIT_OBJECTS (64).
 //
@@ -251,6 +278,11 @@ void ForEachAsync(
 
     detail::WorkerPool<TItem, TWork, TSuccess, TError> pool{workerCount, std::move(onWork), timeout, cancelDrainTimeout};
 
+    // On any exception from Launch, Drain, or the user callbacks (onSuccess/onError),
+    // signal cancellation and wait for in-flight workers before rethrowing. This guarantees
+    // no background thread pool callbacks outlive the ForEachAsync call.
+    auto cancelOnError = wil::scope_exit([&pool] { pool.CancelAndDrainInFlight(); });
+
     // Fill the pool - submit one item per worker to saturate all workers immediately.
     size_t nextItem = 0;
     for (; nextItem < workerCount; ++nextItem)
@@ -290,6 +322,8 @@ void ForEachAsync(
     {
         pool.Drain(i, onSuccess, onError);
     }
+
+    cancelOnError.release();
 }
 
 } // namespace wsl::windows::wslc
