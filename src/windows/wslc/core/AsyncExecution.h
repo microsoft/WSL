@@ -187,6 +187,11 @@ namespace detail {
                 worker.workerResult.hasError = true;
                 worker.workerResult.error = ex;
             }
+            catch (...)
+            {
+                worker.workerResult.hasError = true;
+                worker.workerResult.error = wil::ResultException{wil::details::ResultFromCaughtException()};
+            }
 
             worker.done.SetEvent();
         }
@@ -204,6 +209,10 @@ namespace detail {
 // for workers to exit before throwing HRESULT_FROM_WIN32(ERROR_TIMEOUT).
 //
 // poolSize must not exceed MAXIMUM_WAIT_OBJECTS (64).
+//
+// The timeout is a safety net against indefinite hangs, not a strict per-worker limit.
+// A worker that hangs while other workers are still completing will be caught in the
+// final wait at most one full timeout after all other work has finished.
 //
 // Note: thread pool threads have no guaranteed per-thread initialization. Callers
 // whose onWork requires per-thread setup (e.g. CoInitializeEx) must perform it at
