@@ -31,6 +31,12 @@ namespace detail {
     template <typename TItem, typename TResult>
     struct WorkerResult
     {
+        WorkerResult() = default;
+
+        explicit WorkerResult(const TItem& item_) : item(item_)
+        {
+        }
+
         TItem item;
         std::optional<TResult> result;
         wil::ResultException error{S_OK};
@@ -82,11 +88,13 @@ namespace detail {
         std::vector<HANDLE> doneHandles;
         std::shared_ptr<TSharedContext> context;
         std::chrono::milliseconds timeout;
+        DWORD timeoutMs{};
         DWORD cancelDrainMs{};
 
         WorkerPool(size_t workerCount, TWork onWork, std::chrono::milliseconds timeout_, std::chrono::milliseconds cancelDrainTimeout) :
             context(std::make_shared<TSharedContext>(std::move(onWork))),
             timeout(timeout_),
+            timeoutMs(timeout_ == std::chrono::milliseconds::max() ? INFINITE : static_cast<DWORD>(timeout_.count())),
             cancelDrainMs(static_cast<DWORD>(cancelDrainTimeout.count()))
         {
             workers.reserve(workerCount);
@@ -222,7 +230,6 @@ void ForEachAsync(
         return;
     }
 
-    const DWORD timeoutMs = (timeout == std::chrono::milliseconds::max()) ? INFINITE : static_cast<DWORD>(timeout.count());
     const size_t workerCount = std::min(poolSize, items.size());
 
     detail::WorkerPool<TItem, TWork, TSuccess, TError> pool{workerCount, std::move(onWork), timeout, cancelDrainTimeout};
@@ -239,7 +246,7 @@ void ForEachAsync(
     // completion, so no worker idles while work remains.
     while (nextItem < items.size())
     {
-        const DWORD waitResult = ::WaitForMultipleObjects(static_cast<DWORD>(workerCount), pool.doneHandles.data(), FALSE, timeoutMs);
+        const DWORD waitResult = ::WaitForMultipleObjects(static_cast<DWORD>(workerCount), pool.doneHandles.data(), FALSE, pool.timeoutMs);
 
         if (waitResult == WAIT_TIMEOUT)
         {
@@ -253,8 +260,7 @@ void ForEachAsync(
         pool.Launch(workerIndex, items[nextItem++]);
     }
 
-    // Wait for all in-flight workers to finish and collect their final results.
-    const DWORD finalWait = ::WaitForMultipleObjects(static_cast<DWORD>(workerCount), pool.doneHandles.data(), TRUE, timeoutMs);
+    const DWORD finalWait = ::WaitForMultipleObjects(static_cast<DWORD>(workerCount), pool.doneHandles.data(), TRUE, pool.timeoutMs);
 
     if (finalWait == WAIT_TIMEOUT)
     {

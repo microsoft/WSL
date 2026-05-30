@@ -568,7 +568,7 @@ void ShowContainerStats(CLIExecutionContext& context)
 
     // Fetch stats for all containers concurrently. The Docker engine blocks for ~1s
     // per request to collect a valid precpu_stats sample, so issuing requests in parallel keeps
-    // wall time proportional to ceil(N / batchSize) rather than N.
+    // wall time proportional to ceil(N / poolSize) rather than N.
     nlohmann::json statsJson = nlohmann::json::array();
     wsl::windows::wslc::ForEachAsync<std::wstring>(
         containers,
