@@ -233,6 +233,14 @@ void ForEachAsync(
 {
     THROW_HR_IF(E_INVALIDARG, poolSize == 0);
     THROW_HR_IF(E_INVALIDARG, poolSize > MAXIMUM_WAIT_OBJECTS);
+    THROW_HR_IF(E_INVALIDARG, timeout.count() < 0);
+    THROW_HR_IF(E_INVALIDARG, cancelDrainTimeout.count() < 0);
+
+    // INFINITE (0xFFFFFFFF) is reserved as the Win32 sentinel; values at or above it
+    // would either alias INFINITE or wrap, producing the opposite timeout behavior.
+    constexpr long long c_maxWaitMs = 0xFFFFFFFELL; // INFINITE - 1
+    THROW_HR_IF(E_INVALIDARG, timeout != std::chrono::milliseconds::max() && timeout.count() > c_maxWaitMs);
+    THROW_HR_IF(E_INVALIDARG, cancelDrainTimeout.count() > c_maxWaitMs);
 
     if (items.empty())
     {
