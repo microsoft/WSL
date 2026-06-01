@@ -805,6 +805,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     static_assert(WSLCMountFlagsReadOnly == WSLC_MOUNT::ReadOnly);
     static_assert(WSLCMountFlagsChroot == WSLC_MOUNT::Chroot);
     static_assert(WSLCMountFlagsWriteableOverlayFs == WSLC_MOUNT::OverlayFs);
+    static_assert(WSLCMountFlagsMergedOverlayFs == WSLC_MOUNT::MergedOverlayFs);
 
     wsl::shared::MessageWriter<WSLC_MOUNT> message;
 
@@ -1153,14 +1154,19 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
     THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
 
-    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
-    std::string options = "lowerdir=" + packagedLibMountPoint;
+    // Mount a writable overlay containing both inbox and packaged libraries (the packaged mount
+    // takes precedence). A tmpfs upper/work layer is added — even though nothing is expected to
+    // write here — to match the WSL2 GPU library mount in src/linux/init/main.cpp (UtilMountOverlayFs).
+    // A pure lower-only overlay over virtiofs incorrectly denies non-root callers because it
+    // consults synthesized POSIX ACLs from the virtiofs lower that the lower's own permission
+    // fast-path doesn't apply, so the displayed mode bits are effectively masked by a hidden ACL.
+    std::string lowers = packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
-        options += ":" + inboxLibMountPoint.value();
+        lowers += ":" + inboxLibMountPoint.value();
     }
 
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
+    Mount(m_initChannel, lowers.c_str(), LibrariesMountPoint, nullptr, nullptr, WSLCMountFlagsMergedOverlayFs);
 }
 
 void WSLCVirtualMachine::OnProcessReleased(int Pid)

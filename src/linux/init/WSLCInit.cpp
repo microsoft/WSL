@@ -649,6 +649,21 @@ void HandleMessageImpl(
             target = readField(Message.DestinationIndex);
         }
 
+        // MergedOverlayFs builds a writable overlay over already-mounted lower paths. It is mutually
+        // exclusive with the other mount-type flags.
+        if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::MergedOverlayFs))
+        {
+            THROW_ERRNO_IF(
+                EINVAL,
+                WI_IsAnyFlagSet(Message.Flags, WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs | WSLC_MOUNT::KernelModules));
+
+            THROW_LAST_ERROR_IF(
+                UtilMountOverlayFs(target, source, MS_NOATIME | MS_NOSUID | MS_NODEV, c_defaultRetryTimeout) < 0);
+
+            Transaction.Send<WSLC_MOUNT_RESULT>(response);
+            return;
+        }
+
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 

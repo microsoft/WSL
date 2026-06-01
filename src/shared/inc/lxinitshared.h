@@ -1614,7 +1614,11 @@ struct WSLC_MOUNT
         ReadOnly = 1,
         Chroot = 2,
         OverlayFs = 4,
-        KernelModules = 8
+        KernelModules = 8,
+        // Mount a writable overlay (with a tmpfs upper/work layer) at DestinationIndex over the
+        // colon-separated, already-mounted lower paths supplied in SourceIndex. TypeIndex and
+        // OptionsIndex are ignored. Cannot be combined with Chroot, OverlayFs, or KernelModules.
+        MergedOverlayFs = 16
     };
 
     char Buffer[];

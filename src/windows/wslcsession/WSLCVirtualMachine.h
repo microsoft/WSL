@@ -32,6 +32,7 @@ enum WSLCMountFlags
     WSLCMountFlagsReadOnly = 1,
     WSLCMountFlagsChroot = 2,
     WSLCMountFlagsWriteableOverlayFs = 4,
+    WSLCMountFlagsMergedOverlayFs = 16,
 };
 
 enum WSLCFdType
