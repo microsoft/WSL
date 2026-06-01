@@ -296,7 +296,6 @@ try
 
     if (!raw)
     {
-
         // Launch containerd first
         StartContainerd();
 
@@ -309,17 +308,18 @@ try
 
         auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
+        //  Start the event tracker.
+        m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
+        m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
 
-    // Monitor for unexpected VM exit.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
+        // Monitor for unexpected VM exit.
+        m_ioRelay.AddHandle(
+            std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
-    // Recover any existing resources from storage.
-    RecoverExistingNetworks();
-    RecoverExistingContainers();
+        // Recover any existing resources from storage.
+        RecoverExistingNetworks();
+        RecoverExistingContainers();
     }
 
     errorCleanup.release();
