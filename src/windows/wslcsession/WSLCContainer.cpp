@@ -151,36 +151,15 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 constexpr std::string_view c_containerNetworkPrefix = "container:";
 
-// Returns the target name after "container:" if present, std::nullopt otherwise.
-std::optional<std::string> ParseContainerTarget(std::string_view mode)
-{
-    if (!mode.starts_with(c_containerNetworkPrefix))
-    {
-        return std::nullopt;
-    }
-
-    return std::string{mode.substr(c_containerNetworkPrefix.size())};
-}
-
-bool IsHostMode(std::string_view mode) noexcept
-{
-    return mode == "host";
-}
-
-bool IsNoneMode(std::string_view mode) noexcept
-{
-    return mode == "none";
-}
-
 bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
 {
-    return !IsHostMode(mode) && !IsNoneMode(mode) && !mode.starts_with(c_containerNetworkPrefix);
+    return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
 }
 
 // Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed
 // modes (`service:`, `ns:`, ...) as special, but WSLC only supports `container:`. Surface the
 // rejection here so both Create() and Open() recovery paths share the same gate.
-void RejectUnsupportedColonSyntax(std::string_view mode)
+void RejectUnsupportedNetworkModes(std::string_view mode)
 {
     if (mode.starts_with(c_containerNetworkPrefix))
     {
@@ -191,28 +170,22 @@ void RejectUnsupportedColonSyntax(std::string_view mode)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
 }
 
-std::string ResolveNetworkMode(
-    LPCSTR networkMode, bool hasRequestedPorts, bool hasEndpoints, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
+std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
 {
     const std::string_view mode = (networkMode == nullptr || *networkMode == '\0') ? std::string_view{"bridge"} : networkMode;
 
     // Reject `service:foo` and similar unsupported colon-prefixed modes before any further processing.
-    RejectUnsupportedColonSyntax(mode);
+    RejectUnsupportedNetworkModes(mode);
 
-    // host/none own the entire netns and cannot have additional endpoints.
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcHostNoneNoAdditionalNetworks(), (IsHostMode(mode) || IsNoneMode(mode)) && hasEndpoints);
+    // N.B. Docker validates incompatible combinations (e.g. host/none/container: with additional networks)
+    // and returns clear error messages, so we don't duplicate that validation here.
 
-    // container: shares the target's netns and cannot have additional endpoints.
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcContainerModeNoAdditionalNetworks(), mode.starts_with(c_containerNetworkPrefix) && hasEndpoints);
-
-    if (IsHostMode(mode))
+    if (mode == "host")
     {
         return "host";
     }
 
-    if (IsNoneMode(mode))
+    if (mode == "none")
     {
         THROW_HR_IF_MSG(E_INVALIDARG, hasRequestedPorts, "Port mappings are not supported without networking");
         return "none";
@@ -436,29 +409,6 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
         mount.ReadOnly = static_cast<bool>(nv.ReadOnly);
 
         request.HostConfig.Mounts.emplace_back(mount);
-    }
-}
-
-void ConfigureLdPathForGpu(std::vector<std::string>& Env)
-{
-    static constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
-    auto it = std::ranges::find_if(Env, [](const std::string& e) { return e.starts_with(ldLibraryPathPrefix); });
-
-    if (it != Env.end())
-    {
-        // If the user already has an LD_LIBRARY_PATH, append the GPU library paths to it.
-        auto ldPath = it->substr(ldLibraryPathPrefix.size());
-        if (!ldPath.empty() && !ldPath.ends_with(":"))
-        {
-            it->append(":");
-        }
-
-        it->append(WSLCVirtualMachine::c_gpuLibrariesPath);
-    }
-    else
-    {
-        // Otherwise create a new entry.
-        Env.emplace_back(std::format("LD_LIBRARY_PATH={}", WSLCVirtualMachine::c_gpuLibrariesPath));
     }
 }
 
@@ -1581,8 +1531,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    auto networkMode = ResolveNetworkMode(
-        containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), containerOptions.ContainerNetwork.NetworksCount > 0, sessionNetworks, DockerClient);
+    auto networkMode = ResolveNetworkMode(containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), sessionNetworks, DockerClient);
 
     auto endpoints = ResolveEndpoints(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
@@ -1747,10 +1696,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Docker treats empty NetworkMode as the default (bridge).
     std::string networkMode = dockerContainer.HostConfig.NetworkMode.empty() ? std::string{"bridge"} : dockerContainer.HostConfig.NetworkMode;
 
-    // Mirror Create()'s validation on recovery: refuse to take ownership of a container whose mode
-    // we never could have produced (e.g. `service:foo`), instead of silently letting downstream
-    // string comparisons accept it.
-    RejectUnsupportedColonSyntax(networkMode);
+    RejectUnsupportedNetworkModes(networkMode);
 
     const bool allocateVmPorts = NetworkModeAllocatesVmPorts(networkMode);
 
@@ -1997,7 +1943,7 @@ void WSLCContainerImpl::UnmapPorts()
 
         try
         {
-            if (IsHostMode(m_networkMode))
+            if (m_networkMode == "host")
             {
                 e.VmMapping.VmPort.reset();
             }

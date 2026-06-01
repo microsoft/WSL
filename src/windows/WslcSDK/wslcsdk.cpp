@@ -693,7 +693,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = "none";
+    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -823,7 +823,7 @@ try
     }
 
     // SDK only exposes the network mode (no additional endpoints today).
-    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networking;
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -934,7 +934,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(containerSettings);
 
-    internalType->networking = Convert(networkingMode);
+    internalType->networkMode = Convert(networkingMode);
 
     return S_OK;
 }

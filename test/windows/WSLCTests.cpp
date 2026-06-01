@@ -6254,30 +6254,6 @@ class WSLCTests
         VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.at(additionalNetwork).IPAddress.empty());
     }
 
-    WSLC_TEST_METHOD(ContainerAdditionalNetworksRejectedForHostAndNoneTest)
-    {
-        // This check runs before network existence is validated, so no real network needs to exist.
-        const std::string additionalNetwork = "any-additional-net";
-
-        {
-            WSLCContainerLauncher launcher("debian:latest", "test-multi-net-host-reject", {"sleep", "99999"}, {}, "host");
-            launcher.AddAdditionalNetwork(additionalNetwork);
-
-            auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
-        }
-
-        {
-            WSLCContainerLauncher launcher("debian:latest", "test-multi-net-none-reject", {"sleep", "99999"}, {}, "none");
-            launcher.AddAdditionalNetwork(additionalNetwork);
-
-            auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-            ValidateCOMErrorMessage(L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
-        }
-    }
-
     WSLC_TEST_METHOD(ContainerDuplicateNetworkRejectedTest)
     {
         const std::string primaryNetwork = "multi-net-dup-primary";
@@ -6474,23 +6450,6 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
         ValidateCOMErrorMessage(
             L"Port mappings are not supported with container network mode; ports are owned by the target container.");
-    }
-
-    WSLC_TEST_METHOD(ContainerNetworkModeAdditionalNetworkRejectedTest)
-    {
-        // Container mode does not support additional networks — the target owns the netns.
-        const std::string containerAName = "test-container-mode-addnet-a";
-
-        WSLCContainerLauncher launcherA("debian:latest", containerAName, {"sleep", "99999"}, {});
-        auto containerA = launcherA.Launch(*m_defaultSession);
-        VERIFY_ARE_EQUAL(containerA.State(), WslcContainerStateRunning);
-
-        WSLCContainerLauncher launcherB("debian:latest", "test-container-mode-addnet-b", {"sleep", "99999"}, {}, "container:" + containerAName);
-        launcherB.AddAdditionalNetwork("bridge");
-
-        auto retVal = launcherB.LaunchNoThrow(*m_defaultSession);
-        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-        ValidateCOMErrorMessage(L"Additional networks are not allowed with container network mode.");
     }
 
     WSLC_TEST_METHOD(ContainerNetworkModeInspectRoundTripTest)
