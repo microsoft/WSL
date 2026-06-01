@@ -1322,6 +1322,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
 
+            file.reset();
+
             // Invoke the crash dump callback (if any) now that the dump file has been fully
             // written. Failures in the callback are logged but do not interrupt crash collection.
             if (m_crashDumpCallback)

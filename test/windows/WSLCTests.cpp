@@ -2755,41 +2755,45 @@ class WSLCTests
 
     WSLC_TEST_METHOD(CrashDumpCallback)
     {
+        struct Invocation
+        {
+            std::wstring DumpPath;
+            std::string ProcessName;
+            ULONGLONG Pid;
+            ULONG Signal;
+            ULONGLONG Timestamp;
+        };
+
         class DECLSPEC_UUID("8C5A7B14-9D26-4FAE-AB31-7E5BC23F4802") CallbackInstance
             : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback, IFastRundown>
         {
         public:
-            struct Invocation
-            {
-                std::wstring DumpPath;
-                std::string ProcessName;
-                ULONGLONG Pid;
-                ULONG Signal;
-                ULONGLONG Timestamp;
-            };
-
-            CallbackInstance(std::function<void(Invocation)>&& callback) : m_callback(std::move(callback))
+            CallbackInstance(std::promise<Invocation>& promise, wil::unique_event& release) :
+                m_promise(promise), m_release(release)
             {
             }
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_callback(Invocation{
+                m_promise.set_value(Invocation{
                     DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+
+                // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
+                m_release.wait();
                 return S_OK;
             }
 
         private:
-            std::function<void(Invocation)> m_callback;
+            std::promise<Invocation>& m_promise;
+            wil::unique_event& m_release;
         };
 
-        std::promise<CallbackInstance::Invocation> promise;
-
-        CallbackInstance callback{[&](CallbackInstance::Invocation invocation) { promise.set_value(std::move(invocation)); }};
+        std::promise<Invocation> promise;
+        wil::unique_event release{wil::EventOptions::ManualReset};
+        auto callback = Microsoft::WRL::Make<CallbackInstance>(promise, release);
 
         WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"crash-dump-callback-test");
-        sessionSettings.CrashDumpCallback = &callback;
-
+        sessionSettings.CrashDumpCallback = callback.Get();
         auto session = CreateSession(sessionSettings);
 
         // Trigger a Linux process crash. The shell exits with 128 + SIGSEGV.
@@ -2798,14 +2802,20 @@ class WSLCTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
 
+        // Make sure the callback is unblocked even if a verification below throws.
+        auto releaseCallback = wil::scope_exit([&]() { release.SetEvent(); });
         auto invocation = future.get();
         VERIFY_IS_FALSE(invocation.DumpPath.empty());
-        VERIFY_IS_TRUE(std::filesystem::exists(invocation.DumpPath));
-        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
         VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
+
+        // The dump file should be readable and non-empty.
+        wil::unique_hfile dumpFile{CreateFileW(
+            invocation.DumpPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(dumpFile.is_valid());
+        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
     }
 
     WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
