@@ -92,7 +92,22 @@ void GetImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto images = ImageService::List(session);
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    auto images = ImageService::List(session, filters);
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -290,7 +305,22 @@ void PruneImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
 
     bool all = context.Args.Contains(ArgType::All);
-    auto result = ImageService::Prune(session, all);
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    auto result = ImageService::Prune(session, all, filters);
 
     for (const auto& image : result.UntaggedImages)
     {
