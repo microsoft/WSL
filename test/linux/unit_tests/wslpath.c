@@ -381,6 +381,15 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("\\\\?\\C:\\Users\\", "/mnt/c/Users/", true));
     LxtCheckResult(LxtCheckWslPathTranslation(".", ".", true));
 
+    //
+    // Validate that subsets of the current distro name are correctly treated as an error.
+    //
+
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_PREFIX "-other\\foo", NULL, true));
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_PREFIX "X\\foo", NULL, true));
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_COMPAT_PREFIX "-other\\foo", NULL, true));
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_COMPAT_PREFIX "X\\foo", NULL, true));
+
 ErrorExit:
     return Result;
 }
