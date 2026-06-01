@@ -1137,7 +1137,7 @@ Windows 版本： {}</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>目前執行的核心缺少一個可大幅提升 virtio 裝置效能的修補程式。請更新至較新的 WSL 核心，以啟用此最佳化。</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
@@ -2841,13 +2841,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>從記錄結尾所要顯示的行數</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>在記錄輸出中顯示時間戳記</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>顯示時間戳記之後的記錄 (例如: Unix Epoch 秒數)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>顯示時間戳記之前的記錄 (例如: Unix Epoch 秒數)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>影像名稱[:tag] 格式中的新影像參考</value>

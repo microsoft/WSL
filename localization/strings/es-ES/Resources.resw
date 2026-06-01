@@ -1133,7 +1133,7 @@ Intentando la descarga web...</value>
     <value>wsl2.virtio9p está deshabilitado, revirtiendo a 9p con el transporte de vsock.</value>
   </data>
   <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy networking is not supported when wsl2.virtio is disabled; falling back to networkingMode {}.</value>
+    <value>La red VirtioProxy no es compatible cuando wsl2.virtio está deshabilitado; se usará networkingMode {} como reserva.</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
@@ -2841,13 +2841,13 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Número de líneas que se mostrarán desde el final de los registros</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Mostrar marcas de tiempo en la salida del registro</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Mostrar registros desde la marca de tiempo (por ejemplo, segundos desde la época UNIX)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Mostrar registros anteriores a la marca de tiempo (por ejemplo, segundos desde la época UNIX)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nueva referencia de imagen en formato image-name[:tag]</value>

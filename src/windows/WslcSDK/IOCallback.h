@@ -25,6 +25,9 @@ struct IOCallback
     ~IOCallback();
 
     void Cancel();
+    void Complete();
+
+    bool IsOnIOCallbackThread() const noexcept;
 
     static bool HasIOCallback(const WslcContainerProcessOptionsInternal* options);
     static bool HasIOCallback(const WslcContainerProcessIOCallbackOptions& options);
@@ -37,4 +40,5 @@ private:
     std::thread m_thread;
     wsl::windows::common::io::MultiHandleWait m_io;
     wil::unique_event m_cancelEvent{wil::EventOptions::ManualReset};
+    std::once_flag m_join;
 };

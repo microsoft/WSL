@@ -1133,11 +1133,11 @@ Es wird versucht,...</value>
     <value>wsl2.virtio9p ist deaktiviert und fällt mit vsock-Transport auf 9p zurück.</value>
   </data>
   <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy networking is not supported when wsl2.virtio is disabled; falling back to networkingMode {}.</value>
+    <value>VirtioProxy-Netzwerkfunktionen werden nicht unterstützt, wenn wsl2.virtio deaktiviert ist; es wird auf networkingMode {} zurückgegriffen.</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>Dem laufenden Kernel fehlt ein Patch, der die Leistung von virtio-Geräten deutlich verbessert. Aktualisieren Sie auf einen neueren WSL-Kernel, um diese Optimierung zu aktivieren.</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
@@ -2841,13 +2841,13 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Anzahl der Zeilen, die vom Ende der Protokolle angezeigt werden sollen</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Zeitstempel in der Protokollausgabe anzeigen</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Protokolle seit dem Zeitstempel anzeigen (z. B. Unix-Epochensekunden)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Protokolle vor dem Zeitstempel anzeigen (z. B. Unix-Epoche-Sekunden)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Neue Bildreferenz im Format image-name[:tag]</value>

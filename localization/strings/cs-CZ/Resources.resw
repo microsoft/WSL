@@ -1131,7 +1131,7 @@ Probíhá pokus o stažení webu...</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>Aktuálně spuštěné jádro postrádá opravu, která výrazně zlepšuje výkon zařízení virtio. Pokud chcete tuto optimalizaci povolit, aktualizujte na novější jádro WSL.</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
@@ -2835,13 +2835,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Počet řádků, které se mají zobrazit od konce protokolů</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Zobrazit časová razítka ve výstupu protokolu</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Zobrazit protokoly od časového razítka (např. unix epoch seconds)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Zobrazit protokoly před časovým razítkem (např. unix epoch seconds)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nový odkaz na obrázek ve formátu image-name[:tag]</value>

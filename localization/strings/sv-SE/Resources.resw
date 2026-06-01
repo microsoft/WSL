@@ -1131,7 +1131,7 @@ Försöker ladda ned...</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>Den kernel som körs saknar en korrigering som avsevärt förbättrar prestandan för virtio-enheter. Uppdatera till en nyare WSL-kärna för att aktivera den här optimeringen.</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
@@ -2835,13 +2835,13 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Antal rader som visas från slutet av loggarna</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Visa tidsstämplar i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Visa loggar sedan tidsstämpeln (t.ex. Unix-epoksekunder)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Visa loggar före tidsstämpeln (t.ex. Unix-epoksekunder)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildreferens i formatet image-name[:tag]</value>

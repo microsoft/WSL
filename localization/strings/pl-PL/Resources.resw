@@ -1131,7 +1131,7 @@ Próba pobrania z sieci Web...</value>
     <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
-    <value>The running kernel is missing a patch that significantly improves virtio device performance. Update to a more recent WSL kernel to enable this optimization.</value>
+    <value>W uruchomionym jądrze brakuje poprawki, która znacznie poprawia wydajność urządzenia virtio. Zaktualizuj jądro WSL do nowszej wersji, aby włączyć tę optymalizację.</value>
     <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
@@ -2835,13 +2835,13 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Liczba wierszy do wyświetlenia od końca dzienników</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Pokaż sygnatury czasowe w danych wyjściowych dziennika</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Pokaż dzienniki od sygnatury czasowej (np. sekundy epoki Unix)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Pokaż dzienniki sprzed sygnatury czasowej (np. sekundy epoki Unix)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nowe odwołanie do obrazu w formacie nazwa_obrazu[:tag]</value>
