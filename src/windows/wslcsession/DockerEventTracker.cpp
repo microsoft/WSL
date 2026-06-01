@@ -155,7 +155,8 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {"start", ContainerEvent::Start},
         {"die", ContainerEvent::Stop},
         {"remove", ContainerEvent::Destroy},
-        {"exec_die", ContainerEvent::ExecDied}};
+        {"exec_die", ContainerEvent::ExecDied},
+        {"exec_died", ContainerEvent::ExecDied}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -172,7 +173,6 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     }
 
     std::optional<int> exitCode;
-    std::optional<std::string> execId;
     auto attributes = actor->find("Attributes");
     if (attributes != actor->end())
     {
@@ -181,19 +181,13 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {
             exitCode = std::stoi(exitCodeEntry->get<std::string>());
         }
-
-        auto execIdEntry = attributes->find("execID");
-        if (execIdEntry != attributes->end())
-        {
-            execId = execIdEntry->get<std::string>();
-        }
     }
 
     std::lock_guard lock{m_lock};
 
     for (const auto& e : m_containerCallbacks)
     {
-        if (e.ContainerId == containerId && (!e.ExecId.has_value() || e.ExecId == execId))
+        if (e.ContainerId == containerId)
         {
             e.Callback(it->second, exitCode, eventTime);
         }
@@ -258,18 +252,18 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainer
     std::lock_guard lock{m_lock};
 
     auto id = m_callbackId++;
-    m_containerCallbacks.emplace_back(id, ContainerId, std::optional<std::string>{}, std::move(Callback));
+    m_containerCallbacks.emplace_back(id, ContainerId, std::move(Callback));
 
     return EventTrackingReference{this, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(
-    const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept
+    const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
     std::lock_guard lock{m_lock};
 
     auto id = m_callbackId++;
-    m_containerCallbacks.emplace_back(id, ContainerId, ExecId, std::move(Callback));
+    m_containerCallbacks.emplace_back(id, ContainerId, std::move(Callback));
 
     return EventTrackingReference{this, id};
 }

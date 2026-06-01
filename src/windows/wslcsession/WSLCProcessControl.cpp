@@ -112,7 +112,7 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_id(Id),
     m_client(DockerClient),
     m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
-        Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
+        Container.ID(), std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
 }
 
@@ -175,11 +175,35 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
 
 void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
 {
-    if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
+    bool hasPid = false;
     {
-        WI_ASSERT(ExitCode.has_value());
+        std::lock_guard lock{m_lock};
+        hasPid = m_pid.has_value();
+    }
+    if (hasPid && Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
+    {
+        try
+        {
+            auto result = m_client.InspectExec(m_id);
+            if (result.Running)
+            {
+                return;
+            }
 
-        SetExitCode(ExitCode.value());
+            WI_ASSERT(result.ExitCode.has_value());
+
+            SetExitCode(result.ExitCode.value());
+        }
+        catch (const DockerHTTPException& exception)
+        {
+            if (exception.StatusCode() != 404)
+            {
+                throw;
+            }
+            // N.B. The exec instance is gone. Use the exit code from the event for best effort. It could be wrong.
+            WI_ASSERT(ExitCode.has_value());
+            SetExitCode(ExitCode.value());
+        }
     }
 }
 

@@ -68,7 +68,7 @@ public:
     ~DockerEventTracker();
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
-    EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
+    EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
@@ -83,7 +83,6 @@ private:
     {
         size_t CallbackId;
         std::string ContainerId;
-        std::optional<std::string> ExecId;
         ContainerStateChangeCallback Callback;
     };
 
