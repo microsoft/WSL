@@ -64,11 +64,18 @@ public:
         return wsl::shared::FromJson<T>(m_responseBody.c_str());
     }
 
-    // Only try to decode the error message if it's actually json.
+    // Only try to decode the error message if it's actually json AND the body
+    // is non-empty. Some podman 5xx paths return Content-Type: application/json
+    // with no body (or a streaming-style response whose body the caller did
+    // not drain). Without this empty-body check, DockerMessage() would call
+    // FromJson("") and surface a confusing "Invalid JSON: empty input" error
+    // instead of letting the catch fall through to e.what().
     bool HasErrorMessage() const
     {
         auto it = m_response.find(boost::beast::http::field::content_type);
-        return it != m_response.end() && it->value().starts_with("application/json");
+        return it != m_response.end() &&
+               it->value().starts_with("application/json") &&
+               !m_responseBody.empty();
     }
 
     uint16_t StatusCode() const noexcept

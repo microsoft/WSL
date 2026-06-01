@@ -425,7 +425,47 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, cons
 
     if (response.result_int() != 101)
     {
-        throw DockerHTTPException(std::move(response), verb::post, url.Get(), "", "");
+        // SendRequest only consumed the response headers; for a non-101 the
+        // engine has written an error body that's still in the socket. Drain
+        // it so DockerHTTPException carries the engine's actual message
+        // (e.g. "unable to find user X: no matching entries in passwd file"
+        // when /attach fails because of --user resolution). Without this,
+        // the exception's body is empty and HasErrorMessage / DockerMessage
+        // surface a misleading "Invalid JSON: empty input".
+        std::string body;
+        auto contentLengthIt = response.find(boost::beast::http::field::content_length);
+        if (contentLengthIt != response.end())
+        {
+            size_t expectedLen = 0;
+            try
+            {
+                expectedLen = std::stoull(std::string{contentLengthIt->value()});
+            }
+            CATCH_LOG_MSG("Failed to parse Content-Length for /attach error body");
+
+            if (expectedLen > 0)
+            {
+                constexpr size_t maxBody = 64 * 1024;
+                expectedLen = std::min(expectedLen, maxBody);
+                body.resize(expectedLen);
+                size_t totalRead = 0;
+                while (totalRead < expectedLen)
+                {
+                    auto bytesRead = common::socket::Receive(
+                        socket.get(),
+                        gsl::span(reinterpret_cast<gsl::byte*>(body.data() + totalRead), expectedLen - totalRead),
+                        m_exitingEvent);
+                    if (bytesRead == 0)
+                    {
+                        break;
+                    }
+                    totalRead += bytesRead;
+                }
+                body.resize(totalRead);
+            }
+        }
+
+        throw DockerHTTPException(std::move(response), verb::post, url.Get(), "", std::move(body));
     }
 
     return std::move(socket);

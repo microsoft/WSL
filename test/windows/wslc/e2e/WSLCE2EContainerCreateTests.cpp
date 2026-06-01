@@ -560,8 +560,15 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify(
-            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        // docker: "unable to find user X: no matching entries in passwd file"
+        // podman: same core message wrapped as "preparing container <id> for
+        // attach: <docker message>". Match the engine-agnostic core so the
+        // contract (start must fail with a clear user-not-found message) holds
+        // across both engines.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"unable to find user user_does_not_exist") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stderr->find(L"no matching entries in passwd file") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)

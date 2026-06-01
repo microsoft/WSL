@@ -382,14 +382,23 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownUser_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm -u user_does_not_exist {} id -u", DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        // docker: "unable to find user X: no matching entries in passwd file"
+        // podman: same core message wrapped as "preparing container <id> for
+        // attach: <docker message>". Match the engine-agnostic core.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"unable to find user user_does_not_exist") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stderr->find(L"no matching entries in passwd file") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownGroup_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm -u root:badgid {} id -u", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        // See UnknownUser_Fails for why we substring-match the engine message.
+        VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"unable to find group badgid") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stderr->find(L"no matching entries in group file") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameGroupRoot)
