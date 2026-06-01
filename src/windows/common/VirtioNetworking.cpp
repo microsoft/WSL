@@ -220,6 +220,14 @@ void VirtioNetworking::RefreshGuestConnection()
         }
     };
 
+    ULONG net_mask{};
+    if (ConvertLengthToIpv4Mask(networkSettings->PreferredIpAddress.PrefixLength, &net_mask) == 0)
+    {
+        auto net_mask_string =
+            std::format(L"{}.{}.{}.{}", net_mask & 0xFF, (net_mask >> 8) & 0xFF, (net_mask >> 16) & 0xFF, (net_mask >> 24) & 0xFF);
+        appendOption(L"netmask", net_mask_string);
+    }
+
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
@@ -248,6 +256,8 @@ void VirtioNetworking::RefreshGuestConnection()
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
+
+        WSL_LOG("RefreshVirtioNetConnection", TraceLoggingValue(device_options.c_str(), "DeviceOptions"));
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
