@@ -233,7 +233,8 @@ namespace detail {
 //
 // If onSuccess, onError, or Launch throw, the cancel event is signalled and ForEachAsync
 // waits up to cancelDrainTimeout for any in-flight workers to exit before rethrowing.
-// This guarantees no background thread pool callbacks outlive the ForEachAsync call.
+// If workers do not exit in that window, callbacks may outlive this call; onWork
+// and any state it captures must remain valid until those callbacks finish.
 //
 // poolSize must not exceed MAXIMUM_WAIT_OBJECTS (64).
 //
