@@ -27,6 +27,7 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -34,6 +35,7 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -62,6 +64,17 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MultipleUnusedImages_Success)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
+        VerifyImageIsNotUsed(DebianImage);
+        VerifyImageIsNotUsed(AlpineImage);
+
+        auto result = RunWslc(std::format(L"image delete {} {}", DebianImage.Name, AlpineImage.Name));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -113,6 +126,7 @@ class WSLCE2EImageDeleteTests
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::wstring GetHelpMessage() const
