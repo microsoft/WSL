@@ -382,7 +382,7 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation(".", ".", true));
 
     //
-    // Validate that subsets of the current distro name are correctly treated as an error.
+    // Validate that distro names that only share the current distro name as a prefix are correctly treated as an error.
     //
 
     LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_PREFIX "-other\\foo", NULL, true));
