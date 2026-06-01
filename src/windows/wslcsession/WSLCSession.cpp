@@ -308,6 +308,8 @@ try
 
         auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
+        m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+
         //  Start the event tracker.
         m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
 
