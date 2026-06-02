@@ -128,7 +128,12 @@ namespace details {
             if (m_call)
             {
                 m_call = false;
-                m_lambda();
+
+                try
+                {
+                    m_lambda();
+                }
+                CATCH_LOG();
             }
         }
 
