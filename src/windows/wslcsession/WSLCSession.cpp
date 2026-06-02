@@ -290,7 +290,7 @@ try
     THROW_IF_FAILED(Vm->GetTerminationEvent(&m_vmExitedEvent));
 
     // Configure storage.
-  ConfigureStorage(*Settings, tokenInfo->User.Sid);
+    ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
     // Launch containerd first
     StartContainerd();

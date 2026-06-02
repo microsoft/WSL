@@ -1153,13 +1153,14 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
     THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
 
+    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
     std::string options = "lowerdir=" + packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
         options += ":" + inboxLibMountPoint.value();
     }
 
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), WSLCMountFlagsReadOnly);
+    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
 }
 
 void WSLCVirtualMachine::OnProcessReleased(int Pid)

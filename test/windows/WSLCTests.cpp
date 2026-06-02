@@ -3358,8 +3358,8 @@ class WSLCTests
                 "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
             // Validate that the mount points are writeable.
-            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 0);
-            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 0);
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1);
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1);
         }
     }
 
@@ -3406,9 +3406,9 @@ class WSLCTests
             // Validate that the GPU drivers directory is mounted and accessible.
             expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/drivers"}, 0);
 
-            // Validate that the GPU mount points are writeable.
-            expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 0);
-            expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 0);
+            // Validate that the GPU mount points are read-only.
+            expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
+            expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
 
             // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
             expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});

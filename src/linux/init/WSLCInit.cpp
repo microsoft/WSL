@@ -21,7 +21,6 @@ Abstract:
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
-#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/epoll.h>
 #include <sys/prctl.h>
@@ -630,13 +629,7 @@ void HandleMessageImpl(
             options = mountutil::MountParseFlags(wsl::shared::string::FromSpan(Buffer, Message.OptionsIndex));
         }
 
-        if (Message.Flags & WSLC_MOUNT::ReadOnly)
-        {
-            options.MountFlags |= MS_RDONLY;
-        }
-
         const char* source = readField(Message.SourceIndex);
-        const char* type = readField(Message.TypeIndex);
 
         const char* target{};
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
@@ -659,53 +652,36 @@ void HandleMessageImpl(
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
-        const bool existingMountOverlay = WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot);
-        if (!existingMountOverlay)
-        {
-            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        auto type = readField(Message.TypeIndex);
+        THROW_LAST_ERROR_IF(
+            UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
 
-            // Force the kernel to populate the freshly-mounted root inode's permission
-            // bits before anything stacks an overlayfs on top of it.
-            //
-            // For FUSE-family file systems (virtiofs in particular), fuse_get_root_inode
-            // creates the root inode with attr.mode == ctx->rootmode == S_IFDIR (no perm
-            // bits), and fuse_change_attributes() never runs against it until something
-            // explicitly stats the dentry. If WSLC mounts a virtiofs share and then
-            // immediately stacks an overlayfs whose lowerdir is that share, ovl_get_root
-            // -> ovl_copyattr inherits i_mode = S_IFDIR | 0 from the lower. ovl_getattr
-            // only refreshes the *lower* inode's attrs (so userspace stat() reports the
-            // real 0755/0777), but inode_permission consults the overlay's own i_mode
-            // which stays 0 forever, denying access to every non-root caller.
-            //
-            // A single stat() on the mount target issues FUSE_LOOKUP/FUSE_GETATTR which
-            // fills realinode->i_mode with the real permission bits, so ovl_copyattr
-            // copies the right value when the overlay is mounted next. The cost is one
-            // syscall per mount; for non-fuse filesystems it is a harmless no-op.
+
+        // Workaround for a linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs shared before the permissions have been fetched.
+        // TODO: Remove once fixed upstream.
+        if (wsl::shared::string::IsEqual(type, "virtiofs"))
+        {
             struct stat targetStat{};
             if (stat(target, &targetStat) < 0)
             {
-                LOG_ERROR("stat({}) after mount failed {}", target, errno);
+                LOG_ERROR("stat({}) after virtiofs mount failed {}", target, errno);
             }
         }
 
         std::optional<std::string> overlayTarget;
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs))
         {
-            if (existingMountOverlay)
+            overlayTarget.emplace(target + std::string("-rw"));
+            if (std::filesystem::exists(overlayTarget->c_str()))
             {
-                THROW_LAST_ERROR_IF(UtilMountOverlayFs(target, source, MS_NOATIME | MS_NOSUID | MS_NODEV, c_defaultRetryTimeout) < 0);
+                LOG_ERROR("Overlay directory already exists: {}", overlayTarget.value());
+                THROW_ERRNO(EEXIST);
             }
-            else
+
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(overlayTarget->c_str(), target));
+
+            if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot))
             {
-                overlayTarget.emplace(target + std::string("-rw"));
-                if (std::filesystem::exists(overlayTarget->c_str()))
-                {
-                    LOG_ERROR("Overlay directory already exists: {}", overlayTarget.value());
-                    THROW_ERRNO(EEXIST);
-                }
-
-                THROW_LAST_ERROR_IF(UtilMountOverlayFs(overlayTarget->c_str(), target));
-
                 // If this is a chroot, simply mounts the overlay on top of the "-rw" folder.
                 // We'll chroot into it later, so moving the mountpoint isn't needed.
                 target = overlayTarget->c_str();
@@ -735,6 +711,21 @@ void HandleMessageImpl(
                     std::filesystem::create_directories(chrootTarget);
 
                     THROW_LAST_ERROR_IF(mount(g_state.ModulesMountPoint->c_str(), chrootTarget.c_str(), "none", MS_MOVE, nullptr) < 0);
+                }
+            }
+            else
+            {
+                // Move the "-rw" mount to its final target.
+                THROW_LAST_ERROR_IF(mount(overlayTarget->c_str(), target, "none", MS_MOVE, nullptr) < 0);
+
+                // Clean up the underlying mount point
+                THROW_LAST_ERROR_IF(umount((overlayTarget.value() + "/rw").c_str()));
+
+                std::error_code error;
+                std::filesystem::remove_all(overlayTarget.value(), error);
+                if (error.value() != 0)
+                {
+                    THROW_ERRNO(error.value());
                 }
             }
         }

@@ -580,7 +580,7 @@ try
     }
     else
     {
-        std::wstring options = ReadOnly ? L"ro;umask=000" : L"";
+        std::wstring options = ReadOnly ? L"ro" : L"";
         if (!m_swiotlbOption.empty())
         {
             if (!options.empty())
