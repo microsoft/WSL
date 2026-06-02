@@ -493,7 +493,7 @@ Description:
 
     This routine checks whether translating a path with wslpath matches the
     specified result. Pass NULL as ExpectedPath to assert that wslpath fails
-    to translate the path (i.e. exits with a non-zero status).
+    to translate the path.
 
 Arguments:
 
@@ -553,8 +553,6 @@ Arguments:
     OutputBufferSize - Supplies the size of the output buffer.
 
     ExpectedExitCode - Supplies the expected exit code of the child process.
-        Passing a non-zero value suppresses the ERROR: log lines that
-        LxtWaitPidPoll would otherwise emit on a non-zero exit.
 
 Return Value:
 
@@ -632,8 +630,7 @@ Arguments:
     OutputBufferSize - Supplies the size of the output buffer.
 
     ExpectedExitCode - Supplies the expected exit code of wslpath. Pass 1 when
-        the translation is expected to fail; the helper will then treat the
-        non-zero exit as success and stay silent.
+        the translation is expected to fail.
 
 Return Value:
 
