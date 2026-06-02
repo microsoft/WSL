@@ -84,10 +84,7 @@ void PortRelayAcceptHandle::Collect()
     }
 
     // Set the accept context to mark the socket as connected.
-    const SOCKET listenSocket = ListenSocket.get();
-    THROW_LAST_ERROR_IF(
-        setsockopt(AcceptedSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
-        SOCKET_ERROR);
+    socket::SetAcceptContext(AcceptedSocket.get(), ListenSocket.get());
 
     // Launch a relay for this accepted connection
     LaunchRelay(std::move(AcceptedSocket));

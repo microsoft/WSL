@@ -414,10 +414,7 @@ struct PortRelay
         }
 
         // Set the accept context to mark the socket as connected.
-        const SOCKET listenSocket = ListenSocket.get();
-        THROW_LAST_ERROR_IF(
-            setsockopt(PendingSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
-            SOCKET_ERROR);
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
     }
 
     // If the accept completes immediately, accept context will be set on the accepted socket.
@@ -438,10 +435,7 @@ struct PortRelay
         }
 
         // Set the accept context to mark the socket as connected.
-        const SOCKET listenSocket = ListenSocket.get();
-        THROW_LAST_ERROR_IF(
-            setsockopt(PendingSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
-            SOCKET_ERROR);
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
         return true;
     }
 };
