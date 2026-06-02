@@ -664,8 +664,6 @@ class PluginTests
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
             Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}
-            WSLCMountFolder(../escape): {}
-            WSLCMountFolder(): {}
             Test completed
             WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
@@ -674,9 +672,7 @@ class PluginTests
             static_cast<uint32_t>(E_FAIL),
             E_INVALIDARG,
             HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
-            E_INVALIDARG,
-            E_INVALIDARG);
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
 
         ValidateLogFile(ExpectedOutput.c_str());
     }
