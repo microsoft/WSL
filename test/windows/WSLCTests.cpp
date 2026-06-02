@@ -6039,7 +6039,7 @@ class WSLCTests
         options.ContainerNetwork.NetworksCount = 1;
 
         wil::com_ptr<IWSLCContainer> container;
-        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
         VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
         ValidateCOMErrorMessageContains(L"Network name");
     }
@@ -6055,7 +6055,7 @@ class WSLCTests
         WSLCNetworkOptions networkOptions{};
         networkOptions.Name = networkName.c_str();
         networkOptions.Driver = "bridge";
-        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions, nullptr));
         auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         LPCSTR args[] = {"sleep", "99999"};
