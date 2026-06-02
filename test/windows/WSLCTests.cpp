@@ -3357,9 +3357,9 @@ class WSLCTests
                 "/usr/lib/wsl/lib",
                 "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
-            // Validate that the mount points are not writeable.
-            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
-            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1L);
+            // Validate that the mount points are writeable.
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 0);
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 0);
         }
     }
 
@@ -3406,9 +3406,9 @@ class WSLCTests
             // Validate that the GPU drivers directory is mounted and accessible.
             expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/drivers"}, 0);
 
-            // Validate that the GPU mount points are read-only.
-            expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
-            expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
+            // Validate that the GPU mount points are writeable.
+            expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 0);
+            expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 0);
 
             // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
             expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
@@ -3418,9 +3418,21 @@ class WSLCTests
         // Validate that containers without the GPU flag do not have GPU resources.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-no-gpu", {"/bin/sh", "-c", "test -c /dev/dxg"});
+
             auto container = launcher.Launch(*session);
 
             ValidateContainerOutput(container, {{1, ""}}, 1);
+        }
+
+        // Validate that the directories are readable by non-root users.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-container-no-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+
+            ValidateContainerOutput(container, {}, 0);
         }
     }
 
