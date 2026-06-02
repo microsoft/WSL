@@ -86,9 +86,9 @@ WSLCContainerLauncher::WSLCContainerLauncher(
     const std::string& Name,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
-    WSLCContainerNetworkType containerNetworkType,
+    std::string networkMode,
     WSLCProcessFlags Flags) :
-    WSLCProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLCProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_networkMode(std::move(networkMode))
 {
 }
 
@@ -142,11 +142,6 @@ void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 void WSLCContainerLauncher::SetContainerFlags(WSLCContainerFlags Flags)
 {
     m_containerFlags = Flags;
-}
-
-void WSLCContainerLauncher::SetContainerNetworkName(std::string&& Name)
-{
-    m_containerNetworkName = std::move(Name);
 }
 
 void WSLCContainerLauncher::SetHostname(std::string&& Hostname)
@@ -288,7 +283,6 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
-    options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
@@ -360,21 +354,18 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
-    std::vector<WSLCNetworkAttachment> networkAttachments;
-    if (m_containerNetworkType == WSLCContainerNetworkTypeCustom)
-    {
-        networkAttachments.push_back({m_containerNetworkName.c_str(), nullptr});
-    }
+    options.ContainerNetwork.NetworkMode = m_networkMode.c_str();
+
+    // Each additional network becomes an entry in NetworkingConfig.EndpointsConfig.
+    std::vector<WSLCNetworkConnection> connections;
+    connections.reserve(m_additionalNetworks.size());
     for (const auto& e : m_additionalNetworks)
     {
-        networkAttachments.push_back({e.c_str(), nullptr});
+        connections.push_back({.NetworkName = e.c_str()});
     }
 
-    if (!networkAttachments.empty())
-    {
-        options.ContainerNetwork.Networks = networkAttachments.data();
-        options.ContainerNetwork.NetworksCount = static_cast<ULONG>(networkAttachments.size());
-    }
+    options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
+    options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

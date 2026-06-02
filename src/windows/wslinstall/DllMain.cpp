@@ -940,6 +940,50 @@ extern "C" UINT __stdcall CalculateWslSettingsProtocolIds(MSIHANDLE install)
     return NOERROR;
 }
 
+static void SetWslServiceStartType(DWORD StartType)
+{
+    const wil::unique_schandle manager{OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    THROW_LAST_ERROR_IF(!manager);
+
+    const wil::unique_schandle service{OpenServiceW(manager.get(), L"WSLService", SERVICE_CHANGE_CONFIG)};
+    if (!service)
+    {
+        const auto error = GetLastError();
+        if (error == ERROR_SERVICE_DOES_NOT_EXIST)
+        {
+            return;
+        }
+        THROW_WIN32(error);
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(ChangeServiceConfigW(
+        service.get(), SERVICE_NO_CHANGE, StartType, SERVICE_NO_CHANGE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr));
+}
+
+extern "C" UINT __stdcall DisableWslService(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("DisableWslService");
+        SetWslServiceStartType(SERVICE_DISABLED);
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
+extern "C" UINT __stdcall EnableWslService(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("EnableWslService");
+        SetWslServiceStartType(SERVICE_AUTO_START);
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
     wil::DLLMain(Instance, Reason, Reserved);

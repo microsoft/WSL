@@ -825,6 +825,30 @@ struct CaseInsensitiveCompare
     }
 };
 
+inline std::wstring FormatBytes(uint64_t bytes)
+{
+    constexpr double c_kB = 1000.0;
+    constexpr double c_MB = 1000.0 * 1000.0;
+    constexpr double c_GB = 1000.0 * 1000.0 * 1000.0;
+
+    if (bytes >= static_cast<uint64_t>(c_GB))
+    {
+        return std::format(L"{:.2f} GB", bytes / c_GB);
+    }
+    else if (bytes >= static_cast<uint64_t>(c_MB))
+    {
+        return std::format(L"{:.2f} MB", bytes / c_MB);
+    }
+    else if (bytes >= static_cast<uint64_t>(c_kB))
+    {
+        return std::format(L"{:.2f} KB", bytes / c_kB);
+    }
+    else
+    {
+        return std::format(L"{} B", bytes);
+    }
+}
+
 } // namespace wsl::shared::string
 
 template <>

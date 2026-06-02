@@ -76,7 +76,7 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
-        WSLCContainerNetworkType NetworkMode,
+        std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
@@ -211,7 +211,7 @@ private:
     DockerEventTracker& m_eventTracker;
     DockerEventTracker::EventTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
-    WSLCContainerNetworkType m_networkingMode{};
+    std::string m_networkMode;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer

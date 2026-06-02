@@ -99,14 +99,14 @@ WSLCSignal Convert(WslcSignal signal)
     }
 }
 
-WSLCContainerNetworkType Convert(WslcContainerNetworkingMode mode)
+PCSTR Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
     case WSLC_CONTAINER_NETWORKING_MODE_NONE:
-        return WSLCContainerNetworkTypeNone;
+        return "none";
     case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
-        return WSLCContainerNetworkTypeBridged;
+        return "bridge";
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
@@ -617,7 +617,30 @@ CATCH_RETURN();
 STDAPI WslcReleaseContainer(_In_ WslcContainer container)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(container);
+    // Reject release attempts originating from the container's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(container);
+        auto ioCallback = peek->ioCallbacks.load();
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), ioCallback && ioCallback->IsOnIOCallbackThread());
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(container);
+    auto ioCallback = internalType->ioCallbacks.load();
+    if (ioCallback)
+    {
+        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
+        try
+        {
+            WSLCContainerState state{};
+            THROW_IF_FAILED(internalType->container->GetState(&state));
+
+            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
+            {
+                ioCallback->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }
@@ -626,7 +649,34 @@ CATCH_RETURN();
 STDAPI WslcReleaseProcess(_In_ WslcProcess process)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(process);
+    // Reject release attempts originating from the process's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(process);
+        if (peek->ioCallbacks && peek->ioCallbacks->IsOnIOCallbackThread())
+        {
+            RETURN_HR(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        }
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(process);
+    if (internalType->ioCallbacks)
+    {
+        // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
+        // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
+
+        try
+        {
+            WSLCProcessState state{};
+            int exitCode{};
+            THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
+
+            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
+            {
+                internalType->ioCallbacks->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }
@@ -644,7 +694,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = WSLCContainerNetworkTypeNone;
+    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -773,7 +823,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
+    // SDK only exposes the network mode (no additional endpoints today).
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -884,7 +935,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(containerSettings);
 
-    internalType->networking = Convert(networkingMode);
+    internalType->networkMode = Convert(networkingMode);
 
     return S_OK;
 }

@@ -216,6 +216,14 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct DeviceRequest
+{
+    std::string Driver;
+    std::vector<std::string> DeviceIDs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeviceRequest, Driver, DeviceIDs);
+};
+
 struct HostConfig
 {
     std::vector<Mount> Mounts;
@@ -231,6 +239,7 @@ struct HostConfig
     // the field — so we don't bother with std::optional here.
     std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
+    std::optional<std::vector<DeviceRequest>> DeviceRequests;
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
     std::int64_t Memory{};
@@ -238,7 +247,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct EndpointSettings
@@ -585,8 +594,10 @@ struct BuildKitStatus
 {
     std::string id;
     std::string vertex;
+    int64_t current{};
+    int64_t total{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex, current, total);
 };
 
 struct BuildKitLog

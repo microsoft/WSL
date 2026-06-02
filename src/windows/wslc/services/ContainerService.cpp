@@ -52,7 +52,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, "bridge", processFlags);
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -514,7 +514,7 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -523,8 +523,9 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
+    WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, tail));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(

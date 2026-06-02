@@ -247,6 +247,11 @@ Abstract:
 
 #define LX_INIT_WSL_INIT_WATCHER "init-watcher"
 
+#define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
+
+#define LX_WSLC_CDI_KIND "microsoft.com/wslc"
+#define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
+
 //
 // WSL2-specific environment variables.
 //
