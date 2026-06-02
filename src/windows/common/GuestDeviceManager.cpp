@@ -69,6 +69,37 @@ GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil:
     return m_deviceHostSupport->AddNewDevice(deviceId, server, tag);
 }
 
+_Requires_lock_not_held_(m_lock)
+void GuestDeviceManager::ExtendVirtioFsAggregate(
+    _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ HANDLE UserToken)
+{
+    auto guestDeviceLock = m_lock.lock_exclusive();
+
+    // Options are appended to the name with a semi-colon separator.
+    //  "name;subname=<sub>;key1=value1;key2=value2"
+    // N.B. A ";vm_id=<guid>" option is always appended so the device host can
+    //      identify the owning VM. This mirrors AddHdvShareWithOptions and is
+    //      required because device-host control configs (e.g. ";swiotlb=...",
+    //      forwarded here for aggregate children) are rejected without it.
+    std::wstring nameWithOptions{AccessName};
+    if (ARGUMENT_PRESENT(Options) && Options[0] != L'\0')
+    {
+        nameWithOptions += L";";
+        nameWithOptions += Options;
+    }
+
+    nameWithOptions += std::format(L";vm_id={}", m_machineId);
+
+    auto revert = wil::impersonate_token(UserToken);
+
+    // The aggregate must already exist; the original AddNewDevice call for
+    // this AccessName populated the COM server.
+    auto server = GetRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag);
+    THROW_HR_IF_NULL(E_UNEXPECTED, server.get());
+
+    THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), Path, VIRTIO_FS_FLAGS_TYPE_AGGREGATE));
+}
+
 void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server)
 {
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);

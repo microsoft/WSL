@@ -612,32 +612,69 @@ try
     }
     else
     {
-        std::wstring options = ReadOnly ? L"ro" : L"";
+        //
+        // Share Windows folders through aggregate virtio-fs devices instead
+        // of one PCI device per share. Each share becomes a child of an
+        // aggregate's synthetic root, addressed by a subname derived from the
+        // share GUID (see GuidToHexString). The aggregate tags are the fixed
+        // compile-time constants c_wslcVirtioFsAggregateTag (read-write) and
+        // c_wslcVirtioFsAggregateReadOnlyTag (read-only) so the guest can
+        // agree on the device name without AddShare needing a return channel.
+        //
+        // ReadOnly is enforced host-side: read-only shares are placed in a
+        // separate read-only aggregate whose virtio-fs backend rejects writes
+        // (EROFS) regardless of the guest's mount options. The device host
+        // requires all children of one aggregate to share the same readonly
+        // setting, so read-only and read-write shares cannot share a device.
+        //
+        const auto subname = wsl::shared::string::GuidToHexString<wchar_t>(shareIdLocal);
+        std::wstring options = L"subname=" + subname;
+        if (ReadOnly)
+        {
+            options += L";ro";
+        }
+
         auto appendOption = [&options](const std::wstring& option) {
             if (option.empty())
             {
                 return;
             }
 
-            if (!options.empty())
-            {
-                options += L";";
-            }
-
+            options += L";";
             options += option;
         };
 
+        // Append the swiotlb token so the aggregate device gets the swiotlb pool reservation,
+        // and the vcpus option for the device queue configuration. The options string always
+        // begins with "subname=", so it is never empty here.
         appendOption(m_swiotlbOption);
         appendOption(c_vcpusOption);
 
-        it->second = m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID,
-            m_virtioFsClassId,
-            shareName.c_str(),
-            options.c_str(),
-            WindowsPath,
-            VIRTIO_FS_FLAGS_TYPE_FILES,
-            m_userToken.get());
+        const auto& aggregateTag = ReadOnly ? c_wslcVirtioFsAggregateReadOnlyTag : c_wslcVirtioFsAggregateTag;
+        const auto tag = wsl::shared::string::GuidToString<wchar_t>(aggregateTag, wsl::shared::string::None);
+
+        bool& aggregateCreated = ReadOnly ? m_virtioFsAggregateReadOnlyCreated : m_virtioFsAggregateCreated;
+        GUID& aggregateDevice = ReadOnly ? m_virtioFsAggregateReadOnlyDevice : m_virtioFsAggregateDevice;
+
+        if (!aggregateCreated)
+        {
+            aggregateDevice = m_guestDeviceManager->AddGuestDevice(
+                VIRTIO_FS_DEVICE_ID,
+                m_virtioFsClassId,
+                tag.c_str(),
+                options.c_str(),
+                WindowsPath,
+                VIRTIO_FS_FLAGS_TYPE_AGGREGATE,
+                m_userToken.get());
+            aggregateCreated = true;
+        }
+        else
+        {
+            m_guestDeviceManager->ExtendVirtioFsAggregate(
+                m_virtioFsClassId, tag.c_str(), options.c_str(), WindowsPath, m_userToken.get());
+        }
+
+        it->second = aggregateDevice;
     }
 
     cleanup.release();
@@ -662,7 +699,14 @@ try
     }
     else
     {
-        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, it->second.value());
+        //
+        // Virtio-fs shares are children of a single aggregate device that
+        // is torn down with the VM. Removing the guest device here would
+        // destroy the device shared by every other Windows-folder share,
+        // so aggregate children are append-only: just drop the bookkeeping
+        // entry. (The WSLc consumer never calls RemoveShare in virtio-fs
+        // mode.)
+        //
     }
 
     m_shares.erase(it);

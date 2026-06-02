@@ -73,6 +73,43 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
+
+//
+// Compute a deterministic subname (child name) for a virtio-fs share
+// inside its aggregate device's synthetic root. The hash inputs are:
+//   <canonical-path-utf8> NUL <normalized-options-utf8> NUL <admin>
+// The first 128 bits of the SHA-256 digest are encoded as 32 lowercase
+// hex chars. A deterministic subname keeps the per-share guest-side path
+// stable across service-internal state rebuilds.
+//
+std::wstring ComputeAggregateSubname(const std::wstring& CanonicalPath, const std::wstring& NormalizedOptions, bool Admin)
+{
+    std::string buffer;
+    const auto pathUtf8 = wsl::shared::string::WideToMultiByte(CanonicalPath);
+    const auto optsUtf8 = wsl::shared::string::WideToMultiByte(NormalizedOptions);
+    buffer.append(pathUtf8);
+    buffer.push_back('\0');
+    buffer.append(optsUtf8);
+    buffer.push_back('\0');
+    buffer.push_back(Admin ? '\x01' : '\x00');
+
+    wil::unique_bcrypt_hash hash;
+    THROW_IF_NTSTATUS_FAILED(BCryptCreateHash(BCRYPT_SHA256_ALG_HANDLE, &hash, nullptr, 0, nullptr, 0, 0));
+    THROW_IF_NTSTATUS_FAILED(BCryptHashData(hash.get(), reinterpret_cast<PUCHAR>(buffer.data()), gsl::narrow<ULONG>(buffer.size()), 0));
+
+    std::array<uint8_t, 32> digest{};
+    THROW_IF_NTSTATUS_FAILED(BCryptFinishHash(hash.get(), digest.data(), gsl::narrow<ULONG>(digest.size()), 0));
+
+    static constexpr char hexChars[] = "0123456789abcdef";
+    std::wstring out;
+    out.reserve(32);
+    for (size_t i = 0; i < 16; ++i)
+    {
+        out.push_back(static_cast<wchar_t>(hexChars[digest[i] >> 4]));
+        out.push_back(static_cast<wchar_t>(hexChars[digest[i] & 0x0F]));
+    }
+    return out;
+}
 } // namespace
 
 WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
@@ -1399,12 +1436,35 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-std::optional<WslCoreVm::VirtioFsShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin) const
+std::optional<WslCoreVm::VirtioFsShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR tag, _In_ PCWSTR Subname, _In_ std::optional<bool> Admin) const
 {
-    for (const auto& share : m_virtioFsShares)
+    //
+    // Each aggregate tag lives in one of the two Admin buckets (index 0
+    // = non-admin, index 1 = admin). Identify the matching bucket by tag
+    // and (optionally) Admin, then look up the share by Subname within
+    // that bucket. The subname encodes any RO/RW distinction (via the
+    // hashed options string), so matching by subname alone is enough.
+    //
+    for (size_t bucket = 0; bucket < m_drvfsAggregateTag.size(); ++bucket)
     {
-        if ((share.second == tag) && (!Admin.has_value() || Admin.value() == share.first.Admin))
+        const bool bucketAdmin = (bucket != 0);
+        if (Admin.has_value() && Admin.value() != bucketAdmin)
         {
+            continue;
+        }
+
+        if (m_drvfsAggregateTag[bucket].empty() || m_drvfsAggregateTag[bucket] != tag)
+        {
+            continue;
+        }
+
+        for (const auto& share : m_virtioFsShares)
+        {
+            if (share.first.Admin != bucketAdmin || share.second != Subname)
+            {
+                continue;
+            }
+
             return share.first;
         }
     }
@@ -2175,7 +2235,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
+std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
     WI_ASSERT(m_vmConfig.EnableVirtioFs);
 
@@ -2216,48 +2276,99 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
     appendOption(m_swiotlbOption);
     appendOption(c_vcpusOption);
 
-    // Check if a matching share already exists.
-    bool created = false;
-    std::wstring tag;
+    //
+    // Each share lives inside an aggregate virtio-fs device bucketed by
+    // Admin. A single bucket exposes one PCI device whose synthetic root
+    // holds one child entry per share.
+    //
+    // ReadOnly is not a bucket axis: the standard drvfs path routes "ro"
+    // through the Linux-side bind mount (drvfs.cpp's
+    // ConvertDrvfsMountOptionsToPlan9 classifies "ro" as a
+    // StandardOption, not a Plan9Option), so the host-side aggregate
+    // device never observes "ro" in normal use. If a caller does
+    // explicitly pass "ro" in the plan9 options, the deterministic
+    // subname (which hashes the full normalized options string) still
+    // gives that share its own child entry within the bucket. Aggregate
+    // children are device-RW at the FUSE level; per-share write
+    // protection comes from the guest's bind-mount options.
+    //
     VirtioFsShare key(sharePath.c_str(), effectiveOptions.c_str(), Admin);
-    if (!m_virtioFsShares.contains(key))
+    const bool readOnly = key.Options.contains(L"ro");
+    const size_t bucket = Admin ? 1u : 0u;
+
+    bool created = false;
+    std::wstring subname;
+
+    auto existing = m_virtioFsShares.find(key);
+    if (existing != m_virtioFsShares.end())
     {
-        // Generate a new unique tag for the share.
-        //
-        // N.B. The tag can be maximum 36 characters long so a GUID without braces fits perfectly.
-        GUID tagGuid{};
-        THROW_IF_FAILED(CoCreateGuid(&tagGuid));
-
-        tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
-        WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
-
-        (void)m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID,
-            Admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID,
-            tag.c_str(),
-            key.OptionsString().c_str(),
-            sharePath.c_str(),
-            VIRTIO_FS_FLAGS_TYPE_FILES,
-            UserToken);
-
-        m_virtioFsShares.emplace(std::move(key), tag);
-        created = true;
+        subname = existing->second;
     }
     else
     {
-        tag = m_virtioFsShares[key];
+        const auto normalizedOptions = key.OptionsString();
+        subname = ComputeAggregateSubname(sharePath, normalizedOptions, Admin);
+
+        std::wstring optionsWithSubname{L"subname="};
+        optionsWithSubname += subname;
+        if (!normalizedOptions.empty())
+        {
+            optionsWithSubname += L';';
+            optionsWithSubname += normalizedOptions;
+        }
+
+        const GUID classId = Admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
+
+        if (m_drvfsAggregateTag[bucket].empty())
+        {
+            //
+            // First share in this bucket: allocate a fresh aggregate
+            // tag and create the PCI device. The tag is shared by every
+            // subsequent share in the same bucket.
+            //
+            // N.B. The tag can be maximum 36 characters long so a GUID
+            //      without braces fits perfectly.
+            //
+            GUID tagGuid{};
+            THROW_IF_FAILED(CoCreateGuid(&tagGuid));
+
+            std::wstring aggregateTag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
+            WI_ASSERT(!FindVirtioFsShare(aggregateTag.c_str(), subname.c_str(), Admin));
+
+            (void)m_guestDeviceManager->AddGuestDevice(
+                VIRTIO_FS_DEVICE_ID, classId, aggregateTag.c_str(), optionsWithSubname.c_str(), sharePath.c_str(), VIRTIO_FS_FLAGS_TYPE_AGGREGATE, UserToken);
+
+            m_drvfsAggregateTag[bucket] = std::move(aggregateTag);
+        }
+        else
+        {
+            //
+            // Aggregate device already exists for this bucket: extend
+            // it in-place by registering a new child under the existing
+            // PCI device. No new PCI device is created.
+            //
+            m_guestDeviceManager->ExtendVirtioFsAggregate(
+                classId, m_drvfsAggregateTag[bucket].c_str(), optionsWithSubname.c_str(), sharePath.c_str(), UserToken);
+        }
+
+        m_virtioFsShares.emplace(std::move(key), subname);
+        created = true;
     }
+
+    const std::wstring& tag = m_drvfsAggregateTag[bucket];
 
     WSL_LOG(
         "WslCoreVmAddVirtioFsShare",
         TraceLoggingValue(Admin, "admin"),
+        TraceLoggingValue(readOnly, "readOnly"),
         TraceLoggingValue(sharePath.c_str(), "path"),
         TraceLoggingValue(effectiveOptions.c_str(), "options"),
         TraceLoggingValue(tag.c_str(), "tag"),
+        TraceLoggingValue(subname.c_str(), "subname"),
         TraceLoggingValue(created, "created"),
         TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
 
-    return {tag, sharePath};
+    return {tag, subname, sharePath};
 }
 
 void WslCoreVm::OnCrash(_In_ LPCWSTR Details)
@@ -2655,15 +2766,15 @@ try
                     THROW_HR_IF_MSG(
                         E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
 
-                    try
-                    {
-                        auto response = ProcessVirtioFsRequest(message);
+                try
+                {
+                    auto response = ProcessVirtioFsRequest(message);
 
-                        // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
-                        io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
-                    }
-                    CATCH_LOG();
-                }),
+                    // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
+                    io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
+                }
+                CATCH_LOG();
+            }),
             io::MultiHandleWait::IgnoreErrors);
     }));
 
@@ -2680,12 +2791,14 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
 
     WSL_LOG("VirtiofsMessageRequest", TraceLoggingValue(header->PrettyPrint().c_str(), "Content"));
 
-    auto buildResponse = [header](const std::wstring& tag, const std::wstring& source, HRESULT result) {
-        // Respond to the guest with the tag that should be used to mount the device.
+    auto buildResponse = [header](const std::wstring& tag, const std::wstring& subname, const std::wstring& source, HRESULT result) {
+        // Respond to the guest with the aggregate tag, child subname (inside the
+        // aggregate's synthetic root), and canonicalized source the device maps.
         wsl::shared::MessageWriter<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE> response(LxInitMessageAddVirtioFsDeviceResponse);
         response->Result = SUCCEEDED(result) ? 0 : EINVAL; // TODO: Improved HRESULT -> errno mapping.
         response.WriteString(response->TagOffset, tag);
         response.WriteString(response->SourceOffset, source);
+        response.WriteString(response->SubnameOffset, subname);
 
         // Echo the request's transaction id and mark the message as the first (and only) reply.
         response->Header.TransactionId = header->TransactionId;
@@ -2700,6 +2813,7 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
     if (header->MessageType == LxInitMessageAddVirtioFsDevice)
     {
         std::wstring tag;
+        std::wstring subname;
         std::wstring source;
         const auto result = wil::ResultFromException([&]() {
             const auto* addShare = gslhelpers::try_get_struct<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(Request);
@@ -2712,14 +2826,15 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
 
             // Acquire the lock and attempt to add the device.
             auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-            std::tie(tag, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
+            std::tie(tag, subname, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
         });
 
-        return buildResponse(tag, source, result);
+        return buildResponse(tag, subname, source, result);
     }
     else if (header->MessageType == LxInitMessageRemountVirtioFsDevice)
     {
         std::wstring newTag;
+        std::wstring newSubname;
         std::wstring source;
         const auto result = wil::ResultFromException([&]() {
             const auto* remountShare = gslhelpers::try_get_struct<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE>(Request);
@@ -2727,17 +2842,37 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
 
             const std::string tag = wsl::shared::string::FromSpan(Request, remountShare->TagOffset);
             const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
+
+            //
+            // The aggregate remount protocol always appends the child SubnameOffset, and
+            // guest init ships in lockstep with the service, so a well-formed message
+            // includes it. The size and bounds checks below only guard against a
+            // malformed or truncated payload (so a bogus offset is never dereferenced).
+            // A single aggregate tag is shared by every child, so the subname is required
+            // to identify the specific share -- there is no tag-only fallback.
+            //
+            std::wstring subnameWide;
+            if (header->MessageSize >= offsetof(LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE, SubnameOffset) + sizeof(unsigned int) &&
+                remountShare->SubnameOffset >= sizeof(LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE) &&
+                remountShare->SubnameOffset < header->MessageSize)
+            {
+                const std::string subname = wsl::shared::string::FromSpan(Request, remountShare->SubnameOffset);
+                subnameWide = wsl::shared::string::MultiByteToWide(subname);
+            }
+
+            THROW_HR_IF_MSG(E_INVALIDARG, subnameWide.empty(), "Remount message missing virtio-fs subname");
+
             auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-            const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
+            const auto foundShare = FindVirtioFsShare(tagWide.c_str(), subnameWide.c_str(), !remountShare->Admin);
             THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
-            std::tie(newTag, source) =
+            std::tie(newTag, newSubname, source) =
                 AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
 
             WI_ASSERT(source == foundShare->Path);
         });
 
-        return buildResponse(newTag, source, result);
+        return buildResponse(newTag, newSubname, source, result);
     }
     else
     {
