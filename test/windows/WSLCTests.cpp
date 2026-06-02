@@ -3418,7 +3418,6 @@ class WSLCTests
         // Validate that containers without the GPU flag do not have GPU resources.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-no-gpu", {"/bin/sh", "-c", "test -c /dev/dxg"});
-
             auto container = launcher.Launch(*session);
 
             ValidateContainerOutput(container, {{1, ""}}, 1);
