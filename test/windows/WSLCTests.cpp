@@ -3428,6 +3428,9 @@ class WSLCTests
             WSLCContainerLauncher launcher(
                 "debian:latest", "test-container-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
 
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            launcher.SetUser("nobody");
+
             auto container = launcher.Launch(*session);
 
             ValidateContainerOutput(container, {}, 0);
