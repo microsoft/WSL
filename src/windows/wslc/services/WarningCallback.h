@@ -13,11 +13,8 @@ class DECLSPEC_UUID("A7E3F8B2-4D19-4C6A-9E5B-8F2A1D3C7E90") WarningCallback
 public:
     HRESULT OnWarning(LPCWSTR Message) override
     {
-        if (Message)
-        {
-            wsl::windows::common::wslutil::PrintMessage(Message, stderr);
-        }
-
+        WI_ASSERT(Message);
+        wsl::windows::common::wslutil::PrintMessage(Message, stderr);
         return S_OK;
     }
 };
