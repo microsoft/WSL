@@ -7,6 +7,7 @@
 // Flags for virtiofs vdev device creation.
 #define VIRTIO_FS_FLAGS_TYPE_FILES 0x8000
 #define VIRTIO_FS_FLAGS_TYPE_SECTIONS 0x4000
+#define VIRTIO_FS_FLAGS_TYPE_AGGREGATE 0x2000
 
 inline const std::wstring c_defaultDeviceTag = L"default";
 
@@ -42,6 +43,15 @@ public:
 
     _Requires_lock_not_held_(m_lock)
     GUID AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag);
+
+    //
+    // Add a new child to an existing aggregate virtiofs device. Routes
+    // an AddSharePath call (with the VIRTIO_FS_FLAGS_TYPE_AGGREGATE flag
+    // set) to the same wsldevicehost COM server that hosts the existing
+    // aggregate tag, without creating a new PCI device.
+    //
+    _Requires_lock_not_held_(m_lock)
+    void ExtendVirtioFsAggregate(_In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ HANDLE UserToken);
 
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
 

@@ -1706,10 +1706,23 @@ Return Value:
     while (MountEnum.Next())
     {
         //
-        // Do not consider bind mounts.
+        // Skip non-root mounts (bind mounts), with one exception: aggregate
+        // virtio-fs shares are always bind-mounts from the aggregate device's
+        // synthetic-root child, so virtiofs entries with Root != "/" are
+        // legitimate drvfs mounts whose subname is encoded in Root.
         //
 
-        if (strcmp(MountEnum.Current().Root, "/") != 0)
+        const bool IsVirtioFs = (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0);
+        if (!IsVirtioFs && strcmp(MountEnum.Current().Root, "/") != 0)
+        {
+            continue;
+        }
+
+        //
+        // The aggregate-device root mounts under VIRTIOFS_AGGREGATE_ROOT_DIR
+        // are internal infrastructure (not user-visible drvfs targets); skip.
+        //
+        if (IsVirtioFs && wsl::shared::string::StartsWith(MountEnum.Current().MountPoint, VIRTIOFS_AGGREGATE_ROOT_DIR "/"))
         {
             continue;
         }
@@ -1732,9 +1745,15 @@ Return Value:
             MountSource = MountEnum.Current().Source;
             UtilCanonicalisePathSeparator(MountSource, PATH_SEP_NT);
         }
-        else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
+        else if (IsVirtioFs)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            //
+            // For aggregate shares, derive the subname from Root (strip leading "/").
+            // Legacy direct-mount shares have Root == "/" → empty subname.
+            //
+            const char* Root = MountEnum.Current().Root;
+            const char* Subname = (Root && Root[0] == '/') ? Root + 1 : (Root ? Root : "");
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, Subname);
         }
         else
         {
@@ -2327,10 +2346,26 @@ try
         //
         // Bind mounts which have a root other than / are currently not supported.
         //
-        // TODO_LX: Support bind mounts.
+        //
+        // Skip non-root mounts (bind mounts), except for aggregate virtio-fs
+        // shares which are themselves bind-mounts from the aggregate device's
+        // synthetic-root child. For those, Root encodes "/<subname>".
+        //
+        // TODO_LX: Support arbitrary bind mounts.
         //
 
-        if (strcmp(MountEntry.Root, "/") != 0)
+        const bool IsVirtioFs = (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0);
+        if (!IsVirtioFs && strcmp(MountEntry.Root, "/") != 0)
+        {
+            continue;
+        }
+
+        //
+        // The aggregate-device root mounts under VIRTIOFS_AGGREGATE_ROOT_DIR
+        // are internal infrastructure (not user-visible drvfs targets); skip
+        // them so they're not torn down and remounted incorrectly.
+        //
+        if (IsVirtioFs && wsl::shared::string::StartsWith(MountEntry.MountPoint, VIRTIOFS_AGGREGATE_ROOT_DIR "/"))
         {
             continue;
         }
@@ -2447,7 +2482,13 @@ try
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            //
+            // Derive aggregate-child subname from Root ("/<subname>", or "/"
+            // for legacy direct-mount shares).
+            //
+            const char* Root = MountEntry.Root;
+            const char* Subname = (Root && Root[0] == '/') ? Root + 1 : (Root ? Root : "");
+            RemountVirtioFs(MountEntry.Source, Subname, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
         }
         else
         {
