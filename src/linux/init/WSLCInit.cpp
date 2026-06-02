@@ -653,12 +653,11 @@ void HandleMessageImpl(
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
         auto type = readField(Message.TypeIndex);
-        THROW_LAST_ERROR_IF(
-            UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
 
         // Workaround for a linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs shared before the permissions have been fetched.
         // TODO: Remove once fixed upstream.
-        if (wsl::shared::string::IsEqual(type, "virtiofs"))
+        if (wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE))
         {
             struct stat targetStat{};
             if (stat(target, &targetStat) < 0)
