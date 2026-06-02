@@ -123,6 +123,7 @@ extern "C" {
 HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly)
 try
 {
+    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
@@ -143,6 +144,7 @@ CATCH_RETURN();
 HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint)
 try
 {
+    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint is actually owned by the plugin.
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);

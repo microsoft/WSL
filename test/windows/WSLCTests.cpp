@@ -3231,6 +3231,8 @@ class WSLCTests
         {
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true), E_INVALIDARG);
             VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
             VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 

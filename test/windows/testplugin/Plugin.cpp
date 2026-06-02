@@ -482,6 +482,10 @@ try
         g_logfile << "WSLCMountFolder(nonexistent): "
                   << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", roMountpoint, TRUE) << std::endl;
 
+        // Validate that non-absolute mountpoints are rejected.
+        g_logfile << "WSLCMountFolder(relative): "
+                  << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "relative-mountpoint", TRUE) << std::endl;
+
         g_logfile << "Test completed" << std::endl;
     }
 

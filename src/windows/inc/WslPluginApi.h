@@ -145,7 +145,7 @@ typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation
 // WSLC plugin API calls.
 //
 
-// Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path.
+// Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.
 typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly);
 
 // Unmount a folder previously mounted via WSLCPluginAPI_MountFolder.
