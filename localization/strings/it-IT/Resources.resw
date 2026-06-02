@@ -2117,16 +2117,9 @@ Utilizzo:
     <value>Il contenitore '{}' non è in esecuzione.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress non è ancora supportato.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Il contenitore '{}' è in esecuzione.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Le reti aggiuntive non sono consentite con la modalità di rete contenitori.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>I mapping delle porte non sono supportati con la modalità di rete dei contenitori; Le porte sono di proprietà del contenitore di destinazione.</value>
@@ -2141,9 +2134,6 @@ Utilizzo:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Contenitore "{}" non trovato.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Il nome della rete del contenitore è obbligatorio per il tipo di rete personalizzato.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Il nome della rete non può essere vuoto.</value>
@@ -2841,10 +2831,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Numero di righe da visualizzare dalla fine dei log</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Visualizza i timestamp nell'output di log</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Visualizza i log dal timestamp (ad es. secondi periodo)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
     <value>Mostra i log prima del timestamp (ad esempio, secondi del periodo UNIX)</value>

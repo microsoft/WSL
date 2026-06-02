@@ -2111,16 +2111,9 @@ Użycie:
     <value>Kontener „{}” nie jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>Adres ContainerIpAddress nie jest jeszcze obsługiwany.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Kontener „{}” jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Dodatkowe sieci nie są dozwolone w trybie sieci kontenera.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapowania portów nie są obsługiwane w trybie sieci kontenerów; porty są własnością kontenera docelowego.</value>
@@ -2135,9 +2128,6 @@ Użycie:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Nie znaleziono kontenera „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Nazwa sieci kontenera jest wymagana dla niestandardowego typu sieci.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nazwa sieci nie może być pusta.</value>
@@ -2835,13 +2825,13 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Liczba wierszy do wyświetlenia od końca dzienników</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Pokaż sygnatury czasowe w danych wyjściowych dziennika</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Pokaż dzienniki od sygnatury czasowej (np. sekundy epoki Unix)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Pokaż dzienniki sprzed sygnatury czasowej (np. sekundy epoki Unix)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nowe odwołanie do obrazu w formacie nazwa_obrazu[:tag]</value>

@@ -2117,16 +2117,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 '{}'(이)가 실행되고 있지 않습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress는 아직 지원되지 않습니다.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>컨테이너 '{}'(이)가 실행 중입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>컨테이너 네트워크 모드에서는 추가 네트워크가 허용되지 않습니다.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
@@ -2141,9 +2134,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>컨테이너 '{}'을(를) 찾을 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>사용자 지정 네트워크 유형에는 컨테이너 네트워크 이름이 필요합니다.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>네트워크 이름은 비워 둘 수 없습니다.</value>

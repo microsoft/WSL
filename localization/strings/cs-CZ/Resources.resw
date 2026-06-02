@@ -2111,16 +2111,9 @@ Využití:
     <value>Kontejner {} není spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress zatím není podporováno.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Kontejner {} je spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Další sítě se v režimu kontejnerové sítě nepovolují.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapování portů režim sítě kontejneru nepodporuje; porty patří cílovému kontejneru.</value>
@@ -2135,9 +2128,6 @@ Využití:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Kontejner {} se nenašel.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Pro vlastní typ sítě se vyžaduje název sítě kontejneru.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Název sítě nemůže být prázdný.</value>
@@ -2835,13 +2825,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Počet řádků, které se mají zobrazit od konce protokolů</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Zobrazit časová razítka ve výstupu protokolu</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Zobrazit protokoly od časového razítka (např. unix epoch seconds)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Zobrazit protokoly před časovým razítkem (např. unix epoch seconds)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nový odkaz na obrázek ve formátu image-name[:tag]</value>

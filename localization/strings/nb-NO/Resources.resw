@@ -2111,16 +2111,9 @@ Bruk:
     <value>Beholderen «{}» kjører ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress støttes ikke ennå.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Beholderen «{}» kjører.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Tilleggsnettverk er ikke tillatt med beholdernettverksmodus.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttilordninger støttes ikke med beholdernettverksmodus. porter eies av målbeholderen.</value>
@@ -2135,9 +2128,6 @@ Bruk:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Beholder {} ikke funnet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Navn på beholdernettverk kreves for egendefinert nettverkstype.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nettverksnavnet kan ikke være tomt</value>
@@ -2835,13 +2825,13 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Antall linjer som skal vises fra slutten av loggene</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Vis timestamps i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logger siden timestamp (f.eks. unix epoch-sekunder)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logger før timestamp (f.eks. unix epoch-sekunder)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildereferanse i bilde-navn[:merke]-format</value>

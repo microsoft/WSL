@@ -2111,16 +2111,9 @@ Utilização:
     <value>O contentor "{}" não está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress ainda não é suportado.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>O contentor "{}" está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Não são permitidas redes adicionais com o modo de rede de contentor.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Os mapeamentos de portas não são suportados com o modo de rede de contentores; As portas são propriedade do contentor de destino.</value>
@@ -2135,9 +2128,6 @@ Utilização:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Contentor "{}" não encontrado.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>O nome de rede do contentor é necessário para o tipo de rede personalizado.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>O nome da rede não pode estar vazio.</value>
