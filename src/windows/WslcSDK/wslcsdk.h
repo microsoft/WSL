@@ -477,7 +477,7 @@ typedef struct WslcImageInfo
     // we should expose this
     CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
-    uint64_t sizeBytes;
+    int64_t sizeBytes;
     uint64_t createdUnixTime;
 } WslcImageInfo;
 

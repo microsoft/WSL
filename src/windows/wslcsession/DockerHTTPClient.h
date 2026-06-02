@@ -149,7 +149,8 @@ public:
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     common::docker_schema::Volume InspectVolume(const std::string& Name);
     void RemoveVolume(const std::string& Name);
-    std::vector<common::docker_schema::Volume> ListVolumes();
+    std::vector<common::docker_schema::Volume> ListVolumes(const std::map<std::string, std::vector<std::string>>& filters = {});
+    common::docker_schema::PruneVolumeResult PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Network management.
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
@@ -158,23 +159,6 @@ public:
     common::docker_schema::Network InspectNetwork(const std::string& Name);
 
     // Image management.
-    struct ListImagesFilters
-    {
-        std::optional<std::string> reference;
-        std::optional<std::string> before;
-        std::optional<std::string> since;
-        std::optional<bool> dangling;
-        std::vector<std::string> labels;
-    };
-
-    struct PruneImagesFilters
-    {
-        std::optional<bool> dangling;
-        std::optional<std::uint64_t> until;
-        std::vector<std::string> presentLabels;
-        std::vector<std::string> absentLabels;
-    };
-
     std::unique_ptr<HTTPRequestContext> PullImage(
         const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength, HANDLE BodySource);
@@ -182,11 +166,12 @@ public:
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::unique_ptr<HTTPRequestContext> PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::string& registryAuth);
     std::string Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password);
-    std::vector<common::docker_schema::Image> ListImages(bool all = false, bool digests = false, const ListImagesFilters& filters = {});
+    std::vector<common::docker_schema::Image> ListImages(
+        bool all = false, bool digests = false, const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
-    common::docker_schema::PruneImageResult PruneImages(const PruneImagesFilters& filters = {});
+    common::docker_schema::PruneImageResult PruneImages(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);

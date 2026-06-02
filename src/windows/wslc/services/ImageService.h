@@ -32,7 +32,8 @@ public:
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
 
-    static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
+    static std::vector<wsl::windows::wslc::models::ImageInformation> List(
+        wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     static void Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
@@ -42,6 +43,7 @@ public:
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
     static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
-    static wsl::windows::wslc::models::PruneImagesResult Prune(wsl::windows::wslc::models::Session& session, bool all);
+    static wsl::windows::wslc::models::PruneImagesResult Prune(
+        wsl::windows::wslc::models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters = {});
 };
 } // namespace wsl::windows::wslc::services

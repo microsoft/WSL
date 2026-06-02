@@ -263,6 +263,10 @@ void WSLCVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
+    // Create a job object that will terminate child processes (wslrelay.exe)
+    // when the VM is destroyed.
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
+
     // Start crash dump collection thread.
     auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
     THROW_LAST_ERROR_IF(!crashDumpSocket);
@@ -293,6 +297,11 @@ void WSLCVirtualMachine::Initialize()
 
     const auto modulesDevice = GetVhdDevicePath(1);
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
+
+    // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
+    // to the service so virtio device-options (virtiofs shares, VirtioProxy networking) can include
+    // the swiotlb token.
+    ReadGuestCapabilities();
 
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
@@ -394,6 +403,28 @@ void WSLCVirtualMachine::ConfigureNetworking()
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
+}
+
+void WSLCVirtualMachine::ReadGuestCapabilities()
+{
+    WSLC_GET_GUEST_CAPABILITIES message{};
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
+
+    m_hvPciSwiotlbBase = response.HvPciSwiotlbBase;
+    m_hvPciSwiotlbSize = response.HvPciSwiotlbSize;
+
+    WSL_LOG(
+        "WSLCReadGuestCapabilities",
+        TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
+
+    // Forward the values to the service so AddShare and ConfigureNetworking can include the
+    // swiotlb device-options token. Passing zero for both means the guest kernel does not
+    // support hv_pci swiotlb; the service then omits the token.
+    WSLCGuestCapabilities capabilities{};
+    capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
+    capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
+    THROW_IF_FAILED(m_vm->ApplyGuestCapabilities(&capabilities));
 }
 
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
@@ -870,6 +901,7 @@ void WSLCVirtualMachine::LaunchPortRelay()
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
     process.InheritHandle(m_vmTerminatingEvent.get());
+    process.SetJobObject(m_processJobObject.get());
     process.Start();
 
     readPipe.release();

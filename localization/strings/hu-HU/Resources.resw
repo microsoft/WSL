@@ -1126,6 +1126,14 @@ Webes letöltési... megkísérlése</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>A wsl2.virtio9p le van tiltva, vsock átvitellel visszaesik 9p értékre.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>A VirtioProxy hálózatkezelés nem támogatott, ha a wsl2.virtio le van tiltva; visszalépés a következőre: {} networkingMode.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>A futó kernelből hiányzik egy javítás, amely jelentősen javítja a virtio eszköz teljesítményét. Az optimalizálás engedélyezéséhez frissítsen egy újabb WSL-kernelre.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>Úgy tűnik, hogy a WSL-telepítés sérült (hibakód: {}).
 Nyomjon meg egy billentyűt a WSL javításához, vagy CTRL-C a megszakításhoz.
@@ -2264,6 +2272,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Érvénytelen kép: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Érvénytelen szűrő: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Érvénytelen név: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2416,6 +2428,16 @@ További információ a termékről: https://aka.ms/privacy.</value>
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Tároló naplóinak megtekintése.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Távolítsa el az összes leállított tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Eltávolítja az összes leállított tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Teljes felszabadított terület: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Tárolók eltávolítása.</value>
@@ -2811,6 +2833,15 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>A naplók végéről megjelenítendő sorok száma</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Időbélyegek megjelenítése a napló kimenetében</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Naplók megjelenítése az időbélyegző óta (pl. Unix-korszak másodperceiben)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Naplók megjelenítése az időbélyegző előtt (pl. Unix-korszak másodperceiben)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Új képhivatkozás képnév[:címke] formátumban</value>

@@ -1133,6 +1133,14 @@
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p отключен, выполняется возврат к 9p с использованием транспорта vsock.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>Сетевой режим VirtioProxy не поддерживается, если параметр wsl2.virtio отключен; выполняется переход к networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>В запущенном ядре отсутствует исправление, значительно повышающий производительность устройств virtio. Обновите ядро ​​WSL до более новой версии, чтобы включить эту оптимизацию.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>Возможно, установка WSL повреждена (код ошибки: {}).
 Нажмите любую клавишу, чтобы восстановить WSL, или нажмите CTRL-C, чтобы отменить.
@@ -2271,6 +2279,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Недопустимое изображение: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Недопустимый фильтр: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Недопустимое имя: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2423,6 +2435,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Просмотр журналов контейнера.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Удалить все остановленные контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Удаляет все остановленные контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Объем освобожденной памяти: {:.2f} МБ</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Удалить контейнеры.</value>
@@ -2818,6 +2840,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Число строк, отображаемых с конца журналов</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Показывать метки времени в выводе журнала</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Показать журналы с метки времени (например, секунды эпохи Unix)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Показать журналы до метки времени (например, секунды эпохи Unix)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Новая ссылка на изображение в формате image-name[:tag]</value>

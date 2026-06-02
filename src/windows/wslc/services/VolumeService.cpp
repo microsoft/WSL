@@ -63,7 +63,7 @@ std::vector<WSLCVolumeInformation> VolumeService::List(models::Session& session)
 {
     wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> rawVolumes;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListVolumes(&rawVolumes, &count));
+    THROW_IF_FAILED(session.Get()->ListVolumes(nullptr, 0, &rawVolumes, &count));
 
     std::vector<WSLCVolumeInformation> volumes;
     volumes.reserve(count);

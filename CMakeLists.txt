@@ -175,8 +175,8 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-if (NOT DEFINED WSL_BUILD_SDKCS)
-    set(WSL_BUILD_SDKCS false)
+if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
+    set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
 find_commit_hash(COMMIT_HASH)

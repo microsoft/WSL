@@ -1126,6 +1126,14 @@ Yritetään ladata verkkoa...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p on poistettu käytöstä, palataan takaisin 9p:hen vsock-siirron avulla.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy-verkkoa ei tueta, kun wsl2.virtio on poistettu käytöstä; palataan networkingMode-tilaan {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>Käynnissä olevasta ytimestä puuttuu korjaustiedosto, joka parantaa virtio-laitteen suorituskykyä merkittävästi. Ota tämä optimointi käyttöön päivittämällä uudempi WSL-ydin.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL-asennus vaikuttaa olevan vioittunut (virhekoodi: {}).
 Korjaa WSL painamalla mitä tahansa näppäintä tai peruuta CTRL-C.
@@ -2264,6 +2272,10 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Virheellinen kuva: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Virheellinen suodatin: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Virheellinen nimi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2416,6 +2428,16 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Näytä säilön lokit.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Poista kaikki pysäytetyt säilöt.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Poistaa kaikki pysäytetyt säilöt.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Palautettu tila yhteensä: {:.2f} Mt</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Poista säilöt.</value>
@@ -2811,6 +2833,15 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Lokien lopusta näytettävien rivien määrä</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Näytä aikaleimat lokitulosteessa</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Näytä lokit aikaleiman jälkeen (esim. Unix-epookin sekuntit)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Näytä lokit ennen aikaleimaa (esim. Unix-epookin sekuntit)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Uusi kuvaviittaus muodossa kuva-nimi[:tag]</value>

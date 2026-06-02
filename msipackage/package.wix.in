@@ -620,6 +620,11 @@
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
         <CustomAction Id="CalculateWslSettingsProtocolIds" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="CalculateWslSettingsProtocolIds" Return="check" Execute='immediate' />
 
+        <!-- Disable WSLService before StopServices so SCM rejects activation attempts
+             from COM clients while it is being stopped on uninstall. -->
+        <CustomAction Id="DisableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="DisableWslService" Return="ignore" Execute="deferred" />
+        <CustomAction Id="EnableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="EnableWslService" Return="ignore" Execute="rollback" />
+
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
@@ -674,6 +679,11 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+
+            <!-- Rollback CA must be sequenced before the forward action so it is registered
+                 in the rollback script first. -->
+            <Custom Action="EnableWslService" Before="DisableWslService" Condition='REMOVE~="ALL"' />
+            <Custom Action="DisableWslService" Before="StopServices" Condition='REMOVE~="ALL"' />
 
         </InstallExecuteSequence>
 
