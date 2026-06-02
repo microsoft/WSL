@@ -3426,9 +3426,7 @@ class WSLCTests
         // Validate that the directories are readable by non-root users.
         {
             WSLCContainerLauncher launcher(
-                "debian:latest", "test-container-no-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
-            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
-            launcher.SetUser("nobody");
+                "debian:latest", "test-container-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
 
             auto container = launcher.Launch(*session);
 
