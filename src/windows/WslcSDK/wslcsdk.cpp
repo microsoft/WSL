@@ -268,7 +268,7 @@ struct ImageFileResolver
     }
 
 private:
-    wsl::windows::common::relay::HandleWrapper m_fileHandle;
+    wsl::windows::common::io::HandleWrapper m_fileHandle;
     ULONGLONG m_length;
 };
 
@@ -493,16 +493,42 @@ try
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
     RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
-    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
+
+    // Reject unknown flag bits so future additions can't be silently ignored.
+    constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER;
+    RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
+
+    // Hold uid/gid strings at function scope so the c_str() pointers stored
+    // in driverOpts stay valid through CreateVolume.
+    const auto sizeStr = std::to_string(options->sizeBytes);
+    std::string uidStr;
+    std::string gidStr;
+
+    std::vector<WSLCDriverOption> driverOpts;
+    driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
+
+    if (options->type == WSLC_VHD_TYPE_FIXED)
+    {
+        driverOpts.push_back({"Fixed", "true"});
+    }
+    else
+    {
+        RETURN_HR_IF(E_INVALIDARG, options->type != WSLC_VHD_TYPE_DYNAMIC);
+    }
+
+    if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
+    {
+        uidStr = std::to_string(options->uid);
+        gidStr = std::to_string(options->gid);
+        driverOpts.push_back({"Uid", uidStr.c_str()});
+        driverOpts.push_back({"Gid", gidStr.c_str()});
+    }
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     volumeOptions.Driver = "vhd";
-
-    auto sizeStr = std::to_string(options->sizeBytes);
-    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
-    volumeOptions.DriverOpts = driverOpts;
-    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+    volumeOptions.DriverOpts = driverOpts.data();
+    volumeOptions.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
 
     WSLCVolumeInformation volumeInfo{};
     return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
@@ -531,6 +557,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+
+        // Owner is only honored on named volumes; reject here so callers can't
+        // mistakenly believe it applied to the session rootfs VHD.
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;
     }
@@ -586,7 +616,30 @@ CATCH_RETURN();
 STDAPI WslcReleaseContainer(_In_ WslcContainer container)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(container);
+    // Reject release attempts originating from the container's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(container);
+        auto ioCallback = peek->ioCallbacks.load();
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), ioCallback && ioCallback->IsOnIOCallbackThread());
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(container);
+    auto ioCallback = internalType->ioCallbacks.load();
+    if (ioCallback)
+    {
+        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
+        try
+        {
+            WSLCContainerState state{};
+            THROW_IF_FAILED(internalType->container->GetState(&state));
+
+            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
+            {
+                ioCallback->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }
@@ -595,7 +648,34 @@ CATCH_RETURN();
 STDAPI WslcReleaseProcess(_In_ WslcProcess process)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(process);
+    // Reject release attempts originating from the process's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(process);
+        if (peek->ioCallbacks && peek->ioCallbacks->IsOnIOCallbackThread())
+        {
+            RETURN_HR(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        }
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(process);
+    if (internalType->ioCallbacks)
+    {
+        // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
+        // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
+
+        try
+        {
+            WSLCProcessState state{};
+            int exitCode{};
+            THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
+
+            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
+            {
+                internalType->ioCallbacks->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }

@@ -114,6 +114,8 @@ private:
     std::map<GUID, DeviceHostProxyEntry, wsl::windows::common::helpers::GuidLess> m_devices;
     bool m_devicesShutdown;
 
+    wil::unique_handle m_jobObject;
+
     static constexpr LPCWSTR c_hdvModuleName = L"vmdevicehost.dll";
     static constexpr LPCWSTR c_vmwpctrlModuleName = L"vmwpctrl.dll";
 };

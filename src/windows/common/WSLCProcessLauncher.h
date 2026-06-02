@@ -35,7 +35,7 @@ public:
     NON_COPYABLE(RunningWSLCProcess);
     DEFAULT_MOVABLE(RunningWSLCProcess);
 
-    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
+    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<io::OverlappedIOHandle>>&& ExtraHandles = {});
     int Wait(DWORD TimeoutMs = INFINITE);
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;

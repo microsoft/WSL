@@ -1,8 +1,11 @@
 name: Validate distributions
 
-on: 
-  pull_request: 
+on:
+  pull_request:
     paths: ['distributions/**']
+
+permissions:
+  contents: read
 
 jobs:
   check:

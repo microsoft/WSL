@@ -15,6 +15,7 @@ Abstract:
 #include "ChangeTerminalMode.h"
 #include "SessionService.h"
 #include <deque>
+#include <map>
 
 namespace wsl::windows::wslc::services {
 class DECLSPEC_UUID("3EDD5DBF-CA6C-4CF7-923A-AD94B6A732E5") BuildImageCallback
@@ -35,6 +36,7 @@ private:
 
     void CollapseWindow();
     void Redraw();
+    void RedrawIfNeeded();
     // Use WriteConsoleW directly rather than wprintf: wprintf is noticeably slower for
     // the per-redraw scrolling display and produces visible flicker.
     void WriteTerminal(std::wstring_view content) const;
@@ -54,6 +56,8 @@ private:
     std::string m_pendingLine;
     SHORT m_displayedLines = 0;
     std::chrono::steady_clock::time_point m_lastRedraw{};
+    // Per-entry pull progress lines, keyed by entry id. Updated in place by Redraw. std::map so order is consistent.
+    std::map<std::string, std::string> m_pullLines;
     // Captured at construction so the destructor can detect destruction during exception unwinding.
     int m_uncaughtExceptions = std::uncaught_exceptions();
 };

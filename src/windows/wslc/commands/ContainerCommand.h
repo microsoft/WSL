@@ -119,8 +119,8 @@ struct ContainerListCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
+    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
 };
 
 // Logs Command
@@ -183,11 +183,42 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Stats Command
+struct ContainerStatsCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"stats";
+    ContainerStatsCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Stop Command
 struct ContainerStopCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"stop";
     ContainerStopCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Prune Command
+struct ContainerPruneCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"prune";
+    ContainerPruneCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

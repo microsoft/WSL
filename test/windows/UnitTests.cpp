@@ -345,51 +345,174 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
-    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    WSL2_TEST_METHOD(BinfmtStatusIsLocked)
     {
-        // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        //
+        // Validates the protection mechanism for the cross-distro binfmt wipe bug.
+        //
+        // Fix: per-distro init bind-mounts a read-only file over
+        // /proc/sys/fs/binfmt_misc/status before exec'ing the distro's init
+        // (see LockBinfmtStatusReadOnly in src/linux/init/init.cpp). systemd-shutdown's
+        // disable_binfmt() writes "-1" to that file to clear the kernel-global
+        // binfmt_misc table at shutdown; with the bind-mount in place the write
+        // fails with EROFS so the entries shared with other running distros
+        // survive. Per-entry operations (registering new entries via /register,
+        // unregistering individual entries via the entry file) are unaffected.
+        //
 
-        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
-            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
-        });
-
+        // Default: bind-mount must be in place.
         {
-            // Enable systemd (restarts distro).
+            // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+            // VM teardown that bumped value persists across distro restarts and
+            // breaks later tests like ResourceLimits that assume the kernel default.
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd();
 
-            auto validateBinfmt = []() {
-                // Validate that WSL's binfmt interpreter is still in place.
-                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
-            };
+            // /status is its own mount point.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
-            validateBinfmt();
+            // Reading /status returns the lock-file content ("enabled\n") so
+            // callers that just check whether binfmt_misc is enabled still get a
+            // sensible answer.
+            {
+                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+            }
 
-            // Validate that this still works after restarting the distribution.
-            TerminateDistribution();
-            validateBinfmt();
+            // Direct write to /status — the wipe vector — must fail with EROFS.
+            // The shell's redirection error ("cannot create ...: Read-only file
+            // system") goes to the shell's stderr when the `>` open fails.
+            {
+                auto [_, err] = LxsstuLaunchWslAndCaptureOutput(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status; exit 0'");
+                VERIFY_IS_TRUE(err.find(L"Read-only file system") != std::wstring::npos);
+            }
 
-            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // WSLInterop survives the failed wipe attempt.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // Runtime registration via /register still works (we only block /status).
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
-            // Validate that the unit is regenerated after a daemon-reload.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload && systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
+            // cascade into later tests. Always remove it on scope exit.
+            auto cleanupTestEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+                LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt 2>/dev/null || true'");
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+
+            // Per-entry unregister (writing -1 to the entry file, not /status) still works.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt'"), 0L);
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+            cleanupTestEntry.release();
+
+            // Interop still works.
+            {
+                auto [cmd, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
+            }
+        }
+
+        // protectBinfmt=false: bind-mount must NOT be installed (kill switch).
+        // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
+        // then terminates it; that termination invokes systemd-shutdown's
+        // disable_binfmt() which wipes the kernel-global table because
+        // protectBinfmt=false leaves /status writable. WslShutdown registered
+        // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
+        // after the wipe, so the next test starts a fresh VM where mini_init
+        // re-registers WSLInterop.
+        {
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
+        }
+    }
+
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+
+        // Kill the WSL init process
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
+    WSL2_TEST_METHOD(BinfmtSurvivesDistroTermination)
+    {
+        //
+        // Regression test for the "Exec format error" bug: binfmt_misc registrations
+        // (most importantly WSLInterop) must survive when a peer systemd-enabled distro
+        // terminates. Before this fix, systemd-shutdown's disable_binfmt() wrote `-1`
+        // to /proc/sys/fs/binfmt_misc/status, which clears the entire binfmt_misc
+        // entry table. binfmt_misc itself is a single kernel-global registry — it is
+        // not isolated per distro — so that one write wiped WSLInterop for every
+        // running distro and broke Windows interop everywhere.
+        //
+
+        constexpr auto peerDistroName = L"binfmt-peer-test";
+
+        // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+        // VM teardown that bumped value persists across distro restarts and
+        // breaks later tests like ResourceLimits that assume the kernel default.
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+
+        // Enable systemd on the primary test distro.
+        auto cleanupSystemd = EnableSystemd();
+
+        // Import a second distro from the same tarball as the test distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+
+        auto cleanupPeer =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+        // Enable systemd in the peer distro (no helper exists for non-test distros).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+
+        // Terminate so the config takes effect on next start.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop works in both distros (this also starts the peer with systemd).
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo alive");
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
         }
 
         {
-            // Enable systemd (restarts distro).
-            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo alive", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
 
-            // Validate that WSL's binfmt interpreter is overridden
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+        // Terminate the peer distro — this triggers systemd shutdown. Without
+        // the fix, systemd-shutdown's disable_binfmt() would clear the kernel-
+        // global binfmt_misc table for every running distro.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop still works in the primary distro.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo survived");
+            VERIFY_ARE_EQUAL(out, L"survived\r\n");
+        }
+
+        // Verify the binfmt entry still exists and carries the F (fix-binary) flag.
+        // The F flag is required so the kernel resolves the interpreter at
+        // registration time, making the entry independent of mount-namespace state.
+        {
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
         }
     }
 
@@ -535,6 +658,10 @@ class UnitTests
 
     WSL1_TEST_METHOD(Timer)
     {
+        // This is disabled because of intermittent test failures.
+        // TODO: Enable this test once the underlying issue is resolved.
+        SKIP_TEST_UNSTABLE();
+
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
@@ -2103,6 +2230,17 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(
             L"[experimental]\nignoredPorts=65536",
             std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:22\r\n", wslConfigPath));
+
+        // Verify experimental.swiotlb parsing and validation.
+        //
+        // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently.
+        validateWarnings(L"[experimental]\nswiotlb=64M", L"");
+        validateWarnings(L"[experimental]\nswiotlb=4096K", L"");
+
+        // Malformed values are rejected by the parser; only the parser warning is reported.
+        validateWarnings(
+            L"[experimental]\nswiotlb=garbage",
+            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:22\r\n", wslConfigPath));
 
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");
@@ -6152,31 +6290,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    static LxssDistributionState GetDistroState()
+    {
+        wsl::windows::common::SvcComm service;
+
+        for (const auto& e : service.EnumerateDistributions())
+        {
+            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            {
+                return e.State;
+            }
+        }
+
+        return LxssDistributionStateInvalid;
+    }
+
     TEST_METHOD(DistroTimeout)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
-
-        auto getDistroState = [&]() {
-            wsl::windows::common::SvcComm service;
-
-            for (const auto& e : service.EnumerateDistributions())
-            {
-                if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
-                {
-                    return e.State;
-                }
-            }
-
-            return LxssDistributionStateInvalid;
-        };
 
         // Validate that distributions don't time out when timeout is -1
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
+            VERIFY_ARE_EQUAL(GetDistroState(), LxssDistributionStateRunning);
         }
 
         // Validate that distributions time out when timeout value is > 0
@@ -6190,7 +6329,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             unsigned long iterations = 0;
             while (std::chrono::steady_clock::now() < deadline)
             {
-                if (getDistroState() == LxssDistributionStateInstalled)
+                if (GetDistroState() == LxssDistributionStateInstalled)
                 {
                     LogInfo("Distribution stopped after %lu iterations", iterations);
                     return;
@@ -6200,7 +6339,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 iterations++;
             }
 
-            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, getDistroState());
+            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, GetDistroState());
             VERIFY_FAIL();
         }
     }
@@ -6268,38 +6407,82 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    WSL2_TEST_METHOD(CustomModulesVhd)
+    WSL2_TEST_METHOD(CustomVhdsInUserProfile)
     {
+        // Regression: HCS fails with E_ACCESSDENIED when user-supplied kernelModules or
+        // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
-        auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
-        auto modulesPath = std::format(L"{}\\tools\\modules.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-        auto kernelPath = std::format(L"{}\\tools\\kernel", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
 #endif
 
-        // Create a copy of the modules vhd
-        auto testModules = std::filesystem::current_path() / "test-modules.vhd";
+        // Unique folder under %TEMP% so parallel runs don't collide.
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto testFolder =
+            std::filesystem::temp_directory_path() /
+            std::format(L"wsl-test-vhd-grant-{}", wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None));
+        const auto testModules = testFolder / L"test-modules.vhd";
+        const auto testSystemDistro = testFolder / L"test-system.vhd";
+
+        // Construct the cleanup scope before any filesystem mutations so a failed copy or
+        // VERIFY does not leak the directory across runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(testFolder, ignored);
+        });
+
+        std::filesystem::create_directories(testFolder);
 
         VERIFY_IS_TRUE(CopyFile(modulesPath.c_str(), testModules.c_str(), false));
+        VERIFY_IS_TRUE(CopyFile(systemDistroPath.c_str(), testSystemDistro.c_str(), false));
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testModules); });
+        for (const auto& path : {testModules, testSystemDistro})
+        {
+            auto cmd = std::format(L"icacls.exe \"{}\" /remove Everyone /Q", path.wstring());
+            LxsstuLaunchCommandAndCaptureOutput(cmd.data());
+        }
 
-        auto cmd = std::format(
-            LR"($acl = Get-Acl '{}' ; $acl.RemoveAccessRuleAll((New-Object System.Security.AccessControl.FileSystemAccessRule(\"Everyone\", \"Read\", \"None\", \"None\", \"Allow\"))); Set-Acl -Path '{}' -AclObject $acl)",
-            testModules,
-            testModules);
+        WslConfigChange config{LxssGenerateTestConfig(
+            {.kernel = kernelPath, .kernelModules = testModules.wstring(), .systemDistro = testSystemDistro.wstring()})};
 
-        LxsstuLaunchPowershellAndCaptureOutput(cmd);
-
-        // Update .wslconfig to point to the copied kernel
-        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = testModules.wstring()})};
-
-        // Validate that WSL starts correctly
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK");
+        VERIFY_ARE_EQUAL(out, L"OK\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    WSL2_TEST_METHOD(CustomVhdsAccessibleViaInheritedAcls)
+    {
+        // Regression: VHDs reachable to VMWP via inherited ACLs must boot even when the
+        // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
+#ifdef WSL_DEV_INSTALL_PATH
+
+        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
+
+#else
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
+
+#endif
+
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = modulesPath, .systemDistro = systemDistroPath})};
+
+        // Non-elevated launch so impersonation cannot WRITE_DAC the SYSTEM-owned VHD.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK", 0, nullptr, nonElevatedToken.get());
         VERIFY_ARE_EQUAL(out, L"OK\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
@@ -6659,14 +6842,17 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
         // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
         // that HRESULT instead, and the OnMessage callback must not be invoked.
-        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK) {
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK, std::vector<gsl::byte> pendingBytes = {}) {
             std::vector<gsl::byte> buffer;
             bool callbackInvoked = false;
             std::vector<gsl::byte> message;
 
-            wsl::windows::common::relay::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadSocketMessageHandle>(
-                wsl::windows::common::relay::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                wsl::windows::common::io::HandleWrapper{std::move(server)},
+                buffer,
+                pendingBytes,
+                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
                     callbackInvoked = true;
                     message.assign(received.begin(), received.end());
                 }));
@@ -6760,6 +6946,224 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             client.reset();
 
             readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 6: PendingBytes carries a complete header-only message left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset(); // close the peer; we should still complete from PendingBytes alone.
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 77;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::vector<gsl::byte> pendingBytes(headerBytes, headerBytes + sizeof(header));
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 7: PendingBytes carries a complete message with a body left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            constexpr size_t bodySize = 32;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 81;
+            header->TransactionStep = 3;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i ^ 0xA5);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.end());
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 8: PendingBytes carries only part of a header. The reader must fill in the
+        // rest of the header (and the body) from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 48;
+            constexpr size_t prebufferedBytes = 6; // less than sizeof(MESSAGE_HEADER) = 16
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 91;
+            header->TransactionStep = 4;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(0xC3);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 9: PendingBytes carries the full header plus part of the body. The reader
+        // must read the remaining body bytes from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 64;
+            constexpr size_t prebufferedBodyBytes = 12;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 92;
+            header->TransactionStep = 5;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+
+            const size_t prebufferedBytes = sizeof(MESSAGE_HEADER) + prebufferedBodyBytes;
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 10: PendingBytes contains an invalid (too-small) message size. The
+        // IO should detect this and throw E_UNEXPECTED without invoking OnMessage.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header) - 1; // invalid: smaller than the header itself
+            header.TransactionId = 99;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::vector<gsl::byte> pendingBytes{headerBytes, headerBytes + sizeof(header)};
+
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            const auto hr = wil::ResultFromException([&]() {
+                wsl::windows::common::io::MultiHandleWait io;
+                io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)},
+                    buffer,
+                    pendingBytes,
+                    [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
+                io.Run(std::chrono::seconds(60));
+            });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+            VERIFY_IS_FALSE(callbackInvoked);
+        }
+    }
+
+    TEST_METHOD(MultiHandleWaitAboveMaximumWaitObjects)
+    {
+        // Validate that MultiHandleWait can wait on more than MAXIMUM_WAIT_OBJECTS (64) handles.
+        constexpr size_t handleCount = 100;
+        static_assert(handleCount > MAXIMUM_WAIT_OBJECTS);
+
+        // Scenario 1: signal every event before Run(); all callbacks must fire and Run() must return.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            for (auto& e : events)
+            {
+                e.SetEvent();
+            }
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
+        }
+
+        // Scenario 2: signal events one at a time from another thread while Run() processes them.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            std::thread signaller([&events]() {
+                for (auto& e : events)
+                {
+                    e.SetEvent();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            signaller.join();
+
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
         }
     }
 

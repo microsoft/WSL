@@ -23,7 +23,7 @@ set_target_properties(wslcsdk
 
 add_subdirectory(winrt)
 
-if (WSL_BUILD_SDKCS)
+if (WSL_INCLUDE_SDK_CSHARP)
     add_subdirectory(csharp)
 endif()
 

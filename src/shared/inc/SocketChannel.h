@@ -110,6 +110,7 @@ public:
 
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
+        m_pendingBytes = std::move(other.m_pendingBytes);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -184,7 +185,7 @@ public:
 #ifdef WIN32
 
         auto io = CreateIO();
-        io.AddHandle(std::make_unique<windows::common::relay::WriteHandle>(m_socket.get(), span));
+        io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
 
         io.Run(TimeoutToMilliseconds(timeout));
 
@@ -605,17 +606,17 @@ public:
 
 private:
 #ifdef WIN32
-    windows::common::relay::MultiHandleWait CreateIO() const
+    windows::common::io::MultiHandleWait CreateIO() const
     {
-        wsl::windows::common::relay::MultiHandleWait io;
+        wsl::windows::common::io::MultiHandleWait io;
 
         for (const auto event : m_exitEvents)
         {
             io.AddHandle(
-                std::make_unique<windows::common::relay::EventHandle>(
+                std::make_unique<windows::common::io::EventHandle>(
                     event,
                     [this, event]() { THROW_HR_MSG(E_ABORT, "Exit event 0x%p signaled on channel: %hs", event, m_name.c_str()); }),
-                windows::common::relay::MultiHandleWait::CancelOnCompleted | windows::common::relay::MultiHandleWait::NeedNotComplete);
+                windows::common::io::MultiHandleWait::CancelOnCompleted | windows::common::io::MultiHandleWait::NeedNotComplete);
         }
 
         return io;
@@ -636,9 +637,8 @@ private:
         auto io = CreateIO();
 
         gsl::span<gsl::byte> message;
-
-        io.AddHandle(std::make_unique<windows::common::relay::ReadSocketMessageHandle>(
-            m_socket.get(), m_buffer, [&message](auto& received) { message = received; }));
+        io.AddHandle(std::make_unique<windows::common::io::ReadSocketMessageHandle>(
+            m_socket.get(), m_buffer, m_pendingBytes, [&message](auto& received) { message = received; }));
 
         io.Run(TimeoutToMilliseconds(timeout));
 
@@ -723,6 +723,7 @@ private:
 #ifdef WIN32
 
     std::vector<HANDLE> m_exitEvents;
+    std::vector<gsl::byte> m_pendingBytes;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;

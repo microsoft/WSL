@@ -263,6 +263,10 @@ void WSLCVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
+    // Create a job object that will terminate child processes (wslrelay.exe)
+    // when the VM is destroyed.
+    m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
+
     // Start crash dump collection thread.
     auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
     THROW_LAST_ERROR_IF(!crashDumpSocket);
@@ -293,6 +297,11 @@ void WSLCVirtualMachine::Initialize()
 
     const auto modulesDevice = GetVhdDevicePath(1);
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
+
+    // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
+    // to the service so virtio device-options (virtiofs shares, VirtioProxy networking) can include
+    // the swiotlb token.
+    ReadGuestCapabilities();
 
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
@@ -396,6 +405,28 @@ void WSLCVirtualMachine::ConfigureNetworking()
     LaunchPortRelay();
 }
 
+void WSLCVirtualMachine::ReadGuestCapabilities()
+{
+    WSLC_GET_GUEST_CAPABILITIES message{};
+    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
+
+    m_hvPciSwiotlbBase = response.HvPciSwiotlbBase;
+    m_hvPciSwiotlbSize = response.HvPciSwiotlbSize;
+
+    WSL_LOG(
+        "WSLCReadGuestCapabilities",
+        TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
+
+    // Forward the values to the service so AddShare and ConfigureNetworking can include the
+    // swiotlb device-options token. Passing zero for both means the guest kernel does not
+    // support hv_pci swiotlb; the service then omits the token.
+    WSLCGuestCapabilities capabilities{};
+    capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
+    capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
+    THROW_IF_FAILED(m_vm->ApplyGuestCapabilities(&capabilities));
+}
+
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
@@ -479,10 +510,25 @@ std::pair<ULONG, std::string> WSLCVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
-void WSLCVirtualMachine::Ext4Format(const std::string& Device)
+void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uint32_t> Uid, std::optional<uint32_t> Gid)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+
+    // Uid/Gid must be paired; the named-volume parser enforces this for user
+    // input — this guards future internal callers that bypass it.
+    THROW_HR_IF(E_UNEXPECTED, Uid.has_value() != Gid.has_value());
+
+    std::vector<std::string> args = {mkfsPath};
+    std::string rootOwner;
+    if (Uid.has_value() && Gid.has_value())
+    {
+        rootOwner = std::format("root_owner={}:{}", *Uid, *Gid);
+        args.push_back("-E");
+        args.push_back(rootOwner);
+    }
+    args.push_back(Device);
+
+    ServiceProcessLauncher launcher(mkfsPath, args);
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
@@ -855,6 +901,7 @@ void WSLCVirtualMachine::LaunchPortRelay()
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
     process.InheritHandle(m_vmTerminatingEvent.get());
+    process.SetJobObject(m_processJobObject.get());
     process.Start();
 
     readPipe.release();
