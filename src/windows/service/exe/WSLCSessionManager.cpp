@@ -270,7 +270,7 @@ void WSLCSessionManagerImpl::CreateSession(
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
         AddSessionProcessToJobObject(factory.get());
 
-        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
@@ -415,11 +415,11 @@ void WSLCSessionManagerImpl::EnterSession(
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
-    _In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName)
+    _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName)
 {
     WSLCSessionInitSettings sessionSettings{};
     sessionSettings.SessionId = SessionId;
-    sessionSettings.CreatorPid = CreatorPid;
+    sessionSettings.CreatorProcessName = CreatorProcessName;
     sessionSettings.DisplayName = ResolvedDisplayName;
     sessionSettings.StoragePath = Settings->StoragePath;
     sessionSettings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;

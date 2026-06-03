@@ -201,6 +201,8 @@ private:
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
+
+    __requires_lock_held(m_lock) void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     _Requires_shared_lock_held_(m_lock)
@@ -234,6 +236,7 @@ private:
     std::optional<DockerEventTracker> m_eventTracker;
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
+    std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
 
