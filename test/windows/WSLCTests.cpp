@@ -1022,17 +1022,11 @@ class WSLCTests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage(*m_defaultSession, "alpine:latest");
             WSLCTagImageOptions tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";
             tagOptions.Tag = "latest";
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
-
-            auto alpineCleanup = wil::scope_exit([&]() {
-                RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
-                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
-            });
 
             // List only dangling images
             WSLCFilter danglingTrueFilter{.Key = "dangling", .Value = "true"};
@@ -1303,13 +1297,10 @@ class WSLCTests
 
     WSLC_TEST_METHOD(DeleteImage)
     {
-
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
 
-        auto restore = wil::scope_exit([&]() {
-            LoadTestImage(*m_defaultSession, "alpine:latest");
-        });
+        auto restore = wil::scope_exit([&]() { LoadTestImage(*m_defaultSession, "alpine:latest"); });
 
         // Launch a container to ensure that image deletion fails when in use.
         WSLCContainerLauncher launcher("alpine:latest", "test-delete-container-in-use", {"sleep", "99999"}, {}, "host");
