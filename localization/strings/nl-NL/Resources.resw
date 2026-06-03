@@ -2111,16 +2111,9 @@ Gebruik:
     <value>Container {} is niet actief.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress wordt nog niet ondersteund.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Container {} wordt uitgevoerd.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Aanvullende netwerken zijn niet toegestaan met de containernetwerkmodus.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Poorttoewijzingen worden niet ondersteund met de containernetwerkmodus; poorten behoren toe aan de doelcontainer.</value>
@@ -2135,9 +2128,6 @@ Gebruik:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Kan de container {} niet vinden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>De netwerknaam van de container is verplicht voor een aangepast netwerktype.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Netwerknaam mag niet leeg zijn.</value>

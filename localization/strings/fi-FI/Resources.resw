@@ -2111,16 +2111,9 @@ Käyttö:
     <value>Säilö '{}' ei ole käynnissä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress ei vielä tueta.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Säilö '{}' on käynnissä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Lisäverkkoja ei sallita säilön verkkotilassa.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttimäärityksiä ei tueta säilön verkkotilassa; portit kuuluvat kohdesäilölle.</value>
@@ -2135,9 +2128,6 @@ Käyttö:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Säilöä {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Säilöverkon nimi vaaditaan mukautetulle verkkotyypille.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Verkon nimi ei voi olla tyhjä.</value>

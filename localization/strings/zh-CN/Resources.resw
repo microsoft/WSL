@@ -2117,16 +2117,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器“{}”未运行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>尚不支持 ContainerIpAddress。</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>容器“{}”正在运行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>容器网络模式不允许使用其他网络。</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器网络模式不支持端口映射；端口由目标容器拥有。</value>
@@ -2141,9 +2134,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>找不到容器 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>自定义网络类型需要容器网络名称。</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>网络名称不可为空。</value>

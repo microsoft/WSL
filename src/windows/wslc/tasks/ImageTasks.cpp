@@ -200,13 +200,14 @@ void PushImage(CLIExecutionContext& context)
 void DeleteImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
-
+    const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
     bool force = context.Args.Contains(ArgType::ImageForce);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
-    services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
+    for (const auto& id : imageIds)
+    {
+        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+    }
 }
 
 void LoadImage(CLIExecutionContext& context)

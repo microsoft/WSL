@@ -2111,16 +2111,9 @@ Usage:
     <value>A(z) {} tároló nem fut.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>A ContainerIpAddress még nem támogatott.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>A(z) {} tároló fut.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Tárolóhálózati módban nem engedélyezettek további hálózatok.</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
@@ -2135,9 +2128,6 @@ Usage:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>A(z) {} tároló nem található.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Az egyéni hálózattípushoz meg kell adni a tárolóhálózat nevét.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>A hálózat neve nem lehet üres.</value>
