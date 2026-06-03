@@ -1028,6 +1028,8 @@ class WSLCTests
             tagOptions.Tag = "latest";
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LoadTestImage(*m_defaultSession, "alpine:latest"); });
+
             // List only dangling images
             WSLCFilter danglingTrueFilter{.Key = "dangling", .Value = "true"};
             WSLCListImagesOptions options{.Flags = WSLCListImagesFlagsNone, .Filters = &danglingTrueFilter, .FiltersCount = 1};
@@ -2492,8 +2494,15 @@ class WSLCTests
         // Save multiple images to a single tar, delete one, then load back and verify.
         {
             std::filesystem::path imageTar = L"MultiImageExport.tar";
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                DeleteFileW(imageTar.c_str());
+
+                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+                ULONGLONG spaceReclaimed = 0;
+
+                LOG_IF_FAILED(m_defaultSession->PruneImages(
+                    nullptr, 0, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            });
 
             {
                 wil::unique_handle imageTarFileHandle{CreateFileW(
