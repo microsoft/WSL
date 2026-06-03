@@ -1182,6 +1182,39 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::SaveImages(WSLCHandle OutHandle, const WSLCStringArray* ImageNames, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ImageNames);
+    RETURN_HR_IF(E_INVALIDARG, ImageNames->Count == 0);
+    RETURN_HR_IF(E_INVALIDARG, ImageNames->Count > WSLC_MAX_SAVE_IMAGES_COUNT);
+    RETURN_HR_IF_NULL(E_INVALIDARG, ImageNames->Values);
+
+    std::vector<std::string> names;
+    names.reserve(ImageNames->Count);
+    for (ULONG i = 0; i < ImageNames->Count; i += 1)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, ImageNames->Values[i]);
+        const size_t length = strlen(ImageNames->Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, length == 0);
+        RETURN_HR_IF(E_INVALIDARG, length > WSLC_MAX_IMAGE_NAME_LENGTH);
+        names.emplace_back(ImageNames->Values[i]);
+    }
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto retVal = m_dockerClient->SaveImages(names);
+    SaveImageImpl(retVal, OutHandle, CancelEvent);
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent)
 {
     auto userHandle = OpenUserHandle(OutputHandle);

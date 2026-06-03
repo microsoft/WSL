@@ -40,8 +40,8 @@ public:
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
-    static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
-    static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
+    static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent = nullptr);
+    static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
     static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
     static wsl::windows::wslc::models::PruneImagesResult Prune(
         wsl::windows::wslc::models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters = {});

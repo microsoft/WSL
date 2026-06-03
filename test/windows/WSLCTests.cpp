@@ -2490,6 +2490,135 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(SaveImages)
+    {
+        auto BuildStringArray = [](const std::vector<LPCSTR>& values) -> WSLCStringArray {
+            return WSLCStringArray{.Values = values.empty() ? nullptr : values.data(), .Count = static_cast<ULONG>(values.size())};
+        };
+
+        // Save multiple images to a single tar, delete one, then load back and verify.
+        {
+            std::filesystem::path imageTar = L"MultiImageExport.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+                std::vector<LPCSTR> names = {"hello-world:latest", "alpine:latest"};
+                WSLCStringArray array = BuildStringArray(names);
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_IS_TRUE(fileSize.QuadPart > 0);
+            }
+
+            // Delete hello-world:latest and verify it's gone.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deleted;
+            WSLCDeleteImageOptions delOpts{};
+            delOpts.Image = "hello-world:latest";
+            delOpts.Flags = WSLCDeleteImageFlagsForce;
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&delOpts, &deleted, deleted.size_address<ULONG>()));
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest", false);
+
+            // Load it back from the multi-image tar — hello-world should reappear and alpine should still be present.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            }
+
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+            // Sanity check that the loaded hello-world image is functional.
+            WSLCContainerLauncher launcher("hello-world:latest", "wslc-multi-save-container");
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto output = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, output.Code);
+            VERIFY_IS_TRUE(output.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Single image via SaveImages — must produce a valid tar archive.
+        {
+            std::filesystem::path imageTar = L"MultiImageSingle.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            std::vector<LPCSTR> names = {"hello-world:latest"};
+            WSLCStringArray array = BuildStringArray(names);
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_IS_TRUE(fileSize.QuadPart > 0);
+        }
+
+        // Validate that invalid input parameters are rejected.
+        {
+            // Use a real temp file so ToCOMInputHandle doesn't throw before SaveImages runs.
+            std::filesystem::path placeholderTar = L"MultiImageValidation.tar";
+            auto placeholderCleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(placeholderTar.c_str())); });
+
+            wil::unique_handle placeholder{CreateFileW(
+                placeholderTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == placeholder.get());
+            HANDLE phHandle = placeholder.get();
+
+            // Empty array (Count=0).
+            WSLCStringArray emptyArray{.Values = nullptr, .Count = 0};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &emptyArray, nullptr, nullptr));
+
+            // Empty string entry.
+            LPCSTR emptyEntry[] = {""};
+            WSLCStringArray emptyEntryArray{.Values = emptyEntry, .Count = 1};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &emptyEntryArray, nullptr, nullptr));
+
+            // Name longer than WSLC_MAX_IMAGE_NAME_LENGTH.
+            std::string longName(WSLC_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            LPCSTR longEntry[] = {longName.c_str()};
+            WSLCStringArray longEntryArray{.Values = longEntry, .Count = 1};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &longEntryArray, nullptr, nullptr));
+
+            // Too many images.
+            std::vector<LPCSTR> names(WSLC_MAX_SAVE_IMAGES_COUNT + 1, "foo");
+            WSLCStringArray tooManyArray = BuildStringArray(names);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &tooManyArray, nullptr, nullptr));
+        }
+
+        // Try to save with one of the images not found — must fail
+        {
+            std::filesystem::path imageTar = L"MultiImageError.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+            wil::unique_handle imageTarFileHandle{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            std::vector<LPCSTR> names = {"alpine:latest", "not-found"};
+            WSLCStringArray array = BuildStringArray(names);
+            VERIFY_FAILED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+            ValidateCOMErrorMessage(L"No such image: not-found");
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(0ull, static_cast<ULONGLONG>(fileSize.QuadPart));
+        }
+    }
+
     WSLC_TEST_METHOD(SynchronousIoCancellation)
     {
         // Create a blocked operation that will cause the service to get stuck on a ReadFile() call.

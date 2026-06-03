@@ -164,6 +164,7 @@ public:
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
+    std::pair<uint32_t, wil::unique_socket> SaveImages(const std::vector<std::string>& NamesOrIds);
     common::docker_schema::PruneImageResult PruneImages(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Exec.
@@ -224,7 +225,7 @@ private:
         static std::string Escape(const std::string& Value);
 
         std::string m_path;
-        std::map<std::string, std::string> m_parameters;
+        std::multimap<std::string, std::string> m_parameters;
     };
 
     wil::unique_socket ConnectSocket();

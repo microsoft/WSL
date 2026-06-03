@@ -27,6 +27,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
+#define WSLC_MAX_SAVE_IMAGES_COUNT 256
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
@@ -35,6 +36,7 @@ cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
+cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
 
 typedef
@@ -729,6 +731,7 @@ interface IWSLCSession : IUnknown
     HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
+    HRESULT SaveImages([in] WSLCHandle OutputHandle, [in] const WSLCStringArray* ImageNames, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
