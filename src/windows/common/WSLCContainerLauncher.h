@@ -54,7 +54,7 @@ public:
         const std::string& Name = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},
-        WSLCContainerNetworkType containerNetworkType = WSLCContainerNetworkTypeHost,
+        std::string networkMode = "host",
         WSLCProcessFlags Flags = WSLCProcessFlagsNone);
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
@@ -75,7 +75,6 @@ public:
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetShmSize(int64_t ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
-    void SetContainerNetworkName(std::string&& Name);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
     void SetDnsServers(std::vector<std::string>&& DnsServers);
@@ -98,8 +97,7 @@ private:
     std::deque<std::wstring> m_hostPaths;
     std::deque<std::string> m_volumeNames;
     std::deque<std::string> m_containerPaths;
-    WSLCContainerNetworkType m_containerNetworkType;
-    std::string m_containerNetworkName;
+    std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     int64_t m_shmSize = 0;
