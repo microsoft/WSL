@@ -284,7 +284,7 @@ try
         "SessionInitialized",
         TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
-        TraceLoggingValue(Settings->CreatorProcessName, "CreatorProcess"));
+        TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
@@ -1637,6 +1637,10 @@ HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOption
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
+    THROW_HR_IF_NULL(E_POINTER, containerOptions);
+    THROW_HR_IF_NULL(E_POINTER, Container);
+    THROW_HR_IF(E_POINTER, containerOptions->Image == nullptr);
+
     auto lock = m_lock.lock_shared();
 
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
@@ -1647,7 +1651,7 @@ try
         PDT_ProductAndServicePerformance,
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(result, "Result"),
-        TraceLoggingValue(containerOptions->Image ? containerOptions->Image : "<null>", "Image"),
+        TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
@@ -1657,9 +1661,6 @@ CATCH_RETURN();
 
 void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
 {
-    THROW_HR_IF_NULL(E_POINTER, containerOptions);
-    THROW_HR_IF(E_POINTER, containerOptions->Image == nullptr);
-
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
