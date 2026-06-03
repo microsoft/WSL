@@ -36,9 +36,7 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
-    // Establish a COM execution context so any user-error message set during
-    // session init (e.g. by ConfigureStorage's THROW_HR_WITH_USER_ERROR) is
-    // captured and serialized to IErrorInfo before returning to the caller.
+    // Capture user-error messages and serialize them to IErrorInfo for the caller.
     wsl::windows::common::COMServiceExecutionContext context;
 
     *Session = nullptr;
@@ -52,9 +50,8 @@ try
     session->SetDestructionCallback(std::move(m_destructionCallback));
 
     // Initialize the session with the VM.
-    // N.B. THROW_IF_FAILED (not RETURN_IF_FAILED) is required here so WIL's
-    // error callback invokes CollectError, which consumes the error string
-    // before ~COMServiceExecutionContext runs.
+    // N.B. THROW_IF_FAILED is required (not RETURN_IF_FAILED) so WIL's error
+    // callback fires CollectError before ~COMServiceExecutionContext runs.
     THROW_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.

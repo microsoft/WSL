@@ -32,6 +32,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
+constexpr auto c_storageVhdFilename = L"storage.vhdx";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -152,60 +153,6 @@ std::string GenerateContainerName(int retry)
     }
 
     return name;
-}
-
-// Zero-byte sentinel written at the root of a session storage directory so we can
-// distinguish a directory we own from one the user is using for something else.
-constexpr auto c_sessionMarkerFile = L"wslcsession";
-
-// Validates StoragePath and stamps the marker if needed.
-// IsExistingStorage = true when a session VHD was just attached (legacy directories
-// pre-dating the marker are tolerated and upgraded). When false the directory must
-// be empty or non-existent so we never overwrite unrelated user files.
-void EnsureSessionMarker(const std::filesystem::path& StoragePath, bool IsExistingStorage)
-{
-    const auto markerPath = StoragePath / c_sessionMarkerFile;
-
-    const auto markerAttrs = GetFileAttributesW(markerPath.c_str());
-    if (markerAttrs != INVALID_FILE_ATTRIBUTES)
-    {
-        // A directory at the marker name means the storage path is used for something else.
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), WI_IsFlagSet(markerAttrs, FILE_ATTRIBUTE_DIRECTORY));
-
-        return;
-    }
-
-    std::error_code ec;
-    const bool isDir = std::filesystem::is_directory(StoragePath, ec);
-
-    // is_directory sets ec when the path does not exist (ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND).
-    // That is the normal case for new sessions — only throw on unexpected errors.
-    if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
-    {
-        THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_directory failed for %ls", StoragePath.c_str());
-    }
-
-    if (isDir)
-    {
-        if (!IsExistingStorage)
-        {
-            // New session into an existing directory: require it to be empty.
-            const bool empty = std::filesystem::is_empty(StoragePath, ec);
-            if (ec)
-            {
-                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
-            }
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
-        }
-    }
-    else
-    {
-        std::filesystem::create_directories(StoragePath);
-    }
-
-    wil::unique_hfile marker{CreateFileW(markerPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-    THROW_LAST_ERROR_IF_MSG(!marker, "Failed to create marker file: %ls", markerPath.c_str());
 }
 
 } // namespace
@@ -332,23 +279,49 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
-    // Validate the storage path before creating VM resources so rejection errors
-    // propagate cleanly (Terminate()'s cleanup can overwrite the error context).
+    // Validate storage path before creating VM resources (Terminate() would clobber the error).
     if (Settings->StoragePath != nullptr)
     {
         std::filesystem::path storagePath{Settings->StoragePath};
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings->StoragePath), !storagePath.is_absolute());
 
-        std::error_code ec;
-        const bool vhdExists = std::filesystem::exists(storagePath / L"storage.vhdx", ec);
+        // MSVC's std::filesystem sets ec to ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND
+        // for non-existent paths. Filter those out — only throw on real failures.
+        auto throwOnRealFsError = [](const std::error_code& ec, const std::filesystem::path& path, const char* op) {
+            if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+            {
+                THROW_IF_WIN32_ERROR_MSG(ec.value(), "%hs failed for %ls", op, path.c_str());
+            }
+        };
 
-        // Reject up-front if the caller forbade creating new storage and there is no VHD to attach.
+        std::error_code ec;
+        const auto vhdPath = storagePath / c_storageVhdFilename;
+        const bool vhdExists = std::filesystem::exists(vhdPath, ec);
+        throwOnRealFsError(ec, vhdPath, "exists");
+
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
             Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath),
             !vhdExists && WI_IsFlagSet(Settings->StorageFlags, WSLCSessionStorageFlagsNoCreate));
 
-        EnsureSessionMarker(storagePath, /*IsExistingStorage=*/vhdExists);
+        // Only check emptiness for new sessions. Existing sessions are identified by their VHD.
+        if (!vhdExists)
+        {
+            const bool isDir = std::filesystem::is_directory(storagePath, ec);
+            throwOnRealFsError(ec, storagePath, "is_directory");
+
+            if (isDir)
+            {
+                const bool empty = std::filesystem::is_empty(storagePath, ec);
+                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
+
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
+            }
+            else
+            {
+                std::filesystem::create_directories(storagePath);
+            }
+        }
     }
 
     // Create the VM.
@@ -422,9 +395,9 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         return;
     }
 
-    // Storage path validation and marker stamping are done in Initialize().
+    // Storage path validation is done in Initialize() before any VM resources are created.
     std::filesystem::path storagePath{Settings.StoragePath};
-    m_storageVhdPath = storagePath / "storage.vhdx";
+    m_storageVhdPath = storagePath / c_storageVhdFilename;
 
     std::string diskDevice;
     std::optional<ULONG> diskLun{};

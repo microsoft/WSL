@@ -52,8 +52,7 @@ public:
 
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
 
-    // ISupportErrorInfo: enables IErrorInfo marshaling across COM process boundaries so that
-    // user-facing error messages set via THROW_HR_WITH_USER_ERROR propagate to the caller.
+    // ISupportErrorInfo: enables IErrorInfo marshaling across COM boundaries.
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 
 private:
