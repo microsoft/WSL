@@ -322,6 +322,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWarningCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8153ED5D-8ABB-408B-ADBE-C0F3B13E07C3}">
+                    <RegistryValue Value="IWarningCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLCSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{EF0661E4-6364-40EA-B433-E2FDF11F3519}">
                     <RegistryValue Value="IWSLCSession" Type="string" />
