@@ -7791,7 +7791,7 @@ class WSLCTests
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Create and start a container
-            WSLCContainerLauncher launcher("debian:latest", containerName.c_str(), {"/bin/echo", "OK"});
+            WSLCContainerLauncher launcher("debian:latest", containerName.c_str(), {"sleep", "9999"});
 
             auto container = launcher.Launch(*session);
             container.SetDeleteOnClose(false);
