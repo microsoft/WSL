@@ -452,8 +452,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
         }
 
-        // Reject non-empty storage directories that don't already contain a session VHD
-        // (would otherwise risk overwriting unrelated user files).
+        // Reject non-empty storage directory that doesn't contain a session VHD.
         {
             const auto storagePath = std::filesystem::temp_directory_path() /
                                      std::format(L"wslc-test-storage-{}-{}", GetCurrentProcessId(), GetTickCount64());

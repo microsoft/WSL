@@ -319,7 +319,8 @@ try
             }
             else
             {
-                std::filesystem::create_directories(storagePath);
+                std::filesystem::create_directories(storagePath, ec);
+                THROW_IF_WIN32_ERROR_MSG(ec.value(), "create_directories failed for %ls", storagePath.c_str());
             }
         }
     }
