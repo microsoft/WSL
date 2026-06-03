@@ -992,12 +992,8 @@ try
     if (Config.BootCommand.has_value())
     {
         UtilCreateChildProcess(
-            "BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions, CgroupPathOpt = Config.CgroupPath]() {
-                if (CgroupPathOpt.has_value())
-                {
-                    UtilTryMoveSelfToDistroCgroup(CgroupPathOpt.value(), false, "boot command");
-                }
-
+            "BootCommand",
+            [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
                 //
                 // Restore default signal dispositions for the child process.
                 //
@@ -1007,7 +1003,9 @@ try
 
                 execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
                 LOG_ERROR("execl() failed, {}", errno);
-            });
+            },
+            {},
+            Config.CgroupPath);
     }
 
     return 0;

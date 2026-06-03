@@ -3406,7 +3406,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::string& DistroCgroupPath)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3441,34 +3441,34 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 
-    const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
-        try
-        {
-            if (!DistroCgroupPath.empty())
+    const int ChildPid = UtilCreateChildProcess(
+        "CreateChildProcess",
+        [&]() {
+            try
             {
-                UtilTryMoveSelfToDistroCgroup(DistroCgroupPath, false, "CreateChildProcess");
+                wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+                THROW_LAST_ERROR_IF(!ProcessSocket);
+
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
+                execv(Path, (char* const*)(ArgumentArray.data()));
+
+                // If this point is reached, an error needs to be reported back since execv() failed.
+                THROW_LAST_ERROR();
             }
-            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
-            THROW_LAST_ERROR_IF(!ProcessSocket);
-
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
-            execv(Path, (char* const*)(ArgumentArray.data()));
-
-            // If this point is reached, an error needs to be reported back since execv() failed.
-            THROW_LAST_ERROR();
-        }
-        catch (...)
-        {
-            auto error = wil::ResultFromCaughtException();
-            LOG_ERROR("Command execution failed: {}", errno);
-
-            if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+            catch (...)
             {
-                LOG_ERROR("Failed to write command execution status: {}", errno);
+                auto error = wil::ResultFromCaughtException();
+                LOG_ERROR("Command execution failed: {}", errno);
+
+                if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+                {
+                    LOG_ERROR("Failed to write command execution status: {}", errno);
+                }
             }
-        }
-    });
+        },
+        {},
+        DistroCgroupPath);
 
     THROW_LAST_ERROR_IF(ChildPid < 0);
     ControlPipe.write().reset();

@@ -578,16 +578,16 @@ void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 void Trim(std::wstring& string);
 
-inline auto EnableSystemd(const std::string& extraConfig = "")
+inline auto EnableSystemd(const std::string& extraConfig = "", LPCWSTR distroName = LXSS_DISTRO_NAME_TEST_L)
 {
     // enable systemd on the test distro by editing /etc/wsl.conf
-    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig);
-    TerminateDistribution();
+    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig, distroName);
+    TerminateDistribution(distroName);
 
-    return wil::scope_exit([] {
+    return wil::scope_exit([distroName] {
         // clean up wsl.conf file
-        LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-        TerminateDistribution();
+        LxsstuLaunchWsl(std::format(L"-d {} " LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE, distroName));
+        TerminateDistribution(distroName);
     });
 }
 

@@ -7334,20 +7334,15 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistroName, g_testDistroPath)), 0L);
 
         std::optional<decltype(EnableSystemd())> systemdCleanup;
+        std::optional<decltype(EnableSystemd())> systemdCleanup2;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
-
-            LxssWriteWslDistroConfig("[boot]\nsystemd=true\n", secondDistroName);
-            LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+            systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
         }
 
         auto getCgroup = [](LPCWSTR distro) {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} --cd / -- cat /proc/self/cgroup", distro));
-            while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
-            {
-                out.pop_back();
-            }
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
             return out;
         };
 
@@ -7376,8 +7371,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // can still be in flight when this check runs, so retry until cleanup completes.
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
             [&]() {
-                auto [out2, _] = LxsstuLaunchWslAndCaptureOutput(
-                    L"--cd / -- /bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+                auto [out2, _] =
+                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
                 THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
             },
             std::chrono::seconds(1),
@@ -7398,7 +7393,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     {
         WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
 
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--cd / -- cat /proc/self/cgroup");
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup");
         while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
         {
             out.pop_back();
@@ -7409,7 +7404,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(out, std::wstring(L"0::/"));
 
         auto [exists, __] =
-            LxsstuLaunchWslAndCaptureOutput(L"--cd / -- /bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
+            LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
         while (!exists.empty() && (exists.back() == L'\n' || exists.back() == L'\r'))
         {
             exists.pop_back();

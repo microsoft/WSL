@@ -104,8 +104,7 @@ Abstract:
 constexpr auto c_trueString = "1";
 constexpr size_t c_systemReservedMemory = 32 * 1024 * 1024; // 32MiB reserved for WSL system processes
 constexpr long c_cpuPeriodMicros = 100000;
-constexpr long c_systemReservedCpuMicros = 5000; // 0.05 CPU reserved for WSL system processes
-constexpr auto c_killCgroupProcessesTimeout = std::chrono::milliseconds(1000);
+constexpr long c_systemReservedCpuMicros = 1000; // 0.01 Logical core reserved for WSL system processes
 
 struct VmConfiguration
 {
@@ -2245,6 +2244,17 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
+        bool bootInit = false;
+        bool enableGuiApps = Config.EnableGuiApps;
+        {
+            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+            if (File)
+            {
+                std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
+                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            }
+        }
+
         //
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
@@ -2263,23 +2273,13 @@ void ProcessLaunchInitMessage(
 
             try
             {
-                bool bootInit = false;
-                {
-                    wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-                    if (File)
-                    {
-                        std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit)};
-                        ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-                    }
-                }
-
-                THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0 && errno != EEXIST);
+                THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0);
 
                 if (bootInit)
                 {
                     THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0 && errno != EEXIST);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
                 }
 
                 cleanup.release();
@@ -2294,17 +2294,9 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
-        bool enableGuiApps = Config.EnableGuiApps;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-                File.reset();
-            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -3301,7 +3293,7 @@ try
         }
         else
         {
-            return ProcessCreateProcessMessage(Transaction, Buffer, {});
+            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
         }
 
     case LxMiniInitMessageWaitForPmemDevice:
@@ -3761,7 +3753,6 @@ Return Value:
 
 --*/
 
-try
 {
     struct sysinfo info = {};
     if (sysinfo(&info) < 0)
@@ -3784,7 +3775,7 @@ try
         return;
     }
 
-    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0 && errno != EEXIST)
+    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
     {
         LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
         return;
@@ -3796,7 +3787,7 @@ try
         return;
     }
 
-    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0 && errno != EEXIST)
+    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
     {
         LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
         return;
@@ -3828,7 +3819,6 @@ try
 
     LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
 }
-CATCH_LOG()
 
 int main(int Argc, char* Argv[])
 {
@@ -4037,7 +4027,12 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr))
+    {
+        Result = -1;
+        LOG_ERROR("Failed to mount cgroup2: {}", CGROUP_MOUNTPOINT, errno);
+        goto ErrorExit;
+    }
 
     UtilSetThreadName("mini_init");
 
@@ -4152,61 +4147,6 @@ int main(int Argc, char* Argv[])
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
                         LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
-
-                        //
-                        // Kill any remaining processes in the cgroup with a timeout.
-                        //
-
-                        try
-                        {
-                            const auto KillPath = CgroupDir + "/cgroup.kill";
-                            THROW_LAST_ERROR_IF(WriteToFile(KillPath.c_str(), "1") < 0);
-
-                            const auto EventsPath = CgroupDir + "/cgroup.events";
-                            wil::unique_fd EventsFd{open(EventsPath.c_str(), O_RDONLY | O_CLOEXEC)};
-                            THROW_LAST_ERROR_IF(!EventsFd);
-
-                            const auto Deadline = std::chrono::steady_clock::now() + c_killCgroupProcessesTimeout;
-
-                            for (;;)
-                            {
-                                char Buffer[256];
-                                auto Bytes = TEMP_FAILURE_RETRY(pread(EventsFd.get(), Buffer, sizeof(Buffer) - 1, 0));
-                                THROW_LAST_ERROR_IF(Bytes < 0);
-
-                                Buffer[Bytes] = '\0';
-                                bool Populated = true;
-                                for (const auto& Line : wsl::shared::string::Split<char>(Buffer, '\n'))
-                                {
-                                    if (Line.starts_with("populated "))
-                                    {
-                                        Populated = (Line != "populated 0");
-                                        break;
-                                    }
-                                }
-
-                                if (!Populated)
-                                {
-                                    break;
-                                }
-
-                                const auto Now = std::chrono::steady_clock::now();
-                                if (Now >= Deadline)
-                                {
-                                    LOG_ERROR("Timed out waiting for cgroup {} to drain", CgroupDir);
-                                    break;
-                                }
-
-                                const auto RemainingMs = std::chrono::duration_cast<std::chrono::milliseconds>(Deadline - Now).count();
-
-                                pollfd Pfd{EventsFd.get(), POLLPRI, 0};
-                                if (poll(&Pfd, 1, static_cast<int>(RemainingMs)) < 0)
-                                {
-                                    THROW_LAST_ERROR_IF(errno != EINTR);
-                                }
-                            }
-                        }
-                        CATCH_LOG();
 
                         //
                         // Recursively rmdir the cgroup subtree.

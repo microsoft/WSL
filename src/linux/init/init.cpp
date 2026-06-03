@@ -1179,19 +1179,17 @@ try
         }
 
         SessionLeader = UtilCreateChildProcess(
-            "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
-                if (Config.CgroupPath.has_value())
-                {
-                    UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), false, "session leader");
-                }
-
+            "SessionLeader",
+            [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
                 umask(Config.Umask);
                 Channel.Close();
 
                 THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
                 SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
-            });
+            },
+            {},
+            Config.CgroupPath);
     }
     else
     {
@@ -1233,12 +1231,8 @@ try
         // of other session leaders. See https://github.com/microsoft/WSL/issues/9114.
 
         SessionLeader = UtilCreateChildProcess(
-            "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
-                if (Config.CgroupPath.has_value())
-                {
-                    UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), false, "session leader");
-                }
-
+            "SessionLeader",
+            [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
                 umask(Mask);
                 Channel.Close();
 
@@ -1253,7 +1247,9 @@ try
                 }
 
                 SessionLeaderEntryUtilityVm(channel, Config);
-            });
+            },
+            {},
+            Config.CgroupPath);
     }
 
     if (SessionLeader < 0)
@@ -2320,6 +2316,10 @@ Return Value:
         {
             Config.CgroupPath = DistroCgroupPath;
         }
+        else
+        {
+            LOG_ERROR("Cgroup path {} does not exist", DistroCgroupPath);
+        }
         unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
     }
 
@@ -2544,7 +2544,7 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath.has_value() ? Config.CgroupPath.value() : "");
+                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath);
                 break;
 
             default:
