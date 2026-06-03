@@ -9737,7 +9737,7 @@ class WSLCTests
             auto containerId = result.Output[1];
             containerId.erase(containerId.find_last_not_of(" \n\r") + 1);
 
-            session->Terminate();
+            VERIFY_SUCCEEDED(session->Terminate());
 
             // Phase 2: Create a new session pointing to the same storage with a warning callback.
             auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
@@ -9758,7 +9758,7 @@ class WSLCTests
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
-            session2->Terminate();
+            VERIFY_SUCCEEDED(session2->Terminate());
         }
     }
 
@@ -9801,7 +9801,7 @@ class WSLCTests
             vhdHostPath = inspect.Status->at("HostPath");
             VERIFY_IS_FALSE(vhdHostPath.empty());
 
-            session->Terminate();
+            VERIFY_SUCCEEDED(session->Terminate());
         }
 
         // Phase 2: Delete the VHD file, then restart with a warning callback.
@@ -9828,7 +9828,7 @@ class WSLCTests
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
 
-            session->Terminate();
+            VERIFY_SUCCEEDED(session->Terminate());
         }
     }
 };

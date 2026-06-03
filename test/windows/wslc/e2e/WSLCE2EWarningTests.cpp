@@ -104,9 +104,9 @@ class WSLCE2EWarningTests
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
 
-        const auto expectedWarning =
-            wsl::shared::Localization::MessageWslcFailedToRecoverContainer(string::MultiByteToWide(corruptContainerId));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr.value().find(expectedWarning));
+        const auto expectedStderr = std::format(
+            L"wsl: {}\r\n", wsl::shared::Localization::MessageWslcFailedToRecoverContainer(string::MultiByteToWide(corruptContainerId)));
+        VERIFY_ARE_EQUAL(expectedStderr, result.Stderr.value());
     }
 };
 

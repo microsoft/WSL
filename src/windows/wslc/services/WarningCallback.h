@@ -14,7 +14,9 @@ public:
     HRESULT OnWarning(LPCWSTR Message) override
     {
         WI_ASSERT(Message);
-        wsl::windows::common::wslutil::PrintMessage(Message, stderr);
+        // The message already includes the "wsl: " prefix and a trailing newline (added by
+        // EmitUserWarning), so write it directly. This matches how wsl.exe surfaces its warnings.
+        fputws(Message, stderr);
         return S_OK;
     }
 };
