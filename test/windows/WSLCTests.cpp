@@ -1303,11 +1303,13 @@ class WSLCTests
 
     WSLC_TEST_METHOD(DeleteImage)
     {
-        // Prepare alpine image to delete.
-        LoadTestImage(*m_defaultSession, "alpine:latest");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+        auto restore = wil::scope_exit([&]() {
+            LoadTestImage(*m_defaultSession, "alpine:latest");
+        });
 
         // Launch a container to ensure that image deletion fails when in use.
         WSLCContainerLauncher launcher("alpine:latest", "test-delete-container-in-use", {"sleep", "99999"}, {}, "host");
