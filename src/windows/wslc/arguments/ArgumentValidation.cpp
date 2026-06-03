@@ -57,6 +57,14 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
+    case ArgType::Since:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Since>(), m_name);
+        break;
+
+    case ArgType::Until:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Until>(), m_name);
+        break;
+
     case ArgType::Last:
         validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::Last>(), m_name);
         break;
@@ -252,7 +260,7 @@ void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstr
     }
 }
 
-ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
+int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
     auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
     if (!parsed.has_value())
@@ -260,7 +268,7 @@ ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring&
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return parsed.value();
+    return static_cast<int64_t>(parsed.value());
 }
 
 } // namespace wsl::windows::wslc::validation

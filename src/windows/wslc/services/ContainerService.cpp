@@ -17,6 +17,7 @@ Abstract:
 #include "ConsoleService.h"
 #include "ImageService.h"
 #include "ImageProgressCallback.h"
+#include "WarningCallback.h"
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
@@ -38,7 +39,8 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(
+    Session& session, const std::string& image, const ContainerOptions& options, IWarningCallback* warningCallback = nullptr)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -50,7 +52,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, "bridge", processFlags);
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -160,7 +162,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.AddLabel(key, value);
     }
 
-    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
+    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), warningCallback);
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
         {
@@ -170,7 +172,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }
-        return containerLauncher.Create(*session.Get());
+        return containerLauncher.Create(*session.Get(), warningCallback);
     }
 
     THROW_IF_FAILED(result);
@@ -346,9 +348,10 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // container isn't created when the caller-requested path can't be written. The file is
     // removed automatically if we don't reach Commit() below.
     CidFile cidFile(runOptions.CidFile);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
 
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto runningContainer = CreateInternal(session, image, runOptions, warningCallback.Get());
     auto& container = runningContainer.Get();
 
     WSLCContainerId containerId{};
@@ -357,7 +360,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+    THROW_IF_FAILED(container.Start(startFlags, nullptr, warningCallback.Get())); // TODO: Error message, detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
@@ -377,7 +380,8 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     CidFile cidFile(runOptions.CidFile);
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    auto runningContainer = CreateInternal(session, image, runOptions, warningCallback.Get());
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
@@ -391,7 +395,8 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr, warningCallback.Get()), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -509,7 +514,7 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -518,8 +523,9 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
+    WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, tail));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
@@ -542,5 +548,21 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Stats(&output));
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+}
+
+PruneContainersResult ContainerService::Prune(Session& session)
+{
+    PruneResult result;
+    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+
+    PruneContainersResult pruneResult;
+    pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;
+    pruneResult.PrunedContainers.reserve(result.result.ContainersCount);
+    for (ULONG i = 0; i < result.result.ContainersCount; i++)
+    {
+        pruneResult.PrunedContainers.push_back(result.result.Containers[i]);
+    }
+
+    return pruneResult;
 }
 } // namespace wsl::windows::wslc::services

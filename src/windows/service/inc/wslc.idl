@@ -117,12 +117,43 @@ interface IProgressCallback : IUnknown
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
+[
+    uuid(8153ED5D-8ABB-408B-ADBE-C0F3B13E07C3),
+    pointer_default(unique),
+    object
+]
+interface IWarningCallback : IUnknown
+{
+    HRESULT OnWarning([in, string] LPCWSTR Message);
+};
+
+[
+    uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
+    pointer_default(unique),
+    object
+]
+interface IWSLCPluginNotifier : IUnknown
+{
+    // 'InspectJson' follows the wslc_schema::InspectContainer format.
+    // Returning failure prevents the container creation.
+    HRESULT OnContainerStarted([in] LPCSTR InspectJson);
+
+    // Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are logged but ignored.
+    HRESULT OnContainerStopping([in] LPCSTR ContainerId);
+
+    // 'InspectJson' follows the wslc_schema::InspectImage format. Errors are logged but ignored.
+    HRESULT OnImageCreated([in] LPCSTR InspectJson);
+
+    // Called when an image is deleted. 'ImageId' is the image identifier. Errors are logged but ignored.
+    HRESULT OnImageDeleted([in] LPCSTR ImageId);
+};
+
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
     char Digest[256];
-    ULONGLONG Size;
+    LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
 } WSLCImageInformation;
@@ -130,14 +161,11 @@ typedef struct _WSLCImageInformation
 typedef enum _WSLCListImagesFlags
 {
     WSLCListImagesFlagsNone = 0,
-    WSLCListImagesFlagsAll = 1,           // Show all images (default hides intermediate images)
-    WSLCListImagesFlagsDigests = 2,       // Include digest information
-    WSLCListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
-    WSLCListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
-    // Note: If neither dangling flag is set, no dangling filter is passed (default: both).
+    WSLCListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
+    WSLCListImagesFlagsDigests = 2, // Include digest information
 } WSLCListImagesFlags;
 
-cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests | WSLCListImagesFlagsDanglingTrue | WSLCListImagesFlagsDanglingFalse)")
+cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
 
@@ -160,15 +188,12 @@ typedef KeyValuePair WSLCFilter;
 typedef KeyValuePairInformation WSLCLabelInformation;
 typedef KeyValuePairInformation WSLCDriverOptionInformation;
 
-typedef struct _WSLCListImageOptions
+typedef struct _WSLCListImagesOptions
 {
     DWORD Flags; // WSLCListImagesFlags (can combine with bitwise OR)
-    [unique] LPCSTR Reference; // Filter by reference (name[:tag])
-    [unique] LPCSTR Before; // Filter: show images created before this image
-    [unique] LPCSTR Since; // Filter: show images created since this image
-    [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
-    ULONG LabelsCount;
-} WSLCListImageOptions;
+    [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
+    ULONG FiltersCount;
+} WSLCListImagesOptions;
 
 typedef enum _WSLCProcessFlags
 {
@@ -234,24 +259,19 @@ typedef struct _WSLCUlimit
     LONGLONG Hard;
 } WSLCUlimit;
 
-typedef enum _WSLCContainerNetworkType
+typedef struct _WSLCNetworkConnection
 {
-    WSLCContainerNetworkTypeNone = 0,
-    WSLCContainerNetworkTypeHost = 1,
-    WSLCContainerNetworkTypeBridged = 2,
-    WSLCContainerNetworkTypeCustom = 3
-} WSLCContainerNetworkType;
+    [string] LPCSTR NetworkName;
 
-typedef struct _WSLCNetworkAttachment
-{
-    [unique] LPCSTR NetworkName;
-    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
-} WSLCNetworkAttachment;
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
+} WSLCNetworkConnection;
 
 typedef struct _WSLCContainerNetwork
 {
-    WSLCContainerNetworkType ContainerNetworkType;
-    [unique, size_is(NetworksCount)] const WSLCNetworkAttachment* Networks;
+    [unique, string] LPCSTR NetworkMode;
+
+    [unique, size_is(NetworksCount)] const WSLCNetworkConnection* Networks;
     ULONG NetworksCount;
 } WSLCContainerNetwork;
 
@@ -301,7 +321,7 @@ typedef struct _WSLCContainerOptions
     WSLCStringArray DnsSearchDomains;
     WSLCStringArray DnsOptions;
 
-    ULONGLONG ShmSize;
+    LONGLONG ShmSize; // Matches Docker's int64 ShmSize; consistent with MemoryBytes/NanoCpus
     WSLCContainerNetwork ContainerNetwork;
     [unique, size_is(TmpfsCount)] const WSLCTmpfsMount* Tmpfs;
     ULONG TmpfsCount;
@@ -419,6 +439,21 @@ cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFea
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
 //
+// Values discovered from the guest kernel after the VM has booted, forwarded
+// from wslcsession via IWSLCVirtualMachine::ApplyGuestCapabilities. Add new
+// fields here instead of new IDL methods so the interface does not need a new
+// IID for each kernel-published value.
+//
+typedef struct _WSLCGuestCapabilities
+{
+    // (base, size) of the hv_pci swiotlb pool the kernel reserved and
+    // published under /sys/bus/vmbus/drivers/hv_pci/swiotlb_{base,size}.
+    // Both zero means the running kernel does not support hv_pci swiotlb.
+    UINT64 HvPciSwiotlbBase;
+    UINT64 HvPciSwiotlbSize;
+} WSLCGuestCapabilities;
+
+//
 // IWSLCVirtualMachine - Interface representing a single VM instance.
 // Operations are scoped to this VM. The VM ID is stored internally,
 // so only the holder of this interface can operate on the VM.
@@ -457,6 +492,14 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Removes a previously added filesystem share.
     HRESULT RemoveShare([in] REFGUID ShareId);
+
+    // Configures the per-VM state discovered from the guest kernel after boot
+    // (currently the hv_pci swiotlb pool). Subsequent calls to AddShare and
+    // ConfigureNetworking forward these values to wsldevicehost via the
+    // swiotlb device-options token. A capabilities struct whose fields are
+    // all zero means the guest kernel does not support the feature; the
+    // token is then omitted.
+    HRESULT ApplyGuestCapabilities([in] const WSLCGuestCapabilities* Capabilities);
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
@@ -523,7 +566,7 @@ interface IWSLCContainer : IUnknown
 {
     HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
+    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys, [in, unique] IWarningCallback* WarningCallback);
     HRESULT Delete([in] WSLCDeleteFlags Flags);
     HRESULT Export([in] WSLCHandle TarHandle);
     HRESULT GetState([out] WSLCContainerState* State);
@@ -615,13 +658,6 @@ typedef struct _WSLCVolumeInformation
     char Driver[WSLC_MAX_VOLUME_DRIVER_LENGTH + 1];
 } WSLCVolumeInformation;
 
-typedef struct _WSLCPruneVolumesResults
-{
-    [unique, size_is(VolumesCount)] WSLCVolumeName* Volumes;
-    ULONG VolumesCount;
-    ULONGLONG SpaceReclaimed;
-} WSLCPruneVolumesResults;
-
 typedef struct _WSLCNetworkOptions
 {
     LPCSTR Name;
@@ -639,46 +675,12 @@ typedef struct _WSLCNetworkInformation
     char Driver[64];
 } WSLCNetworkInformation;
 
-typedef struct _WSLCPruneLabelFilter
-{
-    LPCSTR Key;
-    [unique] LPCSTR Value;
-    BOOL Present;
-} WSLCPruneLabelFilter;
-
-typedef struct _WSLCPruneVolumesOptions
-{
-    BOOL All; // If TRUE, prune all unused volumes. If FALSE, only anonymous volumes.
-    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
-    ULONG LabelsCount;
-} WSLCPruneVolumesOptions;
-
 typedef struct _WSLCPruneContainersResults
 {
     [unique, size_is(ContainersCount)] WSLCContainerId* Containers;
     ULONG ContainersCount;
     ULONGLONG SpaceReclaimed;
 } WSLCPruneContainersResults;
-
-typedef enum _WSLCPruneImagesFlags
-{
-    WSLCPruneImagesFlagsNone = 0,
-    WSLCPruneImagesFlagsDanglingTrue = 1,  // Only prune dangling (untagged) images.
-    WSLCPruneImagesFlagsDanglingFalse = 2, // Prune all images not used by any container.
-    // Note: If neither dangling flag is set, no dangling filter is passed (Docker defaults to dangling-only).
-} WSLCPruneImagesFlags;
-
-cpp_quote("#define WSLCPruneImagesFlagsValid (WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCPruneImagesFlags);")
-
-typedef struct _WSLCPruneImagesOptions
-{
-    DWORD Flags; // WSLCPruneImagesFlags
-    ULONGLONG Until;
-    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
-    ULONG LabelsCount;
-} WSLCPruneImagesOptions;
 
 typedef enum _WSLCListContainersFlags
 {
@@ -732,19 +734,19 @@ interface IWSLCSession : IUnknown
     HRESULT GetState([out] WSLCSessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
+    HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
-    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
+    HRESULT PruneImages([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Container management.
-    HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
+    HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
     HRESULT ListContainers([in, unique] const WSLCListContainersOptions* Options,[out, size_is(, *Count)] WSLCContainerEntry** Containers,[out] ULONG* Count, [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports, [out] ULONG* PortsCount);
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
@@ -773,20 +775,22 @@ interface IWSLCSession : IUnknown
     // Initializes the session with a pre-created VM.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm);
+        [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
     HRESULT DeleteVolume([in] LPCSTR Name);
-    HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
-    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out] WSLCPruneVolumesResults* Results);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT PruneVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [in, unique] IWarningCallback* WarningCallback, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Network management.
-    HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);
+    HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
@@ -827,6 +831,8 @@ interface IWSLCSessionFactory : IUnknown
     HRESULT CreateSession(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback,
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
@@ -834,13 +840,13 @@ interface IWSLCSessionFactory : IUnknown
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
-typedef struct _WSLCSessionInformation
+typedef struct _WSLCSessionListEntry
 {
     ULONG SessionId;
     DWORD CreatorPid;
     wchar_t DisplayName[256];
     wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
-} WSLCSessionInformation;
+} WSLCSessionListEntry;
 
 typedef enum _WSLCSessionFlags
 {
@@ -863,9 +869,9 @@ interface IWSLCSessionManager : IUnknown
     HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
 
     // Session management.
-    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
-    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [out] IWSLCSession** Session);
-    HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionInformation** Sessions, [out] ULONG* SessionsCount);
+    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
+    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
+    HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionListEntry** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLCSession** Session);
     HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }

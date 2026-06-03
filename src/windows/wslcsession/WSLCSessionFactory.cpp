@@ -30,7 +30,12 @@ void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& ca
 }
 
 HRESULT wslc::WSLCSessionFactory::CreateSession(
-    _In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _Out_ IWSLCSession** Session, _Out_ IWSLCSessionReference** ServiceRef)
+    _In_ const WSLCSessionInitSettings* Settings,
+    _In_ IWSLCVirtualMachine* Vm,
+    _In_ IWSLCPluginNotifier* PluginNotifier,
+    _In_opt_ IWarningCallback* WarningCallback,
+    _Out_ IWSLCSession** Session,
+    _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
     *Session = nullptr;
@@ -44,7 +49,7 @@ try
     session->SetDestructionCallback(std::move(m_destructionCallback));
 
     // Initialize the session with the VM.
-    RETURN_IF_FAILED(session->Initialize(Settings, Vm));
+    RETURN_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier, WarningCallback));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());

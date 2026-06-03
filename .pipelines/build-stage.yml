@@ -37,7 +37,7 @@ parameters:
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage;wslcsdkcs"
-        pattern: "wsl.msi,wslcsdkcs.dll"
+        pattern: "wsl.msi,wslcsdkcs.dll,Microsoft.WSL.Containers.winmd"
 
   - name: pool
     type: string

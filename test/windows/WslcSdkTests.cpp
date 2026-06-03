@@ -1870,6 +1870,73 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(stdoutData.size(), c_expectedBytes);
     }
 
+    WSLC_TEST_METHOD(ReleaseFromIOCallbackFails)
+    {
+        struct Context
+        {
+            std::atomic<WslcProcess> process{nullptr};
+            std::atomic<WslcContainer> container{nullptr};
+            std::atomic<HRESULT> releaseProcessHr{S_OK};
+            std::atomic<HRESULT> releaseContainerHr{S_OK};
+            std::atomic<bool> captured{false};
+            wil::unique_event done{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            auto* cx = static_cast<Context*>(c);
+
+            // Wait until the test thread has published both handles before sampling.
+            auto process = cx->process.load(std::memory_order_acquire);
+            auto container = cx->container.load(std::memory_order_acquire);
+            if (!process || !container)
+            {
+                return;
+            }
+
+            // Only capture on the first eligible callback; later callbacks no-op.
+            bool expected = false;
+            if (!cx->captured.compare_exchange_strong(expected, true))
+            {
+                return;
+            }
+
+            // Both calls should fail with ERROR_INVALID_HANDLE_STATE without consuming the handles.
+            cx->releaseProcessHr.store(WslcReleaseProcess(process));
+            cx->releaseContainerHr.store(WslcReleaseContainer(container));
+            cx->done.SetEvent();
+        };
+
+        // Continuous writer for the init process so onStdOut fires repeatedly.
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "while true; do echo LINE; sleep 0.05; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        UniqueProcess process;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+        // Publish handles to the callback now that both are valid.
+        ctx.container.store(container.get(), std::memory_order_release);
+        ctx.process.store(process.get(), std::memory_order_release);
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.done.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        VERIFY_ARE_EQUAL(ctx.releaseProcessHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        VERIFY_ARE_EQUAL(ctx.releaseContainerHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+    }
+
     // -----------------------------------------------------------------------
     // Storage tests
     // -----------------------------------------------------------------------
@@ -2509,9 +2576,11 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
         THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
 
-        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
+        // Validate /dev/dxg is available and the dynamic linker is configured to resolve the WSL
+        // GPU libraries.
         {
-            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
+            const char* initArgv[] = {
+                "/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"};
 
             auto output = RunContainerAndCapture(
                 gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);

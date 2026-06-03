@@ -64,6 +64,11 @@ public:
     {
         return WSLCGuestVolumeDriver;
     }
+    const std::map<std::string, std::string>& Labels() const noexcept override
+    {
+        return m_labels;
+    }
+
     void Delete() override;
     std::string Inspect() const override;
     WSLCVolumeInformation GetVolumeInformation() const override;

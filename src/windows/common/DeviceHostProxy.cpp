@@ -27,6 +27,10 @@ DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId
 {
     m_devicesShutdown = false;
     m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
+
+    // Create a job object that will terminate device host processes when this proxy is destroyed
+    // (i.e., when the VM shuts down).
+    m_jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag)
@@ -152,6 +156,15 @@ try
     const wil::com_ptr<IVmDeviceHost> remoteHost = DeviceHost;
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
+
+    // Add the device host process to the job object so it is terminated when the VM shuts down.
+    wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
+    LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
+    if (process)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_jobObject.get(), process.get()));
+    }
+
     return S_OK;
 }
 CATCH_RETURN()

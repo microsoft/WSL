@@ -53,7 +53,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 104
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -477,7 +477,7 @@ typedef struct WslcImageInfo
     // we should expose this
     CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
-    uint64_t sizeBytes;
+    int64_t sizeBytes;
     uint64_t createdUnixTime;
 } WslcImageInfo;
 
