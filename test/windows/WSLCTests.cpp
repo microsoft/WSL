@@ -607,12 +607,12 @@ class WSLCTests
         }
 
         {
-            std::wstring expectedError =
-                L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
-                L"access to the resource is denied";
-
+            // podman surfaces the registry's raw "denied" error rather than dockerd's composed
+            // "pull access denied for <repo>, repository does not exist..." message, and the exact
+            // text (and whether it arrives JSON-wrapped) varies between runs. Match on the stable
+            // substring common to every observed form.
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
-            ValidateCOMErrorMessage(expectedError.c_str());
+            ValidateCOMErrorMessageContains(L"denied: requested access to the resource is denied");
         }
 
         // Validate that PullImage() returns the appropriate error if the session is terminated.

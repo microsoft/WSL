@@ -649,6 +649,16 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
+        // podman's compat /images/create returns HTTP 403 Forbidden when a pulled image cannot
+        // be accessed - including public images that simply do not exist, since registries
+        // deliberately conflate "no such repository" with "access denied". dockerd surfaced this
+        // same case as an HTTP 404, so map a pull 403 back to WSLC_E_IMAGE_NOT_FOUND to keep the
+        // error code stable across the podman migration. Other operations (e.g. push) keep E_FAIL,
+        // where a 403 genuinely means the caller lacks permission.
+        else if (httpResponse->result == boost::beast::http::status::forbidden && std::string_view{OperationName} == "Pull")
+        {
+            THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
+        }
         else
         {
             THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
