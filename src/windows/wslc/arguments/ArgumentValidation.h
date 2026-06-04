@@ -74,12 +74,7 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
 
-// Parses a raw `--label` value of the form "key" or "key=value" into (key, value).
-// Throws E_INVALIDARG with a localized user-facing message if the key is empty.
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value);
-
-// Parses a raw `--opt` driver-option value of the form "key" or "key=value" into (key, value).
-// Does not validate the key; per-driver validation occurs downstream.
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value);
 
 } // namespace wsl::windows::wslc::validation
