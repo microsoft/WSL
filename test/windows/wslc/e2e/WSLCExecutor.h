@@ -17,6 +17,7 @@ Abstract:
 
 #include "precomp.h"
 #include "windows/Common.h"
+#include "VTSupport.h"
 
 namespace WSLCE2ETests {
 
@@ -73,6 +74,16 @@ struct WSLCInteractiveSession
     void ExpectStdout(const std::string& expected);
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
+
+    // Convenience overloads for VT sequence helpers.
+    void ExpectStdout(const wsl::windows::common::vt::Sequence& expected)
+    {
+        ExpectStdout(std::string(expected.Get()));
+    }
+    void ExpectStderr(const wsl::windows::common::vt::Sequence& expected)
+    {
+        ExpectStderr(std::string(expected.Get()));
+    }
 
     bool IsRunning() const;
     void CloseStdin();

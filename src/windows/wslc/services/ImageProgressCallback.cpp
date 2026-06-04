@@ -19,18 +19,19 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::windows::common::vt;
 
 auto ImageProgressCallback::MoveToLine(SHORT line)
 {
     if (line > 0)
     {
-        wprintf(L"\033[%iA", line);
+        std::wcout << Cursor::Up(static_cast<int16_t>(line));
     }
 
     return wil::scope_exit([line = line]() {
         if (line > 1)
         {
-            wprintf(L"\033[%iB", line - 1);
+            std::wcout << Cursor::Down(static_cast<int16_t>(line - 1));
         }
     });
 }
