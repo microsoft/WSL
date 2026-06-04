@@ -118,6 +118,16 @@ interface IProgressCallback : IUnknown
 };
 
 [
+    uuid(8153ED5D-8ABB-408B-ADBE-C0F3B13E07C3),
+    pointer_default(unique),
+    object
+]
+interface IWarningCallback : IUnknown
+{
+    HRESULT OnWarning([in, string] LPCWSTR Message);
+};
+
+[
     uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
     pointer_default(unique),
     object
@@ -556,7 +566,7 @@ interface IWSLCContainer : IUnknown
 {
     HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
+    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys, [in, unique] IWarningCallback* WarningCallback);
     HRESULT Delete([in] WSLCDeleteFlags Flags);
     HRESULT Export([in] WSLCHandle TarHandle);
     HRESULT GetState([out] WSLCContainerState* State);
@@ -724,10 +734,10 @@ interface IWSLCSession : IUnknown
     HRESULT GetState([out] WSLCSessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
@@ -736,7 +746,7 @@ interface IWSLCSession : IUnknown
     HRESULT PruneImages([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Container management.
-    HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
+    HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
     HRESULT ListContainers([in, unique] const WSLCListContainersOptions* Options,[out, size_is(, *Count)] WSLCContainerEntry** Containers,[out] ULONG* Count, [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports, [out] ULONG* PortsCount);
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
@@ -766,7 +776,8 @@ interface IWSLCSession : IUnknown
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
-        [in] IWSLCPluginNotifier* PluginNotifier);
+        [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
@@ -775,11 +786,11 @@ interface IWSLCSession : IUnknown
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
-    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT PruneVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT PruneVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [in, unique] IWarningCallback* WarningCallback, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Network management.
-    HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);
+    HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
@@ -821,6 +832,7 @@ interface IWSLCSessionFactory : IUnknown
         [in] const WSLCSessionInitSettings* Settings,
         [in] IWSLCVirtualMachine* Vm,
         [in] IWSLCPluginNotifier* PluginNotifier,
+        [in, unique] IWarningCallback* WarningCallback,
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
@@ -857,8 +869,8 @@ interface IWSLCSessionManager : IUnknown
     HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
 
     // Session management.
-    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
-    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [out] IWSLCSession** Session);
+    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
+    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionListEntry** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLCSession** Session);
     HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
