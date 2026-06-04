@@ -88,9 +88,7 @@ class WSLCE2ENetworkCreateTests
         result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
         result.Dump(true);
         result.Verify(
-            {.Stdout = L"",
-             .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n",
-             .ExitCode = 1});
+            {.Stdout = L"", .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n", .ExitCode = 1});
     }
 
 private:
