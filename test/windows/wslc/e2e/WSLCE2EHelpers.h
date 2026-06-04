@@ -35,7 +35,7 @@ namespace VT {
     inline const Sequence CR{"\r"};
 
     // The shell PS1 uses SGR 1;31 (bold + red) in a single sequence.
-    // Format::Sgr({1, 31}) produces "\x1b[1;31m" to match exactly.
+    // Sgr({1, 31}) produces "\x1b[1;31m" to match exactly.
     inline const ConstructedSequence RED = Sgr({1, 31});
 
     // Prompt pattern used in WSLC TTY sessions.

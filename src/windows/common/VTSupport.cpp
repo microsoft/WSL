@@ -18,8 +18,11 @@ Abstract:
 
 namespace wsl::windows::common::vt {
 namespace {
-    // Extracts a VT sequence, expected one of the form ESCAPE + prefix + result + suffix, returning the result part.
-    // Any bytes following the suffix (e.g. queued user input) are ignored.
+    // Extracts a VT sequence of the form ESC + prefix + result + suffix, returning
+    // the result part.  Reads up to s_bufferSize bytes non-blockingly; if the buffer
+    // fills completely the suffix may not be present, in which case an empty string
+    // is returned — the same outcome as any other parse failure.  Any bytes after
+    // the suffix (e.g. queued user input) are ignored.
     std::string ExtractSequence(std::istream& inStream, std::string_view prefix, std::string_view suffix)
     {
         // Force discovery of available input
@@ -27,8 +30,11 @@ namespace {
 
         static constexpr std::streamsize s_bufferSize = 1024;
         char buffer[s_bufferSize];
+
+        // readsome() returns at most s_bufferSize, so == s_bufferSize is the full-buffer
+        // case, not overflow.  If the suffix is still within those bytes the parse succeeds
+        // normally; if not, the suffix-not-found path below returns {}.
         std::streamsize bytesRead = inStream.readsome(buffer, s_bufferSize);
-        THROW_HR_IF(E_UNEXPECTED, bytesRead >= s_bufferSize);
 
         std::string_view resultView{buffer, static_cast<size_t>(bytesRead)};
 

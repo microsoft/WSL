@@ -179,6 +179,16 @@ struct Sequence
     {
     }
 
+    // Prevent construction from a std::string (lvalue or rvalue): std::string is
+    // implicitly convertible to std::string_view, so without this guard
+    // Sequence(someString) would compile but leave m_chars dangling once the string
+    // is destroyed.  Use ConstructedSequence for runtime / owned sequences.
+    // A constrained template (rather than named overloads) avoids making char[]
+    // literals ambiguous between the deleted and string_view constructors.
+    template <typename T>
+        requires std::is_same_v<std::remove_cvref_t<T>, std::string>
+    explicit Sequence(T&&) = delete;
+
     std::string_view Get() const
     {
         return m_chars;

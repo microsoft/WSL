@@ -14,6 +14,8 @@ Abstract:
 #pragma once
 #include "SessionService.h"
 #include "VTSupport.h"
+#include <map>
+#include <string>
 
 namespace wsl::windows::wslc::services {
 
