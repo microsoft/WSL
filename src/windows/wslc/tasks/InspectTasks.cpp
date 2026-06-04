@@ -58,7 +58,7 @@ static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, co
     return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId); }, WSLC_E_CONTAINER_NOT_FOUND);
 }
 
-static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::InspectNetwork>& result)
+static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& result)
 {
     return TryInspect([&]() { result = services::NetworkService::Inspect(session, networkName); }, WSLC_E_NETWORK_NOT_FOUND);
 }
@@ -86,7 +86,7 @@ void Inspect(CLIExecutionContext& context)
         auto id = WideToMultiByte(objectId);
         std::optional<wslc_schema::InspectContainer> container;
         std::optional<wslc_schema::InspectImage> image;
-        std::optional<wslc_schema::InspectNetwork> network;
+        std::optional<wslc_schema::Network> network;
         std::optional<wslc_schema::InspectVolume> volume;
 
         if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container))

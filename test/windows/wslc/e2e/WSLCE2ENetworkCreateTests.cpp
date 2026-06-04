@@ -86,9 +86,10 @@ class WSLCE2ENetworkCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Dump(true);
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Network '{}' already exists.\r\nError code: ERROR_ALREADY_EXISTS\r\n", TestNetworkName),
+             .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n",
              .ExitCode = 1});
     }
 
@@ -128,12 +129,12 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                        //
-                << L"  -d,--driver    Specify network driver name (default bridge)\r\n" //
-                << L"  -o,--opt       Set driver specific options\r\n"                //
-                << L"  --label        Network metadata setting\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"                 //
-                << L"  -?,--help      Shows help about the selected command\r\n"      //
+        options << L"The following options are available:\r\n"                            //
+                << L"  -d,--driver     Specify network driver name (default: bridge)\r\n" //
+                << L"  -o,--opt        Set driver specific options\r\n"                   //
+                << L"  -l,--label      Network metadata setting\r\n"                      //
+                << L"  --session       Specify the session to use\r\n"                    //
+                << L"  -?,--help       Shows help about the selected command\r\n"         //
                 << L"\r\n";
         return options.str();
     }

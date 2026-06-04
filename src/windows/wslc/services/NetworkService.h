@@ -23,6 +23,6 @@ struct NetworkService
     static void Create(models::Session& session, const models::CreateNetworkOptions& createOptions);
     static void Delete(models::Session& session, const std::string& name);
     static std::vector<WSLCNetworkInformation> List(models::Session& session);
-    static wsl::windows::common::wslc_schema::InspectNetwork Inspect(models::Session& session, const std::string& name);
+    static wsl::windows::common::wslc_schema::Network Inspect(models::Session& session, const std::string& name);
 };
 } // namespace wsl::windows::wslc::services

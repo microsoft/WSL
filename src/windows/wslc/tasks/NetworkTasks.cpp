@@ -41,7 +41,7 @@ static std::pair<std::string, std::string> OptionsToKeyValue(const std::wstring&
     return {WideToMultiByte(option.substr(0, pos)), WideToMultiByte(option.substr(pos + 1))};
 }
 
-static bool TryInspectNetwork(Session& session, const std::string& networkName, std::optional<wslc_schema::InspectNetwork>& inspectData)
+static bool TryInspectNetwork(Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& inspectData)
 {
     try
     {
@@ -136,10 +136,10 @@ void InspectNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto networkNames = context.Args.GetAll<ArgType::NetworkName>();
-    std::vector<wsl::windows::common::wslc_schema::InspectNetwork> result;
+    std::vector<wsl::windows::common::wslc_schema::Network> result;
     for (const auto& name : networkNames)
     {
-        std::optional<wslc_schema::InspectNetwork> inspectData;
+        std::optional<wslc_schema::Network> inspectData;
         if (TryInspectNetwork(session, WideToMultiByte(name), inspectData))
         {
             result.push_back(*inspectData);

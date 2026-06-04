@@ -468,11 +468,11 @@ void EnsureNetworkDoesNotExist(const std::wstring& networkName)
     }
 }
 
-wslc_schema::InspectNetwork InspectNetwork(const std::wstring& networkName)
+wslc_schema::Network InspectNetwork(const std::wstring& networkName)
 {
     auto result = RunWslc(std::format(L"network inspect {}", networkName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::Network>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }

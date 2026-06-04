@@ -59,7 +59,7 @@ class WSLCE2ENetworkInspectTests
         result = RunWslc(std::format(L"network inspect {}", TestNetworkName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto inspectData =
-            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         auto inspect = inspectData[0];
 
@@ -79,7 +79,7 @@ class WSLCE2ENetworkInspectTests
         result = RunWslc(std::format(L"network inspect {} {}", TestNetworkName1, TestNetworkName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto inspectData =
-            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2u, inspectData.size());
 
         auto inspect1 = inspectData[0];
@@ -107,7 +107,7 @@ class WSLCE2ENetworkInspectTests
         result.Verify({.Stderr = std::format(L"Network not found: '{}'\r\n", TestNetworkName2), .ExitCode = 1});
 
         auto inspectData =
-            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         auto inspect = inspectData[0];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestNetworkName1), inspect.Name);
@@ -150,9 +150,9 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"            //
-                << L"  -?,--help      Shows help about the selected command\r\n" //
+        options << L"The following options are available:\r\n"                    //
+                << L"  --session       Specify the session to use\r\n"            //
+                << L"  -?,--help       Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

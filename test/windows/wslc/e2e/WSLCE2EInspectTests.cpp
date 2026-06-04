@@ -206,7 +206,7 @@ class WSLCE2EInspectTests
             auto result = RunWslc(std::format(L"inspect --type network {}", DebianImage.Name));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             auto inspectData =
-                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
             VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
@@ -233,7 +233,7 @@ class WSLCE2EInspectTests
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             auto inspectData =
-                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
             VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
@@ -243,7 +243,7 @@ class WSLCE2EInspectTests
             auto result = RunWslc(std::format(L"inspect --type network {}", WslcNetworkName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             auto inspectData =
-                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
             VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }

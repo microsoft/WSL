@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "NetworkService.h"
+#include "WarningCallback.h"
 #include <wslutil.h>
 #include <wslc.h>
 
@@ -49,7 +50,8 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
     options.Labels = labels.data();
     options.LabelsCount = static_cast<ULONG>(labels.size());
 
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options));
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)
@@ -73,10 +75,10 @@ std::vector<WSLCNetworkInformation> NetworkService::List(models::Session& sessio
     return networks;
 }
 
-wsl::windows::common::wslc_schema::InspectNetwork NetworkService::Inspect(models::Session& session, const std::string& name)
+wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Session& session, const std::string& name)
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(session.Get()->InspectNetwork(name.c_str(), &output));
-    return FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+    return FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
 }
 } // namespace wsl::windows::wslc::services

@@ -2971,6 +2971,13 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
     <value>Creates a new network.</value>
   </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Specify network driver name (default: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Network metadata setting</value>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Remove one or more networks.</value>
   </data>

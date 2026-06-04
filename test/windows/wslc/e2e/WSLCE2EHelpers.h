@@ -130,7 +130,7 @@ std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
 wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
-wsl::windows::common::wslc_schema::InspectNetwork InspectNetwork(const std::wstring& networkName);
+wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& networkName);
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
