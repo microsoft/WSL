@@ -317,7 +317,6 @@ public:
 
 private:
     std::wstring m_name;
-    bool m_restore;
     std::optional<std::wstring> m_originalValue{std::nullopt};
 };
 
