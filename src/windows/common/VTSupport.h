@@ -16,6 +16,7 @@ Abstract:
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <initializer_list>
 #include <iostream>
 #include <optional>
