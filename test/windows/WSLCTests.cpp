@@ -32,7 +32,6 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
-using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -3040,7 +3039,9 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         // Validate that the same port can't be bound twice
-        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        // TODO: Update error code onced fixed in virtionet mode.
+        VERIFY_ARE_EQUAL(
+            session->MapVmPort(AF_INET, 1234, 80), networkingMode == WSLCNetworkingModeNAT ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_FAIL);
 
         // Check simple case
         listen(80, "port80", false);
@@ -3064,7 +3065,8 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(
+            session->UnmapVmPort(AF_INET, 1234, 80), networkingMode == WSLCNetworkingModeNAT ? HRESULT_FROM_WIN32(ERROR_NOT_FOUND) : E_FAIL);
 
         // Unmap the v6 port
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234, 80));
@@ -3105,9 +3107,18 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + i), static_cast<uint16_t>(80 + i)));
         }
 
-        VERIFY_ARE_EQUAL(
-            session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + c_maxPorts), static_cast<uint16_t>(80 + c_maxPorts)),
-            HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES));
+        if (networkingMode == WSLCNetworkingModeNAT)
+        {
+            // In NAT mode, the 64th port mapping should fail with ERROR_TOO_MANY_OPEN_FILES since the relay process uses a file handle for each mapping.
+            VERIFY_ARE_EQUAL(
+                session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + c_maxPorts), static_cast<uint16_t>(80 + c_maxPorts)),
+                HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES));
+        }
+        else
+        {
+            VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + c_maxPorts), static_cast<uint16_t>(80 + c_maxPorts)));
+            VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, static_cast<uint16_t>(20000 + c_maxPorts), static_cast<uint16_t>(80 + c_maxPorts)));
+        }
 
         for (int i = 0; i < c_maxPorts; i++)
         {

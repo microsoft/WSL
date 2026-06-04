@@ -165,36 +165,10 @@ class WslcSdkWinRtTests
         return std::any_of(images.begin(), images.end(), [&](auto const& img) { return img.Name() == imageName; });
     }
 
-    // Starts a local wslc-registry container using host-mode networking.
-    // Host networking is not exposed by the WinRT projection, so this helper
-    // uses WSLCContainerLauncher with the raw session handle.
-    std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-        const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
+    // Extracts the underlying IWSLCSession COM object from the WinRT session projection.
+    IWSLCSession& DefaultComSession()
     {
-        VERIFY_IS_TRUE(HasImage(L"wslc-registry:latest"));
-
-        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-        if (!username.empty())
-        {
-            env.push_back(std::format("USERNAME={}", username));
-            env.push_back(std::format("PASSWORD={}", password));
-        }
-
-        wsl::windows::common::WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddPort(port, port, AF_INET);
-
-        // Get the IWSLCSession COM object from the SDK session handle.
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session;
-        auto container = launcher.Launch(comSession, WSLCContainerStartFlagsNone);
-
-        auto registryAddress = std::format("127.0.0.1:{}", port);
-
-        // Wait for the registry to be ready by probing from the host.
-        auto hostUrl = std::format(L"http://{}", registryAddress);
-        ExpectHttpResponse(hostUrl.c_str(), 200, true);
-
-        return {std::move(container), registryAddress};
+        return *reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session;
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.
@@ -1455,7 +1429,7 @@ class WslcSdkWinRtTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
+        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession(), c_username, c_password);
 
         const auto serverUri = Uri(winrt::to_hstring(std::format("http://{}", registryAddress)));
 
@@ -1494,7 +1468,7 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(PullImage)
     {
-        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession());
         const auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         {
@@ -1528,7 +1502,7 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(PushImage)
     {
-        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession());
         const auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         // Positive: push an existing image to the local registry.

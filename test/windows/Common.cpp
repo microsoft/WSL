@@ -2917,6 +2917,50 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
+std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+{
+    using namespace wsl::windows::common;
+
+    // Check if the registry image is already loaded on this session.
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+    THROW_IF_FAILED(session.ListImages(nullptr, &images, images.size_address<ULONG>()));
+
+    bool found = std::ranges::any_of(
+        std::span{images.get(), images.size()}, [](const auto& e) { return std::strcmp(e.Image, "wslc-registry:latest") == 0; });
+
+    if (!found)
+    {
+        LoadTestImage(session, "wslc-registry:latest");
+    }
+
+    std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+
+    if (!username.empty())
+    {
+        env.push_back(std::format("USERNAME={}", username));
+        env.push_back(std::format("PASSWORD={}", password));
+    }
+
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    launcher.SetEntrypoint({"/entrypoint.sh"});
+    launcher.AddPort(port, port, AF_INET);
+
+    auto container = launcher.Launch(session, WSLCContainerStartFlagsAttach);
+
+    // Wait for the container to actually bind the port before continuing.
+    auto initProcess = container.GetInitProcess();
+    WaitForOutput(initProcess.GetStdHandle(WSLCFDStderr), std::format("listening on [::]:{}", port));
+
+    auto address = std::format("127.0.0.1:{}", port);
+    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+    int expectedCode = username.empty() ? 200 : 401;
+    ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+    return {std::move(container), std::move(address)};
+}
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
 {
     const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;

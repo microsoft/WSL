@@ -26,6 +26,7 @@ Abstract:
 #include "lxsstest.h"
 #include "wslutil.h"
 #include "WslCoreConfig.h"
+#include "WSLCContainerLauncher.h"
 
 using namespace std::chrono_literals;
 
@@ -618,6 +619,13 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
 void LoadTestImage(IWSLCSession& session, std::string_view imageName);
+
+// Starts a local wslc-registry container with host networking and returns [container, registryAddress].
+// Loads the wslc-registry:latest image into the session if it isn't already present, waits for the
+// registry to bind the port, and probes the v2 endpoint to verify readiness (and the auth gate when
+// credentials are supplied).
+std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 

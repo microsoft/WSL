@@ -22,7 +22,6 @@ Abstract:
 #include "wslc/e2e/WSLCE2EHelpers.h"
 
 using namespace wsl::windows::common::registry;
-using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDistroPath;
 extern std::wstring g_testDataPath;
