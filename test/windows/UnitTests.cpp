@@ -5143,7 +5143,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             wsl::shared::string::MultiByteToWide("01:23:45:67:89:AB"));
     }
 
-    TEST_METHOD(ModernDistroInstall)
+    static void ModernDistroInstallImpl()
     {
         auto tarPath = "file://" + wsl::shared::string::WideToMultiByte(EscapePath(g_testDistroPath));
 
@@ -5777,6 +5777,24 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 validateOrder({L"distro2", L"distro1"});
             }
         }
+    }
+
+    TEST_METHOD(ModernDistroInstall)
+    {
+        ModernDistroInstallImpl();
+    }
+
+    TEST_METHOD(ModernDistroInstallWithHiddenTempFolder)
+    {
+        const auto tempFolder = std::filesystem::temp_directory_path();
+        const auto originalAttributes = GetFileAttributesW(tempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(tempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN));
+
+        auto restoreAttributes = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&] { SetFileAttributesW(tempFolder.c_str(), originalAttributes); });
+
+        ModernDistroInstallImpl();
     }
 
     TEST_METHOD(ModernInstallEndToEnd)
