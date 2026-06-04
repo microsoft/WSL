@@ -754,7 +754,9 @@ class WSLCTests
 
         // Pulling without credentials should fail.
         VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr), E_FAIL);
-        ValidateCOMErrorMessageContains(L"no basic auth credentials");
+        // podman's registry auth failure is "unauthorized: authentication required" rather than
+        // dockerd's "no basic auth credentials"; match the stable podman substring.
+        ValidateCOMErrorMessageContains(L"authentication required");
 
         // Pulling with credentials should succeed.
         VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), nullptr));
@@ -1139,7 +1141,9 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(ToCOMInputHandle(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
 
-            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+            // podman rejects a non-image payload with its own message rather than dockerd's
+            // "archive/tar: invalid tar header"; match the stable podman substring.
+            ValidateCOMErrorMessageContains(L"payload does not match any of the supported image formats");
         }
 
         // Validate that LoadImage fails when the input pipe is closed during reading.
@@ -1244,7 +1248,9 @@ class WSLCTests
                     ToCOMInputHandle(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
                 E_FAIL);
 
-            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+            // podman wraps the underlying tar error in its own import message, so match on the
+            // stable substring rather than the whole dockerd-era message.
+            ValidateCOMErrorMessageContains(L"archive/tar: invalid tar header");
         }
 
         // Validate that ImportImage fails when the input pipe is closed during reading.
@@ -2226,7 +2232,9 @@ class WSLCTests
         // Negative test: Tag a non-existent image.
         {
             VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, runTagImage("nonexistent:notfound", "test", "fail"));
-            ValidateCOMErrorMessage(L"No such image: nonexistent:notfound");
+            // podman reports a missing image as "failed to find image ...: image not known"
+            // rather than dockerd's "No such image: ..."; match the stable podman substring.
+            ValidateCOMErrorMessageContains(L"failed to find image nonexistent:notfound");
         }
 
         // Negative test: Invalid tag format with spaces.
@@ -2290,7 +2298,9 @@ class WSLCTests
         {
             wil::unique_cotaskmem_ansistring output;
             VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
-            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+            // podman reports the missing image as "failed to find image ...: No such image";
+            // match the stable podman substring rather than dockerd's "No such image: ...".
+            ValidateCOMErrorMessageContains(L"failed to find image nonexistent:image");
         }
 
         // Negative test: Bad image name input
@@ -2470,7 +2480,9 @@ class WSLCTests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             VERIFY_FAILED(m_defaultSession->SaveImage(ToCOMInputHandle(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
-            ValidateCOMErrorMessage(L"reference does not exist");
+            // podman reports a missing image as "failed to find image ...: image not known"
+            // rather than dockerd's "reference does not exist"; match the stable podman substring.
+            ValidateCOMErrorMessageContains(L"failed to find image hello-wld:latest");
 
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
