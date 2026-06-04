@@ -271,4 +271,33 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
     return static_cast<int64_t>(parsed.value());
 }
 
+std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
+{
+    std::pair<std::string, std::string> result{};
+    auto pos = value.find('=');
+    if (pos == std::wstring::npos)
+    {
+        result.first = WideToMultiByte(value);
+    }
+    else
+    {
+        result.first = WideToMultiByte(value.substr(0, pos));
+        result.second = WideToMultiByte(value.substr(pos + 1));
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_LabelKeyEmptyError(), result.first.empty());
+    return result;
+}
+
+std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
+{
+    auto pos = value.find('=');
+    if (pos == std::wstring::npos)
+    {
+        return {WideToMultiByte(value), std::string{}};
+    }
+
+    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+}
+
 } // namespace wsl::windows::wslc::validation
