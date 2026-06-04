@@ -72,11 +72,7 @@ public:
     NON_COPYABLE(HalfCloseRelayHandle);
     NON_MOVABLE(HalfCloseRelayHandle);
 
-    HalfCloseRelayHandle(
-        wsl::windows::common::io::HandleWrapper&& Input,
-        wsl::windows::common::io::HandleWrapper&& Output,
-        SOCKET ShutdownSocket,
-        size_t BufferSize) :
+    HalfCloseRelayHandle(wsl::windows::common::io::HandleWrapper&& Input, wsl::windows::common::io::HandleWrapper&& Output, SOCKET ShutdownSocket, size_t BufferSize) :
         m_relay(std::move(Input), std::move(Output), BufferSize), m_shutdownSocket(ShutdownSocket)
     {
     }
