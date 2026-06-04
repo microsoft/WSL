@@ -88,8 +88,7 @@ class WSLCE2ENetworkCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_EmptyLabelKey_Fail)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge --label =foo {}", TestNetworkName));
-        result.Verify(
-            {.Stdout = L"", .Stderr = L"Label key cannot be empty\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = L"Label key cannot be empty\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
