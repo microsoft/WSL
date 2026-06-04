@@ -1,4 +1,18 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    VTSupport.cpp
+
+Abstract:
+
+    This file contains the implementation of VT sequence constructors and
+    console mode helpers declared in VTSupport.h.
+
+--*/
+
 #include "precomp.h"
 #include "VTSupport.h"
 

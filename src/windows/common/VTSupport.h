@@ -1,4 +1,18 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    VTSupport.h
+
+Abstract:
+
+    This file contains VT (Virtual Terminal) sequence constants, construction
+    helpers, and console mode RAII wrappers for use in Windows WSL components.
+
+--*/
+
 #pragma once
 
 #include <cstdint>
