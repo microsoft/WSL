@@ -368,8 +368,17 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    const auto downloadFolder =
-        winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(std::filesystem::temp_directory_path().wstring()).get();
+    // GetFolderFromPathAsync does not accept hidden or system path.
+    // To avoid the temp path having those attributes (mainly hidden),
+    // we need to create a subfolder without those attributes.
+    auto downloadFolderPath = std::filesystem::temp_directory_path() / L"wsl-downloads";
+    std::filesystem::create_directories(downloadFolderPath);
+
+    const auto attributes = GetFileAttributesW(downloadFolderPath.c_str());
+    THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(downloadFolderPath.c_str(), attributes & ~(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)));
+
+    const auto downloadFolder = winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(downloadFolderPath.wstring()).get();
 
     const auto file =
         downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
