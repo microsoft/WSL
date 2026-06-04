@@ -25,13 +25,13 @@ auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        wprintf(std::format(L"{}", Cursor::Up(line)).c_str());
+        wprintf(L"%ls", std::format(L"{}", Cursor::Up(line)).c_str());
     }
 
     return wil::scope_exit([line = line]() {
         if (line > 1)
         {
-            wprintf(std::format(L"{}", Cursor::Down(line - 1)).c_str());
+            wprintf(L"%ls", std::format(L"{}", Cursor::Down(line - 1)).c_str());
         }
     });
 }

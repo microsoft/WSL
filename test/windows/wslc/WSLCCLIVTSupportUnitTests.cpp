@@ -389,20 +389,46 @@ class WSLCCLIVTSupportUnitTests
 
     TEST_METHOD(VT_PrimaryDeviceAttributes)
     {
-        // Feed a synthetic DA1 response: ESC [ ? 62 ; 1 ; 4 c
-        // Conformance level 62 (VT400), extensions: Columns132 (1), Sixel (4).
-        // ExtractSequence is exercised indirectly through PrimaryDeviceAttributes.
-        std::ostringstream out;
-        std::istringstream in{"\x1b[?62;1;4c"};
+        // Clean DA1 response: conformance level 62, extensions Columns132 (1) and Sixel (4).
+        {
+            std::ostringstream out;
+            std::istringstream in{"\x1b[?62;1;4c"};
+            PrimaryDeviceAttributes da{out, in};
 
-        PrimaryDeviceAttributes da{out, in};
+            VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
+            VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Sixel));
+            VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::PrinterPort));
+            VERIFY_ARE_EQUAL("\x1b[0c", out.str());
+        }
 
-        VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
-        VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Sixel));
-        VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::PrinterPort));
+        // Trailing plain text (e.g. queued user input) must not break parsing.
+        {
+            std::ostringstream out;
+            std::istringstream in{"\x1b[?62;1;4chello"};
+            PrimaryDeviceAttributes da{out, in};
 
-        // Verify the DA1 request was sent.
-        VERIFY_ARE_EQUAL("\x1b[0c", out.str());
+            VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
+            VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Sixel));
+        }
+
+        // Trailing VT sequence must not corrupt suffix search or result extraction.
+        {
+            std::ostringstream out;
+            std::istringstream in{"\x1b[?62;6c\x1b[0m"};
+            PrimaryDeviceAttributes da{out, in};
+
+            VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::SelectiveErase));
+            VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
+        }
+
+        // Empty/malformed response — should not throw, extensions remain unset.
+        {
+            std::ostringstream out;
+            std::istringstream in{""};
+            PrimaryDeviceAttributes da{out, in};
+
+            VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
+        }
     }
 
     TEST_METHOD(VT_PrimaryDeviceAttributes_Empty)
