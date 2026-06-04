@@ -167,7 +167,7 @@ class WSLCCLIVTSupportUnitTests
 
     TEST_METHOD(VT_EraseSequences)
     {
-        VERIFY_ARE_EQUAL("\x1b[0K", Erase::LineForward);
+        VERIFY_ARE_EQUAL("\x1b[K", Erase::LineForward);
         VERIFY_ARE_EQUAL("\x1b[1K", Erase::LineBackward);
         VERIFY_ARE_EQUAL("\x1b[2K", Erase::LineEntirely);
         VERIFY_ARE_EQUAL("\x1b[J", Erase::ScreenForward);

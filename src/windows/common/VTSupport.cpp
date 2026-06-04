@@ -287,7 +287,7 @@ namespace Format {
 } // namespace Format
 
 namespace Erase {
-    const Sequence LineForward{WSL_WINDOWS_VT_CSI "0K"};
+    const Sequence LineForward{WSL_WINDOWS_VT_CSI "K"}; // ESC[K  (0 is the default parameter, omitted to match terminal output)
     const Sequence LineBackward{WSL_WINDOWS_VT_CSI "1K"};
     const Sequence LineEntirely{WSL_WINDOWS_VT_CSI "2K"};
     const Sequence ScreenForward{WSL_WINDOWS_VT_CSI "J"};
