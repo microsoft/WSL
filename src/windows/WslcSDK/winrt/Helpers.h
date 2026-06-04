@@ -18,14 +18,17 @@ Abstract:
     do \
     { \
         const auto _hr = (hr); \
-        auto _msg = (msg).get(); \
-        if (_msg) \
+        if (FAILED(_hr)) \
         { \
-            THROW_HR_IF_MSG(_hr, FAILED(_hr), "%ls", _msg); \
-        } \
-        else \
-        { \
-            THROW_IF_FAILED(_hr); \
+            auto _msg = (msg).get(); \
+            if (_msg) \
+            { \
+                throw winrt::hresult_error(_hr, winrt::to_hstring(_msg)); \
+            } \
+            else \
+            { \
+                winrt::throw_hresult(_hr); \
+            } \
         } \
     } while (0)
 
@@ -41,21 +44,27 @@ struct implementation_type;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 template <typename T>
-auto* GetStructPointer(const T& obj)
+auto GetImplementation(const T& obj)
 {
-    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToStructPointer() : nullptr;
+    return winrt::get_self<typename implementation_type<T>::type>(obj);
 }
 
 template <typename T>
-auto* GetHandlePointer(const T& obj)
+auto* GetStructPointer(const T& obj)
 {
-    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToHandlePointer() : nullptr;
+    return obj ? GetImplementation(obj)->ToStructPointer() : nullptr;
+}
+
+template <typename T>
+auto GetStruct(const T& obj)
+{
+    return GetImplementation(obj)->ToStruct();
 }
 
 template <typename T>
 auto GetHandle(const T& obj)
 {
-    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToHandle() : nullptr;
+    return obj ? GetImplementation(obj)->ToHandle() : nullptr;
 }
 
 template <typename T>
@@ -64,15 +73,25 @@ auto* GetStructPointer(const winrt::com_ptr<T>& obj)
     return obj ? obj->ToStructPointer() : nullptr;
 }
 
+// Helper for forwarding C progress callbacks to a WinRT progress token.
+// An instance of this struct is used as the context for the C callback.
+// The callback is invoked synchronously during the blocking C call, so the context
+// lives on the coroutine stack and is always valid for the duration of the call.
 template <typename T>
-auto* GetHandlePointer(const winrt::com_ptr<T>& obj)
+struct ProgressCallbackHelper
 {
-    return obj ? obj->ToHandlePointer() : nullptr;
-}
+    template <typename ProgressTokenT>
+    ProgressCallbackHelper(ProgressTokenT progressToken) :
+        m_reportProgress([progressToken](T progress) { progressToken(progress); })
+    {
+    }
 
-template <typename T>
-auto GetHandle(const winrt::com_ptr<T>& obj)
-{
-    return obj ? obj->ToHandle() : nullptr;
-}
+    static void ReportProgress(PVOID context, T progress)
+    {
+        auto callbackContext = static_cast<ProgressCallbackHelper*>(context);
+        callbackContext->m_reportProgress(progress);
+    }
+
+    const std::function<void(T)> m_reportProgress;
+};
 } // namespace winrt::Microsoft::WSL::Containers::implementation

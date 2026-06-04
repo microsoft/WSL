@@ -44,8 +44,12 @@ public:
 
     // IWSLCSessionFactory
     IFACEMETHOD(CreateSession)
-    (_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _Out_ IWSLCSession** Session, _Out_ IWSLCSessionReference** ServiceRef)
-        override;
+    (_In_ const WSLCSessionInitSettings* Settings,
+     _In_ IWSLCVirtualMachine* Vm,
+     _In_ IWSLCPluginNotifier* PluginNotifier,
+     _In_opt_ IWarningCallback* WarningCallback,
+     _Out_ IWSLCSession** Session,
+     _Out_ IWSLCSessionReference** ServiceRef) override;
 
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
 

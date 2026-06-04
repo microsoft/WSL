@@ -1133,6 +1133,14 @@ Tentando baixar a Web...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p está desabilitado, voltando para 9p com transporte vsock.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy rede não é suportada quando wsl2.virtio está desabilitado; fallback para networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>O kernel em execução não tem um patch que melhora significativamente o desempenho virtio dispositivo. Atualize para um kernel WSL mais recente para habilitar essa otimização.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>A instalação do WSL parece estar corrompida (Código de erro: {}).
 Pressione qualquer tecla para reparar o WSL ou CTRL-C cancelar.
@@ -2110,20 +2118,23 @@ Uso:
     <value>O contêiner '{}' não está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress ainda não tem suporte.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>O contêiner '{}' está em execução.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Não há suporte para mapeamentos de porta com o modo de rede de contêineres; As portas são de propriedade do contêiner de destino.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>O nome do contêiner de destino é necessário para o modo de rede do contêiner.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Contêiner de destino '{}' não encontrado.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Contêiner '{}' não encontrado.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>O nome da rede do contêiner é necessário para o tipo de rede personalizado.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>O nome da rede não pode ficar vazio.</value>
@@ -2258,6 +2269,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Imagem inválida: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Filtro inválido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Nome inválido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2314,12 +2329,16 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>A rede '{}' já existe.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Redes adicionais não são permitidas quando o modo de rede principal é 'host' ou 'none'.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Unsupported network mode: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Rede duplicada: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Ainda não há suporte para as configurações de ponto de extremidade (rede '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2410,6 +2429,16 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Exibir logs de um contêiner.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Remova todos os contêineres parados.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Remove todos os contêineres parados.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Espaço total recuperado: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Remova contêineres.</value>
@@ -2805,6 +2834,15 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Número de linhas a serem mostradas a partir do final dos logs</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Mostrar carimbos de data e hora na saída do log</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Mostrar logs desde o carimbo de data e hora (por exemplo, segundos da época Unix)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Mostrar logs antes do carimbo de data e hora (por exemplo, segundos da época Unix)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nova referência de imagem no formato image-name[:tag]</value>

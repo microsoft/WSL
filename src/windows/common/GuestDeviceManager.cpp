@@ -35,12 +35,15 @@ GUID GuestDeviceManager::AddHdvShareWithOptions(
     // Options are appended to the name with a semi-colon separator.
     //  "name;key1=value1;key2=value2"
     // The AddSharePath implementation is responsible for separating them out and interpreting them.
+    // N.B. A ";vm_id=<guid>" option is always appended so the device host can identify the owning VM.
     std::wstring nameWithOptions{AccessName};
-    if (ARGUMENT_PRESENT(Options))
+    if (ARGUMENT_PRESENT(Options) && Options[0] != L'\0')
     {
         nameWithOptions += L";";
         nameWithOptions += Options;
     }
+
+    nameWithOptions += std::format(L";vm_id={}", m_machineId);
 
     {
         auto revert = wil::impersonate_token(UserToken);

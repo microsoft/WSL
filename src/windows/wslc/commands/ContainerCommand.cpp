@@ -29,6 +29,7 @@ std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerPruneCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));

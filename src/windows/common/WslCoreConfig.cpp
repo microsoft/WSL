@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WslCoreConfig.h"
+#include "helpers.hpp"
 #include "Localization.h"
 #include "WslCoreFirewallSupport.h"
 #include "WslCoreNetworkingSupport.h"
@@ -124,7 +125,8 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::InitialAutoProxyTimeout, InitialAutoProxyTimeout),
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
-        ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug)};
+        ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
+        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes))};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)
@@ -398,22 +400,6 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         }
     }
 
-    // Load NAT configuration from the registry.
-    if (NetworkingMode == wsl::core::NetworkingMode::Nat)
-    {
-        try
-        {
-            const auto machineKey = wsl::windows::common::registry::OpenLxssMachineKey();
-            NatGateway = wsl::windows::common::registry::ReadString(machineKey.get(), nullptr, c_natGatewayAddress, L"");
-            NatNetwork = wsl::windows::common::registry::ReadString(machineKey.get(), nullptr, c_natNetwork, L"");
-
-            auto runAsUser = wil::impersonate_token(UserToken);
-            const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
-            NatIpAddress = wsl::windows::common::registry::ReadString(userKey.get(), nullptr, c_natIpAddress, L"");
-        }
-        CATCH_LOG()
-    }
-
     // Due to an issue with Global Secure Access Client, do not use DNS tunneling if the service is present.
     if (EnableDnsTunneling)
     {
@@ -454,12 +440,26 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtio9p, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioFs, false);
+        VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbSizeBytes, 0);
+
+        if (NetworkingMode == NetworkingMode::VirtioProxy)
+        {
+            NetworkingMode = (defaultNetworkingMode == NetworkingMode::VirtioProxy) ? NetworkingMode::None : NetworkingMode::Nat;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageVirtioProxyRequiresVirtio(ToString(NetworkingMode)));
+        }
     }
 
     if (EnableVirtio9p)
     {
         EMIT_USER_WARNING(wsl::shared::Localization::MessageConfigVirtio9pDisabled());
         EnableVirtio9p = false;
+    }
+
+    // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
+    // N.B. Must run after policy overrides so networking/fs modes reflect final values.
+    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::VirtioProxy)))
+    {
+        SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }
 
     if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)
@@ -480,6 +480,23 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Mirrored), IgnoredPorts, std::set<uint16_t>{});
         VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Mirrored), EnableHostAddressLoopback, false);
+    }
+
+    // Load NAT configuration from the registry.
+    // N.B. This must be done after all networking mode adjustments (e.g. VirtioProxy -> NAT fallback).
+    if (NetworkingMode == wsl::core::NetworkingMode::Nat)
+    {
+        try
+        {
+            const auto machineKey = wsl::windows::common::registry::OpenLxssMachineKey();
+            NatGateway = wsl::windows::common::registry::ReadString(machineKey.get(), nullptr, c_natGatewayAddress, L"");
+            NatNetwork = wsl::windows::common::registry::ReadString(machineKey.get(), nullptr, c_natNetwork, L"");
+
+            auto runAsUser = wil::impersonate_token(UserToken);
+            const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
+            NatIpAddress = wsl::windows::common::registry::ReadString(userKey.get(), nullptr, c_natIpAddress, L"");
+        }
+        CATCH_LOG()
     }
 }
 

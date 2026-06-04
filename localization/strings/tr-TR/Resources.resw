@@ -1126,6 +1126,14 @@ Web'den indirme deneniyor...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p devre dışı bırakıldı, vsock aktarımıyla 9p'ye geri dönülüyor.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy ağı, wsl2.virtio devre dışı bırakıldığında desteklenmez; networkingMode {} moduna geri dönülüyor.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>Çalışan çekirdekte virtio cihaz performansını önemli ölçüde iyileştiren bir yama eksik. Bu iyileştirmeyi etkinleştirmek için daha yeni bir WSL çekirdeğine güncelleştirin.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL yüklemesi bozulmuş gibi görünüyor (Hata kodu: {}).
 WSL'yi onarmak için herhangi bir tuşa basın veya CTRL-C tuşlarına basın.
@@ -2103,20 +2111,23 @@ Kullanım:
     <value>'{}' kapsayıcısı çalışmıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress henüz desteklenmiyor.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>'{}' kapsayıcısı çalışıyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Bağlantı noktası eşlemeleri kapsayıcı ağ modunda desteklenmez; bağlantı noktalarının sahibi hedef kapsayıcıdır.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Kapsayıcı ağ modu için hedef kapsayıcı adı gereklidir.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Hedef kapsayıcı '{}' bulunamadı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>'{}' kapsayıcısı bulunamadı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Özel ağ türü için kapsayıcı ağ adı gereklidir.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Ağ adı boş olamaz.</value>
@@ -2251,6 +2262,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz resim: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Geçersiz filtre: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Geçersiz ad: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2307,12 +2322,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>'{}' ağı zaten var.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Birincil ağ modu 'host' veya 'none' olduğunda ek ağlara izin verilmez.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Yinelenen ağ: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Uç nokta ayarları henüz desteklenmiyor (ağ '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2403,6 +2422,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Kapsayıcının günlüklerini görüntüle.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Durdurulmuş tüm kapsayıcıları kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Durdurulmuş tüm kapsayıcıları kaldırır.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Kapsayıcılar kaldır.</value>
@@ -2798,6 +2827,15 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Günlüklerin sonundan itibaren gösterilecek satır sayısı</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Günlük çıktısında zaman damgalarını göster</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Zaman damgasından bu yana günlükleri göster (örneğin, unix dönem saniyesi)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Zaman damgasından önceki günlükleri göster (örneğin Unix epoch saniyeleri)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde yeni resim referansı</value>

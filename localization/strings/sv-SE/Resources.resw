@@ -1126,6 +1126,14 @@ Försöker ladda ned...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p är inaktiverat och återgår till 9p med vsock-transport.</value>
   </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>VirtioProxy nätverk stöds inte när wsl2.virtio är inaktiverat. återgår till networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>Den kernel som körs saknar en korrigering som avsevärt förbättrar prestandan för virtio-enheter. Uppdatera till en nyare WSL-kärna för att aktivera den här optimeringen.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL-installationen verkar vara skadad (felkod: {}).
 Tryck på valfri tangent för att reparera WSL eller CTRL-C för att avbryta.
@@ -2103,20 +2111,23 @@ Användning:
     <value>Containern {} körs inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress stöds inte ännu.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Containern {} körs.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>Portmappningar stöds inte med containernätverksläge. portar ägs av målcontainern.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Målcontainernamn krävs för containernätverksläge.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Målcontainern {} hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Containern '{}' hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Containernätverksnamn krävs för anpassad nätverkstyp.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nätverksnamnet får inte vara tomt.</value>
@@ -2251,6 +2262,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Ogiltig bild ''{}''</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Ogiltigt filter : ''{}''</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Ogiltigt namn: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2307,12 +2322,16 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Nätverket '{}' finns redan.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Ytterligare nätverk tillåts inte när det primära nätverksläget är host eller none.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Nätverksläge som inte stöds: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplicerat nätverk: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Slutpunktsinställningarna stöds ännu inte (nätverket {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2403,6 +2422,16 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Visa loggar för en container.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Ta bort alla stoppade containrar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Tar bort alla stoppade containrar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Totalt frigjort utrymme: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Ta bort containrar.</value>
@@ -2799,6 +2828,15 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Antal rader som visas från slutet av loggarna</value>
   </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Visa tidsstämplar i loggutdata</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Visa loggar sedan tidsstämpeln (t.ex. Unix-epoksekunder)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Visa loggar före tidsstämpeln (t.ex. Unix-epoksekunder)</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildreferens i formatet image-name[:tag]</value>
   </data>
@@ -2955,7 +2993,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Volymnamn</value>
   </data>
   <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
-    <value>Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)</value>
+    <value>Ange namn på volymdrivrutin, t.ex. 'guest' eller 'vhd' (standard: guest)</value>
     <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
@@ -3038,7 +3076,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>NET I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
-    <value>BLOCKERA I/O</value>
+    <value>BLOCK I/O</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
