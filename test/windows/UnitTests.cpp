@@ -5786,13 +5786,20 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
     TEST_METHOD(ModernDistroInstallWithHiddenTempFolder)
     {
-        const auto tempFolder = std::filesystem::temp_directory_path();
-        const auto originalAttributes = GetFileAttributesW(tempFolder.c_str());
-        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
-        VERIFY_IS_TRUE(SetFileAttributesW(tempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN));
+        // Avoid contaminating the real temp folder.
+        const auto testTempFolder = std::filesystem::temp_directory_path() / L"wsl-install-test";
+        std::filesystem::create_directories(testTempFolder);
+        auto cleanupTempFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(testTempFolder, error);
+        });
 
-        auto restoreAttributes = wil::scope_exit_log(
-            WI_DIAGNOSTICS_INFO, [&] { SetFileAttributesW(tempFolder.c_str(), originalAttributes); });
+        const auto originalAttributes = GetFileAttributesW(testTempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(testTempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN));
+
+        ScopedEnvVariable temp(L"TEMP", testTempFolder.wstring(), true);
+        ScopedEnvVariable tmp(L"TMP", testTempFolder.wstring(), true);
 
         ModernDistroInstallImpl();
     }

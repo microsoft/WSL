@@ -309,16 +309,16 @@ private:
 class ScopedEnvVariable
 {
 public:
-    ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
+    ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value, bool restore = false);
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const WslConfigChange&) = delete;
-    ScopedEnvVariable(WslConfigChange&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
 
 private:
     std::wstring m_name;
+    bool m_restore;
+    std::optional<std::wstring> m_originalValue{std::nullopt};
 };
 
 class UniqueWebServer
