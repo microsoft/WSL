@@ -62,6 +62,59 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
 }
 
+// A unidirectional relay built on top of the HandleIO RelayHandle. When the input handle
+// reaches end-of-file, it half-closes the destination socket by shutting down its send side
+// (shutdown(SD_SEND)) so the peer observes the half-close. This allows BidirectionalRelay to
+// keep relaying the opposite direction (full-duplex) until it also completes.
+class HalfCloseRelayHandle : public wsl::windows::common::io::OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(HalfCloseRelayHandle);
+    NON_MOVABLE(HalfCloseRelayHandle);
+
+    HalfCloseRelayHandle(
+        wsl::windows::common::io::HandleWrapper&& Input,
+        wsl::windows::common::io::HandleWrapper&& Output,
+        SOCKET ShutdownSocket,
+        size_t BufferSize) :
+        m_relay(std::move(Input), std::move(Output), BufferSize), m_shutdownSocket(ShutdownSocket)
+    {
+    }
+
+    void Schedule() override
+    {
+        m_relay.Schedule();
+        State = m_relay.GetState();
+        ShutdownIfCompleted();
+    }
+
+    void Collect() override
+    {
+        m_relay.Collect();
+        State = m_relay.GetState();
+        ShutdownIfCompleted();
+    }
+
+    HANDLE GetHandle() const override
+    {
+        return m_relay.GetHandle();
+    }
+
+private:
+    void ShutdownIfCompleted()
+    {
+        if (State == wsl::windows::common::io::IOHandleStatus::Completed && !m_shutdownDone && m_shutdownSocket != INVALID_SOCKET)
+        {
+            m_shutdownDone = true;
+            LOG_LAST_ERROR_IF(shutdown(m_shutdownSocket, SD_SEND) == SOCKET_ERROR);
+        }
+    }
+
+    wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle> m_relay;
+    SOCKET m_shutdownSocket;
+    bool m_shutdownDone = false;
+};
+
 } // namespace
 
 std::thread wsl::windows::common::relay::CreateThread(_In_ HANDLE InputHandle, _In_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
@@ -281,130 +334,32 @@ wsl::windows::common::relay::InterruptableWrite(
 
 void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In_ HANDLE RightHandle, _In_ size_t BufferSize, _In_ RelayFlags Flags)
 {
-    std::vector<gsl::byte> leftBuffer(BufferSize);
-    const auto leftReadSpan = gsl::make_span(leftBuffer);
-    OVERLAPPED leftOverlapped = {0};
-    const wil::unique_event leftOverlappedEvent(wil::EventOptions::None);
-    leftOverlapped.hEvent = leftOverlappedEvent.get();
-    LARGE_INTEGER leftOffset{};
+    const bool leftIsSocket = WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket);
+    const bool rightIsSocket = WI_IsFlagSet(Flags, RelayFlags::RightIsSocket);
 
-    std::vector<gsl::byte> rightBuffer(BufferSize);
-    const auto rightReadSpan = gsl::make_span(rightBuffer);
-    OVERLAPPED rightOverlapped = {0};
-    const wil::unique_event rightOverlappedEvent(wil::EventOptions::None);
-    rightOverlapped.hEvent = rightOverlappedEvent.get();
-    LARGE_INTEGER rightOffset{};
+    wsl::windows::common::io::MultiHandleWait io;
 
-    bool leftReadPending = false;
-    bool rightReadPending = false;
-    auto cancelReads = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        DWORD bytes;
-        if (leftReadPending)
+    auto addRelay = [&](HANDLE Input, HANDLE Output, bool OutputIsSocket) {
+        std::unique_ptr<wsl::windows::common::io::OverlappedIOHandle> handle;
+        if (OutputIsSocket)
         {
-            CancelIoEx(LeftHandle, &leftOverlapped);
-            GetOverlappedResult(LeftHandle, &leftOverlapped, &bytes, TRUE);
-        }
-
-        if (rightReadPending)
-        {
-            CancelIoEx(RightHandle, &rightOverlapped);
-            GetOverlappedResult(RightHandle, &rightOverlapped, &bytes, TRUE);
-        }
-    });
-
-    DWORD bytesWritten;
-    const HANDLE waitObjects[] = {leftOverlapped.hEvent, rightOverlapped.hEvent};
-    for (;;)
-    {
-        if ((LeftHandle == nullptr) || (RightHandle == nullptr))
-        {
-            break;
-        }
-
-        DWORD leftBytesRead = 0;
-        if (!leftReadPending && LeftHandle)
-        {
-            if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
-            {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-            }
-
-            leftReadPending = true;
-        }
-
-        DWORD rightBytesRead = 0;
-        if (!rightReadPending && RightHandle)
-        {
-            if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
-            {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-            }
-
-            rightReadPending = true;
-        }
-
-        const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitObjects), waitObjects, FALSE, INFINITE);
-        if (waitResult == WAIT_OBJECT_0)
-        {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(LeftHandle, &leftOverlapped, &leftBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
-
-            leftReadPending = false;
-            if (leftBytesRead == 0)
-            {
-                LeftHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
-                {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(RightHandle), SD_SEND) == SOCKET_ERROR);
-                }
-            }
-            else if (RightHandle != nullptr)
-            {
-                auto writeSpan = leftReadSpan.first(leftBytesRead);
-                bytesWritten = InterruptableWrite(RightHandle, writeSpan, {}, &leftOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                leftOffset.QuadPart += leftBytesRead;
-                leftOverlapped.Offset = leftOffset.LowPart;
-                leftOverlapped.OffsetHigh = leftOffset.HighPart;
-            }
-        }
-        else if (waitResult == (WAIT_OBJECT_0 + 1))
-        {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(RightHandle, &rightOverlapped, &rightBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
-
-            rightReadPending = false;
-            if (rightBytesRead == 0)
-            {
-                RightHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
-                {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(LeftHandle), SD_SEND) == SOCKET_ERROR);
-                }
-            }
-            else if (LeftHandle != nullptr)
-            {
-                auto writeSpan = rightReadSpan.first(rightBytesRead);
-                bytesWritten = InterruptableWrite(LeftHandle, writeSpan, {}, &rightOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                rightOffset.QuadPart += rightBytesRead;
-                rightOverlapped.Offset = rightOffset.LowPart;
-                rightOverlapped.OffsetHigh = rightOffset.HighPart;
-            }
+            handle = std::make_unique<HalfCloseRelayHandle>(
+                HandleWrapper{Input}, HandleWrapper{Output}, reinterpret_cast<SOCKET>(Output), BufferSize);
         }
         else
         {
-            THROW_HR_MSG(E_FAIL, "WaitForMultipleObjects %d", waitResult);
+            handle = std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+                HandleWrapper{Input}, HandleWrapper{Output}, BufferSize);
         }
-    }
+
+        io.AddHandle(std::move(handle));
+    };
+
+    // Left -> Right and Right -> Left.
+    addRelay(LeftHandle, RightHandle, rightIsSocket);
+    addRelay(RightHandle, LeftHandle, leftIsSocket);
+
+    io.Run(std::nullopt);
 }
 
 #define TTY_ALT_NUMPAD_VK_MENU (0x12)

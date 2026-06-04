@@ -215,6 +215,13 @@ ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl
     Overlapped.hEvent = Event.get();
 }
 
+ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, size_t BufferSize) :
+    Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
+{
+    Buffer.Resize(BufferSize);
+    Overlapped.hEvent = Event.get();
+}
+
 ReadHandle::~ReadHandle()
 {
     if (State == IOHandleStatus::Pending)
