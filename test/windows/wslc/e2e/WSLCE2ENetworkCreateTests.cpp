@@ -47,7 +47,21 @@ class WSLCE2ENetworkCreateTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'network-name'\r\n", .ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_DefaultDriver_Success)
+    {
+        // TODO: http://task.ms/62564313
+        SKIP_TEST_UNSTABLE();
+
+        auto result = RunWslc(std::format(L"network create {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_BridgeDriver_Success)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -86,7 +100,6 @@ class WSLCE2ENetworkCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
-        result.Dump(true);
         result.Verify(
             {.Stdout = L"", .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n", .ExitCode = 1});
     }
