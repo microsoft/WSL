@@ -45,14 +45,14 @@ namespace VT {
     {
         if (withBracketedPaste)
         {
-            return B_START + prompt;
+            return std::format("{}{}", B_START, prompt);
         }
         return prompt;
     }
 
     inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        return CR + ERASE_LINE + CR + prompt;
+        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
     }
 } // namespace VT
 

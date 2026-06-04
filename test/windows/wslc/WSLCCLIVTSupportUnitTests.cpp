@@ -236,6 +236,18 @@ class WSLCCLIVTSupportUnitTests
         std::wostringstream woss;
         woss << seq;
         VERIFY_ARE_EQUAL(std::wstring{L"\x1b[1m"}, woss.str());
+
+        // std::format — narrow.
+        VERIFY_ARE_EQUAL(std::string{"\x1b[92mhello\x1b[0m"}, std::format("{}{}{}", Format::Fg::BrightGreen, "hello", Format::Default));
+
+        // std::format — wide, sequence bytes widened losslessly.
+        VERIFY_ARE_EQUAL(std::wstring{L"\x1b[92mhello\x1b[0m"}, std::format(L"{}{}{}", Format::Fg::BrightGreen, L"hello", Format::Default));
+
+        // std::format — ConstructedSequence via Sequence base.
+        VERIFY_ARE_EQUAL(std::string{"\x1b[3A text"}, std::format("{} text", Cursor::Up(3)));
+
+        // std::format — Sgr multi-parameter sequence.
+        VERIFY_ARE_EQUAL(std::string{"\x1b[1;31mtext\x1b[0m"}, std::format("{}text{}", Sgr({1, 31}), Format::Default));
     }
 
     TEST_METHOD(VT_ChangeTerminalMode)

@@ -21,17 +21,17 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
-auto ImageProgressCallback::MoveToLine(SHORT line)
+auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        std::wcout << Cursor::Up(static_cast<int16_t>(line));
+        wprintf(std::format(L"{}", Cursor::Up(line)).c_str());
     }
 
     return wil::scope_exit([line = line]() {
         if (line > 1)
         {
-            std::wcout << Cursor::Down(static_cast<int16_t>(line - 1));
+            wprintf(std::format(L"{}", Cursor::Down(line - 1)).c_str());
         }
     });
 }
@@ -127,7 +127,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     }
 
     // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left + 1);
+    const auto visibleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left + 1);
 
     // Truncate to console width to prevent wrapping that would break cursor repositioning.
     if (line.size() > static_cast<size_t>(visibleWidth))

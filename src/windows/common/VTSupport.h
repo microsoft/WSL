@@ -487,3 +487,44 @@ namespace wsl::windows::common::vt {
     }
 
 } // namespace wsl::windows::common::vt
+
+// std::formatter specializations allowing Sequence to be used directly in std::format.
+template<>
+struct std::formatter<wsl::windows::common::vt::Sequence, char> : std::formatter<std::string_view, char>
+{
+    auto format(const wsl::windows::common::vt::Sequence& s, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view, char>::format(s.Get(), ctx);
+    }
+};
+
+template<>
+struct std::formatter<wsl::windows::common::vt::Sequence, wchar_t> : std::formatter<std::wstring_view, wchar_t>
+{
+    auto format(const wsl::windows::common::vt::Sequence& s, std::wformat_context& ctx) const
+    {
+        const auto sv = s.Get();
+        const std::wstring wide(sv.begin(), sv.end());
+        return std::formatter<std::wstring_view, wchar_t>::format(wide, ctx);
+    }
+};
+
+template<>
+struct std::formatter<wsl::windows::common::vt::ConstructedSequence, char>
+    : std::formatter<wsl::windows::common::vt::Sequence, char>
+{
+    auto format(const wsl::windows::common::vt::ConstructedSequence& s, std::format_context& ctx) const
+    {
+        return std::formatter<wsl::windows::common::vt::Sequence, char>::format(s, ctx);
+    }
+};
+
+template<>
+struct std::formatter<wsl::windows::common::vt::ConstructedSequence, wchar_t>
+    : std::formatter<wsl::windows::common::vt::Sequence, wchar_t>
+{
+    auto format(const wsl::windows::common::vt::ConstructedSequence& s, std::wformat_context& ctx) const
+    {
+        return std::formatter<wsl::windows::common::vt::Sequence, wchar_t>::format(s, ctx);
+    }
+};
