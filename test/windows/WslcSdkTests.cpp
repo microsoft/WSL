@@ -2177,7 +2177,10 @@ class WslcSdkTests
 
         // Get the IWSLCSession COM object from the SDK session handle.
         auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+        auto container = launcher.Launch(session, WSLCContainerStartFlagsAttach);
+        auto initProcess = container.GetInitProcess();
+
+        WaitForOutput(initProcess.GetStdHandle(WSLCFDStderr), std::format("listening on [::]:{}", port));
 
         auto registryAddress = std::format("127.0.0.1:{}", port);
 
@@ -2240,7 +2243,6 @@ class WslcSdkTests
         constexpr auto c_password = "password";
 
         auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
-
         // Negative: wrong password must fail.
         {
             wil::unique_cotaskmem_ansistring token;

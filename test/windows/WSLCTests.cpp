@@ -7324,9 +7324,6 @@ class WSLCTests
         auto runCustomBindingTests = [&](WSLCContainerNetworkType containerNetworkType) {
             LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
 
-            // Creates a TCP container with the given port mappings, waits for it to be ready,
-            // and returns it. The returned container is automatically stopped and deleted when
-            // it goes out of scope.
             auto createTcpContainer = [&](const std::vector<PortMapping>& ports) {
                 static int containerIndex = 0;
                 WSLCContainerLauncher launcher(
@@ -7401,7 +7398,6 @@ class WSLCTests
 
             // Anonymous bind on host ip (ephemeral host port).
             {
-
                 if (hostIp.has_value())
                 {
                     auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
@@ -7420,8 +7416,6 @@ class WSLCTests
                 }
             }
 
-            // TODO: uncomment once stable.
-            /*
             // IPv6 loopback (::1) binding.
             {
                 auto container = createTcpContainer({{1263, 8000, AF_INET6, IPPROTO_TCP, "::1"}});
@@ -7462,8 +7456,6 @@ class WSLCTests
                 auto reply = sendUdpAndReceive(1265, AF_INET, "hello");
                 VERIFY_ARE_EQUAL(reply, "HELLO");
             }
-
-            */
 
             // Validate that trying to bind an address that the host doesn't have fails:
             {

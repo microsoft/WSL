@@ -302,7 +302,7 @@ void VirtioNetworking::SetupLoopbackDevice()
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
         m_swiotlbOption.c_str(),
-        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.152",
+        L"client_ip=169.254.73.250;client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248",
         0,
         m_userToken.get());
 
@@ -312,8 +312,8 @@ void VirtioNetworking::SetupLoopbackDevice()
     // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
-    endpointProperties.IPAddress = L"169.254.73.153";
-    endpointProperties.PrefixLength = 30;
+    endpointProperties.IPAddress = L"169.254.73.250";
+    endpointProperties.PrefixLength = 28;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 
