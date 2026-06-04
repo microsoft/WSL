@@ -164,7 +164,8 @@ try
 }
 CATCH_LOG()
 
-void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+void WSLCSessionManagerImpl::CreateSession(
+    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -269,11 +270,11 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
         AddSessionProcessToJobObject(factory.get());
 
-        auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         {
-            const auto factoryHr = factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef);
+            const auto factoryHr = factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
             if (FAILED(factoryHr))
             {
                 if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
@@ -413,14 +414,15 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions,
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+void WSLCSessionManagerImpl::EnterSession(
+    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
     THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WarningCallback, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
@@ -562,20 +564,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WarningCallback, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)

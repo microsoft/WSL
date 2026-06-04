@@ -52,7 +52,7 @@ namespace {
     {
         const auto sessionManager = OpenSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};

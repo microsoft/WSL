@@ -19,7 +19,6 @@ Abstract:
 #include "WSLCSessionFactory.h"
 #include "WSLCSession.h"
 #include "WSLCSessionReference.h"
-#include "ExecutionContext.h"
 
 namespace wslc = wsl::windows::service::wslc;
 
@@ -32,13 +31,11 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachine* Vm,
     _In_ IWSLCPluginNotifier* PluginNotifier,
+    _In_opt_ IWarningCallback* WarningCallback,
     _Out_ IWSLCSession** Session,
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
-    // Capture user-error messages and serialize them to IErrorInfo for the caller.
-    wsl::windows::common::COMServiceExecutionContext context;
-
     *Session = nullptr;
     *ServiceRef = nullptr;
 
@@ -50,9 +47,7 @@ try
     session->SetDestructionCallback(std::move(m_destructionCallback));
 
     // Initialize the session with the VM.
-    // N.B. THROW_IF_FAILED is required (not RETURN_IF_FAILED) so WIL's error
-    // callback fires CollectError before ~COMServiceExecutionContext runs.
-    THROW_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier));
+    RETURN_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier, WarningCallback));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());
