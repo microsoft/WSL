@@ -341,9 +341,18 @@ try
     // Monitor for unexpected VM exit.
     m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
-    // Recover any existing resources from storage.
-    RecoverExistingNetworks();
-    RecoverExistingContainers();
+    // Recover any existing resources from storage. A failure here must not crash the session host
+    // or abort session creation. In particular, podman's compat /containers/json can return HTTP 500
+    // ("getting graph driver info ...: readlink <graphroot>/overlay: invalid argument") for a
+    // non-running container after an unclean session restart - an upstream containers-storage overlay
+    // graph-driver issue (see containers/podman#19090), not a fault on our side. Log and continue so
+    // the session still comes up rather than taking down the process.
+    try
+    {
+        RecoverExistingNetworks();
+        RecoverExistingContainers();
+    }
+    CATCH_LOG();
 
     errorCleanup.release();
     return S_OK;
@@ -397,8 +406,11 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         }
     });
 
-    auto result =
-        wil::ResultFromException([&]() { diskDevice = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false).second; });
+    auto result = wil::ResultFromException([&]() {
+        auto [attachedLun, attachedDevice] = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
+        m_storageDiskLun = attachedLun;
+        diskDevice = std::move(attachedDevice);
+    });
 
     if (FAILED(result))
     {
@@ -422,6 +434,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
         // Then attach the new disk.
         std::tie(diskLun, diskDevice) = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
+        m_storageDiskLun = diskLun;
 
         // Then format it.
         m_virtualMachine->Ext4Format(diskDevice);
@@ -2493,7 +2506,23 @@ try
                 WSL_LOG("PodmanSystemServiceExit", TraceLoggingValue(podmanExitCode, "code"));
             }
 
-            // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+            // Flush the storage filesystem to its backing VHD before the VM is torn down. Under podman,
+            // stopping the system service above does NOT stop conmon-managed running containers, so a
+            // running container's overlay keeps c_containerdStorage busy and the Unmount below fails
+            // (EBUSY) without ever syncing. Detaching the storage disk issues a sync() in the guest first
+            // (see the WSLC_DETACH handler), making recently-written overlay metadata durable so the next
+            // session over this VHD doesn't hit a corrupt overlay store ("readlink .../overlay: invalid
+            // argument" 500, containers/podman#19090).
+            if (m_storageDiskLun.has_value())
+            {
+                try
+                {
+                    m_virtualMachine->DetachDisk(m_storageDiskLun.value());
+                    m_storageDiskLun.reset();
+                }
+                CATCH_LOG();
+            }
+
             try
             {
                 m_virtualMachine->Unmount(c_containerdStorage);
