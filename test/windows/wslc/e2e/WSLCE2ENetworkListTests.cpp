@@ -76,7 +76,7 @@ class WSLCE2ENetworkListTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto networks = FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
-        VERIFY_IS_TRUE(networks.size() >= 2U);
+        VERIFY_ARE_EQUAL(2U, networks.size());
 
         std::vector<std::string> names;
         names.reserve(networks.size());
