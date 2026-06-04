@@ -2982,7 +2982,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Remove one or more networks.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks. A network cannot be removed if it has active endpoints.</value>
+    <value>Removes one or more networks.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
     <value>Display detailed information on one or more networks.</value>
