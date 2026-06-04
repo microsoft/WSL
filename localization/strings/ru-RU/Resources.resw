@@ -2330,7 +2330,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
-    <value>Unsupported network mode: '{}'</value>
+    <value>Неподдерживаемый сетевой режим: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
@@ -3118,6 +3118,40 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
     <value>Предупреждение: файл параметров в {} пуст или имеет недопустимую структуру. Ожидается сопоставление YAML.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>Failed to recover container '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>Failed to recover network '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>Failed to recover volume '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>Failed to initialize swap</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>Failed to restore timestamp for container '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>Failed to parse image import progress</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>Failed to unmount volume '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>Не удалось остановить контейнер '{}' после отклонения подключаемого модуля</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>Failed to release host resources for volume '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
