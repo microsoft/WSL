@@ -246,7 +246,6 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, Eleva
     wil::unique_hfile parentStderrRead;
     wsl::windows::common::helpers::unique_pseudo_console console;
 
-    // Child handles for the pipe-based path; must stay alive until the process has started.
     wil::unique_hfile childStdinRead;
     wil::unique_hfile childStdoutWrite;
     wil::unique_hfile childStderrWrite;
@@ -304,8 +303,6 @@ PseudoConsole::PseudoConsole(SHORT columns, SHORT rows)
     THROW_IF_FAILED(::CreatePseudoConsole(COORD{columns, rows}, inputRead.get(), outputWrite.get(), 0, &rawPseudoConsole));
     Handle.reset(rawPseudoConsole);
 
-    // ConPTY duplicates the handles internally; release the local references now so that EOF
-    // propagates correctly once ClosePseudoConsole runs.
     InputWrite = std::move(inputWrite);
     OutputRead = std::move(outputRead);
 }
@@ -492,8 +489,7 @@ bool WSLCInteractiveSession::Terminate(UINT exitCode)
 
 void WSLCInteractiveSession::VerifyNoErrors()
 {
-    VERIFY_IS_NOT_NULL(
-        m_stderrReader.get(), L"VerifyNoErrors is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
+    WI_ASSERT(m_stderrReader.get() != nullptr);
     m_stderrReader->ExpectClosed(DefaultWaitTimeoutMs);
 
     // Verify that stderr was actually empty - not just closed

@@ -87,11 +87,8 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
 
-    // Returns a snapshot of everything read from stdout so far (in pseudoconsole mode this is the
-    // combined output stream). Non-consuming, unlike ExpectStdout.
     std::string GetStdoutData() const;
 
-    // Resizes the attached pseudoconsole. Only valid for sessions created with a PseudoConsole.
     void ResizePseudoConsole(SHORT columns, SHORT rows);
 
     bool IsRunning() const;
@@ -108,8 +105,6 @@ private:
     wil::unique_hfile m_stdinWrite;
     wil::unique_hfile m_stdoutRead;
     wil::unique_hfile m_stderrRead;
-    // Destroyed (ClosePseudoConsole) after the readers are stopped but before the read pipes are
-    // closed, so the conpty is torn down in the right order. Null for pipe-based sessions.
     wsl::windows::common::helpers::unique_pseudo_console m_pseudoConsole;
     wil::unique_handle m_processHandle;
     wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
