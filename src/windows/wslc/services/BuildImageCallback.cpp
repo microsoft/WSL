@@ -186,10 +186,6 @@ void BuildImageCallback::Redraw()
 {
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    // Use the visible window width (not buffer width), minus one column to avoid the
-    // deferred-wrap edge case when a line is exactly the window width. Clamp to at
-    // least zero so the value never goes negative (which would underflow when passed
-    // to std::wstring::resize).
     const int consoleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left);
 
     const bool showPending = !m_pendingLine.empty();
@@ -206,15 +202,20 @@ void BuildImageCallback::Redraw()
     // during the redraw so the user doesn't see it bouncing through the cursor movement,
     // then show it again at the final position. The dim attribute (\033[2m) renders the
     // scrolling lines de-emphasized regardless of the user's theme.
-    std::wostringstream buffer;
-    buffer << Cursor::Hide << Format::Dim;
+    //
+    // m_frameBuffer is a member so its backing allocation is reused across frames -
+    // it grows to the high-water mark and is never freed between redraws.
+    m_frameBuffer.clear();
+    m_frameBuffer += Cursor::Hide;
+    m_frameBuffer += Format::Dim;
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
     // previous one (e.g. when \r clears the pending line without a replacement).
     if (m_displayedLines > 0)
     {
-        buffer << Cursor::Up(m_displayedLines) << Erase::ScreenForward;
+        m_frameBuffer += Cursor::Up(m_displayedLines);
+        m_frameBuffer += Erase::ScreenForward;
     }
 
     auto appendLine = [&](const std::string& line) {
@@ -223,7 +224,9 @@ void BuildImageCallback::Redraw()
         {
             wline.resize(static_cast<size_t>(consoleWidth));
         }
-        buffer << wline << Erase::LineForward << L'\n';
+        m_frameBuffer += std::move(wline);
+        m_frameBuffer += Erase::LineForward;
+        m_frameBuffer += L'\n';
     };
 
     // Print completed lines (skip older ones if we need room for the pending line).
@@ -249,9 +252,10 @@ void BuildImageCallback::Redraw()
         appendLine(line);
     }
 
-    buffer << Format::Normal << Cursor::Show;
+    m_frameBuffer += Format::Normal;
+    m_frameBuffer += Cursor::Show;
 
-    WriteTerminal(buffer.str());
+    WriteTerminal(m_frameBuffer);
     m_displayedLines = displayCount;
 }
 

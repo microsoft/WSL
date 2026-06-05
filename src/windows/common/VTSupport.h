@@ -125,23 +125,41 @@ public:
         }
         else
         {
-            const DWORD preferredFlags = ENABLE_VIRTUAL_TERMINAL_PROCESSING | (disableNewlineAutoReturn ? DISABLE_NEWLINE_AUTO_RETURN : 0);
-
-            for (DWORD flags : {preferredFlags, static_cast<DWORD>(ENABLE_VIRTUAL_TERMINAL_PROCESSING)})
-            {
+            // Attempts to apply the given extra flags on top of the current mode.
+            // Returns true on success (including when the flags are already set),
+            // false if SetConsoleMode rejected them.
+            auto tryEnable = [&](DWORD flags) -> bool {
                 const DWORD newMode = current | flags;
                 if (newMode == current)
                 {
-                    return;
+                    // The requested flags are already active; report success without
+                    // calling SetConsoleMode.  The destructor will restore current to
+                    // itself (a no-op) which is correct and harmless.
+                    m_console = console;
+                    m_originalMode = current;
+                    return true;
                 }
+
                 if (SetConsoleMode(console, newMode))
                 {
                     m_console = console;
                     m_originalMode = current;
-                    return;
+                    return true;
                 }
+
                 LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
+                return false;
+            };
+
+            // When DISABLE_NEWLINE_AUTO_RETURN is requested, try it first and fall
+            // back to plain ENABLE_VIRTUAL_TERMINAL_PROCESSING if the flag is
+            // unsupported.  When it is not requested, only one attempt is needed.
+            if (disableNewlineAutoReturn && tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
+            {
+                return;
             }
+
+            tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         }
     }
 
@@ -500,6 +518,16 @@ template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::
 inline bool operator==(const char* lhs, const T& rhs)
 {
     return lhs == rhs.Get();
+}
+
+// operator+= overloads for in-place wide string appending.
+// Appends the ASCII sequence bytes directly into lhs without creating a temporary
+// std::wstring, making them more efficient than ToWide() when building a frame buffer.
+inline std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
+{
+    const auto sv = rhs.Get();
+    lhs.append(sv.begin(), sv.end());
+    return lhs;
 }
 
 // Widens a Sequence's ASCII bytes into a std::wstring.

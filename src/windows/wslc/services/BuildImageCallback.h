@@ -58,6 +58,9 @@ private:
     std::chrono::steady_clock::time_point m_lastRedraw{};
     // Per-entry pull progress lines, keyed by entry id. Updated in place by Redraw. std::map so order is consistent.
     std::map<std::string, std::string> m_pullLines;
+    // Reused across Redraw() calls so the backing allocation grows to the high-water
+    // mark and is then reused rather than re-allocated every frame.
+    std::wstring m_frameBuffer;
     // Captured at construction so the destructor can detect destruction during exception unwinding.
     int m_uncaughtExceptions = std::uncaught_exceptions();
 };
