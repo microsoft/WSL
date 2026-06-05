@@ -56,7 +56,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
 
-    for (auto i = 1; i < options.Networks.size(); ++i)
+    for (size_t i = 1; i < options.Networks.size(); ++i)
     {
         containerLauncher.AddAdditionalNetwork(options.Networks[i]);
     }
