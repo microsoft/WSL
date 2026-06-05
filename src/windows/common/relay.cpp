@@ -327,9 +327,22 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
             {
                 THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
+                leftReadPending = true;
             }
+            else if (leftBytesRead == 0)
+            {
+                LeftHandle = nullptr;
+                if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
+                {
+                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(RightHandle), SD_SEND) == SOCKET_ERROR);
+                }
 
-            leftReadPending = true;
+                continue;
+            }
+            else
+            {
+                leftReadPending = true;
+            }
         }
 
         DWORD rightBytesRead = 0;
@@ -338,9 +351,22 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
             {
                 THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
+                rightReadPending = true;
             }
+            else if (rightBytesRead == 0)
+            {
+                RightHandle = nullptr;
+                if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
+                {
+                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(LeftHandle), SD_SEND) == SOCKET_ERROR);
+                }
 
-            rightReadPending = true;
+                continue;
+            }
+            else
+            {
+                rightReadPending = true;
+            }
         }
 
         const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitObjects), waitObjects, FALSE, INFINITE);
@@ -917,6 +943,11 @@ try
 
                         THROW_LAST_ERROR_IF(lastError != ERROR_IO_PENDING);
                     }
+                    else if (Transferred == 0)
+                    {
+                        e.State = Eof;
+                        continue;
+                    }
 
                     // IO is available.
                     Write(i, gsl::make_span(e.Buffer.data(), Transferred));
@@ -938,6 +969,12 @@ try
                 DWORD BytesRead{};
                 if (ReadFile(e.Handle, e.Buffer.data(), static_cast<DWORD>(e.Buffer.size()), &BytesRead, &e.Overlapped))
                 {
+                    if (BytesRead == 0)
+                    {
+                        e.State = Eof;
+                        continue;
+                    }
+
                     // IO is available.
                     Write(i, gsl::make_span(e.Buffer.data(), BytesRead));
 

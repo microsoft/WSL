@@ -6314,6 +6314,119 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(expandedHash, expectedHash);
     }
 
+    // Validates that relay functions properly detect EOF (zero-byte read) on synchronous completion
+    // and terminate instead of spinning. See: https://github.com/microsoft/WSL/issues/40651
+    TEST_METHOD(RelayEofDetection)
+    {
+        // Helper: create an overlapped pipe pair for unidirectional use (server=read, client=write).
+        auto createOverlappedPipe = [](wil::unique_handle& readHandle, wil::unique_handle& writeHandle) {
+            static std::atomic<int> pipeCounter{0};
+            auto pipeName = std::format(L"\\\\.\\pipe\\WslTest_RelayEof_{}", pipeCounter++);
+
+            SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+            readHandle.reset(CreateNamedPipeW(
+                pipeName.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, &sa));
+            VERIFY_IS_NOT_NULL(readHandle.get());
+
+            writeHandle.reset(CreateFileW(pipeName.c_str(), GENERIC_WRITE, 0, &sa, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr));
+            VERIFY_IS_NOT_NULL(writeHandle.get());
+        };
+
+        // Helper: create a duplex overlapped pipe pair (both handles support read+write).
+        auto createDuplexPipe = [](wil::unique_handle& serverHandle, wil::unique_handle& clientHandle) {
+            static std::atomic<int> pipeCounter{0};
+            auto pipeName = std::format(L"\\\\.\\pipe\\WslTest_RelayEofDuplex_{}", pipeCounter++);
+
+            SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+            serverHandle.reset(CreateNamedPipeW(
+                pipeName.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, &sa));
+            VERIFY_IS_NOT_NULL(serverHandle.get());
+
+            clientHandle.reset(CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &sa, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr));
+            VERIFY_IS_NOT_NULL(clientHandle.get());
+        };
+
+        // Test InterruptableRelay: close the write end of a pipe and verify the relay terminates promptly.
+        {
+            wil::unique_handle readPipe, writePipe;
+            createOverlappedPipe(readPipe, writePipe);
+
+            // Write some data, then close the write end to signal EOF.
+            constexpr std::string_view testData = "hello";
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(writePipe.get(), testData.data(), static_cast<DWORD>(testData.size()), &written, nullptr));
+            writePipe.reset();
+
+            // Create an output pipe to capture relayed data.
+            wil::unique_handle outputRead, outputWrite;
+            createOverlappedPipe(outputRead, outputWrite);
+
+            // Run the relay in a thread — it must terminate once it hits EOF.
+            auto relayThread =
+                std::thread([&]() { wsl::windows::common::relay::InterruptableRelay(readPipe.get(), outputWrite.get()); });
+
+            // Wait up to 5 seconds for the relay to finish. If it doesn't, the EOF check is broken.
+            VERIFY_ARE_EQUAL(WaitForSingleObject(relayThread.native_handle(), 5000), WAIT_OBJECT_0);
+            relayThread.join();
+
+            // Verify the data was relayed.
+            outputWrite.reset();
+            char buf[64]{};
+            DWORD bytesRead{};
+            ReadFile(outputRead.get(), buf, sizeof(buf), &bytesRead, nullptr);
+            VERIFY_ARE_EQUAL(bytesRead, static_cast<DWORD>(testData.size()));
+            VERIFY_ARE_EQUAL(std::string_view(buf, bytesRead), testData);
+        }
+
+        // Test BidirectionalRelay: close both peer ends and verify it terminates.
+        {
+            // BidirectionalRelay reads from and writes to both handles, so we need duplex pipes.
+            wil::unique_handle leftServer, leftClient, rightServer, rightClient;
+            createDuplexPipe(leftServer, leftClient);
+            createDuplexPipe(rightServer, rightClient);
+
+            // Close the client ends to simulate peer EOF on both sides.
+            leftClient.reset();
+            rightClient.reset();
+
+            // BidirectionalRelay should detect EOF on both sides and return promptly.
+            auto relayThread =
+                std::thread([&]() { wsl::windows::common::relay::BidirectionalRelay(leftServer.get(), rightServer.get()); });
+
+            VERIFY_ARE_EQUAL(WaitForSingleObject(relayThread.native_handle(), 5000), WAIT_OBJECT_0);
+            relayThread.join();
+        }
+
+        // Test ScopedMultiRelay: close write ends and verify it terminates.
+        {
+            wil::unique_handle read1, write1, read2, write2;
+            createOverlappedPipe(read1, write1);
+            createOverlappedPipe(read2, write2);
+
+            // Write data to one pipe, close both.
+            constexpr std::string_view testData = "relay_test";
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write1.get(), testData.data(), static_cast<DWORD>(testData.size()), &written, nullptr));
+            write1.reset();
+            write2.reset();
+
+            std::string captured;
+            std::mutex captureLock;
+
+            {
+                wsl::windows::common::relay::ScopedMultiRelay relay({read1.get(), read2.get()}, [&](size_t, const gsl::span<gsl::byte>& buffer) {
+                    std::lock_guard lock(captureLock);
+                    captured.append(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+                });
+
+                // Sync should return promptly once both inputs hit EOF.
+                relay.Sync();
+            }
+
+            VERIFY_ARE_EQUAL(captured, std::string(testData));
+        }
+    }
+
     TEST_METHOD(EtcHosts)
     {
         {
