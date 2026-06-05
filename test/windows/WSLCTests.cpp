@@ -3423,6 +3423,19 @@ class WSLCTests
 
             ValidateContainerOutput(container, {{1, ""}}, 1);
         }
+
+        // Validate that the directories are readable by non-root users.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-container-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
+
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            launcher.SetUser("nobody");
+
+            auto container = launcher.Launch(*session);
+
+            ValidateContainerOutput(container, {}, 0);
+        }
     }
 
     WSLC_TEST_METHOD(Modules)
