@@ -2873,7 +2873,26 @@ void LxssUserSessionImpl::_CreateVm()
         m_vmId.store(vmId);
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        try
+        {
+            m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        }
+        catch (...)
+        {
+            // CreateComputeSystem() throws HCS_E_HYPERV_NOT_INSTALLED when the Virtual Machine Platform optional
+            // component is not installed. That HRESULT otherwise maps to a misleading "virtualization is not
+            // enabled" message that points users at their BIOS instead of the missing component. Remap it to an
+            // actionable error covering every path that needs the VM (launch, WSL1->WSL2 conversion, import,
+            // disk mount, ...). Other failures (e.g. the VM starts but networking init fails because VMP is only
+            // partially installed) are left untouched so their existing degraded-mode handling still applies.
+            if (wil::ResultFromCaughtException() == HCS_E_HYPERV_NOT_INSTALLED)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED, wsl::shared::Localization::MessageVirtualMachinePlatformNotInstalled());
+            }
+
+            throw;
+        }
 
         if (m_httpProxyStateTracker)
         {
