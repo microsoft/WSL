@@ -674,8 +674,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
 
-        result = RunWslc(
-            std::format(L"container run --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result = RunWslc(std::format(
+            L"container run --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -696,8 +696,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_NonexistentNetwork_Rejected)
     {
-        auto result = RunWslc(
-            std::format(L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value());
         EnsureContainerDoesNotExist(WslcContainerName);
