@@ -303,20 +303,42 @@ void ImageService::Push(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
 }
 
-void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)
 {
     wil::unique_hfile outputFile{
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
-    Save(session, image, outputFile.get(), cancelEvent);
+    Save(session, images, outputFile.get(), cancelEvent);
 }
 
-void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent)
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, HANDLE outputHandle, HANDLE cancelEvent)
 {
+    WI_ASSERT(!images.empty());
+
     wsl::windows::common::HandleConsoleProgressBar progressBar(
-        outputHandle, L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
+        outputHandle, Localization::MessageWslcSaveInProgress(), wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+
+    if (images.size() == 1)
+    {
+        THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), images[0].c_str(), nullptr, cancelEvent));
+    }
+    else
+    {
+        std::vector<LPCSTR> imagePointers;
+        imagePointers.reserve(images.size());
+        for (const auto& image : images)
+        {
+            imagePointers.push_back(image.c_str());
+        }
+
+        WSLCStringArray imageArray{
+            .Values = imagePointers.data(),
+            .Count = static_cast<ULONG>(imagePointers.size()),
+        };
+
+        THROW_IF_FAILED(session.Get()->SaveImages(ToCOMInputHandle(outputHandle), &imageArray, nullptr, cancelEvent));
+    }
 }
 
 wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(

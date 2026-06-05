@@ -227,6 +227,21 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImages(const std::vector<std::string>& NamesOrIds)
+{
+    auto url = URL::Create("/images/get");
+    for (const auto& name : NamesOrIds)
+    {
+        // 'names' is a repeated query parameter.
+        // See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Image/operation/ImageGet
+        url.SetParameter("names", name);
+    }
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket)};
+}
+
 docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/prune");
