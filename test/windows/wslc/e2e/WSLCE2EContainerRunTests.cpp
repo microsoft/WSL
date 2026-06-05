@@ -745,7 +745,9 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(
             L"container run --name {} --memory 32M {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // Note: stderr is not asserted here because some kernels emit a swap-limit warning
+        // ("Your kernel does not support swap limit capabilities...") when a memory limit is set.
+        result.Verify({.ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL(static_cast<int64_t>(32) * 1024 * 1024, inspect.HostConfig.Memory);
