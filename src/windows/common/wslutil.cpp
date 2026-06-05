@@ -376,7 +376,10 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
 
     const auto attributes = GetFileAttributesW(downloadFolderPath.c_str());
     THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);
-    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(downloadFolderPath.c_str(), attributes & ~(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)));
+    if (attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+    {
+        THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(downloadFolderPath.c_str(), attributes & ~(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)));
+    }
 
     const auto downloadFolder = winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(downloadFolderPath.wstring()).get();
 
