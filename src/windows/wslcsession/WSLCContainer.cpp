@@ -710,8 +710,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     {
         detachKeys = StartOptions->DetachKeys != nullptr ? std::optional<std::string>(StartOptions->DetachKeys) : std::nullopt;
 
-        // A valid (non-zero) tty size is only required when attaching to a tty init process; detached starts (e.g.
-        // 'container run -d -t' or 'container start' without attach) legitimately have no host terminal to size from.
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             WI_IsFlagSet(Flags, WSLCContainerStartFlagsAttach) && WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) &&
@@ -772,8 +770,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && StartOptions != nullptr && StartOptions->TtyRows != 0 &&
-        StartOptions->TtyColumns != 0)
+    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && StartOptions != nullptr)
     {
         try
         {

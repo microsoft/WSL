@@ -378,7 +378,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
         }
     }
 
-    THROW_IF_FAILED(container.Start(startFlags, &startOptions, warningCallback.Get())); //TODO: detach keys
+    THROW_IF_FAILED(container.Start(startFlags, &startOptions, warningCallback.Get())); // TODO: detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);

@@ -21,8 +21,7 @@ using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 
-bool ConsoleService::RelayInteractiveTty(
-    wsl::windows::common::ConsoleState& console, ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
+bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& console, ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
     // Configure the console for interactive usage.
     console.SetInteractiveMode();
@@ -109,8 +108,7 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
     io.Run({});
 }
 
-int ConsoleService::AttachToCurrentConsole(
-    wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process)
+int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process)
 {
     if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {

@@ -565,6 +565,21 @@ class WSLCE2EContainerRunTests
         session.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_TerminalSize)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        constexpr SHORT columns = 42;
+        constexpr SHORT rows = 43;
+        const auto commandLine = std::format(
+            L"container run --rm -it --name {} {} /bin/sh -c \"while true; do stty size; sleep 1; done\"",
+            WslcContainerName,
+            DebianImage.NameAndTag());
+
+        auto session = RunWslcInteractive(commandLine, ElevationType::Elevated, PseudoConsole{columns, rows});
+        VerifyPseudoConsoleTtySize(session, columns, rows);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
     {
         auto result = RunWslc(std::format(

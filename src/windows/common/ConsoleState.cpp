@@ -83,7 +83,6 @@ ConsoleState::ConsoleState()
 
 void ConsoleState::SetInteractiveMode()
 {
-    // Configuring twice would overwrite the saved original state with the already-modified state.
     if (m_interactiveModeConfigured)
     {
         return;

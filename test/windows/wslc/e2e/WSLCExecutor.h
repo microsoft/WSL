@@ -47,18 +47,12 @@ struct WSLCExecutionResult
     bool StdoutContainsSubstring(const std::wstring& substring) const;
 };
 
-// RAII wrapper around a Windows ConPTY pseudoconsole together with the input-write and
-// output-read pipe ends the host uses to drive it. Construct one with the desired initial
-// size and hand it to RunWslcInteractive to attach wslc.exe to a real pseudoterminal instead
-// of plain pipes. Ownership of the conpty and pipes is transferred into the resulting
-// WSLCInteractiveSession, which exposes ResizePseudoConsole() and reads the combined output
-// stream via the normal stdout reader.
 struct PseudoConsole
 {
-    PseudoConsole(SHORT columns, SHORT rows);
-
     NON_COPYABLE(PseudoConsole);
     DEFAULT_MOVABLE(PseudoConsole);
+
+    PseudoConsole(SHORT columns, SHORT rows);
 
     wil::unique_hfile InputWrite;
     wil::unique_hfile OutputRead;
@@ -132,8 +126,6 @@ void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expect
 
 std::wstring GetWslcHeader();
 WSLCInteractiveSession RunWslcInteractive(
-    const std::wstring& commandLine,
-    ElevationType elevationType = ElevationType::Elevated,
-    std::optional<PseudoConsole> pseudoConsole = std::nullopt);
+    const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<PseudoConsole> pseudoConsole = std::nullopt);
 
 } // namespace WSLCE2ETests

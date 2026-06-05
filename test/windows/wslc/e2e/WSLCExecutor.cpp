@@ -253,8 +253,6 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, Eleva
 
     if (pseudoConsole.has_value())
     {
-        // Pseudoconsole mode: wslc.exe is attached to a ConPTY, so stdin/stdout/stderr are
-        // multiplexed onto the conpty's single output stream and there is no separate stderr.
         process.SetPseudoConsole(pseudoConsole->Handle.get());
         parentStdinWrite = std::move(pseudoConsole->InputWrite);
         parentStdoutRead = std::move(pseudoConsole->OutputRead);
@@ -298,12 +296,8 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, Eleva
 
 PseudoConsole::PseudoConsole(SHORT columns, SHORT rows)
 {
-    // Read end of the input pipe is handed to the conpty (it reads what would be written to stdin);
-    // the write end is overlapped so WSLCInteractiveSession::Write (which uses OVERLAPPED I/O) works.
     auto [inputRead, inputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, true);
 
-    // Read end of the output pipe must be overlapped because PartialHandleRead / InterruptableRead
-    // use OVERLAPPED I/O with an event-based cancellation pattern.
     auto [outputRead, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
 
     HPCON rawPseudoConsole{};
@@ -382,7 +376,7 @@ void WSLCInteractiveSession::ResizePseudoConsole(SHORT columns, SHORT rows)
 
 void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 {
-    VERIFY_IS_NOT_NULL(m_stderrReader.get(), L"ExpectStderr is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
+    WI_ASSERT(m_stderrReader.get() != nullptr);
     Log::Comment(std::format(L"Expecting stderr: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stderrReader->ExpectConsume(expected);
 }
@@ -498,7 +492,8 @@ bool WSLCInteractiveSession::Terminate(UINT exitCode)
 
 void WSLCInteractiveSession::VerifyNoErrors()
 {
-    VERIFY_IS_NOT_NULL(m_stderrReader.get(), L"VerifyNoErrors is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
+    VERIFY_IS_NOT_NULL(
+        m_stderrReader.get(), L"VerifyNoErrors is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
     m_stderrReader->ExpectClosed(DefaultWaitTimeoutMs);
 
     // Verify that stderr was actually empty - not just closed
