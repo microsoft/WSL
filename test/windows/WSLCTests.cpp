@@ -3039,9 +3039,8 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         // Validate that the same port can't be bound twice
-        // TODO: Update error code onced fixed in virtionet mode.
         VERIFY_ARE_EQUAL(
-            session->MapVmPort(AF_INET, 1234, 80), networkingMode == WSLCNetworkingModeNAT ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_FAIL);
+            session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
         // Check simple case
         listen(80, "port80", false);
@@ -3065,8 +3064,9 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
 
         // Verify that a proper error is returned if the mapping doesn't exist
+        // TODO: update once virtionet error code is fixed.
         VERIFY_ARE_EQUAL(
-            session->UnmapVmPort(AF_INET, 1234, 80), networkingMode == WSLCNetworkingModeNAT ? HRESULT_FROM_WIN32(ERROR_NOT_FOUND) : E_FAIL);
+            session->UnmapVmPort(AF_INET, 1234, 80), networkingMode == WSLCNetworkingModeNAT ? HRESULT_FROM_WIN32(ERROR_NOT_FOUND) : E_INVALIDARG);
 
         // Unmap the v6 port
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234, 80));
@@ -6960,7 +6960,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLCSignalSIGKILL);
     }
 
-    void RunPortMappingsTest(IWSLCSession& session, WSLCContainerNetworkType containerNetworkType)
+    void RunPortMappingsTest(IWSLCSession& session, WSLCContainerNetworkType containerNetworkType, bool virtionet)
     {
         LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
 
@@ -7073,7 +7073,7 @@ class WSLCTests
             subLauncher.AddPort(1234, 8000, AF_INET);
 
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
-            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
             // Verify that a stopped container returns no ports.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
@@ -7123,7 +7123,7 @@ class WSLCTests
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET);
 
-            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEADDRINUSE));
         }
 
         auto bindSocket = [](auto port) {
@@ -7143,7 +7143,9 @@ class WSLCTests
                 "python:3.12-alpine", "test-ports-fail", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1235, 8000, AF_INET);
-            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
+            VERIFY_ARE_EQUAL(
+                launcher.LaunchNoThrow(session).first,
+                 HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
             // Validate that Create() correctly cleans up bound ports after a port fails to map
             {
@@ -7152,7 +7154,9 @@ class WSLCTests
                 launcher.AddPort(1236, 8000, AF_INET); // Should succeed
                 launcher.AddPort(1235, 8000, AF_INET); // Should fail.
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
+                VERIFY_ARE_EQUAL(
+                    launcher.LaunchNoThrow(session).first,
+                     HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
                 // Validate that port 1236 is still available (was cleaned up after failure).
                 VERIFY_IS_TRUE(!!bindSocket(1236));
@@ -7197,20 +7201,37 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(session.CreateContainer(&options, &container), E_INVALIDARG);
             }
 
-            // TODO: Update once UDP is supported.
+            if (virtionet)
             {
-                WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
-                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
+                {
+                    WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                    launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+                    VERIFY_SUCCEEDED(launcher.LaunchNoThrow(session).first);
+                }
+
+                {
+                    WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                    launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "0.0.0.0");
+
+                    VERIFY_SUCCEEDED(launcher.LaunchNoThrow(session).first);
+                }
             }
-
-            // TODO: Update once custom binding addresses are supported.
+            else
             {
-                WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
-                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
+                {
+                    WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                    launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+                    VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+                }
+
+                {
+                    WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                    launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "0.0.0.0");
+
+                    VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+                }
             }
         }
     }
@@ -7230,16 +7251,16 @@ class WSLCTests
     {
         auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeNAT);
 
-        RunPortMappingsTest(*session, WSLCContainerNetworkTypeBridged);
-        RunPortMappingsTest(*session, WSLCContainerNetworkTypeHost);
+        RunPortMappingsTest(*session, WSLCContainerNetworkTypeBridged, false);
+        RunPortMappingsTest(*session, WSLCContainerNetworkTypeHost, false);
     }
 
     WSLC_TEST_METHOD(PortMappingsVirtioProxy)
     {
         auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy);
 
-        RunPortMappingsTest(*session, WSLCContainerNetworkTypeBridged);
-        RunPortMappingsTest(*session, WSLCContainerNetworkTypeHost);
+        RunPortMappingsTest(*session, WSLCContainerNetworkTypeBridged, true);
+        RunPortMappingsTest(*session, WSLCContainerNetworkTypeHost, true);
     }
 
     WSLC_TEST_METHOD(PortMappingsAdvanced)
@@ -7475,9 +7496,8 @@ class WSLCTests
                     WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                     launcher.AddPort(1265, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
 
-                    // TODO: Update error code once changed in virtionet.
                     auto container = launcher.Create(*session);
-                    VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), E_FAIL);
+                    VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL));
                     ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', Unspecified error ");
                 }
             }
@@ -9370,7 +9390,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
 
             // Start container 2 — should fail because the host port is already reserved by container 1.
-            VERIFY_ARE_EQUAL(container2.Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(container2.Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(WSAEADDRINUSE));
             VERIFY_ARE_EQUAL(container2.State(), WslcContainerStateCreated);
         }
 
