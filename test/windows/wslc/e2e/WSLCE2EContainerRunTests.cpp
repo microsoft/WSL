@@ -670,7 +670,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
     {
-        auto result = RunWslc(std::format(L"network create {}", TestNetworkName));
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
 
@@ -687,20 +687,14 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        VERIFY_IS_TRUE(result.ExitCode.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value());
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"network") != std::wstring::npos);
-        EnsureContainerDoesNotExist(WslcContainerName);
+        result.Verify({.Stderr = L"Invalid network value: network name cannot be empty or whitespace\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_NonexistentNetwork_Rejected)
     {
         auto result = RunWslc(std::format(
             L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        VERIFY_IS_TRUE(result.ExitCode.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value());
-        EnsureContainerDoesNotExist(WslcContainerName);
+        result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
