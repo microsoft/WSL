@@ -319,7 +319,7 @@ class WSLCCLIVTSupportUnitTests
 
         DWORD baseline{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &baseline));
-        SetConsoleMode(h, baseline & ~ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(h, baseline & ~ENABLE_VIRTUAL_TERMINAL_PROCESSING));
 
         {
             EnableVirtualTerminal vt{h};

@@ -21,17 +21,23 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
+void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
+{
+    DWORD written;
+    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+}
+
 auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        wprintf(L"%ls", std::format(L"{}", Cursor::Up(line)).c_str());
+        WriteTerminal(ToWide(Cursor::Up(line)));
     }
 
-    return wil::scope_exit([line = line]() {
+    return wil::scope_exit([line = line, this]() {
         if (line > 1)
         {
-            wprintf(L"%ls", std::format(L"{}", Cursor::Down(line - 1)).c_str());
+            WriteTerminal(ToWide(Cursor::Down(line - 1)));
         }
     });
 }
@@ -47,7 +53,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            wprintf(L"%hs\n", status);
+            WriteTerminal(std::format(L"{}\n", status));
             m_currentLine++;
             return S_OK;
         }
@@ -59,13 +65,13 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
         }
 
         return S_OK;

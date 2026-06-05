@@ -16,6 +16,11 @@ Abstract:
 #include "precomp.h"
 #include "VTSupport.h"
 
+#define WSL_WINDOWS_VT_ESCAPE "\x1b"
+#define WSL_WINDOWS_VT_CSI WSL_WINDOWS_VT_ESCAPE "["
+#define WSL_WINDOWS_VT_OSC WSL_WINDOWS_VT_ESCAPE "]"
+#define WSL_WINDOWS_VT_TEXTFORMAT(_id_) WSL_WINDOWS_VT_CSI #_id_ "m"
+
 namespace wsl::windows::common::vt {
 namespace {
     // Extracts a VT sequence of the form ESC + prefix + result + suffix, returning
@@ -80,18 +85,6 @@ void ConstructedSequence::Clear()
     Set(m_str);
 }
 
-} // namespace wsl::windows::common::vt
-
-// The beginning of a Control Sequence Introducer
-#define WSL_WINDOWS_VT_CSI WSL_WINDOWS_VT_ESCAPE "["
-
-// The beginning of an Operating system command
-#define WSL_WINDOWS_VT_OSC WSL_WINDOWS_VT_ESCAPE "]"
-
-// Define a text formatting sequence with an integer id
-#define WSL_WINDOWS_VT_TEXTFORMAT(_id_) WSL_WINDOWS_VT_CSI #_id_ "m"
-
-namespace wsl::windows::common::vt {
 ConstructedSequence Sgr(std::initializer_list<int> params)
 {
     std::ostringstream result;
@@ -160,41 +153,31 @@ namespace Cursor {
     ConstructedSequence Up(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_CSI << cells << 'A';
-        return ConstructedSequence{std::move(result).str()};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}A", cells)};
     }
 
     ConstructedSequence Down(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_CSI << cells << 'B';
-        return ConstructedSequence{std::move(result).str()};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}B", cells)};
     }
 
     ConstructedSequence Forward(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_CSI << cells << 'C';
-        return ConstructedSequence{std::move(result).str()};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}C", cells)};
     }
 
     ConstructedSequence Backward(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_CSI << cells << 'D';
-        return ConstructedSequence{std::move(result).str()};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}D", cells)};
     }
 
     ConstructedSequence MoveTo(int row, int col)
     {
         THROW_HR_IF(E_INVALIDARG, row < 1 || col < 1);
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_CSI << row << ';' << col << 'H';
-        return ConstructedSequence{std::move(result).str()};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{};{}H", row, col)};
     }
 
     const Sequence Home{WSL_WINDOWS_VT_CSI "H"};

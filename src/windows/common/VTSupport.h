@@ -25,9 +25,6 @@ Abstract:
 #include <type_traits>
 #include "wslutil.h"
 
-// The escape character that begins all VT sequences
-#define WSL_WINDOWS_VT_ESCAPE "\x1b"
-
 namespace wsl::windows::common::vt {
 
 // Get the integral value for an enum.

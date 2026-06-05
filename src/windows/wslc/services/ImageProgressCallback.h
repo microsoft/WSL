@@ -29,10 +29,12 @@ public:
 
 private:
     static CONSOLE_SCREEN_BUFFER_INFO Info();
+    void WriteTerminal(std::wstring_view content) const;
     std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
     std::map<std::string, int> m_statuses;
     int m_currentLine = 0;
-    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{GetStdHandle(STD_OUTPUT_HANDLE)};
-    wsl::windows::common::vt::ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
+    HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
+    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{m_console};
+    wsl::windows::common::vt::ChangeTerminalMode m_terminalMode{m_console, false};
 };
 } // namespace wsl::windows::wslc::services
