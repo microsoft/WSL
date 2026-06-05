@@ -5290,7 +5290,7 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_ARE_EQUAL(hr, E_POINTER);
         }
 
         // Test null container name
