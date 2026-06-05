@@ -329,8 +329,7 @@ try
                 const bool pathExists = std::filesystem::exists(storagePath, ec);
                 throwOnRealFsError(ec, storagePath, "exists");
 
-                THROW_HR_WITH_USER_ERROR_IF(
-                    E_INVALIDARG, Localization::MessageWslcSessionStorageNotADirectory(storagePath.c_str()), pathExists);
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageNotADirectory(storagePath.c_str()), pathExists);
 
                 std::filesystem::create_directories(storagePath, ec);
                 THROW_IF_WIN32_ERROR_MSG(ec.value(), "create_directories failed for %ls", storagePath.c_str());
