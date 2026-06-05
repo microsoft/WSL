@@ -733,8 +733,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus)
     {
-        auto result = RunWslc(std::format(
-            L"container run --name {} --cpus 1.5 {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --name {} --cpus 1.5 {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -743,8 +742,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Memory)
     {
-        auto result = RunWslc(std::format(
-            L"container run --name {} --memory 32M {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --name {} --memory 32M {} true", WslcContainerName, DebianImage.NameAndTag()));
         // Note: stderr is not asserted here because some kernels emit a swap-limit warning
         // ("Your kernel does not support swap limit capabilities...") when a memory limit is set.
         result.Verify({.ExitCode = 0});
@@ -756,9 +754,7 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ulimit)
     {
         auto result = RunWslc(std::format(
-            L"container run --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container run --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -781,11 +777,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus_Invalid)
     {
-        auto result =
-            RunWslc(std::format(L"container run --rm --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n",
-             .ExitCode = 1});
+        auto result = RunWslc(std::format(L"container run --rm --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n", .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -793,8 +786,7 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -803,8 +795,7 @@ class WSLCE2EContainerRunTests
         auto result =
             RunWslc(std::format(L"container run --rm --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n",
-             .ExitCode = 1});
+            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n", .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 

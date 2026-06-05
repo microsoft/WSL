@@ -94,15 +94,15 @@ class WSLCCLIResourceLimitsParserUnitTests
     {
         const std::vector<std::wstring> invalid = {
             L"",
-            L"=1024",         // empty name
-            L"nofile=",       // empty value
-            L"nofile",        // missing '='
-            L"nofile=abc",    // non-numeric soft
-            L"nofile=1024:",  // empty hard
-            L"nofile=:1024",  // empty soft
-            L"nofile=-2",     // negative other than -1
+            L"=1024",           // empty name
+            L"nofile=",         // empty value
+            L"nofile",          // missing '='
+            L"nofile=abc",      // non-numeric soft
+            L"nofile=1024:",    // empty hard
+            L"nofile=:1024",    // empty soft
+            L"nofile=-2",       // negative other than -1
             L"nofile=1024:512", // hard < soft (and both positive)
-            L"nofile=1.5",    // not integer
+            L"nofile=1.5",      // not integer
         };
 
         for (const auto& input : invalid)
