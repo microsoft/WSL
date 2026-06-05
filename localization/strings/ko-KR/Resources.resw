@@ -2964,6 +2964,50 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>로드를 요청했지만 입력이 제공되지 않았습니다.</value>
   </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Manage networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>WSL 네트워크의 수명 주기를 관리합니다(만들기, 검사, 나열 및 삭제 포함).</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Create a network.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Creates a new network.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Specify network driver name (default: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Network metadata setting</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Remove one or more networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Removes one or more networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>하나 이상의 네트워크에 대한 자세한 정보를 표시합니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>하나 이상의 네트워크에 대한 자세한 정보를 표시합니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>List networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Lists all networks in the session.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Network name</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Outputs the network names only</value>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>볼륨을 관리합니다.</value>
   </data>
@@ -3120,33 +3164,33 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
-    <value>Failed to recover container '{}'</value>
+    <value>컨테이너 '{}' 복구 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
-    <value>Failed to recover network '{}'</value>
+    <value>네트워크 '{}' 복구 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
-    <value>Failed to recover volume '{}'</value>
+    <value>볼륨 '{}' 복구 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
-    <value>Failed to initialize swap</value>
+    <value>전환 초기화 실패</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
-    <value>Failed to restore timestamp for container '{}'</value>
+    <value>컨테이너 '{}'의 타임스탬프 복원 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
-    <value>Failed to parse image import progress</value>
+    <value>이미지 가져오기 진행률 구문 분석 실패</value>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
-    <value>Failed to unmount volume '{}': {}</value>
+    <value>볼륨 '{}' 탑재 실패: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
-    <value>Failed to stop container '{}' after plugin rejection</value>
+    <value>플러그인 거부 후 컨테이너 '{}' 중지 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
