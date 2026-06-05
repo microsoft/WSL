@@ -365,17 +365,14 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
     const bool attach = WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach);
 
-    std::optional<wsl::windows::common::ConsoleState> console;
+    wsl::windows::common::ConsoleState console;
     WSLCProcessStartOptions startOptions{};
-    if (attach)
+    if (runOptions.TTY)
     {
-        console.emplace();
-        if (runOptions.TTY)
-        {
-            const auto size = console->GetWindowSize();
-            startOptions.TtyRows = size.Y;
-            startOptions.TtyColumns = size.X;
-        }
+
+        const auto size = console.GetWindowSize();
+        startOptions.TtyRows = size.Y;
+        startOptions.TtyColumns = size.X;
     }
 
     THROW_IF_FAILED(container.Start(startFlags, &startOptions, warningCallback.Get())); // TODO: detach keys
@@ -387,7 +384,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Handle attach if requested
     if (attach)
     {
-        return ConsoleService::AttachToCurrentConsole(*console, runningContainer.GetInitProcess());
+        return ConsoleService::AttachToCurrentConsole(console, runningContainer.GetInitProcess());
     }
 
     PrintMessage(L"%hs", stdout, containerId);
@@ -414,15 +411,11 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
 
-    std::optional<wsl::windows::common::ConsoleState> console;
+    wsl::windows::common::ConsoleState console;
     WSLCProcessStartOptions startOptions{};
-    if (attach)
-    {
-        console.emplace();
-        const auto size = console->GetWindowSize();
-        startOptions.TtyRows = size.Y;
-        startOptions.TtyColumns = size.X;
-    }
+    const auto size = console.GetWindowSize();
+    startOptions.TtyRows = size.Y;
+    startOptions.TtyColumns = size.X;
 
     THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, warningCallback.Get()), WSLC_E_CONTAINER_IS_RUNNING);
 
@@ -438,7 +431,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     THROW_IF_FAILED(process->GetFlags(&processFlags));
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    return ConsoleService::AttachToCurrentConsole(*console, std::move(runningProcess));
+    return ConsoleService::AttachToCurrentConsole(console, std::move(runningProcess));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)

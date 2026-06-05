@@ -712,8 +712,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
 
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            WI_IsFlagSet(Flags, WSLCContainerStartFlagsAttach) && WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) &&
-                (StartOptions->TtyColumns == 0 || StartOptions->TtyRows == 0),
+            WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && (StartOptions->TtyColumns == 0 || StartOptions->TtyRows == 0),
             "Invalid tty size: %lu:%lu",
             StartOptions->TtyRows,
             StartOptions->TtyColumns);
@@ -1102,13 +1101,15 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id), m_state != WslcContainerStateRunning);
 
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty) && StartOptions != nullptr &&
-            (StartOptions->TtyRows == 0 || StartOptions->TtyColumns == 0),
-        "Invalid tty size: %lu:%lu",
-        StartOptions->TtyRows,
-        StartOptions->TtyColumns);
+    if (StartOptions != nullptr)
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty) && (StartOptions->TtyRows == 0 || StartOptions->TtyColumns == 0),
+            "Invalid tty size: %lu:%lu",
+            StartOptions->TtyRows,
+            StartOptions->TtyColumns);
+    }
 
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
