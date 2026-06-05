@@ -765,7 +765,7 @@ void WriteHandle::Schedule()
     else
     {
         auto error = GetLastError();
-        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.Get());
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p, size: %zu", (void*)Handle.Get(), buffer.size());
 
         // The write is pending, update to 'Pending'
         State = IOHandleStatus::Pending;

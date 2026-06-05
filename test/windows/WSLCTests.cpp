@@ -7002,6 +7002,8 @@ class WSLCTests
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
+            // TODO: Undo once stabilized.
+            std::this_thread::sleep_for(std::chrono::seconds(3));
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Verify that ListContainers returns the port data for a running container.
@@ -7498,7 +7500,7 @@ class WSLCTests
 
                     auto container = launcher.Create(*session);
                     VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL));
-                    ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', Unspecified error ");
+                    ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', The requested address is not valid in its context. ");
                 }
             }
         };
