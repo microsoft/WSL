@@ -930,6 +930,12 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
                 WindowsHosts.append(CurrentEntry);
             }
         }
+
+        if (WindowsHosts.size() > 8 * _1MB)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageHostsFileTooLarge());
+            return {};
+        }
     }
 
     WI_ASSERT(Stream.eof());
