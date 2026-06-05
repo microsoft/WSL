@@ -104,6 +104,12 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Volumes>(std::move(volumes));
                 handled = true;
             }
+            else if (dataType == Data::Networks)
+            {
+                std::vector<WSLCNetworkInformation> networks;
+                dataMap.Add<Data::Networks>(std::move(networks));
+                handled = true;
+            }
 
             if (!handled)
             {

@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    VolumeModel.h
+    NetworkModel.h
 
 Abstract:
 
-    This file contains the VolumeModel definitions
+    This file contains the NetworkModel definitions
 
 --*/
 
@@ -19,7 +19,7 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-struct CreateVolumeOptions
+struct CreateNetworkOptions
 {
     std::string Name;
     std::optional<std::string> Driver;

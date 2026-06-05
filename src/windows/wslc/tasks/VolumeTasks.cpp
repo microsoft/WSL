@@ -80,13 +80,13 @@ void CreateVolume(CLIExecutionContext& context)
 
     for (const auto& option : context.Args.GetAll<ArgType::Options>())
     {
-        auto parsed = DriverOption::Parse(option);
+        auto parsed = validation::ParseDriverOption(option);
         options.DriverOpts.emplace_back(parsed.first, parsed.second);
     }
 
     for (const auto& label : context.Args.GetAll<ArgType::Label>())
     {
-        auto parsed = Label::Parse(label);
+        auto parsed = validation::ParseLabel(label);
         options.Labels.emplace_back(parsed.first, parsed.second);
     }
 
