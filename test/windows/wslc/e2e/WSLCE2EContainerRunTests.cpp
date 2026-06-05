@@ -44,6 +44,7 @@ class WSLCE2EContainerRunTests
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
+        EnsureNetworkDoesNotExist(TestNetworkName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
@@ -58,6 +59,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureVolumeDoesNotExist(WslcVolumeName);
+        EnsureNetworkDoesNotExist(TestNetworkName);
 
         EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
@@ -647,6 +649,60 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_DefaultIsBridge)
+    {
+        auto result = RunWslc(std::format(L"container run --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostMode)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("host"), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
+    {
+        auto result = RunWslc(std::format(L"network create {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(
+            std::format(L"container run --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(wsl::shared::string::WideToMultiByte(TestNetworkName)));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_EmptyValue_Rejected)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"network") != std::wstring::npos);
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_NonexistentNetwork_Rejected)
+    {
+        auto result = RunWslc(
+            std::format(L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value());
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
@@ -782,6 +838,9 @@ private:
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";
 
+    // Test user-defined network
+    const std::wstring TestNetworkName = L"wslc-test-network";
+
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
@@ -833,6 +892,7 @@ private:
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --network         Connect a container to a network\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"

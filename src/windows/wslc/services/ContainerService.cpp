@@ -51,8 +51,15 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
+    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front();
+
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, "bridge", processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
+
+    for (auto i = 1; i < options.Networks.size(); ++i)
+    {
+        containerLauncher.AddAdditionalNetwork(options.Networks[i]);
+    }
 
     // Set port options if provided
     for (const auto& port : options.Ports)

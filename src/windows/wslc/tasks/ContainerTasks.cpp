@@ -498,6 +498,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::Network))
+    {
+        auto networks = context.Args.GetAll<ArgType::Network>();
+        options.Networks.reserve(options.Networks.size() + networks.size());
+        for (const auto& value : networks)
+        {
+            options.Networks.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());

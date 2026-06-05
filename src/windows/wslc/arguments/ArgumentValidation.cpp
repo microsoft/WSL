@@ -87,7 +87,20 @@ void Argument::Validate(const ArgMap& execArgs) const
         if (value.empty() ||
             std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
         {
-            throw ArgumentException(std::format(L"Invalid {} argument value: working directory cannot be empty or whitespace", m_name));
+            throw ArgumentException(Localization::WSLCCLI_WorkingDirEmptyError(m_name));
+        }
+        break;
+    }
+
+    case ArgType::Network:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::Network>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
+            }
         }
         break;
     }

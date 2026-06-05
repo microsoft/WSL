@@ -840,6 +840,7 @@ private:
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --network         Connect a container to a network\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"

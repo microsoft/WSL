@@ -345,6 +345,106 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    TEST_METHOD(SetContainerOptionsFromArgs_WithoutNetwork_NetworksIsEmpty)
+    {
+        CLIExecutionContext context;
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Networks.empty());
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkSingleValue_SetsNetwork)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network host ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("host"), options.Networks[0]);
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkMultipleValues_PreservesOrder)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 --network net2 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"\" ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkSingleValue_SetsNetwork)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network host ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("host"), options.Networks[0]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkMultipleValues_PreservesOrder)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 --network net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"\" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
     // code as the CLI up to the point of command execution, including parsing and argument validtion.
