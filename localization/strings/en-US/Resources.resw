@@ -918,6 +918,10 @@ Falling back to NAT networking.</value>
     <value>DNS Tunneling is not supported</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>The Windows hosts file is too large and will not be reflected inside WSL. Consider reducing the size of %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>The wsl2.localhostForwarding setting has no effect when using mirrored networking mode</value>
   </data>
