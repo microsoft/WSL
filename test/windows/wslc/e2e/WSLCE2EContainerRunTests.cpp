@@ -731,6 +731,81 @@ class WSLCE2EContainerRunTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} --cpus 1.5 {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'500'000'000), inspect.HostConfig.NanoCpus);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Memory)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} --memory 32M {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(32) * 1024 * 1024, inspect.HostConfig.Memory);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ulimit)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.Ulimits.size());
+
+        std::map<std::string, std::pair<int64_t, int64_t>> byName;
+        for (const auto& ul : inspect.HostConfig.Ulimits)
+        {
+            byName[ul.Name] = {ul.Soft, ul.Hard};
+        }
+
+        VERIFY_IS_TRUE(byName.contains("nofile"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1024), byName["nofile"].first);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(2048), byName["nofile"].second);
+
+        VERIFY_IS_TRUE(byName.contains("nproc"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].first);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus_Invalid)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n",
+             .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Memory_Invalid)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ulimit_Invalid)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n",
+             .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal_Invalid)
     {
         {
@@ -820,6 +895,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  --cidfile         Write the container ID to the provided path\r\n"
+                << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
                 << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
                 << L"  --dns-option      Set DNS options\r\n"
@@ -832,6 +908,7 @@ private:
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
+                << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
@@ -841,6 +918,7 @@ private:
                 << L"  --stop-signal     Signal to stop the container\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
+                << L"  --ulimit          Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
