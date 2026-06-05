@@ -47,6 +47,24 @@ struct WSLCExecutionResult
     bool StdoutContainsSubstring(const std::wstring& substring) const;
 };
 
+// RAII wrapper around a Windows ConPTY pseudoconsole together with the input-write and
+// output-read pipe ends the host uses to drive it. Construct one with the desired initial
+// size and hand it to RunWslcInteractive to attach wslc.exe to a real pseudoterminal instead
+// of plain pipes. Ownership of the conpty and pipes is transferred into the resulting
+// WSLCInteractiveSession, which exposes ResizePseudoConsole() and reads the combined output
+// stream via the normal stdout reader.
+struct PseudoConsole
+{
+    PseudoConsole(SHORT columns, SHORT rows);
+
+    NON_COPYABLE(PseudoConsole);
+    DEFAULT_MOVABLE(PseudoConsole);
+
+    wil::unique_hfile InputWrite;
+    wil::unique_hfile OutputRead;
+    wsl::windows::common::helpers::unique_pseudo_console Handle;
+};
+
 // Interactive session for testing wslc commands that require stdin/stdout interaction.
 // Uses PartialHandleRead for race-free output validation
 struct WSLCInteractiveSession
@@ -57,7 +75,8 @@ struct WSLCInteractiveSession
         wil::unique_hfile stdoutRead,
         wil::unique_hfile stderrRead,
         wil::unique_handle processHandle,
-        wil::unique_handle nonElevatedToken = wil::unique_handle{});
+        wil::unique_handle nonElevatedToken = wil::unique_handle{},
+        wsl::windows::common::helpers::unique_pseudo_console pseudoConsole = {});
     ~WSLCInteractiveSession();
 
     // Non-copyable, non-movable
@@ -74,6 +93,13 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
 
+    // Returns a snapshot of everything read from stdout so far (in pseudoconsole mode this is the
+    // combined output stream). Non-consuming, unlike ExpectStdout.
+    std::string GetStdoutData() const;
+
+    // Resizes the attached pseudoconsole. Only valid for sessions created with a PseudoConsole.
+    void ResizePseudoConsole(SHORT columns, SHORT rows);
+
     bool IsRunning() const;
     void CloseStdin();
     std::optional<int> GetExitCode() const;
@@ -88,6 +114,9 @@ private:
     wil::unique_hfile m_stdinWrite;
     wil::unique_hfile m_stdoutRead;
     wil::unique_hfile m_stderrRead;
+    // Destroyed (ClosePseudoConsole) after the readers are stopped but before the read pipes are
+    // closed, so the conpty is torn down in the right order. Null for pipe-based sessions.
+    wsl::windows::common::helpers::unique_pseudo_console m_pseudoConsole;
     wil::unique_handle m_processHandle;
     wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
     std::unique_ptr<PartialHandleRead> m_stdoutReader;
@@ -102,6 +131,9 @@ WSLCExecutionResult RunWslcAndRedirectToFile(
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
 
 std::wstring GetWslcHeader();
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
+WSLCInteractiveSession RunWslcInteractive(
+    const std::wstring& commandLine,
+    ElevationType elevationType = ElevationType::Elevated,
+    std::optional<PseudoConsole> pseudoConsole = std::nullopt);
 
 } // namespace WSLCE2ETests

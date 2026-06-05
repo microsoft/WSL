@@ -235,20 +235,43 @@ std::wstring GetWslcHeader()
     return header.str();
 }
 
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType)
+WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
 
-    auto [childStdinRead, parentStdinWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, false, true);
-    auto [parentStdoutRead, childStdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
-    auto [parentStderrRead, childStderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
-
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdinRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
-    process.SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
+
+    wil::unique_hfile parentStdinWrite;
+    wil::unique_hfile parentStdoutRead;
+    wil::unique_hfile parentStderrRead;
+    wsl::windows::common::helpers::unique_pseudo_console console;
+
+    // Child handles for the pipe-based path; must stay alive until the process has started.
+    wil::unique_hfile childStdinRead;
+    wil::unique_hfile childStdoutWrite;
+    wil::unique_hfile childStderrWrite;
+
+    if (pseudoConsole.has_value())
+    {
+        // Pseudoconsole mode: wslc.exe is attached to a ConPTY, so stdin/stdout/stderr are
+        // multiplexed onto the conpty's single output stream and there is no separate stderr.
+        process.SetPseudoConsole(pseudoConsole->Handle.get());
+        parentStdinWrite = std::move(pseudoConsole->InputWrite);
+        parentStdoutRead = std::move(pseudoConsole->OutputRead);
+        console = std::move(pseudoConsole->Handle);
+    }
+    else
+    {
+        std::tie(childStdinRead, parentStdinWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, false, true);
+        std::tie(parentStdoutRead, childStdoutWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
+        std::tie(parentStderrRead, childStderrWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
+
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdinRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+        process.SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
+    }
 
     wil::unique_handle nonElevatedToken;
     if (elevationType == ElevationType::NonElevated)
@@ -269,7 +292,28 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, Eleva
         std::move(parentStdoutRead),
         std::move(parentStderrRead),
         std::move(processHandle),
-        std::move(nonElevatedToken)); // Transfer token ownership to the session
+        std::move(nonElevatedToken), // Transfer token ownership to the session
+        std::move(console));
+}
+
+PseudoConsole::PseudoConsole(SHORT columns, SHORT rows)
+{
+    // Read end of the input pipe is handed to the conpty (it reads what would be written to stdin);
+    // the write end is overlapped so WSLCInteractiveSession::Write (which uses OVERLAPPED I/O) works.
+    auto [inputRead, inputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, true);
+
+    // Read end of the output pipe must be overlapped because PartialHandleRead / InterruptableRead
+    // use OVERLAPPED I/O with an event-based cancellation pattern.
+    auto [outputRead, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+
+    HPCON rawPseudoConsole{};
+    THROW_IF_FAILED(::CreatePseudoConsole(COORD{columns, rows}, inputRead.get(), outputWrite.get(), 0, &rawPseudoConsole));
+    Handle.reset(rawPseudoConsole);
+
+    // ConPTY duplicates the handles internally; release the local references now so that EOF
+    // propagates correctly once ClosePseudoConsole runs.
+    InputWrite = std::move(inputWrite);
+    OutputRead = std::move(outputRead);
 }
 
 // WSLCInteractiveSession implementation
@@ -280,16 +324,24 @@ WSLCInteractiveSession::WSLCInteractiveSession(
     wil::unique_hfile stdoutRead,
     wil::unique_hfile stderrRead,
     wil::unique_handle processHandle,
-    wil::unique_handle nonElevatedToken) :
+    wil::unique_handle nonElevatedToken,
+    wsl::windows::common::helpers::unique_pseudo_console pseudoConsole) :
     CommandLine(std::move(commandLine)),
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
     m_stderrRead(std::move(stderrRead)),
+    m_pseudoConsole(std::move(pseudoConsole)),
     m_processHandle(std::move(processHandle)),
     m_nonElevatedToken(std::move(nonElevatedToken))
 {
     m_stdoutReader = std::make_unique<PartialHandleRead>(m_stdoutRead.get());
-    m_stderrReader = std::make_unique<PartialHandleRead>(m_stderrRead.get());
+
+    // In pseudoconsole mode stderr is multiplexed onto the conpty output, so there is no
+    // separate stderr handle to read from.
+    if (m_stderrRead.is_valid())
+    {
+        m_stderrReader = std::make_unique<PartialHandleRead>(m_stderrRead.get());
+    }
 }
 
 WSLCInteractiveSession::~WSLCInteractiveSession()
@@ -317,8 +369,20 @@ void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
     m_stdoutReader->ExpectConsume(expected);
 }
 
+std::string WSLCInteractiveSession::GetStdoutData() const
+{
+    return m_stdoutReader->GetData();
+}
+
+void WSLCInteractiveSession::ResizePseudoConsole(SHORT columns, SHORT rows)
+{
+    VERIFY_IS_TRUE(static_cast<bool>(m_pseudoConsole), L"ResizePseudoConsole requires a pseudoconsole-backed session");
+    THROW_IF_FAILED(::ResizePseudoConsole(m_pseudoConsole.get(), COORD{columns, rows}));
+}
+
 void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 {
+    VERIFY_IS_NOT_NULL(m_stderrReader.get(), L"ExpectStderr is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
     Log::Comment(std::format(L"Expecting stderr: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stderrReader->ExpectConsume(expected);
 }
@@ -434,6 +498,7 @@ bool WSLCInteractiveSession::Terminate(UINT exitCode)
 
 void WSLCInteractiveSession::VerifyNoErrors()
 {
+    VERIFY_IS_NOT_NULL(m_stderrReader.get(), L"VerifyNoErrors is not supported for pseudoconsole-backed sessions (stderr is merged into stdout)");
     m_stderrReader->ExpectClosed(DefaultWaitTimeoutMs);
 
     // Verify that stderr was actually empty - not just closed

@@ -8639,7 +8639,7 @@ class WSLCTests
 
             auto process = execLauncher.Launch(container.Get());
 
-            ValidateProcessOutput(process, {{1, expectedSize + "\n"}});
+            ValidateProcessOutput(process, {{WSLCFDTty, expectedSize + "\r\n"}});
         }
     }
 
