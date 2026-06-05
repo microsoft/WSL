@@ -20,6 +20,7 @@ Abstract:
 #include "WarningCallback.h"
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
+#include <ConsoleState.h>
 #include <CommandLine.h>
 #include <filesystem>
 #include <unordered_map>
@@ -270,7 +271,8 @@ int ContainerService::Attach(Session& session, const std::string& id)
     {
         // TTY process - relay using interactive TTY handling
         WI_ASSERT(stderrLogs.Empty());
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.Release().get(), true))
+        wsl::windows::common::ConsoleState console;
+        if (!ConsoleService::RelayInteractiveTty(console, runningProcess, stdinLogs.Release().get(), true))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
             return 0; // Exit early if user detached
@@ -360,17 +362,32 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags, nullptr, warningCallback.Get())); // TODO: Error message, detach keys
+
+    const bool attach = WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach);
+
+    std::optional<wsl::windows::common::ConsoleState> console;
+    WSLCProcessStartOptions startOptions{};
+    if (attach)
+    {
+        console.emplace();
+        if (runOptions.TTY)
+        {
+            const auto size = console->GetWindowSize();
+            startOptions.TtyRows = size.Y;
+            startOptions.TtyColumns = size.X;
+        }
+    }
+
+    THROW_IF_FAILED(container.Start(startFlags, &startOptions, warningCallback.Get())); //TODO: detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
     cidFile.Commit(containerId);
 
     // Handle attach if requested
-    if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
+    if (attach)
     {
-        ConsoleService consoleService;
-        return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
+        return ConsoleService::AttachToCurrentConsole(*console, runningContainer.GetInitProcess());
     }
 
     PrintMessage(L"%hs", stdout, containerId);
@@ -396,7 +413,18 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr, warningCallback.Get()), WSLC_E_CONTAINER_IS_RUNNING);
+
+    std::optional<wsl::windows::common::ConsoleState> console;
+    WSLCProcessStartOptions startOptions{};
+    if (attach)
+    {
+        console.emplace();
+        const auto size = console->GetWindowSize();
+        startOptions.TtyRows = size.Y;
+        startOptions.TtyColumns = size.X;
+    }
+
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, warningCallback.Get()), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -410,8 +438,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     THROW_IF_FAILED(process->GetFlags(&processFlags));
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(std::move(runningProcess));
+    return ConsoleService::AttachToCurrentConsole(*console, std::move(runningProcess));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
@@ -492,6 +519,14 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
     auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+
+    wsl::windows::common::ConsoleState console;
+    if (options.TTY)
+    {
+        const auto size = console.GetWindowSize();
+        processLauncher.SetTtySize(size.Y, size.X);
+    }
+
     if (options.User.has_value())
     {
         auto user = options.User.value();
@@ -502,7 +537,7 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
         processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
     }
 
-    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
+    return ConsoleService::AttachToCurrentConsole(console, processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)

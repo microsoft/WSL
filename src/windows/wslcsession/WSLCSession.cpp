@@ -1941,7 +1941,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLCProcessOptions* Options, IWSLCProcess** Process, int* Errno)
+HRESULT WSLCSession::CreateRootNamespaceProcess(
+    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, IWSLCProcess** Process, int* Errno)
 try
 {
     WSLCExecutionContext context(this);
@@ -1954,7 +1955,7 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
+    auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
     THROW_IF_FAILED(process.CopyTo(Process));
 
     return S_OK;

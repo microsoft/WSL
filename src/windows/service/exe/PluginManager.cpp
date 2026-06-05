@@ -215,7 +215,7 @@ try
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
 
     if (Errno != nullptr)
     {

@@ -8147,6 +8147,7 @@ class WSLCTests
         {
             WSLCContainerLauncher launcher(
                 "debian:latest", "logs-test-5", {"/bin/bash", "-c", "stat -f /dev/stdin | grep -io 'Type:.*$'"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
+            launcher.SetTtySize(24, 80);
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
@@ -8543,6 +8544,7 @@ class WSLCTests
         // Validate behavior for tty containers
         {
             WSLCContainerLauncher launcher("debian:latest", "attach-test-3", {"/bin/bash"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            launcher.SetTtySize(24, 80);
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
@@ -8600,6 +8602,71 @@ class WSLCTests
             attachedReader.Expect("OK\n");
             attachedReader.ExpectClosed();
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
+        }
+    }
+
+    WSLC_TEST_METHOD(TtySize)
+    {
+        constexpr ULONG c_rows = 43;
+        constexpr ULONG c_columns = 42;
+        const std::string expectedSize = "43 42";
+
+        // Container init process.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "tty-size-init", {"/bin/sh", "-c", "while true; do stty size; sleep 1; done"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            launcher.SetTtySize(c_rows, c_columns);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            auto tty = process.GetStdHandle(WSLCFDTty);
+
+            // Wait for the size to be reflected in a loop, since the tty size is applied asynchronously.
+            PartialHandleRead reader(tty.get());
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, reader.GetData().find(expectedSize) == std::string::npos); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(60));
+        }
+
+        // Exec process.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "tty-size-exec", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCProcessLauncher execLauncher({}, {"/usr/bin/stty", "size"}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            execLauncher.SetTtySize(c_rows, c_columns);
+
+            auto process = execLauncher.Launch(container.Get());
+
+            ValidateProcessOutput(process, {{1, expectedSize + "\n"}});
+        }
+    }
+
+    WSLC_TEST_METHOD(ProcessInvalidTtySize)
+    {
+        // A tty process created with an explicit zero size (0 rows / 0 columns) is invalid and must be rejected with
+        // E_INVALIDARG, both for the container init process (attach) and for an exec'd process.
+
+        // Container init process: attaching to a tty container with a (0, 0) size is rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "invalid-tty-size-init", {"/bin/sh"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+
+            // N.B. SetTtySize is intentionally not called, so the launcher passes a (0, 0) size.
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+        }
+
+        // Exec process: exec'ing a tty process with a (0, 0) size is rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "invalid-tty-size-exec", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCProcessLauncher execLauncher({}, {"/bin/sh", "-c", "stty size"}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+
+            // N.B. SetTtySize is intentionally not called, so the launcher passes a (0, 0) size.
+            auto [result, process] = execLauncher.LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
     }
 
@@ -9196,7 +9263,12 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-detach", {"sleep", "9999999"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
 
             auto container = launcher.Create(*m_defaultSession);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, DetachKeys, nullptr));
+
+            WSLCProcessStartOptions startOptions{};
+            startOptions.TtyRows = 24;
+            startOptions.TtyColumns = 80;
+            startOptions.DetachKeys = DetachKeys;
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, &startOptions, nullptr));
 
             auto initProcess = container.GetInitProcess();
 
@@ -9219,6 +9291,7 @@ class WSLCTests
             // Validate detaching from an exec'd process.
             {
                 WSLCProcessLauncher processLauncher({}, {"sleep", "9999999"}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
+                processLauncher.SetTtySize(24, 80);
 
                 if (DetachKeys != nullptr)
                 {
@@ -9247,7 +9320,11 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-detach", {"cat"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             auto container = launcher.Create(*m_defaultSession);
 
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsAttach, "invalid", nullptr), E_INVALIDARG);
+            WSLCProcessStartOptions invalidDetachOptions{};
+            invalidDetachOptions.TtyRows = 24;
+            invalidDetachOptions.TtyColumns = 80;
+            invalidDetachOptions.DetachKeys = "invalid";
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsAttach, &invalidDetachOptions, nullptr), E_INVALIDARG);
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
 
@@ -9255,6 +9332,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Attach("invalid", &unusedHandle, &unusedHandle, &unusedHandle), E_INVALIDARG);
 
             WSLCProcessLauncher processLauncher({}, {"cat"}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
+            processLauncher.SetTtySize(24, 80);
             processLauncher.SetDetachKeys("invalid");
 
             // N.B. Docker returns HTTP 500 if the detach keys are invalid, but unlike other cases there's a proper error message.

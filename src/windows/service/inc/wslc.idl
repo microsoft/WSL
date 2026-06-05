@@ -219,9 +219,14 @@ typedef struct _WSLCProcessOptions
     WSLCStringArray CommandLine;
     WSLCStringArray Environment;
     WSLCProcessFlags Flags;
+} WSLCProcessOptions;
+
+typedef struct _WSLCProcessStartOptions
+{
     ULONG TtyRows; // Only needed when tty fd's are passed.
     ULONG TtyColumns;
-} WSLCProcessOptions;
+    [unique, string] LPCSTR DetachKeys;
+} WSLCProcessStartOptions;
 
 typedef struct _WSLCNamedVolume
 {
@@ -566,12 +571,12 @@ interface IWSLCContainer : IUnknown
 {
     HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] const WSLCProcessStartOptions* StartOptions, [in, unique] IWarningCallback* WarningCallback);
     HRESULT Delete([in] WSLCDeleteFlags Flags);
     HRESULT Export([in] WSLCHandle TarHandle);
     HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
-    HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] LPCSTR DetachKeys, [out] IWSLCProcess** Process);
+    HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
@@ -752,7 +757,7 @@ interface IWSLCSession : IUnknown
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [out] IWSLCProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [out] IWSLCProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
