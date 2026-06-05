@@ -582,9 +582,6 @@ namespace {
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
 {
-    // Size the pseudoconsole is resized to after the initial size has been observed. The values are
-    // intentionally unusual so they can't be confused with a transient default tty size the container
-    // might briefly have before the start-time resize lands.
     constexpr SHORT resizedColumns = 100;
     constexpr SHORT resizedRows = 37;
     VERIFY_IS_TRUE(columns != resizedColumns || rows != resizedRows, L"Resized tty size must differ from the initial size");

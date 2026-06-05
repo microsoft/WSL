@@ -6820,8 +6820,8 @@ class WSLCTests
             auto container = launcher.Launch(*m_defaultSession);
 
             WSLCProcessLauncher execLauncher({}, {"/bin/sh", "-c", "stty size"}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            execLauncher.SetTtySize(0, 0);
 
-            // N.B. SetTtySize is intentionally not called, so the launcher passes a (0, 0) size.
             auto [result, process] = execLauncher.LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
