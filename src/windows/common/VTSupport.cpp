@@ -24,10 +24,18 @@ Abstract:
 namespace wsl::windows::common::vt {
 namespace {
     // Extracts a VT sequence of the form ESC + prefix + result + suffix, returning
-    // the result part.  Reads up to s_bufferSize bytes non-blockingly; if the buffer
+    // the result part.  Reads up to s_bufferSize bytes from inStream; calls peek()
+    // first to prompt the stream buffer to fill from the underlying device, then
+    // uses readsome() to drain only what is immediately available.  If the buffer
     // fills completely the suffix may not be present, in which case an empty string
     // is returned — the same outcome as any other parse failure.  Any bytes after
     // the suffix (e.g. queued user input) are ignored.
+    //
+    // Note: peek() may block briefly on a real console stdin until the terminal
+    // delivers its response (typically a few milliseconds for DA1).  It will not
+    // block indefinitely because all supported Windows console hosts (Windows Terminal,
+    // conhost.exe) respond to ESC[0c, and non-console streams (pipes, stringstreams)
+    // have data already buffered by the caller.
     std::string ExtractSequence(std::istream& inStream, std::string_view prefix, std::string_view suffix)
     {
         // Force discovery of available input
