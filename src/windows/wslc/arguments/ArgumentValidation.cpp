@@ -104,7 +104,7 @@ void Argument::Validate(const ArgMap& execArgs) const
 
             if (IsEqual(value, L"host", true))
             {
-                throw ArgumentException(L"host mode networking is not supported");
+                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
         }
         break;
