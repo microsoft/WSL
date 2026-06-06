@@ -391,20 +391,21 @@ class WSLCCLIVTSupportUnitTests
     {
         // Clean DA1 response: conformance level 62, extensions Columns132 (1) and Sixel (4).
         {
-            std::ostringstream out;
-            std::istringstream in{"\x1b[?62;1;4c"};
+            std::wostringstream out;
+            std::wistringstream in{L"\x1b[?62;1;4c"};
             PrimaryDeviceAttributes da{out, in};
 
             VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
             VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Sixel));
             VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::PrinterPort));
-            VERIFY_ARE_EQUAL("\x1b[0c", out.str());
+            // DA1 request must have been written to the output stream.
+            VERIFY_ARE_EQUAL(std::wstring{L"\x1b[0c"}, out.str());
         }
 
         // Trailing plain text (e.g. queued user input) must not break parsing.
         {
-            std::ostringstream out;
-            std::istringstream in{"\x1b[?62;1;4chello"};
+            std::wostringstream out;
+            std::wistringstream in{L"\x1b[?62;1;4chello"};
             PrimaryDeviceAttributes da{out, in};
 
             VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
@@ -413,8 +414,8 @@ class WSLCCLIVTSupportUnitTests
 
         // Trailing VT sequence must not corrupt suffix search or result extraction.
         {
-            std::ostringstream out;
-            std::istringstream in{"\x1b[?62;6c\x1b[0m"};
+            std::wostringstream out;
+            std::wistringstream in{L"\x1b[?62;6c\x1b[0m"};
             PrimaryDeviceAttributes da{out, in};
 
             VERIFY_IS_TRUE(da.Supports(PrimaryDeviceAttributes::Extension::SelectiveErase));
@@ -423,8 +424,8 @@ class WSLCCLIVTSupportUnitTests
 
         // Empty/malformed response — should not throw, extensions remain unset.
         {
-            std::ostringstream out;
-            std::istringstream in{""};
+            std::wostringstream out;
+            std::wistringstream in{L""};
             PrimaryDeviceAttributes da{out, in};
 
             VERIFY_IS_FALSE(da.Supports(PrimaryDeviceAttributes::Extension::Columns132));
@@ -434,8 +435,8 @@ class WSLCCLIVTSupportUnitTests
     TEST_METHOD(VT_PrimaryDeviceAttributes_Empty)
     {
         // Empty/malformed response — should not throw, extensions remain unset.
-        std::ostringstream out;
-        std::istringstream in{""};
+        std::wostringstream out;
+        std::wistringstream in{L""};
 
         PrimaryDeviceAttributes da{out, in};
 

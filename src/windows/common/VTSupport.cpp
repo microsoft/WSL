@@ -21,39 +21,50 @@ Abstract:
 #define WSL_WINDOWS_VT_OSC WSL_WINDOWS_VT_ESCAPE "]"
 #define WSL_WINDOWS_VT_TEXTFORMAT(_id_) WSL_WINDOWS_VT_CSI #_id_ "m"
 
+// Wide-string equivalents used for wostream output in PrimaryDeviceAttributes.
+#define WSL_WINDOWS_VT_ESCAPE_W L"\x1b"
+#define WSL_WINDOWS_VT_CSI_W WSL_WINDOWS_VT_ESCAPE_W L"["
+
 namespace wsl::windows::common::vt {
 namespace {
-    // Extracts a VT sequence of the form ESC + prefix + result + suffix, returning
-    // the result part.  Reads up to s_bufferSize bytes from inStream; calls peek()
-    // first to prompt the stream buffer to fill from the underlying device, then
-    // uses readsome() to drain only what is immediately available.  If the buffer
-    // fills completely the suffix may not be present, in which case an empty string
-    // is returned — the same outcome as any other parse failure.  Any bytes after
+    // Extracts a VT sequence of the form ESC + prefix + result + suffix from a
+    // wide input stream, returning the result part as a std::wstring.
+    //
+    // Reads up to s_bufferSize wide characters from inStream; calls peek() first
+    // to prompt the stream buffer to fill from the underlying device, then uses
+    // readsome() to drain only what is immediately available.  If the buffer fills
+    // completely the suffix may not be present, in which case an empty wstring is
+    // returned — the same outcome as any other parse failure.  Any characters after
     // the suffix (e.g. queued user input) are ignored.
+    //
+    // The DA1 response bytes are pure ASCII (0x00–0x7F); under _O_U8TEXT mode the
+    // CRT decodes each byte to the identical wchar_t value, so wide reads are
+    // lossless for all VT escape sequence content.
     //
     // Note: peek() may block briefly on a real console stdin until the terminal
     // delivers its response (typically a few milliseconds for DA1).  It will not
     // block indefinitely because all supported Windows console hosts (Windows Terminal,
-    // conhost.exe) respond to ESC[0c, and non-console streams (pipes, stringstreams)
+    // conhost.exe) respond to ESC[0c, and non-console streams (pipes, wstringstreams)
     // have data already buffered by the caller.
-    std::string ExtractSequence(std::istream& inStream, std::string_view prefix, std::string_view suffix)
+    std::wstring ExtractSequence(std::wistream& inStream, std::wstring_view prefix, std::wstring_view suffix)
     {
-        // Force discovery of available input
+        // Force discovery of available input.
         std::ignore = inStream.peek();
 
         static constexpr std::streamsize s_bufferSize = 1024;
-        char buffer[s_bufferSize];
+        wchar_t buffer[s_bufferSize];
 
-        // readsome() returns at most s_bufferSize, so == s_bufferSize is the full-buffer
-        // case, not overflow.  If the suffix is still within those bytes the parse succeeds
-        // normally; if not, the suffix-not-found path below returns {}.
-        std::streamsize bytesRead = inStream.readsome(buffer, s_bufferSize);
+        // readsome() returns at most s_bufferSize wide characters, so == s_bufferSize
+        // is the full-buffer case, not overflow.  If the suffix is still within those
+        // characters the parse succeeds normally; if not, the suffix-not-found path
+        // below returns {}.
+        std::streamsize charsRead = inStream.readsome(buffer, s_bufferSize);
 
-        std::string_view resultView{buffer, static_cast<size_t>(bytesRead)};
+        std::wstring_view resultView{buffer, static_cast<size_t>(charsRead)};
 
         // Locate the escape character that begins the sequence.
-        const size_t escapeIndex = resultView.find(WSL_WINDOWS_VT_ESCAPE[0]);
-        if (escapeIndex == std::string_view::npos)
+        const size_t escapeIndex = resultView.find(L'\x1b');
+        if (escapeIndex == std::wstring_view::npos)
         {
             return {};
         }
@@ -67,14 +78,14 @@ namespace {
         }
 
         // Find the suffix anywhere after the prefix.
-        const std::string_view body = resultView.substr(1 + prefix.length());
+        const std::wstring_view body = resultView.substr(1 + prefix.length());
         const size_t suffixIndex = body.find(suffix);
-        if (suffixIndex == std::string_view::npos)
+        if (suffixIndex == std::wstring_view::npos)
         {
             return {};
         }
 
-        return std::string{body.substr(0, suffixIndex)};
+        return std::wstring{body.substr(0, suffixIndex)};
     }
 } // namespace
 
@@ -111,28 +122,32 @@ ConstructedSequence Sgr(std::initializer_list<int> params)
     return ConstructedSequence{std::move(result).str()};
 }
 
-PrimaryDeviceAttributes::PrimaryDeviceAttributes(std::ostream& outStream, std::istream& inStream)
+PrimaryDeviceAttributes::PrimaryDeviceAttributes(std::wostream& outStream, std::wistream& inStream)
 {
     try
     {
         // Best-effort: enable VT input on the real console handle so the terminal
         // sends a machine-readable DA1 response.  When stdin is redirected (e.g.
-        // in unit tests that supply their own stringstreams) this will fail, but
+        // in unit tests that supply their own wstringstreams) this will fail, but
         // we still proceed — the caller is responsible for providing a readable
         // inStream that contains the DA1 response.
         EnableVirtualTerminal inputMode{GetStdHandle(STD_INPUT_HANDLE), EnableVirtualTerminal::Mode::Input};
 
-        // Send DA1 Primary Device Attributes request
-        outStream << WSL_WINDOWS_VT_CSI << "0c";
+        // Send DA1 Primary Device Attributes request.
+        // The CSI sequence bytes are pure ASCII; L"..." widening is lossless.
+        outStream << WSL_WINDOWS_VT_CSI_W << L"0c";
         outStream.flush();
 
-        // Response is of the form WSL_WINDOWS_VT_CSI ? <conformance level> ; (<extension number> ;)* c
-        std::string sequence = ExtractSequence(inStream, "[?", "c");
-        std::vector<std::string> values = wsl::shared::string::Split(sequence, ';');
+        // Response is of the form ESC[?<conformance level>;<extension>...c
+        // Split returns std::vector<std::wstring> via the wstring_view template overload.
+        std::wstring sequence = ExtractSequence(inStream, L"[?", L"c");
+        std::vector<std::wstring> values = wsl::shared::string::Split(sequence, L';');
 
         if (!values.empty())
         {
-            m_conformanceLevel = std::stoul(values[0]);
+            // Use wcstoul so the wchar_t digits are parsed directly without any
+            // narrowing conversion.
+            m_conformanceLevel = std::wcstoul(values[0].c_str(), nullptr, 10);
         }
 
         // m_extensions is a uint64_t bitmask; extension values >= 64 cannot be
@@ -141,7 +156,7 @@ PrimaryDeviceAttributes::PrimaryDeviceAttributes(std::ostream& outStream, std::i
         constexpr unsigned long c_maxExtensionBit = 63ul;
         for (size_t i = 1; i < values.size(); ++i)
         {
-            const unsigned long ext = std::stoul(values[i]);
+            const unsigned long ext = std::wcstoul(values[i].c_str(), nullptr, 10);
             if (ext <= c_maxExtensionBit)
             {
                 m_extensions |= 1ull << ext;
@@ -278,7 +293,7 @@ namespace Format {
 } // namespace Format
 
 namespace Erase {
-    const Sequence LineForward{WSL_WINDOWS_VT_CSI "K"}; // ESC[K  (0 is the default parameter, omitted to match terminal output)
+    const Sequence LineForward{WSL_WINDOWS_VT_CSI "K"};
     const Sequence LineBackward{WSL_WINDOWS_VT_CSI "1K"};
     const Sequence LineEntirely{WSL_WINDOWS_VT_CSI "2K"};
     const Sequence ScreenForward{WSL_WINDOWS_VT_CSI "J"};

@@ -275,7 +275,10 @@ ConstructedSequence Sgr(std::initializer_list<int> params);
 struct PrimaryDeviceAttributes
 {
     // Queries the device attributes on creation.
-    PrimaryDeviceAttributes(std::ostream& outStream, std::istream& inStream);
+    // Both streams must be opened in _O_U8TEXT mode (or equivalent wide mode).
+    // outStream receives the DA1 request; inStream provides the terminal's response.
+    // All DA1 sequence bytes are pure ASCII so widening/narrowing is lossless.
+    PrimaryDeviceAttributes(std::wostream& outStream, std::wistream& inStream);
 
     // The extensions that a device may support.
     enum class Extension
