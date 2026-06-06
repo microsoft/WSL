@@ -101,6 +101,11 @@ void Argument::Validate(const ArgMap& execArgs) const
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
             }
+
+            if (IsEqual(value, L"host", true))
+            {
+                throw ArgumentException(L"host mode networking is not supported");
+            }
         }
         break;
     }

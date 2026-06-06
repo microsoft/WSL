@@ -658,14 +658,12 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostMode)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostMode_Rejected)
     {
         auto result =
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        const auto inspect = InspectContainer(WslcContainerName);
-        VERIFY_ARE_EQUAL(std::string("host"), inspect.HostConfig.NetworkMode);
+        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
