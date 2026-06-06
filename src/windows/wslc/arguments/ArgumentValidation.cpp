@@ -352,8 +352,9 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
     const int64_t soft = parseLimit(colonPos == std::wstring::npos ? valuesPart : valuesPart.substr(0, colonPos));
     const int64_t hard = colonPos == std::wstring::npos ? soft : parseLimit(valuesPart.substr(colonPos + 1));
 
-    // -1 == unlimited; otherwise hard must be >= soft.
-    if (soft != -1 && hard != -1 && hard < soft)
+    // This rejects "-1:1024" and "-1:<finite>" while allowing "<finite>:-1", "-1:-1", and "-1".
+    const bool invalidRange = (soft == -1) ? (hard != -1) : (hard != -1 && hard < soft);
+    if (invalidRange)
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
     }
