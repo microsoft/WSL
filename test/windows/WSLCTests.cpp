@@ -3401,24 +3401,26 @@ class WSLCTests
         std::filesystem::create_directories(testFolder);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
 
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-        auto unmount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session->UnmountWindowsFolder("/win-path"); });
+        static constexpr auto mountPoint = "/virtiofs-ownership-test";
+
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), mountPoint, false));
+        auto unmount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session->UnmountWindowsFolder(mountPoint); });
 
         // Create a file and chown to uid 1000:100, then verify ownership is preserved.
         // Without the 'metadata' option on the virtiofs share, chown appears to succeed but
         // subsequent stat reports uid=0/gid=0 because ownership is not persisted.
         auto result = ExpectCommandResult(
             session.get(),
-            {"/bin/sh", "-c", "touch /win-path/owned.txt && chown 1000:100 /win-path/owned.txt && stat -c '%u %g' /win-path/owned.txt"},
+            {"/bin/sh", "-c", "touch /virtiofs-ownership-test/owned.txt && chown 1000:100 /virtiofs-ownership-test/owned.txt && stat -c '%u %g' /virtiofs-ownership-test/owned.txt"},
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("1000 100\n"));
 
         // Verify that a file created by a non-root user retains the creator's ownership.
-        // Use 'su' to run as uid 65534 (nobody) and create a file, then verify ownership.
+        // Use numeric UID via su to avoid dependency on specific usernames being configured.
         result = ExpectCommandResult(
             session.get(),
-            {"/bin/sh", "-c", "rm -f /win-path/nobody.txt && su nobody -s /bin/sh -c 'touch /win-path/nobody.txt' && stat -c '%u' /win-path/nobody.txt"},
+            {"/bin/sh", "-c", "rm -f /virtiofs-ownership-test/nonroot.txt && su -s /bin/sh '#65534' -c 'touch /virtiofs-ownership-test/nonroot.txt' && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
