@@ -930,6 +930,12 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
                 WindowsHosts.append(CurrentEntry);
             }
         }
+
+        if (WindowsHosts.size() > 8 * _1MB)
+        {
+            LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE), "Windows hosts file too large");
+            return {};
+        }
     }
 
     WI_ASSERT(Stream.eof());
