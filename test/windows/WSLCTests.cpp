@@ -3388,6 +3388,42 @@ class WSLCTests
         ValidateWindowsMounts(true);
     }
 
+    // Validates that virtiofs mounts preserve file ownership for non-root users (regression test for #40719).
+    WSLC_TEST_METHOD(WindowsMountsVirtioFsFileOwnership)
+    {
+        auto settings = GetDefaultSessionSettings(L"virtiofs-ownership-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+        auto testFolder = std::filesystem::current_path() / "test-folder-virtiofs-ownership";
+        std::filesystem::create_directories(testFolder);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+        auto unmount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session->UnmountWindowsFolder("/win-path"); });
+
+        // Create a file and chown to uid 1000:100, then verify ownership is preserved.
+        // Without the 'metadata' option on the virtiofs share, chown appears to succeed but
+        // subsequent stat reports uid=0/gid=0 because ownership is not persisted.
+        auto result = ExpectCommandResult(
+            session.get(),
+            {"/bin/sh", "-c", "touch /win-path/owned.txt && chown 1000:100 /win-path/owned.txt && stat -c '%u %g' /win-path/owned.txt"},
+            0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::string("1000 100\n"));
+
+        // Verify that a file created by a non-root user retains the creator's ownership.
+        // Use 'su' to run as uid 65534 (nobody) and create a file, then verify ownership.
+        result = ExpectCommandResult(
+            session.get(),
+            {"/bin/sh", "-c", "rm -f /win-path/nobody.txt && su nobody -s /bin/sh -c 'touch /win-path/nobody.txt' && stat -c '%u' /win-path/nobody.txt"},
+            0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
+    }
+
     // Validates that VirtioFs shares are reused across mount/unmount cycles for the same Windows folder.
     WSLC_TEST_METHOD(WindowsMountsVirtioFsShareReuse)
     {

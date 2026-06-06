@@ -580,7 +580,7 @@ try
     }
     else
     {
-        std::wstring options = ReadOnly ? L"ro" : L"";
+        std::wstring options = ReadOnly ? L"ro;metadata" : L"metadata";
         if (!m_swiotlbOption.empty())
         {
             if (!options.empty())
