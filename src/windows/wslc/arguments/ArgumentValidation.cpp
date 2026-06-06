@@ -11,19 +11,16 @@ Abstract:
     Implementation of the Argument Validation.
 
 --*/
+
+#include "precomp.h"
 #include "Argument.h"
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "Exceptions.h"
 #include "Localization.h"
-#include <cerrno>
 #include <charconv>
-#include <cmath>
-#include <cwchar>
 #include <format>
-#include <limits>
-#include <tuple>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -298,30 +295,16 @@ void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstrin
 
 int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName)
 {
-    // Accept a positive decimal number of CPUs (e.g. "0.5", "1", "2.5") and convert to nanoCPUs.
-    // Matches Docker's --cpus semantics: nanoCpus = cpus * 1e9.
     constexpr double NanosPerCpu = 1'000'000'000.0;
     constexpr double MaxCpus = static_cast<double>(std::numeric_limits<int64_t>::max()) / NanosPerCpu;
 
-    if (input.empty())
-    {
-        throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
-    }
+    const std::string narrow = WideToMultiByte(input);
+    const char* begin = narrow.c_str();
+    const char* end = begin + narrow.size();
 
-    // Reject leading whitespace or sign characters so we get the same behavior as the strict parsers.
-    for (wchar_t c : input)
-    {
-        const bool isDigit = (c >= L'0' && c <= L'9');
-        if (!isDigit && c != L'.')
-        {
-            throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
-        }
-    }
-
-    wchar_t* end = nullptr;
-    errno = 0;
-    const double cpus = std::wcstod(input.c_str(), &end);
-    if (errno != 0 || end == nullptr || *end != L'\0' || !std::isfinite(cpus) || cpus <= 0.0 || cpus > MaxCpus)
+    double cpus{};
+    const auto result = std::from_chars(begin, end, cpus, std::chars_format::fixed);
+    if (result.ec != std::errc() || result.ptr != end || cpus <= 0.0 || cpus > MaxCpus)
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
     }
@@ -339,51 +322,35 @@ void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring&
 
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName)
 {
-    // Accepts <name>=<soft>[:<hard>]; if hard is omitted hard = soft. -1 is permitted to mean unlimited.
+    // Accepts <name>=<soft>[:<hard>]; if hard is omitted hard = soft. -1 means unlimited.
     const auto equalsPos = input.find(L'=');
     if (equalsPos == std::wstring::npos || equalsPos == 0)
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
     }
 
-    const std::wstring nameW = input.substr(0, equalsPos);
     const std::wstring valuesPart = input.substr(equalsPos + 1);
-
-    if (nameW.empty() || valuesPart.empty())
-    {
-        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
-    }
-
-    int64_t soft = 0;
-    int64_t hard = 0;
-
     const auto colonPos = valuesPart.find(L':');
+
     auto parseLimit = [&](const std::wstring& limitStr) -> int64_t {
         if (limitStr.empty())
         {
             throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
         }
-        return GetIntegerFromString<int64_t>(limitStr, argName, [](int64_t v) { return v >= -1; });
+
+        try
+        {
+            return GetIntegerFromString<int64_t>(limitStr, argName, [](int64_t v) { return v >= -1; });
+        }
+        catch (const ArgumentException&)
+        {
+            // Re-throw with the ulimit-specific error message so the user sees the full input.
+            throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+        }
     };
 
-    try
-    {
-        if (colonPos == std::wstring::npos)
-        {
-            soft = parseLimit(valuesPart);
-            hard = soft;
-        }
-        else
-        {
-            soft = parseLimit(valuesPart.substr(0, colonPos));
-            hard = parseLimit(valuesPart.substr(colonPos + 1));
-        }
-    }
-    catch (const ArgumentException&)
-    {
-        // Re-throw with the ulimit-specific error message so the user sees the full input.
-        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
-    }
+    const int64_t soft = parseLimit(colonPos == std::wstring::npos ? valuesPart : valuesPart.substr(0, colonPos));
+    const int64_t hard = colonPos == std::wstring::npos ? soft : parseLimit(valuesPart.substr(colonPos + 1));
 
     // -1 == unlimited; otherwise hard must be >= soft.
     if (soft != -1 && hard != -1 && hard < soft)
@@ -391,7 +358,7 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
         throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
     }
 
-    return {WideToMultiByte(nameW), soft, hard};
+    return {WideToMultiByte(input.substr(0, equalsPos)), soft, hard};
 }
 
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
