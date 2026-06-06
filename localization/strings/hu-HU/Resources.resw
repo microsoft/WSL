@@ -918,6 +918,10 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A DNS-alagút nem támogatott</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>A Windows-gazdagépfájl túl nagy, és nem fog megjelenni a WSL. Fontolja meg a %SystemRoot%\System32\drivers\etc\hosts méretének csökkentését</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>A wsl2.localhostForwarding beállításnak nincs hatása tükrözött hálózati mód használatakor</value>
   </data>
@@ -2365,6 +2369,9 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Érvénytelen képcímke-formátum: „{}”. A várt formátum a következő: „name:tag”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Save in progress.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>A WSLC a Linuxos Windows-alrendszer tároló CLI eszköze.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2959,30 +2966,30 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Betöltés kérelmezve, de nincs megadva bevitel.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
-    <value>Manage networks.</value>
+    <value>Hálózatok kezelése.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>
+    <value>A WSL-hálózatok életciklusának kezelése, beleértve azok létrehozását, vizsgálatát, listázását és törlését.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
-    <value>Create a network.</value>
+    <value>Hálózat létrehozása.</value>
   </data>
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
-    <value>Creates a new network.</value>
+    <value>Új hálózatot hoz létre.</value>
   </data>
   <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
-    <value>Specify network driver name (default: bridge)</value>
+    <value>Adja meg a hálózati illesztőprogram nevét (alapértelmezett: bridge)</value>
     <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
-    <value>Network metadata setting</value>
+    <value>Hálózati metaadatok beállítása</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
-    <value>Remove one or more networks.</value>
+    <value>Távolítson el egy vagy több hálózatot.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks.</value>
+    <value>Eltávolít egy vagy több hálózatot.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
     <value>Részletes információk megjelenítése egy vagy több hálózatról.</value>
@@ -2991,16 +2998,16 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Részletes információk megjelenítése egy vagy több hálózatról.</value>
   </data>
   <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
-    <value>List networks.</value>
+    <value>Hálózatok listázása.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Listázza a munkamenetben szereplő összes hálózatot.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
-    <value>Network name</value>
+    <value>Hálózat neve</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Csak a hálózatneveket adja ki</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Kötetek kezelése.</value>

@@ -924,6 +924,10 @@ Fallback auf NAT-Netzwerk.</value>
     <value>DNS-Tunneln wird nicht unterstützt</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Die Windows-Hostdatei ist zu groß und wird nicht in WSL wiedergegeben. Erwägen Sie eine Verkleinerung der %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Die Einstellung "wsl2.localhostForwarding" hat keine Auswirkungen, wenn der gespiegelte Netzwerkmodus verwendet wird.</value>
   </data>
@@ -2371,6 +2375,9 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Ungültiges Bild-Tag-Format: „{}“. Erwartetes Format ist „name:tag“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Save in progress.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC ist das Windows-Subsystem für Linux Container-CLI-Tool.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2965,30 +2972,30 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Laden angefordert, aber keine Eingabe bereitgestellt.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
-    <value>Manage networks.</value>
+    <value>Netzwerke verwalten.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
     <value>Verwalten Sie den Lebenszyklus WSL Netzwerks, einschließlich Erstellen, Überprüfen, Auflisten und Löschen.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
-    <value>Create a network.</value>
+    <value>Erstellen Sie ein Netzwerk.</value>
   </data>
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
-    <value>Creates a new network.</value>
+    <value>Erstellt ein neues Netzwerk.</value>
   </data>
   <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
-    <value>Specify network driver name (default: bridge)</value>
+    <value>Geben Sie den Namen des Netzwerktreibers an (Standard: bridge)</value>
     <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
-    <value>Network metadata setting</value>
+    <value>Einstellung für Netzwerkmetadaten</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
-    <value>Remove one or more networks.</value>
+    <value>Ein oder mehrere Netzwerke entfernen.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks.</value>
+    <value>Entfernt ein oder mehrere Netzwerke.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
     <value>Zeigt detaillierte Informationen zu einem oder mehreren Netzwerken an.</value>
@@ -2997,16 +3004,16 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Zeigt detaillierte Informationen zu einem oder mehreren Netzwerken an.</value>
   </data>
   <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
-    <value>List networks.</value>
+    <value>Listet Netzwerke auf.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Listet alle Netzwerke in der Sitzung auf.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
-    <value>Network name</value>
+    <value>Netzwerkname</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Gibt nur die Netzwerknamen aus</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes verwalten.</value>

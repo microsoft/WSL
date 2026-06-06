@@ -918,6 +918,10 @@ Faller tilbake til NAT-nettverk.</value>
     <value>DNS-tunnelering støttes ikke</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows-vertsfilen er for stor og vil ikke vises i WSL. Vurder å redusere størrelsen på %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Innstillingen wsl2.localhostForwarding har ingen effekt ved bruk av avspeilet nettverksmodus</value>
   </data>
@@ -2365,6 +2369,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Ugyldig bildemerkeformat: «{}». Forventet format er «navn:merke»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Lagring pågår.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC er beholder-CLI-verktøyet for Windows-undersystemet for Linux.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2959,30 +2966,30 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Forespurt lasting, men ingen inndata oppgitt.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
-    <value>Manage networks.</value>
+    <value>Administrer nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
     <value>Administrer livssyklusen til WSL nettverk, inkludert oppretting, inspeksjon, oppføring og sletting av dem.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
-    <value>Create a network.</value>
+    <value>Opprett et nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
-    <value>Creates a new network.</value>
+    <value>Oppretter et nytt nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
     <value>Specify network driver name (default: bridge)</value>
     <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
-    <value>Network metadata setting</value>
+    <value>Innstilling for nettverksmetadata</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
-    <value>Remove one or more networks.</value>
+    <value>Fjern ett eller flere nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks.</value>
+    <value>Fjerner ett eller flere nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
     <value>Vis detaljert informasjon på ett eller flere nettverk.</value>
@@ -2991,16 +2998,16 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis detaljert informasjon på ett eller flere nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
-    <value>List networks.</value>
+    <value>Vis nettverk.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Viser alle nettverk i økten.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
-    <value>Network name</value>
+    <value>Nettverksnavn</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Sender bare nettverksnavn</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Administrer volumer.</value>

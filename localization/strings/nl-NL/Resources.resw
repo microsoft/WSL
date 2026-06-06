@@ -918,6 +918,10 @@ Terugvallen op NAT-netwerken.</value>
     <value>DNS-tunneling wordt niet ondersteund</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Het Windows-hostbestand is te groot en wordt niet weergegeven in WSL. Overweeg de grootte van %SystemRoot%\System32\drivers\etc\hosts te verkleinen</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>De instelling wsl2.localhostForwarding heeft geen effect bij het gebruik van de gespiegelde netwerkmodus</value>
   </data>
@@ -2364,6 +2368,9 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Ongeldige indeling van afbeeldingstag: {}. Verwachte indeling is 'naam:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Save in progress.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC is het Windows-subsysteem voor Linux Container CCLI-hulpprogramma.</value>

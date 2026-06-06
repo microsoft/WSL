@@ -925,6 +925,10 @@ Voltando à rede NAT.</value>
     <value>Não há suporte para túnel DNS</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>O arquivo de hosts do Windows é muito grande e não será refletido dentro WSL. Considere reduzir o tamanho do %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>A configuração wsl2.localhostForwarding não tem efeito ao usar o modo de rede espelhado</value>
   </data>
@@ -2372,6 +2376,9 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Formato de marca de imagem inválido: ''{}''. O formato esperado é ''name:tag''</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Save in progress.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC é a ferramenta CLI de Contêiner do Subsistema do Windows para Linux.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -3001,7 +3008,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Liste as redes.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Lista todas as redes na sessão.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nome da rede</value>
