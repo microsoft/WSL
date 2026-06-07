@@ -357,7 +357,7 @@ class WSLCCLIExecutionUnitTests
 
     TEST_METHOD(RunCommand_ParseNetworkSingleValue_SetsNetwork)
     {
-        auto invocation = CreateInvocationFromCommandLine(L"wslc --network host ubuntu sh");
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 ubuntu sh");
 
         ContainerRunCommand command{L""};
         CLIExecutionContext context;
@@ -368,7 +368,7 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(1u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("host"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
     }
 
     TEST_METHOD(RunCommand_ParseNetworkMultipleValues_PreservesOrder)
@@ -402,7 +402,7 @@ class WSLCCLIExecutionUnitTests
 
     TEST_METHOD(CreateCommand_ParseNetworkSingleValue_SetsNetwork)
     {
-        auto invocation = CreateInvocationFromCommandLine(L"wslc --network host ubuntu sh");
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 ubuntu sh");
 
         ContainerCreateCommand command{L""};
         CLIExecutionContext context;
@@ -413,7 +413,7 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(1u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("host"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkMultipleValues_PreservesOrder)
