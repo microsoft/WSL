@@ -918,6 +918,10 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>DNS-tunneltrafik stöds inte</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows-värdfilen är för stor och återspeglas inte i WSL. Överväg att minska storleken på %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Inställningen wsl2.localhostForwarding har ingen effekt när speglat nätverksläge används</value>
   </data>
@@ -2365,6 +2369,9 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Ogiltigt format för avbildningstagg: {}. Förväntat format är name:tag</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Spara pågår.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC är Windows-undersystem för Linux Container CLI-verktyget.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2959,48 +2966,48 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Begärd inläsning men inga indata angivna.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
-    <value>Manage networks.</value>
+    <value>Hantera nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>
+    <value>Hantera livscykeln för WSL-nätverk, inklusive att skapa, inspektera, lista och ta bort dem.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
-    <value>Create a network.</value>
+    <value>Skapa ett nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
-    <value>Creates a new network.</value>
+    <value>Skapar ett nytt nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
-    <value>Specify network driver name (default: bridge)</value>
+    <value>Ange nätverksdrivrutinens namn (standard: bridge)</value>
     <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
-    <value>Network metadata setting</value>
+    <value>Inställning för nätverksmetadata</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
-    <value>Remove one or more networks.</value>
+    <value>Ta bort ett eller flera nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks.</value>
+    <value>Tar bort ett eller flera nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
-    <value>Display detailed information on one or more networks.</value>
+    <value>Visa detaljerad information om ett eller flera nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
-    <value>Display detailed information on one or more networks.</value>
+    <value>Visa detaljerad information om ett eller flera nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
-    <value>List networks.</value>
+    <value>Lista nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Visar en lista över alla nätverk i sessionen.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
-    <value>Network name</value>
+    <value>Nätverksnamn</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Matar endast ut nätverksnamnen</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Hantera volymer.</value>

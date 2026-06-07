@@ -918,6 +918,10 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>DNS Tüneli desteklenmiyor</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows hosts dosyası çok büyük ve WSL içinde yansıtılmayacaktır. %SystemRoot%\System32\drivers\etc\hosts dosyasının boyutunu küçültmeyi değerlendirin</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Yansıtılmış ağ modu kullanılırken wsl2.localhostForwarding ayarının etkisi yoktur</value>
   </data>
@@ -2365,6 +2369,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz resim etiketi biçimi: '{}'. Beklenen biçim: 'ad:etiket'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Kaydetme devam ediyor.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC, Linux için Windows Alt Sistemi Kapsayıcı CLI aracıdır.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2959,30 +2966,30 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Yükleme istendi ancak giriş sağlanmadı.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
-    <value>Manage networks.</value>
+    <value>Ağları yönet.</value>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>
+    <value>Oluşturma, inceleme, listeleme ve silme işlemleri de dahil olmak üzere WSL ağlarının yaşam döngüsünü yönetin.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
-    <value>Create a network.</value>
+    <value>Bir ağ oluşturun.</value>
   </data>
   <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
-    <value>Creates a new network.</value>
+    <value>Yeni bir ağ oluşturur.</value>
   </data>
   <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
-    <value>Specify network driver name (default: bridge)</value>
+    <value>Ağ sürücüsü adını belirtin (varsayılan: bridge)</value>
     <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
-    <value>Network metadata setting</value>
+    <value>Ağ meta verisi ayarı</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
-    <value>Remove one or more networks.</value>
+    <value>Bir veya birden fazla ağı kaldırın.</value>
   </data>
   <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more networks.</value>
+    <value>Bir veya birden fazla ağı kaldırır.</value>
   </data>
   <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
     <value>Bir veya birden çok ağ üzerinde ayrıntılı bilgi görüntüle.</value>
@@ -2991,16 +2998,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Bir veya birden çok ağ üzerinde ayrıntılı bilgi görüntüle.</value>
   </data>
   <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
-    <value>List networks.</value>
+    <value>Ağları listeleyin.</value>
   </data>
   <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
-    <value>Lists all networks in the session.</value>
+    <value>Oturumdaki tüm ağları listeler.</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
-    <value>Network name</value>
+    <value>Ağ adı</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Yalnızca ağ adlarının çıkışını oluşturur</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Birimleri yönetin.</value>
