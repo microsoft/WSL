@@ -130,9 +130,9 @@ std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
 
-void CreateSwap(unsigned int Lun);
+std::optional<std::string> FormatScratchDevice(unsigned int Lun);
 
-int CreateTempDirectory(const char* ParentPath, std::string& Path);
+void CreateSwap(unsigned int Lun);
 
 wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath);
 
@@ -183,7 +183,8 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    int DistroCgroupNamespaceFd);
+    int DistroCgroupNamespaceFd,
+    unsigned int ScratchLun);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -310,6 +311,59 @@ Return Value:
     return Fd;
 }
 
+std::optional<std::string> FormatScratchDevice(unsigned int Lun)
+
+/*++
+
+Routine Description:
+
+    This routine formats the scratch vhd used to back the system distro overlay's
+    read/write layer.
+
+    N.B. This must run after the scratch device LUN is attached, but before the
+         overlay is created so the overlay can mount the device as its rw layer.
+
+Arguments:
+
+    Lun - Supplies the LUN of the scratch device, or UINT_MAX if none.
+
+Return Value:
+
+    The scratch device path on success, std::nullopt on failure.
+
+--*/
+
+try
+{
+    if (Lun == UINT_MAX)
+    {
+        return std::nullopt;
+    }
+
+    const std::string DevicePath = GetLunDevicePath(Lun);
+    WaitForBlockDevice(DevicePath.c_str());
+
+    //
+    // Format the scratch device with ext4.
+    //
+    // N.B. This runs with the system distro as the root filesystem, so mkfs.ext4
+    //      and the scratch device node are directly reachable.
+    //
+    // N.B. The journal is omitted (the data is disposable) and the inode table is
+    //      lazily initialized to keep formatting off the boot critical path.
+    //
+
+    const std::string CommandLine = std::format("/usr/sbin/mkfs.ext4 -q -m 0 -O ^has_journal -E lazy_itable_init=1 '{}'", DevicePath);
+    THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0);
+
+    return DevicePath;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return std::nullopt;
+}
+
 void CreateSwap(unsigned int Lun)
 
 /*++
@@ -347,50 +401,6 @@ Return Value:
         CommandLine = std::format("/usr/sbin/swapon '{}'", DevicePath);
         UtilExecCommandLine(CommandLine.c_str(), nullptr);
     });
-}
-
-int CreateTempDirectory(const char* ParentPath, std::string& Path)
-
-/*++
-
-Routine Description:
-
-    This routine creates a unique directory under the specified parent path.
-
-Arguments:
-
-    ParentPath - Supplies the path of the parent directory.
-
-    Path - Supplies a buffer to receive the path of the child directory that was
-        created.
-
-Return Value:
-
-    0 on success, -1 on failure.
-
---*/
-
-{
-    if (ParentPath)
-    {
-        Path = ParentPath;
-    }
-
-    //
-    // Generate a random name for the directory.
-    //
-    // N.B. mkdtemp requires a template string that ends in "XXXXXX".
-    //
-
-    Path += "/wslXXXXXX";
-
-    if (mkdtemp(Path.data()) == NULL)
-    {
-        LOG_ERROR("mkdtemp({}) failed {}", Path.c_str(), errno);
-        return -1;
-    }
-
-    return 0;
 }
 
 dev_t GetBlockDeviceNumber(const std::string& BlockDeviceName)
@@ -1495,7 +1505,7 @@ Return Value:
     size_t TargetPathLength = strlen(Target);
     auto AddTemporaryMount = [&](const char* Name, const char* Source, unsigned long MountFlags) {
         std::string Path;
-        THROW_LAST_ERROR_IF(CreateTempDirectory(Target, Path) < 0);
+        THROW_LAST_ERROR_IF(UtilCreateTempDirectory(Target, Path) < 0);
         THROW_LAST_ERROR_IF(mount(Source, Path.c_str(), nullptr, MountFlags, nullptr) < 0);
         AddEnvironmentVariable(Name, Path.substr(TargetPathLength).data());
     };
@@ -1710,7 +1720,8 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    int DistroCgroupNamespaceFd)
+    int DistroCgroupNamespaceFd,
+    unsigned int ScratchLun)
 
 /*++
 
@@ -1749,6 +1760,10 @@ Arguments:
 
     DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
+    ScratchLun - Supplies the SCSI LUN of the scratch device used to back the
+        overlay read/write layer, or UINT_MAX if none. When unavailable, the
+        overlay falls back to a tmpfs read/write layer.
+
 Return Value:
 
     None. This method does not return.
@@ -1758,10 +1773,26 @@ Return Value:
 try
 {
     //
-    // Create a writable layer on top of the read-only vhd.
+    // Format the scratch device (backed by a vhd) used to back the overlay
+    // read/write layer so it is disk-backed instead of consuming guest memory.
+    // On failure, the overlay transparently falls back to tmpfs.
     //
 
-    THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target, SYSTEM_DISTRO_VHD_PATH) < 0);
+    const std::optional<std::string> ScratchDevice = FormatScratchDevice(ScratchLun);
+
+    //
+    // Create a writable layer on top of the read-only vhd. If the scratch-backed
+    // overlay fails to mount (e.g. the backing vhd is full or the rw layer setup
+    // fails), fall back to a tmpfs-backed overlay so the system distro can still
+    // launch.
+    //
+
+    if (UtilMountOverlayFs(Target, SYSTEM_DISTRO_VHD_PATH, 0, {}, ScratchDevice) < 0)
+    {
+        THROW_LAST_ERROR_IF(!ScratchDevice.has_value());
+        LOG_ERROR("scratch-backed overlay mount failed, falling back to tmpfs");
+        THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target, SYSTEM_DISTRO_VHD_PATH, 0, {}, std::nullopt) < 0);
+    }
 
     //
     // Launch the init daemon, this method does not return.
@@ -1899,7 +1930,7 @@ try
     std::string MountPoint;
     if (Flags & LxMiniInitMessageFlagCreateOverlayFs)
     {
-        if (CreateTempDirectory(Target, MountPoint) < 0)
+        if (UtilCreateTempDirectory(Target, MountPoint) < 0)
         {
             return -1;
         }
@@ -1989,7 +2020,7 @@ int MountSystemDistro(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int De
 Routine Description:
 
     This routine mounts the system distro as read-only, creates a writable
-    tmpfs layer using overlayfs, and chroots to the mount point.
+    overlayfs layer, and chroots to the mount point.
 
 Arguments:
 
@@ -2389,7 +2420,8 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
                         ChildPid,
-                        DistroCgroupNamespace.get());
+                        DistroCgroupNamespace.get(),
+                        Message->ScratchLun);
                 }
             }
 
