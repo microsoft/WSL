@@ -137,10 +137,7 @@ void ValidateFilter(const std::vector<std::wstring>& values)
 {
     for (const auto& value : values)
     {
-        if (value.find(L'=') == std::wstring::npos)
-        {
-            throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
-        }
+        std::ignore = ParseFilter(value);
     }
 }
 
@@ -211,8 +208,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(
+            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 
@@ -295,6 +292,17 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
     if (pos == std::wstring::npos)
     {
         return {WideToMultiByte(value), std::string{}};
+    }
+
+    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+}
+
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+{
+    auto pos = value.find(L'=');
+    if (pos == std::wstring::npos)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
     }
 
     return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
