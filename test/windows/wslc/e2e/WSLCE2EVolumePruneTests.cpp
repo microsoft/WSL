@@ -69,7 +69,7 @@ class WSLCE2EVolumePruneTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_FALSE(
-            result.StdoutContainsSubstring(std::format(L"Deleted: {}", TestVolumeName)),
+            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
             L"Named volume should not be pruned without --all");
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
 
@@ -133,7 +133,7 @@ class WSLCE2EVolumePruneTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_FALSE(
-            result.StdoutContainsSubstring(std::format(L"Deleted: {}", TestVolumeName)),
+            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
             L"Volume in use by a running container must not be pruned");
 
         VerifyVolumeIsListed(TestVolumeName);
@@ -150,7 +150,7 @@ class WSLCE2EVolumePruneTests
         const auto filteredPrune = RunWslc(L"volume prune --all --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
-            filteredPrune.StdoutContainsSubstring(std::format(L"Deleted: {}", TestVolumeName)),
+            filteredPrune.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
             L"Filtered prune should not have deleted the non-matching volume");
         VerifyVolumeIsListed(TestVolumeName);
 
@@ -179,7 +179,7 @@ class WSLCE2EVolumePruneTests
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
         VERIFY_IS_FALSE(
-            result.StdoutContainsSubstring(std::format(L"Deleted: {}", TestVolumeName2)),
+            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName2)),
             L"Volume without the matching label must not be deleted");
 
         VerifyVolumeIsNotListed(TestVolumeName);
@@ -203,7 +203,7 @@ class WSLCE2EVolumePruneTests
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName2)));
         VERIFY_IS_FALSE(
-            result.StdoutContainsSubstring(std::format(L"Deleted: {}", TestVolumeName)),
+            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
             L"Labeled volume must be preserved when prune negates that label");
 
         VerifyVolumeIsListed(TestVolumeName);
