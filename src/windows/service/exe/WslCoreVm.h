@@ -91,6 +91,10 @@ public:
 
     void EjectVhd(_In_ PCWSTR VhdPath);
 
+    // Ejects and deletes the per-instance overlay scratch vhd (if any) that was
+    // created for the instance with the specified id.
+    void CleanupInstanceScratch(_In_ const GUID& InstanceId);
+
     const wsl::core::Config& GetConfig() const noexcept;
 
     GUID GetRuntimeId() const;
@@ -202,6 +206,9 @@ private:
     _Requires_lock_held_(m_lock)
     void EjectVhdLockHeld(_In_ PCWSTR VhdPath);
 
+    _Requires_lock_held_(m_lock)
+    void CleanupInstanceScratchLockHeld(_In_ const GUID& InstanceId);
+
     _Requires_lock_held_(m_guestDeviceLock)
     std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin = {}) const;
 
@@ -303,6 +310,7 @@ private:
     std::shared_ptr<LxssRunningInstance> m_systemDistro;
     _Guarded_by_(m_lock) std::bitset<MAX_VHD_COUNT> m_lunBitmap;
     _Guarded_by_(m_lock) std::map<AttachedDisk, DiskState> m_attachedDisks;
+    _Guarded_by_(m_lock) std::map<GUID, std::filesystem::path, wsl::windows::common::helpers::GuidLess> m_instanceScratchVhds;
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;

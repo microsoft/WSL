@@ -45,6 +45,10 @@ using namespace std::string_literals;
 static constexpr size_t c_bootEntropy = 0x1000;
 static constexpr auto c_localDevicesKey = L"SOFTWARE\\Microsoft\\Terminal Server Client\\LocalDevices";
 
+// Virtual size of the dynamically-expanding scratch vhd that backs overlay
+// read/write layers. The vhd grows on demand, so this is only an upper bound.
+static constexpr ULONGLONG c_scratchVhdSizeBytes = 64ull * _1GB;
+
 #define LXSS_ENABLE_GUI_APPS() (m_vmConfig.EnableGuiApps && (m_systemDistroDeviceId != ULONG_MAX))
 
 using namespace wsl::windows::common;
@@ -1205,12 +1209,55 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
 #endif
 
     std::wstring userProfile{};
+    ULONG scratchLun = ULONG_MAX;
+    auto scratchCleanup = wil::scope_exit([&]() { CleanupInstanceScratchLockHeld(InstanceId); });
     if (LXSS_ENABLE_GUI_APPS() && (MessageType == LxMiniInitMessageLaunchInit))
     {
         WI_SetFlag(flags, LxMiniInitMessageFlagLaunchSystemDistro);
         sharedMemoryRoot = m_sharedMemoryRoot;
 
         userProfile = m_userProfile;
+
+        // Create and attach a per-instance scratch vhd to back the system distro overlay's
+        // read/write layer, so heavy writes land on reclaimable disk instead of guest memory.
+        //
+        // N.B. This can fail if the target directory is compressed, encrypted, or if the user
+        //      does not have write access. On failure the guest falls back to a tmpfs overlay.
+        try
+        {
+            auto scratchPath = m_tempPath / std::format(L"scratch-{}.vhdx", wsl::shared::string::GuidToString<wchar_t>(InstanceId));
+
+            // Eject and delete the scratch vhd if creation/attach succeeds but it is never
+            // successfully tracked (otherwise CleanupInstanceScratch / the temp dir teardown
+            // owns it). Released only once the vhd is recorded in m_instanceScratchVhds.
+            auto cleanupScratch = wil::scope_exit([&]() {
+                // Avoid advertising a lun that was torn down or never tracked.
+                scratchLun = ULONG_MAX;
+
+                try
+                {
+                    EjectVhdLockHeld(scratchPath.c_str());
+                }
+                CATCH_LOG()
+
+                try
+                {
+                    const auto runAsUser = wil::impersonate_token(m_userToken.get());
+                    LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(scratchPath.c_str()));
+                }
+                CATCH_LOG()
+            });
+
+            {
+                const auto runAsUser = wil::impersonate_token(m_userToken.get());
+                wsl::core::filesystem::CreateVhd(scratchPath.c_str(), c_scratchVhdSizeBytes, &m_userSid.Sid, false, false);
+            }
+
+            scratchLun = AttachDiskLockHeld(scratchPath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+            m_instanceScratchVhds.emplace(InstanceId, scratchPath);
+            cleanupScratch.release();
+        }
+        CATCH_LOG()
     }
 
     WI_SetFlagIf(flags, LxMiniInitMessageFlagExportCompressGzip, WI_IsFlagSet(ExportFlags, LXSS_EXPORT_DISTRO_FLAGS_GZIP));
@@ -1228,11 +1275,15 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
+    message->ScratchLun = scratchLun;
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
 
-    return CreateInstanceInternal(
+    auto instance = CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
+
+    scratchCleanup.release();
+    return instance;
 }
 
 std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
@@ -1396,6 +1447,44 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
         m_attachedDisks.erase(search);
         FreeLun(message.Lun);
     }
+}
+
+void WslCoreVm::CleanupInstanceScratch(_In_ const GUID& InstanceId)
+{
+    auto lock = m_lock.lock_exclusive();
+    CleanupInstanceScratchLockHeld(InstanceId);
+}
+
+_Requires_lock_held_(m_lock)
+void WslCoreVm::CleanupInstanceScratchLockHeld(_In_ const GUID& InstanceId)
+{
+    const auto search = m_instanceScratchVhds.find(InstanceId);
+    if (search == m_instanceScratchVhds.end())
+    {
+        return;
+    }
+
+    const auto scratchPath = std::move(search->second);
+    m_instanceScratchVhds.erase(search);
+
+    // Eject and delete the scratch vhd.
+    //
+    // N.B. The scratch device is only ever mounted inside the per-instance overlay mount
+    //      namespace, which is destroyed when the instance terminates, so by this point no
+    //      mount pins the device. Both steps are best-effort: any leftover is reclaimed when
+    //      the per-VM temp directory is deleted on VM teardown.
+    try
+    {
+        EjectVhdLockHeld(scratchPath.c_str());
+    }
+    CATCH_LOG()
+
+    try
+    {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(scratchPath.c_str()));
+    }
+    CATCH_LOG()
 }
 
 _Requires_lock_held_(m_guestDeviceLock)

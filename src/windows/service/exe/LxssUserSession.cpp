@@ -2591,6 +2591,16 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                         instanceId, configuration, LxMiniInitMessageLaunchInit, m_utilityVm->GetConfig().KernelBootTimeout, defaultUid, clientKey);
                 }
 
+                // If instance startup fails after this point, ensure the per-instance overlay
+                // scratch vhd created in CreateInstance is ejected and deleted (the normal
+                // terminate path is not reached for an instance that never finishes starting).
+                auto scratchCleanupOnFailure = wil::scope_exit([&]() {
+                    if (m_utilityVm)
+                    {
+                        m_utilityVm->CleanupInstanceScratch(instanceId);
+                    }
+                });
+
                 // Log telemetry to determine how long initialization takes.
                 WSL_LOG(
                     "InitializeInstanceBegin",
@@ -2645,6 +2655,8 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
+
+                scratchCleanupOnFailure.release();
 
                 result = S_OK;
             }
@@ -3613,9 +3625,11 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
             success = (success || force);
             if (success)
             {
+                std::optional<GUID> scratchInstanceId;
                 if (const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(instance->second.get()); wslcoreInstance != nullptr)
                 {
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
+                    scratchInstanceId = wslcoreInstance->GetInstanceId();
                 }
 
                 instance->second->Stop();
@@ -3629,6 +3643,12 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                 m_lifetimeManager.RemoveCallback(clientKey);
 
                 m_runningInstances.erase(instance);
+
+                // Eject and delete the per-instance overlay scratch vhd, if one was created.
+                if (scratchInstanceId.has_value() && m_utilityVm)
+                {
+                    m_utilityVm->CleanupInstanceScratch(scratchInstanceId.value());
+                }
 
                 // If the instance that was terminated was a WSL2 instance,
                 // check if the VM is now idle.
