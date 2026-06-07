@@ -120,9 +120,8 @@ class WSLCE2EVolumePruneTests
         VerifyVolumeIsListed(TestVolumeName);
 
         // Start a container that holds the volume open.
-        RunWslc(
-            std::format(
-                L"container run -d --name {} -v {}:/data {} sleep infinity", WslcContainerName, TestVolumeName, DebianImage.NameAndTag()))
+        RunWslc(std::format(
+                    L"container run -d --name {} -v {}:/data {} sleep infinity", WslcContainerName, TestVolumeName, DebianImage.NameAndTag()))
             .Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() {
