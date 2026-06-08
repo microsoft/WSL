@@ -1458,6 +1458,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
+    // An empty auth string is not a valid X-Registry-Auth header; reject it up-front (before the
+    // image lookup) so callers get E_INVALIDARG rather than a downstream not-found/failure.
+    RETURN_HR_IF(E_INVALIDARG, *RegistryAuthenticationInformation == '\0');
 
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     EnforceRegistryAllowlist(repo);
@@ -1566,6 +1569,17 @@ try
     *SpaceReclaimed = 0;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    // Validate filter keys client-side: podman returns HTTP 500 (-> E_FAIL) for an unknown filter,
+    // but an unknown filter key is a bad argument. The image-prune endpoint supports dangling/until/label.
+    for (const auto& [key, values] : filters)
+    {
+        // image-prune supports dangling/until/label (and label! for negated label match).
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            std::format("invalid filter '{}'", key),
+            key != "dangling" && key != "until" && key != "label" && key != "label!");
+    }
 
     auto lock = m_lock.lock_shared();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -2166,6 +2180,38 @@ int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTime
 }
 // Network management.
 
+// Validate an IPAM subnet (CIDR) / gateway (IP) up-front so malformed input returns a clear
+// E_INVALIDARG instead of podman's generic HTTP 500 -> E_FAIL.
+static void ValidateSubnetOption(const std::string& subnet)
+{
+    bool valid = false;
+    if (auto slash = subnet.find('/'); slash != std::string::npos && slash + 1 < subnet.size())
+    {
+        const auto ip = subnet.substr(0, slash);
+        const auto prefix = subnet.substr(slash + 1);
+        in_addr v4{};
+        in6_addr v6{};
+        const bool ipOk = inet_pton(AF_INET, ip.c_str(), &v4) == 1 || inet_pton(AF_INET6, ip.c_str(), &v6) == 1;
+        bool prefixOk = !prefix.empty();
+        for (char c : prefix)
+        {
+            if (c < '0' || c > '9') { prefixOk = false; break; }
+        }
+        valid = ipOk && prefixOk;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, std::format("invalid subnet: {}", subnet), !valid);
+}
+
+static void ValidateGatewayOption(const std::string& gateway)
+{
+    in_addr v4{};
+    in6_addr v6{};
+    const bool valid = inet_pton(AF_INET, gateway.c_str(), &v4) == 1 || inet_pton(AF_INET6, gateway.c_str(), &v6) == 1;
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, std::format("invalid gateway: {}", gateway), !valid);
+}
+
 HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options)
 try
 {
@@ -2185,6 +2231,17 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
+
+    // Validate IPAM options client-side: podman returns HTTP 500 (-> E_FAIL) for a malformed
+    // subnet/gateway, but these are bad arguments and should fail fast with E_INVALIDARG.
+    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    {
+        ValidateSubnetOption(it->second);
+    }
+    if (auto it = driverOpts.find("Gateway"); it != driverOpts.end())
+    {
+        ValidateGatewayOption(it->second);
+    }
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);

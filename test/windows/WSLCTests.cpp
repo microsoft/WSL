@@ -717,8 +717,11 @@ class WSLCTests
 
         // Validate that pushing a non-existent image fails.
         {
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr), E_FAIL);
-            ValidateCOMErrorMessage(L"An image does not exist locally with the tag: does-not-exist");
+            // podman reports a missing local image as WSLC_E_IMAGE_NOT_FOUND ("failed to find image
+            // ...: image not known"), which is more precise than dockerd's generic E_FAIL.
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr), WSLC_E_IMAGE_NOT_FOUND);
+            ValidateCOMErrorMessageContains(L"failed to find image");
         }
 
         // Validate passing empty auth string returns an appropriate error.
