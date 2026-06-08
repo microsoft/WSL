@@ -85,21 +85,39 @@ public:
 
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
-    IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier) override;
+    IFACEMETHOD(Initialize)(
+        _In_ const WSLCSessionInitSettings* Settings,
+        _In_ IWSLCVirtualMachine* Vm,
+        _In_ IWSLCPluginNotifier* PluginNotifier,
+        _In_opt_ IWarningCallback* WarningCallback) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
 
     // Image management.
-    IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
-    IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(ImportImage)(_In_ const WSLCHandle ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ const WSLCHandle ImageHandle,
+        _In_ LPCSTR ImageName,
+        _In_ IProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
+    IFACEMETHOD(SaveImages)(_In_ WSLCHandle OutputHandle, _In_ const WSLCStringArray* ImageNames, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImagesOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
-    IFACEMETHOD(PushImage)(_In_ LPCSTR Image, _In_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
     IFACEMETHOD(PruneImages)(
@@ -110,7 +128,7 @@ public:
         _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
+    IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
@@ -137,12 +155,13 @@ public:
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
      _In_ ULONG FiltersCount,
+     _In_opt_ IWarningCallback* WarningCallback,
      _Out_ WSLCVolumeName** Volumes,
      _Out_ ULONG* VolumesCount,
      _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Network management.
-    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
+    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
@@ -183,6 +202,10 @@ private:
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
+
+    _Requires_shared_lock_held_(m_lock)
+    void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     _Requires_shared_lock_held_(m_lock)
@@ -216,6 +239,7 @@ private:
     std::optional<DockerEventTracker> m_eventTracker;
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
+    std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
 
@@ -247,7 +271,7 @@ private:
 
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
     std::recursive_mutex m_userCOMCallbacksLock;
-    __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
+    __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

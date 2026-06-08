@@ -2914,7 +2914,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
 }
 
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(

@@ -656,7 +656,7 @@ bool ReadSocketMessageHandle::ProcessChunk()
     if (ReadingHeader)
     {
         THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER), "Unexpected message size: %u", messageSize);
-        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024, "Message size too large: %u", messageSize);
+        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 16 * 1024 * 1024, "Message size too large: %u", messageSize);
 
         if (Buffer.size() < messageSize)
         {

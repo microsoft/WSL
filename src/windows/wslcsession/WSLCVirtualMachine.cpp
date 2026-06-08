@@ -1038,6 +1038,8 @@ try
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
+    THROW_HR_IF_MSG(E_INVALIDARG, LinuxPath[0] != '/', "Mountpoint is not absolute: '%hs'", LinuxPath);
+
     const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
     auto normalizedPath = std::filesystem::weakly_canonical(path).wstring();
     GUID shareGuid{};

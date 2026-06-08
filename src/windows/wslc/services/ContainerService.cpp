@@ -17,6 +17,7 @@ Abstract:
 #include "ConsoleService.h"
 #include "ImageService.h"
 #include "ImageProgressCallback.h"
+#include "WarningCallback.h"
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
@@ -38,7 +39,8 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(
+    Session& session, const std::string& image, const ContainerOptions& options, IWarningCallback* warningCallback = nullptr)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -49,8 +51,15 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
+    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front();
+
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
+
+    for (size_t i = 1; i < options.Networks.size(); ++i)
+    {
+        containerLauncher.AddAdditionalNetwork(options.Networks[i]);
+    }
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -101,6 +110,21 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     if (options.ShmSize.has_value())
     {
         containerLauncher.SetShmSize(options.ShmSize.value());
+    }
+
+    if (options.MemoryBytes.has_value())
+    {
+        containerLauncher.SetMemoryLimit(options.MemoryBytes.value());
+    }
+
+    if (options.NanoCpus.has_value())
+    {
+        containerLauncher.SetNanoCpus(options.NanoCpus.value());
+    }
+
+    for (const auto& [name, soft, hard] : options.Ulimits)
+    {
+        containerLauncher.AddUlimit(name, soft, hard);
     }
 
     if (!options.Entrypoint.empty())
@@ -156,7 +180,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.AddLabel(key, value);
     }
 
-    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
+    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), warningCallback);
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
         {
@@ -166,7 +190,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }
-        return containerLauncher.Create(*session.Get());
+        return containerLauncher.Create(*session.Get(), warningCallback);
     }
 
     THROW_IF_FAILED(result);
@@ -342,9 +366,10 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // container isn't created when the caller-requested path can't be written. The file is
     // removed automatically if we don't reach Commit() below.
     CidFile cidFile(runOptions.CidFile);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
 
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto runningContainer = CreateInternal(session, image, runOptions, warningCallback.Get());
     auto& container = runningContainer.Get();
 
     WSLCContainerId containerId{};
@@ -353,7 +378,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+    THROW_IF_FAILED(container.Start(startFlags, nullptr, warningCallback.Get())); // TODO: Error message, detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
@@ -373,7 +398,8 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     CidFile cidFile(runOptions.CidFile);
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    auto runningContainer = CreateInternal(session, image, runOptions, warningCallback.Get());
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
@@ -387,7 +413,8 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr, warningCallback.Get()), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
