@@ -918,6 +918,10 @@ Palataan nat-verkkopalveluun.</value>
     <value>DNS-tunnelointia ei tueta</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windowsin hosts-tiedosto on liian suuri, eikä se näy WSL:ssä. Harkitse %SystemRoot%\System32\drivers\etc\hosts-tiedoston koon pienentämistä</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>wsl2.localhostForwarding-asetuksella ei ole vaikutusta käytettäessä peilatun verkon tilaa</value>
   </data>
@@ -2364,6 +2368,9 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Virheellinen kuvatunnisteen muoto: '{}'. Odotettu muoto on name:tag</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Tallennus on meneillään.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC on Windows-alijärjestelmä Linuxille Container CLI -työkalu.</value>
