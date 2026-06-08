@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include <Sfc.h>
+#include <msiquery.h>
 
 #include "Common.h"
 #include "registry.hpp"
@@ -21,6 +22,7 @@ Abstract:
 #include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
+using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
@@ -343,6 +345,80 @@ class InstallerTests
     {
         const auto msiKey = wsl::windows::common::registry::OpenKey(m_lxssKey.get(), L"MSI", KEY_ALL_ACCESS);
         wsl::windows::common::registry::DeleteKeyValue(msiKey.get(), L"ProductCode");
+    }
+
+    // Creates a copy of the current MSI modified to trigger MajorUpgrade then fail.
+    // The copy has a new ProductCode (avoids maintenance mode), bumped version,
+    // and a Type 19 custom action that forces failure after RemoveExistingProducts.
+    std::wstring CreateFailingUpgradeMsi()
+    {
+        auto badMsiPath = (std::filesystem::temp_directory_path() / L"wsl_bad_upgrade.msi").wstring();
+        std::filesystem::copy_file(m_msiPath, badMsiPath, std::filesystem::copy_options::overwrite_existing);
+
+        unique_msi_handle database;
+        THROW_IF_WIN32_ERROR(MsiOpenDatabaseW(badMsiPath.c_str(), MSIDBOPEN_TRANSACT, &database));
+
+        // Generate and set a new ProductCode to avoid maintenance mode
+        GUID newGuid;
+        THROW_IF_FAILED(CoCreateGuid(&newGuid));
+        wil::unique_cotaskmem_string guidStr;
+        THROW_IF_FAILED(StringFromCLSID(newGuid, &guidStr));
+
+        {
+            unique_msi_handle view;
+            THROW_IF_WIN32_ERROR(
+                MsiDatabaseOpenViewW(database.get(), L"UPDATE `Property` SET `Value` = ? WHERE `Property` = 'ProductCode'", &view));
+            unique_msi_handle rec{MsiCreateRecord(1)};
+            MsiRecordSetStringW(rec.get(), 1, guidStr.get());
+            THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), rec.get()));
+        }
+
+        // Bump version so MajorUpgrade detection is unambiguous
+        {
+            unique_msi_handle view;
+            THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(
+                database.get(), L"UPDATE `Property` SET `Value` = '99.99.99' WHERE `Property` = 'ProductVersion'", &view));
+            THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), 0));
+        }
+
+        // Add a Type 19 custom action that always fails
+        {
+            unique_msi_handle view;
+            THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(
+                database.get(),
+                L"INSERT INTO `CustomAction` (`Action`, `Type`, `Target`) VALUES ('ForceFailure', 19, 'Intentional failure for "
+                L"rollback testing')",
+                &view));
+            THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), 0));
+        }
+
+        // Schedule after RemoveExistingProducts (~1510 with afterInstallInitialize) but before ProcessComponents (1600).
+        // This ensures old files are removed (and backed up in the transaction) before the forced failure triggers rollback.
+        {
+            unique_msi_handle view;
+            THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(
+                database.get(), L"INSERT INTO `InstallExecuteSequence` (`Action`, `Sequence`) VALUES ('ForceFailure', 1599)", &view));
+            THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), 0));
+        }
+
+        // Regenerate PackageCode in Summary Information stream
+        {
+            MSIHANDLE hSummary = 0;
+            THROW_IF_WIN32_ERROR(MsiGetSummaryInformationW(database.get(), nullptr, 1, &hSummary));
+            auto closeSummary = wil::scope_exit([&]() { MsiCloseHandle(hSummary); });
+
+            GUID packageGuid;
+            THROW_IF_FAILED(CoCreateGuid(&packageGuid));
+            wil::unique_cotaskmem_string packageGuidStr;
+            THROW_IF_FAILED(StringFromCLSID(packageGuid, &packageGuidStr));
+
+            THROW_IF_WIN32_ERROR(MsiSummaryInfoSetPropertyW(hSummary, 9 /* PID_REVNUMBER */, VT_LPSTR, 0, nullptr, packageGuidStr.get()));
+            THROW_IF_WIN32_ERROR(MsiSummaryInfoPersist(hSummary));
+        }
+
+        THROW_IF_WIN32_ERROR(MsiDatabaseCommit(database.get()));
+        LogInfo("Created failing upgrade MSI: %ls (ProductCode: %ls)", badMsiPath.c_str(), guidStr.get());
+        return badMsiPath;
     }
 
     void InstallGitHubRelease(const std::wstring& version)
@@ -696,23 +772,35 @@ class InstallerTests
 
     TEST_METHOD(MsiUpgradeRollbackRestoresFiles)
     {
-        // Verify that direct MSI install via msiexec works after uninstall.
-        // This validates the test infrastructure before testing failure scenarios.
-        UninstallMsi();
-        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+        // Ensure current MSI is properly installed as our baseline
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
 
-        // Re-install the MSI directly via msiexec (same path as CallMsiExec).
+        // Record baseline file state for rollback verification
+        auto wslExePath = m_installedPath / WSL_BINARY_NAME;
+        auto wslServicePath = m_installedPath / L"wslservice.exe";
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExePath));
+        VERIFY_IS_TRUE(std::filesystem::exists(wslServicePath));
+        auto originalWslSize = std::filesystem::file_size(wslExePath);
+        auto originalServiceSize = std::filesystem::file_size(wslServicePath);
+
+        // Create a modified MSI with a different ProductCode, higher version, and a
+        // Type 19 custom action that forces failure after RemoveExistingProducts.
+        // This triggers MajorUpgrade (same UpgradeCode) then fails, exercising rollback.
+        auto badMsiPath = CreateFailingUpgradeMsi();
+        auto cleanupBadMsi = wil::scope_exit([&]() { std::filesystem::remove(badMsiPath); });
+
+        // Attempt upgrade with the failing MSI — expect ERROR_INSTALL_FAILURE (1603)
         PrepareForMsiOperation();
         auto logPath = GenerateMsiLogPath();
-        std::wstring commandLine;
-        THROW_IF_FAILED(wil::GetSystemDirectoryW(commandLine));
-        commandLine += std::format(L"\\msiexec.exe /qn /norestart /i \"{}\" /L*V \"{}\"", m_msiPath, logPath);
-
-        LogInfo("Calling msiexec: %ls", commandLine.c_str());
 
         DWORD exitCode = -1;
         wsl::shared::retry::RetryWithTimeout<void>(
             [&]() {
+                std::wstring commandLine;
+                THROW_IF_FAILED(wil::GetSystemDirectoryW(commandLine));
+                commandLine += std::format(
+                    L"\\msiexec.exe /qn /norestart /i \"{}\" SKIPVALIDATION=1 SKIPMSIX=1 SKIPLSP=1 /L*V \"{}\"", badMsiPath, logPath);
+                LogInfo("Calling msiexec with failing upgrade MSI: %ls", commandLine.c_str());
                 exitCode = LxsstuRunCommand(commandLine.data());
                 THROW_HR_IF(E_ABORT, exitCode == ERROR_INSTALL_ALREADY_RUNNING);
             },
@@ -720,7 +808,32 @@ class InstallerTests
             std::chrono::minutes(2),
             []() { return wil::ResultFromCaughtException() == E_ABORT; });
 
-        VERIFY_ARE_EQUAL(0L, exitCode);
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(ERROR_INSTALL_FAILURE), exitCode);
+
+        // Verify rollback restored the original files
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExePath), L"wsl.exe should be restored by rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslServicePath), L"wslservice.exe should be restored by rollback");
+        VERIFY_ARE_EQUAL(originalWslSize, std::filesystem::file_size(wslExePath));
+        VERIFY_ARE_EQUAL(originalServiceSize, std::filesystem::file_size(wslServicePath));
+
+        // Verify the original MSI is still registered
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        // Verify from MSI log that MajorUpgrade was exercised (RemoveExistingProducts ran before ForceFailure)
+        if (std::filesystem::exists(logPath))
+        {
+            std::ifstream logFile(logPath);
+            std::string logContent((std::istreambuf_iterator<char>(logFile)), std::istreambuf_iterator<char>());
+
+            auto removePos = logContent.find("RemoveExistingProducts");
+            auto forceFailPos = logContent.find("ForceFailure");
+            VERIFY_IS_TRUE(removePos != std::string::npos, L"MSI log should show RemoveExistingProducts ran");
+            VERIFY_IS_TRUE(forceFailPos != std::string::npos, L"MSI log should show ForceFailure ran");
+            VERIFY_IS_TRUE(removePos < forceFailPos, L"RemoveExistingProducts should run before ForceFailure");
+        }
+
+        // Reinstall current MSI to ensure clean state for subsequent tests
+        InstallMsi();
         ValidatePackageInstalledProperly();
     }
 
