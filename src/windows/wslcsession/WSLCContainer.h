@@ -78,6 +78,8 @@ public:
         std::string&& Image,
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
+        std::vector<std::string>&& namedVolumes,
+        WSLCVolumes& Volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
@@ -133,6 +135,7 @@ public:
         WSLCVirtualMachine& virtualMachine,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
+        WSLCVolumes& Volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -206,6 +209,12 @@ private:
     WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
+
+    // Names of the docker named volumes this container references. Used at Start()
+    // to refuse running when a referenced volume is not available.
+    std::vector<std::string> m_namedVolumes;
+    WSLCVolumes& m_volumes;
+
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
     DockerEventTracker& m_eventTracker;

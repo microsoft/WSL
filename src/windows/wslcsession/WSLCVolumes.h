@@ -52,7 +52,10 @@ public:
 
     std::string InspectVolume(_In_ const std::string& Name) const;
 
-    bool ContainsVolume(_In_ const std::string& Name) const;
+    // Returns the status of the named volume as {Code, Message}: {S_OK, ""} if it is usable,
+    // otherwise a failure HRESULT and reason. A missing volume is reported as a failure with an
+    // empty message.
+    std::pair<HRESULT, std::string> GetVolumeStatus(_In_ const std::string& Name) const;
 
 private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);
