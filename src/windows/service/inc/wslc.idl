@@ -713,7 +713,7 @@ typedef enum _WSLCSessionState
 typedef struct _WSLCSessionInitSettings
 {
     ULONG SessionId;
-    ULONG CreatorPid;
+    [unique] LPCWSTR CreatorProcessName;
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
     WSLCSessionStorageFlags StorageFlags;
