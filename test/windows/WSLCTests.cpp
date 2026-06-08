@@ -7161,6 +7161,7 @@ class WSLCTests
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
             // TODO: Undo once stabilized.
+            std::this_thread::sleep_for(std::chrono::seconds(3));
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Verify that ListContainers returns the port data for a running container.
