@@ -775,6 +775,9 @@ class InstallerTests
         // Ensure current MSI is properly installed as our baseline
         VERIFY_IS_TRUE(IsMsiPackageInstalled());
 
+        // Guarantee the current MSI is reinstalled even if the test fails partway through.
+        auto restoreMsi = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
         // Record baseline file state for rollback verification
         auto wslExePath = m_installedPath / WSL_BINARY_NAME;
         auto wslServicePath = m_installedPath / L"wslservice.exe";
@@ -808,6 +811,7 @@ class InstallerTests
             std::chrono::minutes(2),
             []() { return wil::ResultFromCaughtException() == E_ABORT; });
 
+        LogInfo("msiexec exit code: %lu (expected %lu)", exitCode, static_cast<DWORD>(ERROR_INSTALL_FAILURE));
         VERIFY_ARE_EQUAL(static_cast<DWORD>(ERROR_INSTALL_FAILURE), exitCode);
 
         // Verify rollback restored the original files
@@ -833,6 +837,8 @@ class InstallerTests
         }
 
         // Reinstall current MSI to ensure clean state for subsequent tests
+        // (restoreMsi scope_exit also covers this, but explicit call validates it succeeds)
+        restoreMsi.release();
         InstallMsi();
         ValidatePackageInstalledProperly();
     }
