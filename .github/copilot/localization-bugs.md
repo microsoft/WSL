@@ -22,11 +22,10 @@ language-neutral `intune/WSL.admx` live in this repo.) To route a report for rev
 > fixing. The gold-standard level of detail is **Bug 1223866** (`.../GlobalCollaborationService/Global%20Collaboration%20Service%20Project/_workitems/edit/1223866`):
 > for each resource ID it gives the current (bad) value and the proposed value, e.g.
 >
-> ```xml
-> <data name="MessageDistroAlreadySet" xml:space="preserve">
->   <value>Der Verteilungsname wurde bereits festgelegt.</value>   <!-- current  -->
->   <value>Der Distributionsname wurde bereits festgelegt.</value> <!-- proposed -->
-> </data>
+> ```text
+> MessageDistroAlreadySet
+>   current:  Der Verteilungsname wurde bereits festgelegt.
+>   proposed: Der Distributionsname wurde bereits festgelegt.
 > ```
 
 ### Deriving the resource-ID list
