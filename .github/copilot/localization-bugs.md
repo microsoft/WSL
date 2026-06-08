@@ -155,8 +155,7 @@ $desc="Community es-ES localization PR. PR: https://github.com/microsoft/WSL/pul
 az boards work-item create --org $org --project $proj --type "Bug" `
   --title "WSL: Review community es-ES localization PR (GitHub #14109)" `
   --area "$area" --description $desc `
-  --fields "System.Description=$desc" `
-           "Microsoft.VSTS.TCM.ReproSteps=$desc" `
+  --fields "Microsoft.VSTS.TCM.ReproSteps=$desc" `
            "Custom.Language=Spanish (Spain, International Sort)" `
            "Custom.IssueType=Incorrect Translation" `
            "Custom.ProductArea=Software" `
@@ -207,9 +206,33 @@ az boards work-item create --org $org --project $proj --type "Bug" `
 
 ### After creating
 
-Cross-link the systems: paste the ADO Bug ID into the GitHub PR (and vice-versa) so reviewers can find both.
-Then read each new bug back (see gotcha above) to confirm it persisted under `Global\Windows`.
+Keep the GitHub link in the ADO Bug's description/repro steps (it's already there from the body above) so the
+loc team can trace back to the report. Do **not** paste the internal ADO Bug ID into the public GitHub PR or
+issue. Then read each new bug back (see gotcha above) to confirm it persisted under `Global\Windows`.
 
 If GCS moves a bug to **More Info**, it almost always means the resource-ID detail is missing or too
 abstract: supply the explicit `<data name>` list (see "Deriving the resource-ID list"), then move the
 bug back to **Active** and reassign it to the requesting GCS reviewer.
+
+### What happens after you file (automated pipeline)
+
+Filing the Bug under `Global\Windows` is usually the end of the manual work. A **Fabric Self Service** bot
+(`FabricClient-Prod`) automatically picks the Bug up and creates a **DTT (Direct-To-Translator) job** for the
+locale, posting its progress as Bug discussion comments. So a stream of `FabricClient-Prod` comments is the
+**expected, healthy** path — not something a human has to act on:
+
+- `Bug picked up for processing by the Fabric Self Service process.`
+- `Successfully created 1 DTT Jobs: ... <locale> ...` → the report is now in the translation pipeline; **no
+  further action**.
+
+Watch for these exceptions, which **do** need action:
+
+- **New locale not onboarded.** If the locale isn't onboarded to **TDBuild** for the WSL subtenant
+  (`WindowsUndocking` / `LiftedWSL`), the DTT job can't be created and a human comments pointing you to file an
+  onboarding request at the **Global Services Hub** (`https://globalservices.powerappsportals.com/global/`).
+  This is GCS-side onboarding and is *separate from* (and in addition to) the WSL-repo build registration a new
+  locale needs. Greek (`el-GR`, GitHub #40244) hit exactly this.
+- **Oversized report.** A non-retriable `Rqf query exceeded threshold of 1000 words` failure means the report's
+  scope is too large; reduce the scope or set `Custom.OverrideMaxStringsThreshold` and re-file.
+
+If you only see `FabricClient-Prod` "Successfully created ... DTT Jobs" comments, you're done.
