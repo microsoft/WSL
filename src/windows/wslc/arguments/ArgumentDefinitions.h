@@ -41,6 +41,7 @@ _(BuildTarget,    "target",              NO_ALIAS,          Kind::Value,       L
 _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CIDFileArgDescription()) \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
+_(Cpus,           "cpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,         "detach",              L"d",              Kind::Flag,        Localization::WSLCCLI_DetachArgDescription()) \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSArgDescription()) \
@@ -72,6 +73,7 @@ _(Interactive,    "interactive",         L"i",              Kind::Flag,        L
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \
+_(Memory,         "memory",              L"m",              Kind::Value,       Localization::WSLCCLI_MemoryArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
@@ -106,6 +108,7 @@ _(Time,           "time",                L"t",              Kind::Value,       L
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,           "type",                L"t",              Kind::Value,       Localization::WSLCCLI_TypeArgDescription()) \
+_(Ulimit,         "ulimit",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_UlimitArgDescription()) \
 _(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
 _(Username,       "username",            L"u",              Kind::Value,       Localization::WSLCCLI_LoginUsernameArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \

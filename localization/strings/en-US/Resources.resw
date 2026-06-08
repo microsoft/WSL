@@ -2708,6 +2708,14 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>The command to run</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Number of CPUs (e.g. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Delete containers even if they are running</value>
   </data>
@@ -2776,6 +2784,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Show the latest created container (includes all states)</value>
+  </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Memory limit (e.g. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Container host name</value>
@@ -2909,6 +2921,14 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Mount tmpfs to the container at the given path</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit options (format: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], use -1 for unlimited)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (use -1 for unlimited)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>User ID for the process (name|uid|uid:gid)</value>

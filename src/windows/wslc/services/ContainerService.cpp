@@ -109,6 +109,21 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetShmSize(options.ShmSize.value());
     }
 
+    if (options.MemoryBytes.has_value())
+    {
+        containerLauncher.SetMemoryLimit(options.MemoryBytes.value());
+    }
+
+    if (options.NanoCpus.has_value())
+    {
+        containerLauncher.SetNanoCpus(options.NanoCpus.value());
+    }
+
+    for (const auto& [name, soft, hard] : options.Ulimits)
+    {
+        containerLauncher.AddUlimit(name, soft, hard);
+    }
+
     if (!options.Entrypoint.empty())
     {
         auto entrypoints = options.Entrypoint;
