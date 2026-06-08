@@ -2552,7 +2552,7 @@ std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes)
     bool done = false;
     while (true)
     {
-        for (wchar_t name = 'a'; name < 'z'; name++)
+        for (wchar_t name = 'a'; name <= 'z'; name++)
         {
             std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
             cmd += name;
