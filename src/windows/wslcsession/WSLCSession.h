@@ -200,8 +200,6 @@ private:
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
-    // Called by WSLCVirtualMachine on the crash dump collection thread once a dump file has been
-    // fully written. Dispatches to every registered ICrashDumpCallback under m_crashDumpLock.
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     _Requires_shared_lock_held_(m_lock)
