@@ -828,9 +828,18 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendStre
         const auto toRead = static_cast<DWORD>(std::min<uint64_t>(bufSize, ContentLength - totalSent));
 
         DWORD bytesRead = 0;
-        THROW_LAST_ERROR_IF(!ReadFile(BodySource, buf.get(), toRead, &bytesRead, nullptr));
+        if (!ReadFile(BodySource, buf.get(), toRead, &bytesRead, nullptr))
+        {
+            const auto readError = GetLastError();
+            // A body source that closes before ContentLength bytes (e.g. ERROR_BROKEN_PIPE on a
+            // closed pipe) is a truncated upload; surface it as a generic failure rather than
+            // leaking the raw pipe error code to the caller.
+            THROW_HR_IF_MSG(
+                E_FAIL, readError == ERROR_BROKEN_PIPE, "Body source closed before %llu of %llu bytes were read", totalSent, ContentLength);
+            THROW_WIN32(readError);
+        }
         THROW_HR_IF_MSG(
-            E_UNEXPECTED, bytesRead == 0, "Premature EOF on body source at %llu of %llu bytes", totalSent, ContentLength);
+            E_FAIL, bytesRead == 0, "Premature EOF on body source at %llu of %llu bytes", totalSent, ContentLength);
 
         totalSent += bytesRead;
         const bool lastChunk = (totalSent >= ContentLength);

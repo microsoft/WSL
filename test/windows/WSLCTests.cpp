@@ -2240,7 +2240,9 @@ class WSLCTests
         // Negative test: Invalid tag format with spaces.
         {
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), runTagImage("debian:latest", "test", "invalid tag"));
-            ValidateCOMErrorMessage(L"invalid tag format");
+            // podman reports a malformed tag/reference as "invalid reference format" (via HTTP 500),
+            // not dockerd's "invalid tag format"; match the stable podman substring.
+            ValidateCOMErrorMessageContains(L"invalid reference format");
         }
     }
 
@@ -2312,11 +2314,13 @@ class WSLCTests
 
             // Invalid name.
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
-            ValidateCOMErrorMessage(L"invalid reference format");
+            // podman surfaces a long "...invalid reference format" message; match the stable substring.
+            ValidateCOMErrorMessageContains(L"invalid reference format");
 
             // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
             VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
-            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
+            // podman: "failed to find image ...: No such image" rather than dockerd's "No such image: ...".
+            ValidateCOMErrorMessageContains(L"failed to find image search/debian:latest");
         }
     }
 

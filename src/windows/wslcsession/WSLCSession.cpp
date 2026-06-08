@@ -1432,7 +1432,7 @@ try
     catch (const DockerHTTPException& e)
     {
         std::string errorMessage;
-        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        if (e.HasErrorMessage())
         {
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
@@ -1440,6 +1440,10 @@ try
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
+        // podman returns HTTP 500 (not 400) for a malformed tag/reference; treat its
+        // "invalid reference format" error as a bad argument rather than a generic failure.
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, errorMessage.find("invalid reference format") != std::string::npos);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 
@@ -1505,6 +1509,10 @@ std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
+        // podman returns HTTP 500 (not 400) for a malformed image reference; treat its
+        // "invalid reference format" error as a bad argument rather than a generic failure.
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, errorMessage.find("invalid reference format") != std::string::npos);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 
