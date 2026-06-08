@@ -3171,8 +3171,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         // Validate that the same port can't be bound twice
-        VERIFY_ARE_EQUAL(
-            session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(WSAEADDRINUSE));
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
         // Check simple case
         listen(80, "port80", false);
@@ -7162,7 +7161,6 @@ class WSLCTests
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
             // TODO: Undo once stabilized.
-            std::this_thread::sleep_for(std::chrono::seconds(3));
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Verify that ListContainers returns the port data for a running container.
@@ -7304,9 +7302,7 @@ class WSLCTests
                 "python:3.12-alpine", "test-ports-fail", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1235, 8000, AF_INET);
-            VERIFY_ARE_EQUAL(
-                launcher.LaunchNoThrow(session).first,
-                 HRESULT_FROM_WIN32(WSAEADDRINUSE));
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
             // Validate that Create() correctly cleans up bound ports after a port fails to map
             {
@@ -7315,9 +7311,7 @@ class WSLCTests
                 launcher.AddPort(1236, 8000, AF_INET); // Should succeed
                 launcher.AddPort(1235, 8000, AF_INET); // Should fail.
 
-                VERIFY_ARE_EQUAL(
-                    launcher.LaunchNoThrow(session).first,
-                     HRESULT_FROM_WIN32(WSAEADDRINUSE));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEADDRINUSE));
 
                 // Validate that port 1236 is still available (was cleaned up after failure).
                 VERIFY_IS_TRUE(!!bindSocket(1236));
@@ -7659,7 +7653,8 @@ class WSLCTests
 
                     auto container = launcher.Create(*session);
                     VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL));
-                    ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', The requested address is not valid in its context. ");
+                    ValidateCOMErrorMessage(
+                        L"Failed to map port '1.1.1.1:1265/tcp', The requested address is not valid in its context. ");
                 }
             }
         };

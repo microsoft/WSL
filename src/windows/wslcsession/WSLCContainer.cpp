@@ -1929,9 +1929,7 @@ void WSLCContainerImpl::MapPorts()
                     m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
                 THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(WSAEADDRINUSE),
-                    wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id),
-                    !allocatedPort);
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id), !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
@@ -1948,7 +1946,8 @@ void WSLCContainerImpl::MapPorts()
             auto result = wil::ResultFromCaughtException();
             if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || result == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
-                THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
+                THROW_HR_WITH_USER_ERROR(
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
             }
             throw;
         }
