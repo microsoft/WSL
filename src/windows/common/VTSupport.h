@@ -209,6 +209,10 @@ struct Sequence
         return m_chars;
     }
 
+    // Returns true if this is a color or formatting sequence (SGR or OSC 8 hyperlink)
+    // that should be suppressed when --no-color is set.
+    bool IsColor() const;
+
 protected:
     void Set(const std::string& s)
     {

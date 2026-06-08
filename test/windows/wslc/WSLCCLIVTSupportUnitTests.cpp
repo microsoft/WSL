@@ -191,6 +191,32 @@ class WSLCCLIVTSupportUnitTests
         });
     }
 
+    TEST_METHOD(VT_IsColor)
+    {
+        // Named SGR sequences are color.
+        VERIFY_IS_TRUE(Format::Bright.IsColor());
+        VERIFY_IS_TRUE(Format::Dim.IsColor());
+        VERIFY_IS_TRUE(Format::Fg::BrightRed.IsColor());
+        VERIFY_IS_TRUE(Format::Default.IsColor());
+
+        // Constructed multi-param SGR is color.
+        VERIFY_IS_TRUE(Sgr({1, 31}).IsColor());
+
+        // OSC 8 hyperlink is color-adjacent.
+        VERIFY_IS_TRUE(Format::Hyperlink("text", "https://example.com").IsColor());
+
+        // Cursor movement is structural — not color.
+        VERIFY_IS_FALSE(Cursor::Up(1).IsColor());
+        VERIFY_IS_FALSE(Cursor::Home.IsColor());
+
+        // Erase is structural — not color.
+        VERIFY_IS_FALSE(Erase::LineForward.IsColor());
+        VERIFY_IS_FALSE(Erase::ScreenForward.IsColor());
+
+        // Progress is structural — not color.
+        VERIFY_IS_FALSE(Progress::Construct(Progress::State::Normal, 50u).IsColor());
+    }
+
     TEST_METHOD(VT_StringConcatenation)
     {
         // Sequence + Sequence

@@ -89,6 +89,29 @@ namespace {
     }
 } // namespace
 
+bool Sequence::IsColor() const
+{
+    const auto sv = m_chars;
+    if (sv.size() < 2 || sv[0] != '\x1b')
+    {
+        return false;
+    }
+
+    if (sv[1] == '[')
+    {
+        // CSI sequence — color if final byte is 'm' (SGR)
+        return sv.back() == 'm';
+    }
+
+    if (sv[1] == ']')
+    {
+        // OSC 8 hyperlink — treated as color-adjacent
+        return sv.size() >= 3 && sv[2] == '8';
+    }
+
+    return false;
+}
+
 void ConstructedSequence::Append(const Sequence& sequence)
 {
     if (!sequence.Get().empty())

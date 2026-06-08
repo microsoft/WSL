@@ -24,10 +24,10 @@ class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallbac
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
-    auto MoveToLine(int line);
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
 private:
+    auto MoveToLine(int line);
     static CONSOLE_SCREEN_BUFFER_INFO Info();
     void WriteTerminal(std::wstring_view content) const;
     std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
