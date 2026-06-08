@@ -10,7 +10,7 @@ Abstract:
 
     Header for a type that implements ICrashDumpCallback. Bridges the COM
     ICrashDumpCallback interface back to the C-style SDK callback registered
-    via WslcSetSessionSettingsCrashDumpCallback.
+    via WslcRegisterSessionCrashDumpCallback.
 
 --*/
 #pragma once
@@ -24,9 +24,6 @@ struct CrashDumpCallback : public winrt::implements<CrashDumpCallback, ICrashDum
 
     // ICrashDumpCallback
     HRESULT STDMETHODCALLTYPE OnCrashDump(_In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONGLONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp) override;
-
-    // Creates a CrashDumpCallback if the options provides a callback.
-    static winrt::com_ptr<CrashDumpCallback> CreateIf(const WslcSessionOptionsInternal* options);
 
 private:
     WslcSessionCrashDumpCallback m_callback = nullptr;

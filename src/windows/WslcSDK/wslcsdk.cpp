@@ -441,12 +441,6 @@ try
         result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
-    auto crashDumpCallback = CrashDumpCallback::CreateIf(internalType);
-    if (crashDumpCallback)
-    {
-        result->crashDumpCallback.attach(crashDumpCallback.as<ICrashDumpCallback>().detach());
-        runtimeSettings.CrashDumpCallback = crashDumpCallback.get();
-    }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
@@ -606,15 +600,44 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsCrashDumpCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionCrashDumpCallback crashDumpCallback, _In_opt_ PVOID crashDumpContext)
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-    RETURN_HR_IF(E_INVALIDARG, crashDumpCallback == nullptr && crashDumpContext != nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, subscription);
+    *subscription = nullptr;
+    RETURN_HR_IF_NULL(E_INVALIDARG, crashDumpCallback);
 
-    internalType->crashDumpCallback = crashDumpCallback;
-    internalType->crashDumpCallbackContext = crashDumpContext;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalSession = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+
+    auto result = std::make_unique<WslcCrashDumpSubscriptionImpl>();
+    auto callback = winrt::make_self<CrashDumpCallback>(crashDumpCallback, crashDumpContext);
+    result->callback = callback.get();
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            internalSession->session->RegisterCrashDumpCallback(result->callback.get(), &result->subscription))))
+    {
+        *subscription = reinterpret_cast<WslcCrashDumpSubscription>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription)
+try
+{
+    auto internalType = CheckAndGetInternalTypeUniquePointer(subscription);
+
+    // Release the service-side subscription first so it unregisters cleanly, then drop the shim.
+    internalType->subscription.reset();
+    internalType->callback.reset();
 
     return S_OK;
 }
@@ -625,11 +648,10 @@ try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    // Intentionally destroy session before termination callback in the event that
-    // the termination callback ends up being invoked by session destruction.
+    // Drop the session before the termination callback, in case session destruction triggers
+    // the termination callback.
     internalType->session.reset();
     internalType->terminationCallback.reset();
-    internalType->crashDumpCallback.reset();
 
     return S_OK;
 }

@@ -38,15 +38,3 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-winrt::com_ptr<CrashDumpCallback> CrashDumpCallback::CreateIf(const WslcSessionOptionsInternal* options)
-{
-    if (options->crashDumpCallback)
-    {
-        return winrt::make_self<CrashDumpCallback>(options->crashDumpCallback, options->crashDumpCallbackContext);
-    }
-    else
-    {
-        return nullptr;
-    }
-}

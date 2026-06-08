@@ -121,7 +121,13 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
+    // Invoked when a Linux process crash dump has been written to disk. The arguments mirror
+    // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
+    // fanning them out to any registered COM callbacks.
+    using TOnCrashDump =
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -219,8 +225,9 @@ private:
 
     std::string m_rootVhdType;
 
-    // Optional callback invoked after a crash dump is successfully written.
-    wil::com_ptr<ICrashDumpCallback> m_crashDumpCallback;
+    // Invoked by the crash dump collection thread after a crash dump is fully written.
+    // Supplied by the session, which fans out to any registered ICrashDumpCallback subscribers.
+    TOnCrashDump m_onCrashDump;
 
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;

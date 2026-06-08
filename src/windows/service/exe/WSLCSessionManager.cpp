@@ -427,7 +427,6 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
-    sessionSettings.CrashDumpCallback = Settings->CrashDumpCallback;
     return sessionSettings;
 }
 

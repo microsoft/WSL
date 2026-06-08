@@ -541,7 +541,6 @@ typedef struct _WSLCSessionSettings {
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
-    [unique] ICrashDumpCallback* CrashDumpCallback;
 } WSLCSessionSettings;
 
 typedef enum _WSLCLogsFlags
@@ -732,7 +731,6 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
-    [unique] ICrashDumpCallback* CrashDumpCallback;
 } WSLCSessionInitSettings;
 
 [
@@ -805,6 +803,8 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 }
 
 //

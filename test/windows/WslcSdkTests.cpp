@@ -65,6 +65,9 @@ void CloseProcess(WslcProcess process)
 
 using UniqueProcess = wil::unique_any<WslcProcess, decltype(CloseProcess), CloseProcess>;
 
+using UniqueCrashDumpSubscription =
+    wil::unique_any<WslcCrashDumpSubscription, decltype(&WslcReleaseCrashDumpSubscription), WslcReleaseCrashDumpSubscription>;
+
 struct ProcessOutput
 {
     std::string stdoutOutput;
@@ -348,10 +351,12 @@ class WslcSdkTests
         WslcSessionSettings sessionSettings;
         VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-crashcb-test", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsCrashDumpCallback(&sessionSettings, callback, &promise));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+        UniqueCrashDumpSubscription subscription;
+        VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
         auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
 

@@ -248,13 +248,14 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
     return *this;
 }
 
-WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent) :
+WSLCVirtualMachine::WSLCVirtualMachine(
+    _In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLCFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
-    m_crashDumpCallback(Settings->CrashDumpCallback),
+    m_onCrashDump(std::move(OnCrashDump)),
     m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
@@ -1324,11 +1325,11 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             file.reset();
 
-            // Invoke the crash dump callback (if any) now that the dump file has been fully
-            // written. Failures in the callback are logged but do not interrupt crash collection.
-            if (m_crashDumpCallback)
+            // Notify the session that a crash dump has been fully written. The session fans out
+            // to any registered ICrashDumpCallback subscribers. Failures are caller-handled.
+            if (m_onCrashDump)
             {
-                LOG_IF_FAILED(m_crashDumpCallback->OnCrashDump(fullPath.c_str(), process.c_str(), crashPid, crashSignal, crashTimestamp));
+                m_onCrashDump(fullPath.wstring(), process, crashPid, crashSignal, crashTimestamp);
             }
         }
         CATCH_LOG()

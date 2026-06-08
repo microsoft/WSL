@@ -2793,8 +2793,12 @@ class WSLCTests
         auto callback = Microsoft::WRL::Make<CallbackInstance>(promise, release);
 
         WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"crash-dump-callback-test");
-        sessionSettings.CrashDumpCallback = callback.Get();
         auto session = CreateSession(sessionSettings);
+
+        // Register the callback through IWSLCSession::RegisterCrashDumpCallback. Holding the
+        // returned subscription keeps the registration alive; releasing it auto-unregisters.
+        wil::com_ptr<IUnknown> subscription;
+        VERIFY_SUCCEEDED(session->RegisterCrashDumpCallback(callback.Get(), &subscription));
 
         // Trigger a Linux process crash. The shell exits with 128 + SIGSEGV.
         ExpectCommandResult(session.get(), {"/bin/sh", "-c", "kill -SEGV $$"}, 128 + WSLCSignalSIGSEGV);
