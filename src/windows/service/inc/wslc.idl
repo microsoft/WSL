@@ -264,10 +264,16 @@ typedef struct _WSLCUlimit
 typedef struct _WSLCNetworkConnection
 {
     [string] LPCSTR NetworkName;
-
     [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
     ULONG SettingsCount;
 } WSLCNetworkConnection;
+
+// Options for IWSLCContainer::ConnectToNetwork.
+typedef struct _WSLCNetworkConnectionOptions
+{
+    [unique] LPCSTR NetworkName;
+    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
+} WSLCNetworkConnectionOptions;
 
 typedef struct _WSLCContainerNetwork
 {
@@ -581,6 +587,8 @@ interface IWSLCContainer : IUnknown
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
     HRESULT Stats([out] LPSTR* Output);
+    HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
+    HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
 }
 
 typedef enum _WSLCDeletedImageType

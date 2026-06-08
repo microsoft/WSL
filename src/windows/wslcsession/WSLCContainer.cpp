@@ -2310,6 +2310,72 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
     *Labels = labelsArray.release();
 }
 
+void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
+{
+    THROW_HR_IF(E_POINTER, Options == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Options->ContainerIpAddress != nullptr);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkMode == "host" || m_networkMode == "none");
+
+    common::docker_schema::ContainerNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.ConnectContainerToNetwork(Options->NetworkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(Options->NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), Options->NetworkName);
+    }
+
+    WSL_LOG(
+        "ContainerConnectedToNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(Options->NetworkName, "NetworkName"));
+}
+
+void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
+{
+    THROW_HR_IF(E_POINTER, NetworkName == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkName) == 0);
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkMode == "host" || m_networkMode == "none");
+
+    common::docker_schema::ContainerNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.DisconnectContainerFromNetwork(NetworkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), NetworkName);
+    }
+
+    WSL_LOG(
+        "ContainerDisconnectedFromNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(NetworkName, "NetworkName"));
+}
+
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
@@ -2320,6 +2386,22 @@ try
     *Count = 0;
     *Labels = nullptr;
     return CallImpl(&WSLCContainerImpl::GetLabels, Labels, Count);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
+try
+{
+    COMServiceExecutionContext context;
+    return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkName)
+try
+{
+    COMServiceExecutionContext context;
+    return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
 }
 CATCH_RETURN();
 

@@ -2119,6 +2119,10 @@ Usage:
     <value>Container '{}' is running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress is not yet supported.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
   </data>
@@ -2329,6 +2333,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Unsupported network mode: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplicate network: '{}'</value>
