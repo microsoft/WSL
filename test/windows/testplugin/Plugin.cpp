@@ -228,10 +228,11 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
     }
     else if (g_testType == PluginTestType::HostCrash)
     {
-        // Validate plugin host crash isolation. Forcefully exit the host
-        // process so the COM RPC returns one of the HRESULTs in IsHostCrash
-        // (RPC_E_DISCONNECTED / RPC_E_SERVER_DIED / ...). The service should
-        // treat this as non-fatal and continue.
+        // Validate plugin host crash handling. Forcefully exit the host process
+        // so the COM RPC returns one of the HRESULTs in IsHostCrash
+        // (RPC_E_DISCONNECTED / RPC_E_SERVER_DIED / ...). The service treats a
+        // crash during a veto hook as a fatal plugin error and aborts the
+        // operation.
         LogLine("Crashing host");
         g_logfile.flush();
         TerminateProcess(GetCurrentProcess(), 1);

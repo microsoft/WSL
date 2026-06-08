@@ -17,6 +17,7 @@ Abstract:
 
 import "unknwn.idl";
 import "wtypes.idl";
+import "wslc.idl";
 
 cpp_quote("const GUID CLSID_WslPluginHost = {0x7a1d2c3e, 0x4b5f, 0x6a7d, {0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f}};")
 cpp_quote("#ifdef __cplusplus")
@@ -58,8 +59,12 @@ interface IWslPluginHostCallback : IUnknown
         [out, system_handle(sh_socket)] HANDLE* Socket);
 
     //
-    // WSLC plugin API. WSLCProcessHandle is mapped to a service-allocated
-    // DWORD cookie that the host wraps in an opaque void* for the plugin.
+    // WSLC plugin API. WslcCreateProcess returns a marshaled IWSLCProcess that
+    // the host wraps in an opaque WSLCProcessHandle for the plugin and calls
+    // directly (GetStdHandle/GetExitEvent/GetState), so there is no service-side
+    // process bookkeeping: lifetime is owned by the host via COM reference
+    // counting and the remote process is released when the host releases it (or
+    // when the host process exits).
     //
 
     HRESULT WslcMountFolder(
@@ -79,24 +84,8 @@ interface IWslPluginHostCallback : IUnknown
         [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
         [in] DWORD EnvCount,
         [in, unique, size_is(EnvCount), string] LPCSTR* Environment,
-        [out] DWORD* ProcessCookie,
+        [out] IWSLCProcess** Process,
         [out] int* Errno);
-
-    HRESULT WslcProcessGetFd(
-        [in] DWORD ProcessCookie,
-        [in] DWORD Fd,
-        [out, system_handle(sh_socket)] HANDLE* Handle);
-
-    HRESULT WslcProcessGetExitEvent(
-        [in] DWORD ProcessCookie,
-        [out, system_handle(sh_event)] HANDLE* ExitEvent);
-
-    HRESULT WslcProcessGetExitCode(
-        [in] DWORD ProcessCookie,
-        [out] int* ExitCode);
-
-    HRESULT WslcReleaseProcess(
-        [in] DWORD ProcessCookie);
 };
 
 //
@@ -114,20 +103,16 @@ interface IWslPluginHost : IUnknown
     //
     // Initialize the plugin host: load the plugin DLL and call its entry point.
     // The Callback interface is used by the plugin to call back into the service.
+    // JobObject is the service's job object; the host assigns itself to it before
+    // running any plugin code so that processes spawned by the plugin inherit the
+    // job and are terminated if the service exits unexpectedly.
     //
 
     HRESULT Initialize(
         [in] IWslPluginHostCallback* Callback,
+        [in, system_handle(sh_job)] HANDLE JobObject,
         [in, string] LPCWSTR PluginPath,
         [in, string] LPCWSTR PluginName);
-
-    //
-    // Returns a handle to this COM server process. Used by the service to add
-    // the plugin host to a job object for automatic cleanup on service exit.
-    //
-
-    HRESULT GetProcessHandle(
-        [out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     //
     // Lifecycle hook dispatchers - mirror WSLPluginHooksV1.
@@ -200,15 +185,16 @@ interface IWslPluginHost : IUnknown
 
     //
     // WSLC plugin hooks. Mirror WSLPluginHooksV1 WSLC entries.
-    // UserToken is duplicated into the host by COM's system_handle marshaling.
-    // UserSid is serialized as a byte array (same convention as WSL hooks).
+    // UserToken is a scalar system handle, duplicated into the host by COM's
+    // system_handle marshaling (same convention as the WSL hooks above; a null
+    // handle marshals through unchanged). UserSid is serialized as a byte array.
     //
 
     HRESULT OnWslcSessionCreated(
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData,
         [out, string] LPWSTR* ErrorMessage);
@@ -217,7 +203,7 @@ interface IWslPluginHost : IUnknown
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData);
 
@@ -225,7 +211,7 @@ interface IWslPluginHost : IUnknown
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData,
         [in, string] LPCSTR InspectJson,
@@ -235,7 +221,7 @@ interface IWslPluginHost : IUnknown
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData,
         [in, string] LPCSTR ContainerId);
@@ -244,7 +230,7 @@ interface IWslPluginHost : IUnknown
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData,
         [in, string] LPCSTR InspectJson);
@@ -253,7 +239,7 @@ interface IWslPluginHost : IUnknown
         [in] DWORD SessionId,
         [in, string] LPCWSTR DisplayName,
         [in] DWORD ApplicationPid,
-        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in, system_handle(sh_token)] HANDLE UserToken,
         [in] DWORD SidSize,
         [in, unique, size_is(SidSize)] BYTE* SidData,
         [in, string] LPCSTR ImageId);

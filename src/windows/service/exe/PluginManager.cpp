@@ -28,11 +28,13 @@ using wsl::windows::service::PluginHostCallbackImpl;
 using wsl::windows::service::PluginManager;
 
 // Acquire an apartment-local IWslPluginHost proxy for `plugin` (named `host`).
-// On a host-process crash, log it and `continue` the surrounding loop. On any
-// other failure to acquire (which would indicate a fundamental COM problem,
-// not a plugin-reported issue), log the HRESULT and `continue` so a single
-// busted plugin does not break the iteration for the others. Use only inside
-// the per-plugin loops in PluginManager hook methods.
+// On a host-process crash, latch a fatal plugin error and `continue` the
+// surrounding loop: teardown/notification hooks must not block WSL, but the
+// latch makes the next start operation fail fast instead of repeatedly driving
+// a dead host. On any other failure to acquire (which would indicate a
+// fundamental COM problem, not a plugin-reported issue), log the HRESULT and
+// `continue` so a single busted plugin does not break the iteration for the
+// others. Use only inside the per-plugin loops in PluginManager hook methods.
 #define ACQUIRE_PLUGIN_HOST_OR_CONTINUE(plugin, host, stage) \
     Microsoft::WRL::ComPtr<IWslPluginHost> host; \
     { \
@@ -41,7 +43,7 @@ using wsl::windows::service::PluginManager;
         { \
             if (IsHostCrash(_acqHr)) \
             { \
-                LogPluginHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
+                LatchHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
             } \
             else \
             { \
@@ -53,9 +55,11 @@ using wsl::windows::service::PluginManager;
 
 // Same as ACQUIRE_PLUGIN_HOST_OR_CONTINUE, but for hook methods that surface a
 // plugin error to abort the guarded operation (e.g. OnVmStarted). A host crash
-// is still isolated (logged + `continue`), but any other acquisition failure is
-// thrown so it is surfaced exactly like a plugin-reported error would be, rather
-// than silently allowing the operation to proceed without consulting the plugin.
+// is fatal: it is latched and thrown as a fatal plugin error, matching the
+// pre-refactor behavior where an in-process plugin crash brought down WSL. Any
+// other acquisition failure is likewise thrown so it is surfaced exactly like a
+// plugin-reported error would be, rather than silently allowing the operation to
+// proceed without consulting the plugin.
 #define ACQUIRE_PLUGIN_HOST_OR_THROW(plugin, host, stage) \
     Microsoft::WRL::ComPtr<IWslPluginHost> host; \
     { \
@@ -64,8 +68,7 @@ using wsl::windows::service::PluginManager;
         { \
             if (IsHostCrash(_acqHr)) \
             { \
-                LogPluginHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
-                continue; \
+                ThrowHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
             } \
             THROW_HR_MSG(_acqHr, "Failed to acquire plugin host proxy for: '%ls'", (plugin).name.c_str()); \
         } \
@@ -363,20 +366,13 @@ PluginManager::ScopedComInit PluginManager::EnsureInitialized()
 
             if (FAILED(loadResult))
             {
-                // Treat host-process crashes and benign COM activation races (server is
-                // shutting down or its exec failed) as non-fatal — the plugin is simply
-                // unavailable for this session. All other failures, including registration
-                // errors (REGDB_E_CLASSNOTREG), access denials, and plugin-reported errors
-                // from Initialize, are treated as fatal plugin load failures so the user
-                // gets a clear error rather than a silently-disabled plugin.
-                if (IsHostCrash(loadResult) || loadResult == CO_E_SERVER_EXEC_FAILURE || loadResult == CO_E_SERVER_STOPPING)
-                {
-                    LOG_HR_MSG(loadResult, "Plugin host activation failed for: '%ls', skipping", e.name.c_str());
-                }
-                else
-                {
-                    m_pluginError.emplace(PluginError{e.name, loadResult});
-                }
+                // Any load failure is fatal: the plugin is recorded so that
+                // subsequent operations block with a clear error rather than a
+                // silently-disabled plugin. This includes host-process crashes
+                // and benign-looking COM activation failures (the server is
+                // shutting down or its exec failed) — matching the pre-refactor
+                // behavior where a plugin that failed to load blocked WSL.
+                m_pluginError.emplace(PluginError{e.name, loadResult});
             }
         }
     });
@@ -403,24 +399,19 @@ void PluginManager::LoadPlugin(OutOfProcPlugin& plugin)
         TraceLoggingValue(activationHr, "CoCreateInstanceResult"));
     THROW_IF_FAILED_MSG(activationHr, "Failed to create plugin host for: '%ls'", plugin.path.c_str());
 
-    // Join the host to our job object before Initialize runs plugin code, so any
-    // child processes the plugin spawns inherit the job and are killed when the
-    // service exits. A failure here is non-fatal: the host is still reaped via
-    // CoReleaseServerProcess on clean shutdown, just not on a service crash.
+    // Create the job object before initializing the host so we can hand it to
+    // Initialize. The host assigns itself to the job before running any plugin
+    // code, so any child processes the plugin spawns inherit the job and are
+    // killed when the service exits. Job assignment is fatal in the host: a host
+    // that isn't in the job would escape the kill-on-close guarantee, so a
+    // failure surfaces here (alongside activation and plugin entry-point errors)
+    // and the host process exits when its proxy is released on unwind.
+    // system_handle(sh_job) marshaling duplicates the job handle into the host
+    // for the duration of the Initialize call.
     EnsureJobObjectCreated();
-    wil::unique_handle process;
-    const HRESULT getProcessHr = host->GetProcessHandle(&process);
-    LOG_IF_FAILED_MSG(getProcessHr, "Failed to get plugin host process handle for: '%ls'", plugin.path.c_str());
-    if (SUCCEEDED(getProcessHr))
-    {
-        LOG_IF_WIN32_BOOL_FALSE_MSG(
-            AssignProcessToJobObject(m_jobObject.get(), process.get()),
-            "Failed to assign plugin host to job object for: '%ls'",
-            plugin.path.c_str());
-    }
 
     THROW_IF_FAILED_MSG(
-        host->Initialize(plugin.callback.Get(), plugin.path.c_str(), plugin.name.c_str()),
+        host->Initialize(plugin.callback.Get(), m_jobObject.get(), plugin.path.c_str(), plugin.name.c_str()),
         "Plugin host failed to initialize: '%ls'",
         plugin.path.c_str());
 
@@ -514,8 +505,7 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
 
         if (IsHostCrash(hr))
         {
-            LogPluginHostCrash(e, hr, "OnVmStarted");
-            continue;
+            ThrowHostCrash(e, hr, "OnVmStarted");
         }
 
         ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
@@ -543,7 +533,7 @@ void PluginManager::OnVmStopping(const WSLSessionInformation* Session)
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnVmStopping");
+            LatchHostCrash(e, result, "OnVmStopping");
             continue;
         }
 
@@ -590,8 +580,7 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
 
         if (IsHostCrash(hr))
         {
-            LogPluginHostCrash(e, hr, "OnDistributionStarted");
-            continue;
+            ThrowHostCrash(e, hr, "OnDistributionStarted");
         }
 
         ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
@@ -634,7 +623,7 @@ void PluginManager::OnDistributionStopping(const WSLSessionInformation* Session,
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnDistributionStopping");
+            LatchHostCrash(e, result, "OnDistributionStopping");
             continue;
         }
 
@@ -676,7 +665,7 @@ void PluginManager::OnDistributionRegistered(const WSLSessionInformation* Sessio
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnDistributionRegistered");
+            LatchHostCrash(e, result, "OnDistributionRegistered");
             continue;
         }
 
@@ -718,7 +707,7 @@ void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Sess
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnDistributionUnregistered");
+            LatchHostCrash(e, result, "OnDistributionUnregistered");
             continue;
         }
 
@@ -728,14 +717,6 @@ void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Sess
 
 void PluginManager::ThrowIfPluginError(HRESULT Result, LPWSTR ErrorMessage, WSLSessionId Session, LPCWSTR Plugin)
 {
-    // If the host process crashed, don't propagate as a fatal plugin error —
-    // log it and let the caller decide. The plugin is already dead.
-    if (IsHostCrash(Result))
-    {
-        LOG_HR_MSG(Result, "Plugin host process crashed for plugin: '%ls'", Plugin);
-        return;
-    }
-
     if (FAILED(Result))
     {
         if (ErrorMessage != nullptr && ErrorMessage[0] != L'\0')
@@ -774,22 +755,17 @@ bool PluginManager::IsHostCrash(HRESULT hr)
     }
 }
 
-void PluginManager::LogPluginHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage)
+void PluginManager::LatchHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage)
 {
     LOG_HR_MSG(result, "Plugin host crashed at %hs for: '%ls'", stage, plugin.name.c_str());
 
     // Fire telemetry only on first observation per plugin: a dead plugin will
     // hit this path on every subsequent VM/distro lifecycle event, and we
-    // don't want to flood the telemetry channel with duplicates.
+    // don't want to flood the telemetry channel with duplicates. Any WSLC
+    // processes the dead host created are released automatically by COM when
+    // the host process exits, so there is nothing to drain here.
     if (!plugin.crashTelemetryFired.exchange(true))
     {
-        // Release any WSLC processes the dead host created so they don't leak
-        // until service shutdown.
-        if (plugin.callback)
-        {
-            plugin.callback->DrainProcesses();
-        }
-
         WSL_LOG_TELEMETRY(
             "PluginHostCrash",
             PDT_ProductAndServiceUsage,
@@ -798,6 +774,27 @@ void PluginManager::LogPluginHostCrash(OutOfProcPlugin& plugin, HRESULT result, 
             TraceLoggingValue(result, "Result"),
             TraceLoggingValue(stage, "Stage"));
     }
+
+    // Latch a fatal plugin error so subsequent operations fail fast with a
+    // single consistent message instead of repeatedly driving a dead host that
+    // is never re-activated for this service lifetime. The first crash wins; a
+    // load-time failure already recorded in m_pluginError is left untouched.
+    auto lock = m_pluginErrorLock.lock_exclusive();
+    if (!m_pluginError.has_value())
+    {
+        m_pluginError.emplace(PluginError{plugin.name, result});
+    }
+}
+
+void PluginManager::ThrowHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage)
+{
+    // Record the crash (telemetry + fatal latch), then throw a fatal plugin
+    // error so the guarded start/veto operation (VM/distro/session/container
+    // creation) is aborted. The HRESULT is whichever RPC/CO_E_* code COM
+    // surfaced for the dead host; it is reported the same way a plugin-returned
+    // fatal error would be.
+    LatchHostCrash(plugin, result, stage);
+    THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageFatalPluginError(plugin.name.c_str()));
 }
 
 void PluginManager::ThrowIfFatalPluginError()
@@ -805,18 +802,26 @@ void PluginManager::ThrowIfFatalPluginError()
     ExecutionContext context(Context::Plugin);
     auto coInit = EnsureInitialized();
 
-    if (!m_pluginError.has_value())
+    // m_pluginError can be set at load time (single-threaded, under m_initOnce)
+    // or latched at runtime from a hook on any RPC thread when a host crash is
+    // observed, so read it under the lock and act on a local copy.
+    std::optional<PluginError> error;
+    {
+        auto lock = m_pluginErrorLock.lock_shared();
+        error = m_pluginError;
+    }
+
+    if (!error.has_value())
     {
         return;
     }
-    else if (m_pluginError->error == WSL_E_PLUGIN_REQUIRES_UPDATE)
+    else if (error->error == WSL_E_PLUGIN_REQUIRES_UPDATE)
     {
-        THROW_HR_WITH_USER_ERROR(
-            WSL_E_PLUGIN_REQUIRES_UPDATE, wsl::shared::Localization::MessagePluginRequiresUpdate(m_pluginError->plugin));
+        THROW_HR_WITH_USER_ERROR(WSL_E_PLUGIN_REQUIRES_UPDATE, wsl::shared::Localization::MessagePluginRequiresUpdate(error->plugin));
     }
     else
     {
-        THROW_HR_WITH_USER_ERROR(m_pluginError->error, wsl::shared::Localization::MessageFatalPluginError(m_pluginError->plugin));
+        THROW_HR_WITH_USER_ERROR(error->error, wsl::shared::Localization::MessageFatalPluginError(error->plugin));
     }
 }
 
@@ -881,13 +886,12 @@ void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data(),
+            sidData.data(),
             &errorMessage);
 
         if (IsHostCrash(hr))
         {
-            LogPluginHostCrash(e, hr, "OnWslcSessionCreated");
-            continue;
+            ThrowHostCrash(e, hr, "OnWslcSessionCreated");
         }
 
         ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
@@ -920,11 +924,11 @@ void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data());
+            sidData.data());
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnWslcSessionStopping");
+            LatchHostCrash(e, result, "OnWslcSessionStopping");
             continue;
         }
 
@@ -961,14 +965,13 @@ try
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data(),
+            sidData.data(),
             InspectJson,
             &errorMessage);
 
         if (IsHostCrash(hr))
         {
-            LogPluginHostCrash(e, hr, "OnWslcContainerStarted");
-            continue;
+            ThrowHostCrash(e, hr, "OnWslcContainerStarted");
         }
 
         ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
@@ -1004,12 +1007,12 @@ void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Sessio
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data(),
+            sidData.data(),
             ContainerId);
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnWslcContainerStopping");
+            LatchHostCrash(e, result, "OnWslcContainerStopping");
             continue;
         }
 
@@ -1043,12 +1046,12 @@ void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LP
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data(),
+            sidData.data(),
             InspectJson);
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnWslcImageCreated");
+            LatchHostCrash(e, result, "OnWslcImageCreated");
             continue;
         }
 
@@ -1083,12 +1086,12 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
             Session->ApplicationPid,
             Session->UserToken,
             static_cast<DWORD>(sidData.size()),
-            sidData.empty() ? nullptr : sidData.data(),
+            sidData.data(),
             ImageId);
 
         if (IsHostCrash(result))
         {
-            LogPluginHostCrash(e, result, "OnWslcImageDeleted");
+            LatchHostCrash(e, result, "OnWslcImageDeleted");
             continue;
         }
 
@@ -1098,63 +1101,10 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
 
 // --- IWslPluginHostCallback WSLC implementations (service-side) ---
 
-DWORD PluginHostCallbackImpl::InsertProcessLocked(wil::com_ptr<IWSLCProcess> process)
-{
-    std::lock_guard lock(m_processLock);
-
-    // Reserve a cookie that's neither 0 nor already in use. Wraparound is fine.
-    THROW_HR_IF(E_OUTOFMEMORY, m_processes.size() >= std::numeric_limits<DWORD>::max() - 1);
-
-    DWORD cookie = m_nextCookie;
-    while (cookie == 0 || m_processes.find(cookie) != m_processes.end())
-    {
-        ++cookie;
-    }
-    m_nextCookie = cookie + 1;
-    m_processes.emplace(cookie, std::move(process));
-    return cookie;
-}
-
-wil::com_ptr<IWSLCProcess> PluginHostCallbackImpl::FindProcess(DWORD cookie) const
-{
-    std::lock_guard lock(m_processLock);
-
-    auto it = m_processes.find(cookie);
-    return (it == m_processes.end()) ? nullptr : it->second;
-}
-
-wil::com_ptr<IWSLCProcess> PluginHostCallbackImpl::RemoveProcess(DWORD cookie)
-{
-    std::lock_guard lock(m_processLock);
-
-    auto it = m_processes.find(cookie);
-    if (it == m_processes.end())
-    {
-        return nullptr;
-    }
-    auto process = std::move(it->second);
-    m_processes.erase(it);
-    return process;
-}
-
-void PluginHostCallbackImpl::DrainProcesses() noexcept
-try
-{
-    std::unordered_map<DWORD, wil::com_ptr<IWSLCProcess>> processes;
-    {
-        std::lock_guard lock(m_processLock);
-        processes.swap(m_processes);
-    }
-
-    // Release outside the lock: a process Release() may run teardown that
-    // re-enters this callback.
-}
-CATCH_LOG()
-
 STDMETHODIMP PluginHostCallbackImpl::WslcMountFolder(_In_ DWORD SessionId, _In_ LPCWSTR WindowsPath, _In_ LPCSTR Mountpoint, _In_ BOOL ReadOnly)
 try
 {
-    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
+    // TODO: Add logic to validate that the mountpoint isn't in use by another plugin.
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
     auto session = m_owner.ResolveWslcSession(SessionId);
@@ -1198,12 +1148,12 @@ STDMETHODIMP PluginHostCallbackImpl::WslcCreateProcess(
     _In_reads_opt_(ArgumentCount) LPCSTR* Arguments,
     _In_ DWORD EnvCount,
     _In_reads_opt_(EnvCount) LPCSTR* Environment,
-    _Out_ DWORD* ProcessCookie,
+    _COM_Outptr_ IWSLCProcess** Process,
     _Out_ int* Errno)
 try
 {
-    RETURN_HR_IF(E_POINTER, Executable == nullptr || ProcessCookie == nullptr || Errno == nullptr);
-    *ProcessCookie = 0;
+    RETURN_HR_IF(E_POINTER, Executable == nullptr || Process == nullptr || Errno == nullptr);
+    *Process = nullptr;
     *Errno = 0;
     RETURN_HR_IF(E_INVALIDARG, (ArgumentCount > 0 && Arguments == nullptr) || (EnvCount > 0 && Environment == nullptr));
 
@@ -1250,117 +1200,17 @@ try
         return result;
     }
 
-    *ProcessCookie = InsertProcessLocked(std::move(process));
+    // Hand the IWSLCProcess back to the host. COM marshals it across the host
+    // boundary; the host then calls it directly (GetStdHandle/GetExitEvent/
+    // GetState) and owns its lifetime, so the service keeps no per-process state.
+    *Process = process.detach();
 
     WSL_LOG(
         "WslcPluginCreateProcessCall",
         TraceLoggingValue(SessionId, "SessionId"),
         TraceLoggingValue(Executable, "Executable"),
-        TraceLoggingValue(*ProcessCookie, "ProcessCookie"),
         TraceLoggingValue(S_OK, "Result"));
 
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetFd(_In_ DWORD ProcessCookie, _In_ DWORD Fd, _Out_ HANDLE* Handle)
-try
-{
-    RETURN_HR_IF(E_POINTER, Handle == nullptr);
-    *Handle = nullptr;
-
-    auto process = FindProcess(ProcessCookie);
-    RETURN_HR_IF(E_INVALIDARG, !process);
-
-    WSLCFD wslcFd{};
-    switch (static_cast<WSLCProcessFd>(Fd))
-    {
-    case WSLCProcessFdStdin:
-        wslcFd = WSLCFDStdin;
-        break;
-    case WSLCProcessFdStdout:
-        wslcFd = WSLCFDStdout;
-        break;
-    case WSLCProcessFdStderr:
-        wslcFd = WSLCFDStderr;
-        break;
-    default:
-        WSL_LOG(
-            "WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
-        return E_INVALIDARG;
-    }
-
-    WSLCHandle handle{};
-    auto result = process->GetStdHandle(wslcFd, &handle);
-
-    WSL_LOG(
-        "WslcPluginProcessGetFd",
-        TraceLoggingValue(static_cast<int>(Fd), "Fd"),
-        TraceLoggingValue(handle.Handle.Socket, "Handle"),
-        TraceLoggingValue(result, "Result"));
-
-    RETURN_IF_FAILED(result);
-    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
-
-    // Pass through as HANDLE; COM's system_handle(sh_socket) marshaling will duplicate
-    // it into the host process which then surfaces it to the plugin.
-    *Handle = handle.Handle.Socket;
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetExitEvent(_In_ DWORD ProcessCookie, _Out_ HANDLE* ExitEvent)
-try
-{
-    RETURN_HR_IF(E_POINTER, ExitEvent == nullptr);
-    *ExitEvent = nullptr;
-
-    auto process = FindProcess(ProcessCookie);
-    RETURN_HR_IF(E_INVALIDARG, !process);
-
-    auto result = process->GetExitEvent(ExitEvent);
-
-    WSL_LOG("WslcPluginProcessGetExitEvent", TraceLoggingValue(*ExitEvent, "ExitEvent"), TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetExitCode(_In_ DWORD ProcessCookie, _Out_ int* ExitCode)
-try
-{
-    RETURN_HR_IF(E_POINTER, ExitCode == nullptr);
-    *ExitCode = -1;
-
-    auto process = FindProcess(ProcessCookie);
-    RETURN_HR_IF(E_INVALIDARG, !process);
-
-    WSLCProcessState state{};
-    auto result = process->GetState(&state, ExitCode);
-
-    if (SUCCEEDED(result) && state != WslcProcessStateExited && state != WslcProcessStateSignalled)
-    {
-        result = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
-    }
-
-    WSL_LOG(
-        "WslcPluginProcessGetExitCode",
-        TraceLoggingValue(*ExitCode, "ExitCode"),
-        TraceLoggingValue(static_cast<int>(state), "State"),
-        TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-STDMETHODIMP PluginHostCallbackImpl::WslcReleaseProcess(_In_ DWORD ProcessCookie)
-try
-{
-    auto process = RemoveProcess(ProcessCookie);
-    WSL_LOG(
-        "WslcPluginReleaseProcess",
-        TraceLoggingValue(ProcessCookie, "ProcessCookie"),
-        TraceLoggingValue(process != nullptr, "Found"));
     return S_OK;
 }
 CATCH_RETURN();

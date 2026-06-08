@@ -118,7 +118,7 @@ private:
             std::is_nothrow_invocable_v<decltype(Routine), SessionEntry&, wil::com_ptr<IWSLCSession>&>,
             "ForEachSession routine must be noexcept to preserve container invariants during remove_if");
 
-        using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
+        using TResult = std::conditional_t<std::is_same_v<T, void>, std::nullptr_t, std::optional<T>>;
         TResult result{};
 
         auto each = [&](SessionEntry& entry) {
@@ -133,16 +133,20 @@ private:
                 // reference. The StoppingNotified flag is intentionally left
                 // untouched here; DispatchSessionStopping flips it so the
                 // notification fires exactly once.
+                // Reserve the slot up front so push_back cannot reallocate (and
+                // therefore cannot throw) after `entry` is moved-from. Combined
+                // with SessionEntry's noexcept move, this guarantees `entry` is
+                // only consumed once the destination slot is known to exist.
+                DeadSessions.reserve(DeadSessions.size() + 1);
                 try
                 {
                     DeadSessions.push_back(std::move(entry));
                 }
                 catch (...)
                 {
-                    // Couldn't queue it for deferred stopping dispatch: keep it
-                    // tracked (the move above is noexcept, so entry is intact)
-                    // and reap it on a later pass rather than dropping it
-                    // without unregistering.
+                    // Defensive: if queuing for the deferred stopping dispatch
+                    // still fails, keep the session tracked and reap it on a
+                    // later pass rather than dropping it without unregistering.
                     LOG_CAUGHT_EXCEPTION();
                     return false;
                 }
@@ -191,7 +195,7 @@ private:
     {
         std::vector<SessionEntry> deadSessions;
 
-        using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
+        using TResult = std::conditional_t<std::is_same_v<T, void>, std::nullptr_t, std::optional<T>>;
         TResult result{};
 
         {

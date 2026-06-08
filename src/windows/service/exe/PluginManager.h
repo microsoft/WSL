@@ -35,10 +35,10 @@ class PluginManager;
 //
 // IWslPluginHostCallback implementation — lives in the service process and
 // handles API calls coming from the plugin host (MountFolder, ExecuteBinary,
-// WSLC* APIs etc.). One instance is created per plugin host so that the
-// per-plugin WSLC process map (cookie -> IWSLCProcess) is isolated: a plugin
-// cannot guess another plugin's cookie, and the map drains automatically when
-// the plugin host process goes away.
+// WSLC* APIs etc.). WslcCreateProcess returns a marshaled IWSLCProcess directly
+// to the host, which calls it (GetStdHandle/GetExitEvent/GetState) without any
+// service-side process bookkeeping; the remote process is released by COM when
+// the host releases it or the host process exits.
 //
 class PluginHostCallbackImpl
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWslPluginHostCallback>
@@ -78,36 +78,10 @@ public:
         _In_reads_opt_(ArgumentCount) LPCSTR* Arguments,
         _In_ DWORD EnvCount,
         _In_reads_opt_(EnvCount) LPCSTR* Environment,
-        _Out_ DWORD* ProcessCookie,
+        _COM_Outptr_ IWSLCProcess** Process,
         _Out_ int* Errno) override;
 
-    STDMETHODIMP WslcProcessGetFd(_In_ DWORD ProcessCookie, _In_ DWORD Fd, _Out_ HANDLE* Handle) override;
-
-    STDMETHODIMP WslcProcessGetExitEvent(_In_ DWORD ProcessCookie, _Out_ HANDLE* ExitEvent) override;
-
-    STDMETHODIMP WslcProcessGetExitCode(_In_ DWORD ProcessCookie, _Out_ int* ExitCode) override;
-
-    STDMETHODIMP WslcReleaseProcess(_In_ DWORD ProcessCookie) override;
-
-    // Release all outstanding process mappings. Called when the plugin host
-    // crashes so the WSLC processes it created aren't stranded until shutdown.
-    void DrainProcesses() noexcept;
-
 private:
-    // Allocate a new cookie -> process mapping. Loops past 0 and past collisions.
-    // Throws on exhaustion.
-    DWORD InsertProcessLocked(wil::com_ptr<IWSLCProcess> process);
-
-    // Resolve a cookie to its process under m_processLock; returns nullptr if unknown.
-    wil::com_ptr<IWSLCProcess> FindProcess(DWORD cookie) const;
-
-    // Remove a cookie mapping; returns the removed process (may be null).
-    wil::com_ptr<IWSLCProcess> RemoveProcess(DWORD cookie);
-
-    mutable std::mutex m_processLock;
-    std::unordered_map<DWORD, wil::com_ptr<IWSLCProcess>> m_processes;
-    DWORD m_nextCookie{1};
-
     // The PluginManager that owns this callback. Used to resolve a WSLC
     // SessionId to a live IWSLCSession via the manager's registered session
     // reference map (see PluginManager::ResolveWslcSession).
@@ -258,13 +232,26 @@ private:
     static std::vector<BYTE> SerializeSid(PSID Sid);
     static bool IsHostCrash(HRESULT hr);
 
-    // Logs a host crash to ETL and fires the PluginHostCrash telemetry event
-    // at most once per plugin per service lifetime, so a single bad plugin
-    // does not flood telemetry across every subsequent VM/distro lifecycle.
-    static void LogPluginHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage);
+    // Records an observed host-process crash: logs it to ETL, fires the
+    // PluginHostCrash telemetry event at most once per plugin per service
+    // lifetime (so a single bad plugin does not flood telemetry across every
+    // subsequent VM/distro lifecycle), and latches a fatal plugin error so
+    // later operations fail fast. The host is not re-activated for the rest of
+    // the service lifetime.
+    void LatchHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage);
+
+    // LatchHostCrash, then throws the latched error as a fatal plugin error to
+    // abort a start/veto operation. Use from start hooks (OnVmStarted, etc.);
+    // teardown hooks latch but cannot block, so they call LatchHostCrash + skip.
+    [[noreturn]] void ThrowHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage);
 
     std::once_flag m_initOnce;
     std::vector<OutOfProcPlugin> m_plugins;
+
+    // Guards m_pluginError. The error is written once at load time under
+    // m_initOnce and may later be latched from a hook on any RPC thread when a
+    // host crash is observed, so all accesses outside the initial load take it.
+    wil::srwlock m_pluginErrorLock;
     std::optional<PluginError> m_pluginError;
 
     // Global Interface Table used to make IWslPluginHost proxies callable from

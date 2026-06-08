@@ -795,56 +795,48 @@ class PluginTests
     // --- PR #40120 (out-of-process plugin host) coverage ---
     //
     // These tests validate the new isolation and locking behavior:
-    //   * HostCrashIsolation              — host process crash is non-fatal (IsHostCrash).
+    //   * HostCrashIsFatal                — host process crash aborts the guarded operation (fatal).
     //   * ConcurrentCallbacks             — concurrent shared_lock readers on m_callbackLock.
     //   * AsyncApiCallFromWorker          — cross-apartment plugin API call from a non-hook thread.
     //   * CallbacksDuringTerminationDoNotCrash — exclusive m_callbackLock drains in-flight
     //                                        callbacks before m_utilityVm.reset().
 
-    WSL2_TEST_METHOD(HostCrashIsolation)
+    WSL2_TEST_METHOD(HostCrashIsFatal)
     {
+        // A plugin host process crash during a veto hook (OnVmStarted) is fatal:
+        // the guarded operation is aborted with a fatal plugin error rather than
+        // silently continuing (matching the pre-refactor behavior where an
+        // in-process plugin crash took down WSL). The exact HRESULT is whichever
+        // RPC/CO_E_* code COM surfaces for the dead host, so assert on the
+        // user-facing prefix rather than an exact error code.
         ConfigurePlugin(PluginTestType::HostCrash);
 
-        // wslservice is on-demand; the first StartWsl below starts it. Capture
-        // its PID afterward, run more commands, and confirm the PID hasn't
-        // changed (i.e. the plugin host crash did not take the service down).
-        StartWsl(0);
-        const DWORD pidBefore = GetWslServiceRunningPid();
-        VERIFY_IS_TRUE(pidBefore != 0);
+        constexpr auto fatalPrefix = L"A fatal error was returned by plugin 'TestPlugin'";
 
-        // Shut down the VM. _VmTerminate will call OnVmStopping against the
-        // dead host; IsHostCrash treats RPC_E_DISCONNECTED-style errors as
-        // non-fatal (logged + skipped) so this must not fail.
-        WslShutdown();
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+        VERIFY_IS_TRUE(
+            output.find(fatalPrefix) != std::wstring::npos, std::format(L"Expected a fatal plugin error, got: '{}'", output).c_str());
 
-        // Service must accept new work after the host crash.
-        StartWsl(0);
+        // The crash latches a fatal plugin error, so a subsequent operation also
+        // fails — the host is not re-activated for this service lifetime. Whether
+        // it fails fast via the latch (service still up) or re-crashes after the
+        // on-demand service idle-restarts and reloads the plugin, the user-facing
+        // result is the same fatal plugin error.
+        auto [output2, error2] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+        VERIFY_IS_TRUE(
+            output2.find(fatalPrefix) != std::wstring::npos,
+            std::format(L"Expected a fatal plugin error on the second attempt, got: '{}'", output2).c_str());
 
-        const DWORD pidAfter = GetWslServiceRunningPid();
-        VERIFY_ARE_EQUAL(pidBefore, pidAfter);
-
-        // Plugin host is loaded once via std::call_once and is NOT re-activated
-        // after a crash. Verify by counting "Plugin loaded" occurrences: should
-        // be exactly one across both wsl invocations.
+        // Confirm the plugin actually ran up to the crash point.
         StopWslService();
 
         std::wifstream file(logFile);
         const auto fileContent = std::wstring{std::istreambuf_iterator<wchar_t>(file), {}};
         LogInfo("Logfile: %ls", fileContent.c_str());
 
-        auto countOccurrences = [&](const std::wstring& needle) {
-            size_t count = 0;
-            size_t pos = 0;
-            while ((pos = fileContent.find(needle, pos)) != std::wstring::npos)
-            {
-                ++count;
-                pos += needle.size();
-            }
-            return count;
-        };
-
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), countOccurrences(L"Plugin loaded. TestMode="));
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), countOccurrences(L"Crashing host"));
+        VERIFY_IS_TRUE(
+            fileContent.find(L"Crashing host") != std::wstring::npos,
+            std::format(L"Expected the plugin to reach the crash point, log: '{}'", fileContent).c_str());
     }
 
     WSL2_TEST_METHOD(ConcurrentCallbacks)

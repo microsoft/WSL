@@ -31,8 +31,7 @@ public:
     PluginHost& operator=(const PluginHost&) = delete;
 
     // IWslPluginHost
-    STDMETHODIMP Initialize(_In_ IWslPluginHostCallback* Callback, _In_ LPCWSTR PluginPath, _In_ LPCWSTR PluginName) override;
-    STDMETHODIMP GetProcessHandle(_Out_ HANDLE* ProcessHandle) override;
+    STDMETHODIMP Initialize(_In_ IWslPluginHostCallback* Callback, _In_ HANDLE JobObject, _In_ LPCWSTR PluginPath, _In_ LPCWSTR PluginName) override;
 
     STDMETHODIMP OnVMStarted(
         _In_ DWORD SessionId,
@@ -184,8 +183,8 @@ private:
     static HRESULT CALLBACK LocalPluginError(LPCWSTR UserMessage);
     static HRESULT CALLBACK LocalExecuteBinaryInDistribution(WSLSessionId Session, const GUID* Distro, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket);
 
-    // WSLC API stubs. WSLCProcessHandle is a heap-allocated wrapper around the
-    // DWORD process cookie owned by the service-side PluginHostCallbackImpl.
+    // WSLC API stubs. WSLCProcessHandle is a heap-allocated wrapper that owns
+    // the IWSLCProcess COM proxy marshaled from wslcsession via the service.
     static HRESULT CALLBACK LocalWslcMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly);
     static HRESULT CALLBACK LocalWslcUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint);
     static HRESULT CALLBACK LocalWslcCreateProcess(

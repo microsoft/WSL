@@ -32,6 +32,13 @@ std::atomic<wsl::windows::pluginhost::PluginHost*> wsl::windows::pluginhost::g_p
 // thread_local to avoid TLS initialization issues across DLL/EXE boundaries.
 static std::atomic<DWORD> g_hookThreadId{0};
 
+// Guards the lifetime of the PluginHost reachable via g_pluginHost. Plugin API
+// stubs hold this shared for the full duration of their call; ~PluginHost takes
+// it exclusive before clearing g_pluginHost and tearing down m_callback / the
+// plugin DLL. This is a process-global (not a PluginHost member) so that taking
+// it doesn't itself dereference the object being destroyed.
+static wil::srwlock g_hostLock;
+
 namespace {
 
 // Plugins may invoke API stubs from worker threads they create themselves,
@@ -39,9 +46,10 @@ namespace {
 // cross-process m_callback proxy can't be used and calls would fail with
 // CO_E_NOTINITIALIZED. This RAII helper joins the calling thread to the MTA
 // for the duration of the API call. RPC_E_CHANGED_MODE means the thread is
-// already STA-initialized; we leave its apartment unchanged. The supported
-// path is an uninitialized worker thread joining the MTA where m_callback was
-// marshaled — calling the proxy from a caller-created STA is not supported.
+// already STA-initialized; we leave its apartment unchanged and still proceed,
+// relying on COM cross-apartment marshaling to dispatch the call to the MTA
+// where m_callback was marshaled. The primary (and tested) path is an
+// uninitialized worker thread joining the MTA directly.
 struct ScopedComInitForCallback
 {
     HRESULT initHr;
@@ -66,6 +74,36 @@ struct ScopedComInitForCallback
 
 } // namespace
 
+// Snapshots g_pluginHost under a shared lock on g_hostLock that is held for the
+// lifetime of the ScopedHostRef. Because ~PluginHost takes g_hostLock exclusive
+// before clearing g_pluginHost and destroying m_callback / unloading the plugin
+// DLL, a stub holding a ScopedHostRef keeps the host (and its callback proxy)
+// alive for the whole call: the destructor blocks until the stub finishes, and
+// any stub that starts after teardown observes a null host and bails. Without
+// this, a plugin worker thread that loaded g_pluginHost just before the teardown
+// CAS could go on to dereference freed memory or run already-unloaded plugin code.
+class ScopedHostRef
+{
+public:
+    ScopedHostRef() : m_lock(g_hostLock.lock_shared()), m_host(g_pluginHost.load(std::memory_order_acquire))
+    {
+    }
+
+    PluginHost* operator->() const noexcept
+    {
+        return m_host;
+    }
+
+    explicit operator bool() const noexcept
+    {
+        return m_host != nullptr;
+    }
+
+private:
+    wil::rwlock_release_shared_scope_exit m_lock;
+    PluginHost* m_host;
+};
+
 // Tracks how many PluginHost instances have ever been constructed in this
 // process. Used by main() to distinguish "we were activated and the client
 // disconnected normally" from "we sat here for the entire startup window
@@ -84,11 +122,18 @@ PluginHost::PluginHost()
 
 PluginHost::~PluginHost()
 {
-    // Clear globally reachable state so late plugin API calls fail with
-    // E_UNEXPECTED instead of dereferencing freed memory. Release-store
-    // pairs with the acquire-loads in the Local* API stubs.
-    PluginHost* expected = this;
-    g_pluginHost.compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel);
+    // Quiesce in-flight plugin API stub calls before tearing down state they may
+    // be using. Stubs hold g_hostLock shared (via ScopedHostRef) for their whole
+    // duration and snapshot g_pluginHost under it; taking g_hostLock exclusive
+    // here blocks until every in-flight stub has finished, and clearing
+    // g_pluginHost under the lock means any later stub observes null and fails
+    // with E_UNEXPECTED instead of dereferencing freed memory or running plugin
+    // code from the about-to-be-unloaded DLL.
+    {
+        auto lock = g_hostLock.lock_exclusive();
+        PluginHost* expected = this;
+        g_pluginHost.compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel);
+    }
 
     // Module unloads automatically via wil::unique_hmodule destructor.
 
@@ -99,11 +144,23 @@ PluginHost::~PluginHost()
 
 // --- IWslPluginHost implementation ---
 
-STDMETHODIMP PluginHost::Initialize(_In_ IWslPluginHostCallback* Callback, _In_ LPCWSTR PluginPath, _In_ LPCWSTR PluginName)
+STDMETHODIMP PluginHost::Initialize(_In_ IWslPluginHostCallback* Callback, _In_ HANDLE JobObject, _In_ LPCWSTR PluginPath, _In_ LPCWSTR PluginName)
 try
 {
-    RETURN_HR_IF(E_INVALIDARG, Callback == nullptr || PluginPath == nullptr || PluginName == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Callback == nullptr || JobObject == nullptr || PluginPath == nullptr || PluginName == nullptr);
     RETURN_HR_IF(E_ILLEGAL_METHOD_CALL, m_module.is_valid()); // Already initialized
+
+    // Join the service's job object before loading or running any plugin code, so that
+    // any child processes the plugin spawns inherit the job and are terminated when the
+    // service exits (the service sets JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE). The host runs
+    // as SYSTEM, so it can assign itself. JobObject is a duplicate owned by the marshaler
+    // for the duration of this call and is freed on return; the assignment persists.
+    // A failure here is fatal: a host that isn't in the job escapes the kill-on-close
+    // guarantee and would be orphaned (along with any children it spawns) when the
+    // service closes the job. Failing Initialize makes the service release this host's
+    // proxy, which exits the host process before any plugin code runs.
+    RETURN_IF_WIN32_BOOL_FALSE_MSG(
+        AssignProcessToJobObject(JobObject, GetCurrentProcess()), "Failed to assign plugin host to job object: '%ls'", PluginName);
 
     m_callback = Callback;
 
@@ -151,21 +208,6 @@ try
         RETURN_HR_MSG(hr, "Plugin entry point failed: '%ls'", PluginPath);
     }
 
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDMETHODIMP PluginHost::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
-try
-{
-    RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
-    *ProcessHandle = nullptr;
-
-    wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId()));
-    RETURN_LAST_ERROR_IF_NULL(process);
-
-    // COM's system_handle(sh_process) marshaling will duplicate this into the caller's process.
-    *ProcessHandle = process.release();
     return S_OK;
 }
 CATCH_RETURN();
@@ -431,8 +473,8 @@ PluginHost::SessionContext PluginHost::BuildSessionContext(DWORD SessionId, HAND
 
 HRESULT CALLBACK PluginHost::LocalMountFolder(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -446,8 +488,8 @@ HRESULT CALLBACK PluginHost::LocalMountFolder(WSLSessionId Session, LPCWSTR Wind
 
 HRESULT CALLBACK PluginHost::LocalExecuteBinary(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -491,8 +533,8 @@ HRESULT CALLBACK PluginHost::LocalExecuteBinary(WSLSessionId Session, LPCSTR Pat
 
 HRESULT CALLBACK PluginHost::LocalPluginError(LPCWSTR UserMessage)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr)
+    ScopedHostRef host;
+    if (!host)
     {
         // Not on a hook thread — PluginError must only be called
         // synchronously from within OnVMStarted/OnDistributionStarted.
@@ -510,8 +552,8 @@ HRESULT CALLBACK PluginHost::LocalPluginError(LPCWSTR UserMessage)
 
 HRESULT CALLBACK PluginHost::LocalExecuteBinaryInDistribution(WSLSessionId Session, const GUID* Distro, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -766,19 +808,21 @@ CATCH_RETURN();
 
 namespace {
 
-// Opaque wrapper handed to the plugin as WSLCProcessHandle. The DWORD cookie
-// identifies the IWSLCProcess held by the service-side PluginHostCallbackImpl.
+// Opaque wrapper handed to the plugin as WSLCProcessHandle. It owns the
+// IWSLCProcess COM proxy marshaled from wslcsession (via the service), so the
+// host calls the process interface directly and the remote process is released
+// when the plugin releases this wrapper (or when the host process exits).
 struct WslcProcessWrapper
 {
-    DWORD cookie;
+    wil::com_ptr<IWSLCProcess> process;
 };
 
 } // namespace
 
 HRESULT CALLBACK PluginHost::LocalWslcMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -793,8 +837,8 @@ HRESULT CALLBACK PluginHost::LocalWslcMountFolder(WSLCSessionId Session, LPCWSTR
 
 HRESULT CALLBACK PluginHost::LocalWslcUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -808,8 +852,8 @@ HRESULT CALLBACK PluginHost::LocalWslcUnmountFolder(WSLCSessionId Session, LPCST
 HRESULT CALLBACK PluginHost::LocalWslcCreateProcess(
     WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -845,12 +889,12 @@ HRESULT CALLBACK PluginHost::LocalWslcCreateProcess(
     }
 
     // Allocate the wrapper before creating the remote process so a throwing
-    // allocation can't strand a service-side cookie that only WslcReleaseProcess
+    // allocation can't strand a remote process that only WslcReleaseProcess
     // frees. Nothing between the remote create and release() below can throw.
     auto wrapper = std::make_unique<WslcProcessWrapper>();
 
-    DWORD cookie = 0;
-    HRESULT hr = host->m_callback->WslcCreateProcess(Session, Executable, argCount, Arguments, envCount, Env, &cookie, &localErrno);
+    HRESULT hr =
+        host->m_callback->WslcCreateProcess(Session, Executable, argCount, Arguments, envCount, Env, wrapper->process.put(), &localErrno);
     if (Errno != nullptr)
     {
         *Errno = localErrno;
@@ -861,15 +905,14 @@ HRESULT CALLBACK PluginHost::LocalWslcCreateProcess(
         return hr;
     }
 
-    wrapper->cookie = cookie;
     *Process = wrapper.release();
     return S_OK;
 }
 
 HRESULT CALLBACK PluginHost::LocalWslcProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -882,13 +925,39 @@ HRESULT CALLBACK PluginHost::LocalWslcProcessGetFd(WSLCProcessHandle Process, WS
     RETURN_IF_FAILED(coInit.Result());
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-    return host->m_callback->WslcProcessGetFd(wrapper->cookie, static_cast<DWORD>(Fd), Handle);
+    RETURN_HR_IF(E_INVALIDARG, wrapper->process == nullptr);
+
+    WSLCFD wslcFd{};
+    switch (Fd)
+    {
+    case WSLCProcessFdStdin:
+        wslcFd = WSLCFDStdin;
+        break;
+    case WSLCProcessFdStdout:
+        wslcFd = WSLCFDStdout;
+        break;
+    case WSLCProcessFdStderr:
+        wslcFd = WSLCFDStderr;
+        break;
+    default:
+        return E_INVALIDARG;
+    }
+
+    WSLCHandle handle{};
+    RETURN_IF_FAILED(wrapper->process->GetStdHandle(wslcFd, &handle));
+
+    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
+
+    // Pass through as HANDLE; COM's system_handle(sh_socket) marshaling already
+    // duplicated it into this process.
+    *Handle = handle.Handle.Socket;
+    return S_OK;
 }
 
 HRESULT CALLBACK PluginHost::LocalWslcProcessGetExitEvent(WSLCProcessHandle Process, HANDLE* ExitEvent)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
@@ -901,25 +970,36 @@ HRESULT CALLBACK PluginHost::LocalWslcProcessGetExitEvent(WSLCProcessHandle Proc
     RETURN_IF_FAILED(coInit.Result());
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-    return host->m_callback->WslcProcessGetExitEvent(wrapper->cookie, ExitEvent);
+    RETURN_HR_IF(E_INVALIDARG, wrapper->process == nullptr);
+    return wrapper->process->GetExitEvent(ExitEvent);
 }
 
 HRESULT CALLBACK PluginHost::LocalWslcProcessGetExitCode(WSLCProcessHandle Process, int* ExitCode)
 {
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
+    ScopedHostRef host;
+    if (!host || host->m_callback == nullptr)
     {
         return E_UNEXPECTED;
     }
 
     RETURN_HR_IF(E_INVALIDARG, Process == nullptr);
     RETURN_HR_IF(E_POINTER, ExitCode == nullptr);
+    *ExitCode = -1;
 
     ScopedComInitForCallback coInit;
     RETURN_IF_FAILED(coInit.Result());
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-    return host->m_callback->WslcProcessGetExitCode(wrapper->cookie, ExitCode);
+    RETURN_HR_IF(E_INVALIDARG, wrapper->process == nullptr);
+
+    WSLCProcessState state{};
+    auto result = wrapper->process->GetState(&state, ExitCode);
+    if (SUCCEEDED(result) && state != WslcProcessStateExited && state != WslcProcessStateSignalled)
+    {
+        result = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
+    }
+
+    return result;
 }
 
 void CALLBACK PluginHost::LocalWslcReleaseProcess(WSLCProcessHandle Process)
@@ -929,19 +1009,12 @@ void CALLBACK PluginHost::LocalWslcReleaseProcess(WSLCProcessHandle Process)
         return;
     }
 
-    std::unique_ptr<WslcProcessWrapper> wrapper{static_cast<WslcProcessWrapper*>(Process)};
-
-    auto* host = g_pluginHost.load(std::memory_order_acquire);
-    if (host == nullptr || host->m_callback == nullptr)
-    {
-        return;
-    }
-
+    // Initialize COM before taking ownership: destroying the wrapper releases
+    // the IWSLCProcess proxy, which marshals a Release back to wslcsession and
+    // needs COM initialized on this thread. coInit is declared first so it
+    // outlives the wrapper (reverse destruction order).
     ScopedComInitForCallback coInit;
-    if (FAILED(coInit.Result()))
-    {
-        return;
-    }
+    LOG_IF_FAILED(coInit.Result());
 
-    LOG_IF_FAILED(host->m_callback->WslcReleaseProcess(wrapper->cookie));
+    std::unique_ptr<WslcProcessWrapper> wrapper{static_cast<WslcProcessWrapper*>(Process)};
 }
