@@ -769,7 +769,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && WI_IsFlagSet(Flags, WSLCContainerStartFlagsAttach) && StartOptions != nullptr)
+    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && StartOptions != nullptr)
     {
         try
         {
