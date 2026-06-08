@@ -2054,7 +2054,9 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* 
 {
     WSLCExecutionContext context(&m_session);
 
-    RETURN_HR_IF(E_POINTER, Stdin == nullptr || Stdout == nullptr || Stderr == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, Stdin);
+    RETURN_HR_IF_NULL(E_POINTER, Stdout);
+    RETURN_HR_IF_NULL(E_POINTER, Stderr);
 
     *Stdin = {};
     *Stdout = {};
@@ -2122,7 +2124,8 @@ HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys
 {
     WSLCExecutionContext context(&m_session);
 
-    RETURN_HR_IF(E_POINTER, Options == nullptr || Process == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Process);
     RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     *Process = nullptr;

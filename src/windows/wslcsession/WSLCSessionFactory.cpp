@@ -38,7 +38,8 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
-    RETURN_HR_IF(E_POINTER, Session == nullptr || ServiceRef == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    RETURN_HR_IF_NULL(E_POINTER, ServiceRef);
 
     *Session = nullptr;
     *ServiceRef = nullptr;

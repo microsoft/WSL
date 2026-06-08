@@ -1682,7 +1682,7 @@ try
     WSLCExecutionContext context(this, WarningCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
-    THROW_HR_IF(E_POINTER, containerOptions->Image == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(containerOptions->Flags, ~WSLCContainerFlagsValid),
@@ -2628,7 +2628,8 @@ try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || LinuxPath == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
+    RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);

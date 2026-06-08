@@ -167,7 +167,7 @@ CATCH_LOG()
 void WSLCSessionManagerImpl::CreateSession(
     _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
-    THROW_HR_IF(E_POINTER, WslcSession == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, WslcSession);
 
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -339,7 +339,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
 void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 {
-    THROW_HR_IF(E_POINTER, Session == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, Session);
 
     auto tokenInfo = GetCallingProcessTokenInfo();
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
@@ -360,7 +360,7 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
 {
-    THROW_HR_IF(E_POINTER, Session == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, Session);
 
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -390,7 +390,8 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
-    THROW_HR_IF(E_POINTER, Sessions == nullptr || SessionsCount == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, Sessions);
+    THROW_HR_IF_NULL(E_POINTER, SessionsCount);
 
     std::vector<WSLCSessionListEntry> sessionInfo;
 

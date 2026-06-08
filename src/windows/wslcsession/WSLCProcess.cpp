@@ -108,7 +108,8 @@ int WSLCProcess::GetPid() const
 HRESULT WSLCProcess::GetState(WSLCProcessState* State, int* Code)
 try
 {
-    RETURN_HR_IF(E_POINTER, State == nullptr || Code == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, State);
+    RETURN_HR_IF_NULL(E_POINTER, Code);
 
     std::tie(*State, *Code) = m_control->GetState();
     return S_OK;
