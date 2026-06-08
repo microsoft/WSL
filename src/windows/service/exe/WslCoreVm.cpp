@@ -1221,32 +1221,14 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
         // Create and attach a per-instance scratch vhd to back the system distro overlay's
         // read/write layer, so heavy writes land on reclaimable disk instead of guest memory.
         //
-        // N.B. This can fail if the target directory is compressed, encrypted, or if the user
-        //      does not have write access. On failure the guest falls back to a tmpfs overlay.
+        // N.B. The vhd path is derived from the instance id (GetInstanceScratchPath) and is not
+        //      tracked: cleanup on failure here, on a later startup failure (scratchCleanup), and
+        //      on terminate all recompute it. Creation can fail if the target directory is
+        //      compressed, encrypted, or not writable by the user; on any failure the scratch is
+        //      torn down and the guest falls back to a tmpfs overlay.
         try
         {
-            auto scratchPath = m_tempPath / std::format(L"scratch-{}.vhdx", wsl::shared::string::GuidToString<wchar_t>(InstanceId));
-
-            // Eject and delete the scratch vhd if creation/attach succeeds but it is never
-            // successfully tracked (otherwise CleanupInstanceScratch / the temp dir teardown
-            // owns it). Released only once the vhd is recorded in m_instanceScratchVhds.
-            auto cleanupScratch = wil::scope_exit([&]() {
-                // Avoid advertising a lun that was torn down or never tracked.
-                scratchLun = ULONG_MAX;
-
-                try
-                {
-                    EjectVhdLockHeld(scratchPath.c_str());
-                }
-                CATCH_LOG()
-
-                try
-                {
-                    const auto runAsUser = wil::impersonate_token(m_userToken.get());
-                    LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(scratchPath.c_str()));
-                }
-                CATCH_LOG()
-            });
+            const auto scratchPath = GetInstanceScratchPath(InstanceId);
 
             {
                 const auto runAsUser = wil::impersonate_token(m_userToken.get());
@@ -1254,10 +1236,16 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
             }
 
             scratchLun = AttachDiskLockHeld(scratchPath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
-            m_instanceScratchVhds.emplace(InstanceId, scratchPath);
-            cleanupScratch.release();
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+
+            // Tear down any partially-created scratch and avoid advertising a torn-down lun; the
+            // guest falls back to a tmpfs overlay.
+            scratchLun = ULONG_MAX;
+            CleanupInstanceScratchLockHeld(InstanceId);
+        }
     }
 
     WI_SetFlagIf(flags, LxMiniInitMessageFlagExportCompressGzip, WI_IsFlagSet(ExportFlags, LXSS_EXPORT_DISTRO_FLAGS_GZIP));
@@ -1455,24 +1443,25 @@ void WslCoreVm::CleanupInstanceScratch(_In_ const GUID& InstanceId)
     CleanupInstanceScratchLockHeld(InstanceId);
 }
 
+std::filesystem::path WslCoreVm::GetInstanceScratchPath(_In_ const GUID& InstanceId) const
+{
+    return m_tempPath / std::format(L"scratch-{}.vhdx", wsl::shared::string::GuidToString<wchar_t>(InstanceId));
+}
+
 _Requires_lock_held_(m_lock)
 void WslCoreVm::CleanupInstanceScratchLockHeld(_In_ const GUID& InstanceId)
 {
-    const auto search = m_instanceScratchVhds.find(InstanceId);
-    if (search == m_instanceScratchVhds.end())
-    {
-        return;
-    }
-
-    const auto scratchPath = std::move(search->second);
-    m_instanceScratchVhds.erase(search);
-
-    // Eject and delete the scratch vhd.
+    // Eject and delete the per-instance overlay scratch vhd. The path is derived from the
+    // instance id, so this is idempotent and safe to call on any failure path and on terminate:
+    // ejecting a device that was never attached is a no-op, and deleting a file that was never
+    // created is ignored.
     //
     // N.B. The scratch device is only ever mounted inside the per-instance overlay mount
     //      namespace, which is destroyed when the instance terminates, so by this point no
-    //      mount pins the device. Both steps are best-effort: any leftover is reclaimed when
-    //      the per-VM temp directory is deleted on VM teardown.
+    //      mount pins the device. Any leftover is also reclaimed when the per-VM temp directory
+    //      is deleted on VM teardown.
+    const auto scratchPath = GetInstanceScratchPath(InstanceId);
+
     try
     {
         EjectVhdLockHeld(scratchPath.c_str());
@@ -1482,7 +1471,10 @@ void WslCoreVm::CleanupInstanceScratchLockHeld(_In_ const GUID& InstanceId)
     try
     {
         const auto runAsUser = wil::impersonate_token(m_userToken.get());
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(scratchPath.c_str()));
+        if (!DeleteFileW(scratchPath.c_str()) && (GetLastError() != ERROR_FILE_NOT_FOUND))
+        {
+            LOG_LAST_ERROR();
+        }
     }
     CATCH_LOG()
 }
