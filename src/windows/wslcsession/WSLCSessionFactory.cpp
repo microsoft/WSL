@@ -38,6 +38,8 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
+    RETURN_HR_IF(E_POINTER, Session == nullptr || ServiceRef == nullptr);
+
     *Session = nullptr;
     *ServiceRef = nullptr;
 
@@ -71,6 +73,8 @@ CATCH_RETURN()
 HRESULT wslc::WSLCSessionFactory::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
+
     wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
     RETURN_LAST_ERROR_IF(!process);
 
