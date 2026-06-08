@@ -2791,6 +2791,7 @@ class WSLCTests
         std::promise<Invocation> promise;
         wil::unique_event release{wil::EventOptions::ManualReset};
         auto callback = Microsoft::WRL::Make<CallbackInstance>(promise, release);
+        auto releaseCallback = wil::scope_exit([&]() { release.SetEvent(); });
 
         WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"crash-dump-callback-test");
         auto session = CreateSession(sessionSettings);
@@ -2806,8 +2807,6 @@ class WSLCTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
 
-        // Make sure the callback is unblocked even if a verification below throws.
-        auto releaseCallback = wil::scope_exit([&]() { release.SetEvent(); });
         auto invocation = future.get();
         VERIFY_IS_FALSE(invocation.DumpPath.empty());
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);

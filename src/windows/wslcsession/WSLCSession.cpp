@@ -2574,19 +2574,18 @@ try
         it = m_crashDumpCallbacks.emplace(m_crashDumpCallbacks.end(), Callback);
     }
 
+    // Roll back the registration if creating the subscription object fails so we don't leak it.
+    auto removeOnFailure = wil::scope_exit([&]() { RemoveCrashDumpCallback(it); });
+
     // The subscription holds a strong reference to this session, which guarantees that
     // RemoveCrashDumpCallback is safe to call from the subscription destructor regardless of the
     // order in which the client releases its session and subscription pointers.
     Microsoft::WRL::ComPtr<CrashDumpSubscription> subscription;
-    auto hr = Microsoft::WRL::MakeAndInitialize<CrashDumpSubscription>(&subscription, Microsoft::WRL::ComPtr<WSLCSession>{this}, it);
-    if (FAILED(hr))
-    {
-        // MakeAndInitialize failed -- drop the callback we just registered so we don't leak it.
-        RemoveCrashDumpCallback(it);
-        RETURN_HR(hr);
-    }
+    RETURN_IF_FAILED(Microsoft::WRL::MakeAndInitialize<CrashDumpSubscription>(&subscription, Microsoft::WRL::ComPtr<WSLCSession>{this}, it));
 
     RETURN_IF_FAILED(subscription.CopyTo(Subscription));
+
+    removeOnFailure.release();
     return S_OK;
 }
 CATCH_RETURN();
