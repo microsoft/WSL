@@ -227,9 +227,6 @@ namespace Cursor {
     }
 
     const Sequence Home{WSL_WINDOWS_VT_CSI "H"};
-    const Sequence SavePos{WSL_WINDOWS_VT_CSI "s"};
-    const Sequence RestorePos{WSL_WINDOWS_VT_CSI "u"};
-
     const Sequence EnableBlink{WSL_WINDOWS_VT_CSI "?12h"};
     const Sequence DisableBlink{WSL_WINDOWS_VT_CSI "?12l"};
     const Sequence Show{WSL_WINDOWS_VT_CSI "?25h"};

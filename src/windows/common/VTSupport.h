@@ -230,6 +230,7 @@ struct ConstructedSequence : public Sequence
     {
         Set(m_str);
     }
+
     explicit ConstructedSequence(std::string s) : m_str(std::move(s))
     {
         Set(m_str);
@@ -239,6 +240,7 @@ struct ConstructedSequence : public Sequence
     {
         Set(m_str);
     }
+
     ConstructedSequence& operator=(const ConstructedSequence& other)
     {
         m_str = other.m_str;
@@ -249,11 +251,14 @@ struct ConstructedSequence : public Sequence
     ConstructedSequence(ConstructedSequence&& other) noexcept : m_str(std::move(other.m_str))
     {
         Set(m_str);
+        other.Set(other.m_str);
     }
+
     ConstructedSequence& operator=(ConstructedSequence&& other) noexcept
     {
         m_str = std::move(other.m_str);
         Set(m_str);
+        other.Set(other.m_str);
         return *this;
     }
 
