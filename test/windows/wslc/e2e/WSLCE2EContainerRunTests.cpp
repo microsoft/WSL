@@ -527,7 +527,10 @@ class WSLCE2EContainerRunTests
             std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
+
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt, true);
         session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");

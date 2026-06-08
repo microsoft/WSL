@@ -467,10 +467,13 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt, true);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
 
         session.ExpectStdout(expectedPrompt);
 

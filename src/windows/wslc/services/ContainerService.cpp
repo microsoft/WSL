@@ -431,7 +431,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     THROW_IF_FAILED(process->GetFlags(&processFlags));
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    return ConsoleService::AttachToCurrentConsole(console, std::move(runningProcess));
+    return ConsoleService::AttachToCurrentConsole(console, std::move(runningProcess), true);
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)

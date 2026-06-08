@@ -87,6 +87,8 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
 
+    void IgnoreSequence(const std::string& sequence);
+
     std::string GetStdoutData() const;
 
     void ResizePseudoConsole(SHORT columns, SHORT rows);
@@ -110,6 +112,7 @@ private:
     wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
     std::unique_ptr<PartialHandleRead> m_stdoutReader;
     std::unique_ptr<PartialHandleRead> m_stderrReader;
+    std::optional<std::string> m_ignoreSequence;
 };
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
