@@ -2795,6 +2795,16 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name of the container</value>
   </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Connect a container to a network</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Invalid {} value: network name cannot be empty or whitespace</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>host mode networking is not supported</value>
+  </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Do not use cache when building the image</value>
   </data>
@@ -2877,6 +2887,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Working directory inside the container</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Invalid {} value: working directory cannot be empty or whitespace</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path</value>
