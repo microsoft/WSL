@@ -2597,6 +2597,7 @@ void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) no
 }
 
 void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+try
 {
     // Snapshot the callback list under the lock so that cross-process callback invocations don't
     // hold m_crashDumpLock (and can't deadlock with Register/Remove on the same thread that the
@@ -2607,11 +2608,14 @@ void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::st
         snapshot.assign(m_crashDumpCallbacks.begin(), m_crashDumpCallbacks.end());
     }
 
+    auto comCall = RegisterUserCOMCallback();
+
     for (const auto& callback : snapshot)
     {
         LOG_IF_FAILED(callback->OnCrashDump(DumpPath.c_str(), ProcessName.c_str(), Pid, Signal, Timestamp));
     }
 }
+CATCH_LOG();
 
 HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
 try
