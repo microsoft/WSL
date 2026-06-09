@@ -824,6 +824,98 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Cpus)
+    {
+        auto result = RunWslc(std::format(L"container create --name {} --cpus 0.5 {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(500'000'000), inspect.HostConfig.NanoCpus);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Memory)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --name {} --memory 32M {} true", WslcContainerName, DebianImage.NameAndTag()));
+        // stderr not asserted: some kernels emit a swap-limit warning when --memory is set.
+        result.Verify({.ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(32) * 1024 * 1024, inspect.HostConfig.Memory);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.Ulimits.size());
+
+        std::map<std::string, std::pair<int64_t, int64_t>> byName;
+        for (const auto& ul : inspect.HostConfig.Ulimits)
+        {
+            byName[ul.Name] = {ul.Soft, ul.Hard};
+        }
+
+        VERIFY_IS_TRUE(byName.contains("nofile"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1024), byName["nofile"].first);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(2048), byName["nofile"].second);
+
+        VERIFY_IS_TRUE(byName.contains("nproc"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].first);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Entrypoint)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --name {} --entrypoint /bin/whoami {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"root\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_EnvFile)
+    {
+        WriteTestFile(
+            EnvTestFile1, {"WSLC_TEST_CREATE_ENV_FILE_A=create-env-file-a", "WSLC_TEST_CREATE_ENV_FILE_B=create-env-file-b"});
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --env-file {} {} env", WslcContainerName, EscapePath(EnvTestFile1.wstring()), DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_CREATE_ENV_FILE_A=create-env-file-a"));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_CREATE_ENV_FILE_B=create-env-file-b"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish)
+    {
+        constexpr uint16_t hostPort = 48317;
+        constexpr uint16_t containerPort = 80;
+
+        // Port bindings only show up in inspect after start, so create then start before inspecting.
+        auto result = RunWslc(std::format(
+            L"container create --name {} -p {}:{} {} sleep 5", WslcContainerName, hostPort, containerPort, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto portKey = std::to_string(containerPort) + "/tcp";
+        VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
+
+        const auto& bindings = inspect.Ports.at(portKey);
+        VERIFY_ARE_EQUAL(1u, bindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(hostPort), bindings[0].HostPort);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
