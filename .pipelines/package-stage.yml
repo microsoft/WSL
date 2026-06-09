@@ -32,7 +32,7 @@ stages:
     dependsOn: [build_x64, build_arm64]
     jobs:
       - job: package
-        displayName: "Create msixbundle & appxupload"
+        displayName: "Package WSL release artifacts"
         timeoutInMinutes: 60
 
         ${{ if eq(parameters.pool, '') }}:
@@ -45,6 +45,8 @@ stages:
           ob_outputDirectory: '$(Build.SourcesDirectory)\out'
           ob_artifactBaseName: 'drop_wsl'
           ob_artifactSuffix: '_package'
+          # Outputs are explicitly signed+verified by the EsrpCodeSigning tasks below.
+          ob_sdl_codeSignValidation_enabled: false
           buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
           buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
 
@@ -81,6 +83,10 @@ stages:
                   $dest = "bin\$($arch.dir)\Release"
                   New-Item -ItemType Directory -Path $dest -Force
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\installer\installer.$($arch.platform).msix" "$dest\installer.msix"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.lib" "$dest\wslcsdk.lib"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.dll" "$dest\wslcsdk.dll"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdkcs.dll" "$dest\wslcsdkcs.dll"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\Microsoft.WSL.Containers.winmd" "$dest\Microsoft.WSL.Containers.winmd"
               }
 
               # Copy MSIs to the output bundle directory
@@ -94,7 +100,7 @@ stages:
             displayName: "CMake configure (bundle-only)"
             inputs:
               workingDirectory: "."
-              cmakeArgs: . -DBUNDLE_ONLY=TRUE -DCMAKE_BUILD_TYPE=Release -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION)
+              cmakeArgs: . -DBUNDLE_ONLY=TRUE -DCMAKE_BUILD_TYPE=Release -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DWSL_INCLUDE_SDK_CSHARP=true
 
           - script: cmake --build . --config Release --target bundle -- -m
             displayName: Create msixbundle

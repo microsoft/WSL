@@ -8,6 +8,7 @@
 #include <TraceLoggingProvider.h>
 
 #include "Stringify.h"
+#include "WmiService.h"
 #include "WslTelemetry.h"
 #include "hns_schema.h"
 
@@ -15,6 +16,8 @@ static constexpr auto c_computeNetworkModuleName = L"ComputeNetwork.dll";
 static constexpr auto c_dnsPortNumber = 53;
 static constexpr auto c_mdnsPortNumber = 5353;
 static constexpr auto c_llmnrPortNumber = 5355;
+
+static constexpr std::pair<uint16_t, uint16_t> c_invalidEphemeralPortRange = {1, 0};
 
 using namespace wsl::shared;
 
@@ -51,6 +54,15 @@ void wsl::core::networking::GuestNetworkService::CreateGuestNetworkService(
     m_ignoredPorts = IgnoredPorts;
     // Always allow binds for 53. This is a workaround to unblock Docker Desktop and needs to be revisited in the future.
     m_ignoredPorts.insert(c_dnsPortNumber);
+
+    m_hostTcpEphemeralPortRange = QueryHostEphemeralPortRange(L"MSFT_NetTCPSetting");
+    m_hostUdpEphemeralPortRange = QueryHostEphemeralPortRange(L"MSFT_NetUDPSetting");
+    WSL_LOG(
+        "GuestNetworkService::CreateGuestNetworkService - host ephemeral port ranges",
+        TraceLoggingValue(m_hostTcpEphemeralPortRange.first, "tcpStartPort"),
+        TraceLoggingValue(m_hostTcpEphemeralPortRange.second, "tcpEndPort"),
+        TraceLoggingValue(m_hostUdpEphemeralPortRange.first, "udpStartPort"),
+        TraceLoggingValue(m_hostUdpEphemeralPortRange.second, "udpEndPort"));
 
     hns::GuestNetworkService request{};
     request.VirtualMachineId = VmId;
@@ -166,6 +178,53 @@ bool wsl::core::networking::GuestNetworkService::IsPortAllocationMulticast(const
     return false;
 }
 
+std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::QueryHostEphemeralPortRange(LPCWSTR WmiClassName) noexcept
+try
+{
+    const auto com = wil::CoInitializeEx();
+    WmiService service(L"ROOT\\StandardCimv2");
+    WmiEnumerate enumSetting(service);
+
+    auto query = std::format(L"SELECT DynamicPortRangeStartPort, DynamicPortRangeNumberOfPorts FROM {}", WmiClassName);
+    for (const auto& instance : enumSetting.query(query.c_str()))
+    {
+        unsigned int startPort = 0;
+        unsigned int numberOfPorts = 0;
+
+        if (instance.get(L"DynamicPortRangeStartPort", &startPort) &&
+            instance.get(L"DynamicPortRangeNumberOfPorts", &numberOfPorts) && startPort > 0 && numberOfPorts > 0)
+        {
+            const auto endPort = static_cast<uint64_t>(startPort) + numberOfPorts - 1;
+            if (startPort > UINT16_MAX || endPort > UINT16_MAX)
+            {
+                LOG_HR_MSG(E_FAIL, "Ephemeral port range overflows uint16_t: start=%u, count=%u", startPort, numberOfPorts);
+                return c_invalidEphemeralPortRange;
+            }
+
+            return {static_cast<uint16_t>(startPort), static_cast<uint16_t>(endPort)};
+        }
+    }
+
+    LOG_HR_MSG(E_FAIL, "No valid ephemeral port range found in WMI class %ls", WmiClassName);
+    return c_invalidEphemeralPortRange;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to query host ephemeral port range from WMI class %ls", WmiClassName);
+    return c_invalidEphemeralPortRange;
+}
+
+bool wsl::core::networking::GuestNetworkService::IsPortInHostEphemeralRange(uint16_t PortNumber, int Protocol) const noexcept
+{
+    const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
+    return PortNumber >= range.first && PortNumber <= range.second;
+}
+
+bool wsl::core::networking::GuestNetworkService::IsPortInGuestEphemeralRange(uint16_t PortNumber) const noexcept
+{
+    return PortNumber >= m_reservedPortRange.startingPort && PortNumber <= m_reservedPortRange.endingPort;
+}
+
 int wsl::core::networking::GuestNetworkService::OnPortAllocationRequest(const SOCKADDR_INET& Address, _In_ int Protocol, _In_ bool Allocate) noexcept
 try
 {
@@ -204,7 +263,22 @@ try
 
     const auto lock = m_dataLock.lock_exclusive();
 
-    if (PortNumber >= m_reservedPortRange.startingPort && PortNumber <= m_reservedPortRange.endingPort)
+    // The guest's reserved ephemeral range can overlap with the host range. Ports in
+    // the guest range are safe for the guest to use even if they fall within the host range.
+    if (IsPortInHostEphemeralRange(PortNumber, Protocol) && !IsPortInGuestEphemeralRange(PortNumber))
+    {
+        const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
+        WSL_LOG(
+            "GuestNetworkService::OnPortAllocationRequest - denying port in host ephemeral range",
+            TraceLoggingValue(StringAddress.c_str(), "IP address"),
+            TraceLoggingValue(Protocol == IPPROTO_TCP ? "TCP" : "UDP", "protocol"),
+            TraceLoggingValue(PortNumber, "portNumber"),
+            TraceLoggingValue(range.first, "hostEphemeralStart"),
+            TraceLoggingValue(range.second, "hostEphemeralEnd"));
+        return -LX_EADDRINUSE;
+    }
+
+    if (IsPortInGuestEphemeralRange(PortNumber))
     {
         WSL_LOG(
             "GuestNetworkService::OnPortAllocationRequest",

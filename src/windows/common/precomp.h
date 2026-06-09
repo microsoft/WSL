@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 
-#pragma warning(disable : 4200 4214)
+#pragma warning(disable : 4200 4214 4875)
 
 #ifdef __cplusplus
 #define _WINSOCKAPI_
@@ -52,6 +52,7 @@ Abstract:
 #include <msi.h>
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <wuapi.h>
 #include "windowsdefs.h"
 
 // Annotations
@@ -141,6 +142,7 @@ Abstract:
 #include <lxbusapi.h>
 
 // Utility/helper functions
+#include "COMImplClass.h"
 #include "conncheckshared.h"
 #include "helpers.hpp"
 #include "string.hpp"

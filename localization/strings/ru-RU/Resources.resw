@@ -117,6 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <!--
+    Localization Glossary — Technical Terms
+    ========================================
+    The following technical terms appear in many strings throughout this file.
+    Per-string <comment> elements provide guidance for each occurrence, but
+    this glossary serves as a central reference for developers and reviewers.
+
+    "mount"   — Making a disk/filesystem accessible. Translate per locale or keep "mount".
+    "VHD"     — Virtual Hard Disk. Do not translate (file format name).
+    "tar"     — File archive format. Do not translate (file format name).
+    "swap"    — Virtual memory swap space. Translate per locale or keep "swap".
+    "sparse"  — Storage term: file uses disk space only for written data. Translate per locale.
+    "DNS"     — Domain Name System. Do not translate (protocol acronym).
+    "proxy"   — Network proxy server. Translate per locale standard networking term.
+    "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+  -->
   <data name="AppName" xml:space="preserve">
     <value>Подсистема Windows для Linux</value>
   </data>
@@ -137,24 +153,27 @@
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
     <value>Этот том уже подключен в WSL2.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
     <value>Диск с таким именем уже подключен; отключите диск или выберите новое имя и повторите попытку.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>Указанное имя подключения содержит недопустимый символ "/". Повторите попытку без недопустимого символа.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
     <value>Диск успешно подключен как "/mnt/wsl/{}".
 Примечание. Расположение будет разным, если вы изменили параметр automount.root в /etc/wsl.conf.
 Чтобы отключить и отключить диск, выполните команду "wsl.exe {} {}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountFailed" xml:space="preserve">
     <value>Диск был подключен, но подключить его не удалось: {}.
 Для получения дополнительных сведений выполните команду "dmesg" в WSL2.
 Чтобы отключить диск, выполните команду "wsl.exe {} {}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
     <value>Ниже указан список допустимых дистрибутивов, которые можно установить.
@@ -177,6 +196,7 @@
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Для подключения диска требуется доступ администратора.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Не удалось экспортировать дистрибутив.</value>
@@ -219,9 +239,6 @@
     <value>Недопустимое имя распространения: "{}".
 Чтобы получить список допустимых дистрибутивов, используйте "wsl.exe --list --online'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>Экземпляр подсистема Windows для Linux завершен.</value>
   </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Недопустимый аргумент командной строки: {}
@@ -313,7 +330,7 @@
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
     <value>VHD уже подключен с помощью команды wsl.exe --mount, отключите диск перед запуском.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>Текущая конфигурация компьютера не поддерживает WSL1.
@@ -539,7 +556,7 @@
 Аргументы для управления дистрибутивами в подсистеме Windows для Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [параметры]
-        Экспорт дистрибутива в TAR-файл.
+        Экспорт дистрибутива в tar-файл.
         Имя файла может быть "-" для stdout.
 
         Параметры:
@@ -547,7 +564,7 @@
                 Указывает формат экспорта. Поддерживаемые значения: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [параметры]
-        Импортирует указанный TAR-файл в качестве нового дистрибутива.
+        Импортирует указанный tar-файл в качестве нового дистрибутива.
         Имя файла может быть "-" для stdin.
 
         Параметры:
@@ -555,12 +572,12 @@
                 Указывает версию, используемую для нового дистрибутива.
 
             --vhd
-                Указывает, что предоставленный файл является файлом VHD или VHDX, а не TAR-файлом.
+                Указывает, что предоставленный файл является файлом VHD или VHDX, а не tar-файлом.
                 Эта операция создает копию VHD-файла в указанном расположении установки.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Импортирует указанный VHD-файл в качестве нового дистрибутива.
-        Этот виртуальный жесткий диск должен быть отформатирован с типом файловой системы ext4.
+        Этот VHD должен быть отформатирован с типом файловой системы ext4.
 
     --list, -l [параметры]
         Перечисление дистрибутивов.
@@ -612,7 +629,7 @@
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>Версия WSL: {}
@@ -635,8 +652,8 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Виртуальный жесткий диск пользовательских модулей ядра в {} не найден: "{}".</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>VHD пользовательских модулей ядра в {} не найден: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>Настраиваемое системное распределение, указанное в {}, не найдено или имеет неправильный формат.</value>
@@ -697,7 +714,7 @@
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount на ARM64 требует Windows версии 27653 или более поздней.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
     <value>Последняя версия подсистема Windows для Linux уже установлена.</value>
@@ -750,6 +767,11 @@
   </data>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Для запуска оболочки отладки требуется запуск wsl.exe от имени администратора.</value>
+  </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection включена, а ваши дистрибутивы, возможно, зарегистрированы под другой учетной записью.
+Подробнее о Admin Protection можно узнать на https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Сбой процесса установки для распространения "{}" с кодом завершения: {}.</value>
@@ -810,7 +832,7 @@
     <value>Открыть EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Это распределение не содержит имя по умолчанию. Используйте --name , чтобы выбрать имя распространения.</value>
+    <value>Это распределение не содержит имя по умолчанию. Используйте --name для выбора имени распределения.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -827,6 +849,7 @@
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Использование устаревшей регистрации распространения. Вместо этого рассмотрите возможность использования дистрибутива на основе tar.</value>
+    <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Устаревшие регистрации дистрибутивов не поддерживают аргумент --version .</value>
@@ -858,6 +881,10 @@
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Не удалось создать диск переключения в "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
+  </data>
+  <data name="MessageFailedToCreateDisk" xml:space="preserve">
+    <value>Не удалось создать диск "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
@@ -873,6 +900,7 @@
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>БЕЗОПАСНЫЙ РЕЖИМ ВКЛЮЧЕН — многие функции будут отключены</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
     <value>Режим зеркальной сети не поддерживается: {}.
@@ -895,24 +923,34 @@
   </data>
   <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
     <value>Туннелирование DNS не поддерживается</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
+  </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Файл hosts в Windows слишком большой и не будет отображаться в WSL. Попробуйте уменьшить размер %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
   </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Параметр wsl2.localhostForwarding не действует при использовании зеркального сетевого режима</value>
   </data>
   <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
     <value>В узле обнаружено изменение HTTP-прокси. Перезапустите WSL, чтобы применить изменение.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера localhost обнаружена, но не отражена в WSL. WSL в режиме NAT не поддерживает прокси-серверы localhost.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера IPv6 обнаружена, но не отражена в WSL. WSL в режиме NAT не поддерживает IPv6.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
     <value>Конфигурация прокси-сервера localhost IPv6 обнаружена, но не отражена в WSL. WSL не поддерживает прокси-серверы localhost IPv6.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
     <value>При попытке разрешить параметры прокси-сервера произошла непредвиденная ошибка. Параметры прокси-сервера не были зеркально отражены в WSL.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>Произошла ошибка при доступе к реестру. Путь: "{}". Ошибка: {}</value>
@@ -955,10 +993,20 @@
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>Команда wsl.exe --mount отключена политикой компьютера.</value>
-    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
     <value>Подсистема WSL1 отключена политикой компьютера.</value>
+  </data>
+  <data name="MessageWSLContainerDisabled" xml:space="preserve">
+    <value>Команда wsl.exe --mount отключена политикой компьютера.</value>
+  </data>
+  <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
+    <value>Реестр образов контейнера "{}" заблокирован политикой компьютера.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
+    <value>Создание образов контейнеров заблокировано, так как политикой компьютера настроен список разрешенных реестров контейнеров. При сборке образов базовые образы могут извлекаться из любых реестров, и их нельзя надежно ограничить этим списком разрешенных.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Выполните команду "wsl.exe --set-version {} 2", чтобы перейти на WSL2.</value>
@@ -1018,7 +1066,7 @@
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Не удалось завершить операцию, так как VHD сейчас используется. Чтобы принудительно остановить использование WSL, выполните команду wsl.exe --shutdown</value>
-    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} не является допустимым логическим значением, &lt;true|false&gt;</value>
@@ -1026,6 +1074,7 @@
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
     <value>Разреженный VHD поддерживается только в WSL2.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Запуск WSL в виде локальной системы не поддерживается.</value>
@@ -1075,7 +1124,7 @@
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
     <value>Похоже, это VHD-файл. Используйте --vhd для импорта VHD вместо tar.</value>
-    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
     <value>Не удалось установить {} с Microsoft Store: {}
@@ -1087,6 +1136,14 @@
   </data>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p отключен, выполняется возврат к 9p с использованием транспорта vsock.</value>
+  </data>
+  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
+    <value>Сетевой режим VirtioProxy не поддерживается, если параметр wsl2.virtio отключен; выполняется переход к networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>В запущенном ядре отсутствует исправление, значительно повышающий производительность устройств virtio. Обновите ядро ​​WSL до более новой версии, чтобы включить эту оптимизацию.</value>
+    <comment>{Locked="virtio"}</comment>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>Возможно, установка WSL повреждена (код ошибки: {}).
@@ -1123,23 +1180,26 @@
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Из-за текущей проблемы совместимости с клиентом глобального безопасного доступа туннелирование DNS отключено.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Поддержка разреженного VHD в настоящее время отключена из-за возможного повреждения данных.
 Чтобы принудительно использовать разреженный VHD в дистрибутиве, выполните команду:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Не удалось подключить {}. Дополнительные сведения см. в dmesg.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
     <value>Обработка /etc/fstab с помощью mount -a завершилась неудачей.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>Произошла ошибка при подключении диска дистрибутива, он был подключен только для чтения в качестве резервного варианта.
 Инструкции по восстановлению см. на странице https://aka.ms/wsldiskmountrecovery</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Не удалось перевести "{}"</value>
@@ -1178,28 +1238,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Автоматический прокси включен</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
     <value>Позволяет WSL использовать сведения HTTP-прокси Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Автоматический прокси включен.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Позволяет WSL использовать сведения HTTP-прокси Windows.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
     <value>Используйте лучший анализ DNS</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>Применимо, тольк, если для параметра wsl2.dnsTunneling установлено значение ИСТИНА. Если установлено значение ИСТИНА, Windows извлечет вопрос из запроса DNS и попытается его решить, игнорируя неизвестные записи.</value>
-    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.dnsTunneling"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Используйте лучший анализ DNS.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, тольк, если для параметра wsl2.dnsTunneling установлено значение ИСТИНА. Если установлено значение ИСТИНА, Windows извлечет вопрос из запроса DNS и попытается его решить, игнорируя неизвестные записи.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Настраиваемое ядро</value>
@@ -1221,6 +1288,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
     <value>Абсолютный путь Windows к VHD модулей настраиваемого ядра Linux.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
     <value>Обзор модулей ядра</value>
@@ -1230,6 +1298,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Абсолютный путь Windows к VHD модулей настраиваемого ядра Linux.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Пользовательский системный дистрибутив</value>
@@ -1238,8 +1307,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Обзор дистрибутивов</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Укажите путь к виртуальному жесткому диску, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+    <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1250,6 +1319,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, который в основном используется для работы приложений с графическим интерфейсом в WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Включить консоль отладки</value>
@@ -1264,19 +1334,23 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Логическое значение для включения окна вывода консоли, в котором отображается содержимое диагностических сообщений при запуске экземпляра дистрибутива WSL 2.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Размер виртуального жесткого диска по умолчанию</value>
+    <value>Размер VHD по умолчанию</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
     <value>Максимальный размер по умолчанию для расширяемого виртуального жесткого диска WSL (VHD) только для вновь создаваемых дистрибутивов.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Восстановить размер</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Размер виртуального жесткого диска по умолчанию</value>
+    <value>Размер VHD по умолчанию</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Максимальный размер по умолчанию, указанный в мегабайтах, для расширяемого виртуального жесткого диска WSL (VHD) только для вновь создаваемых дистрибутивов.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Разработчик</value>
@@ -1296,28 +1370,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>DNS-прокси включен</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
     <value>Применимо, только если для параметра wsl2.networkingMode установлено значение NAT. Логическое значение, сообщающее WSL о необходимости настройки DNS-сервера в Linux для NAT на узле. Установка значения ЛОЖЬ приведет к зеркалированию DNS-серверов из Windows в Linux.</value>
-    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.networkingMode"}{Locked="DNS"}.wslconfig property key names should not be translated. "DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>DNS-прокси включен.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, только если для параметра wsl2.networkingMode установлено значение NAT. Логическое значение, сообщающее WSL о необходимости настройки DNS-сервера в Linux для NAT на узле. Установка значения ЛОЖЬ приведет к зеркалированию DNS-серверов из Windows в Linux.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>Нисходящая маршрутизация событий DNS включена</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
     <value>Изменяет способ передачи DNS-запросов из WSL в Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Нисходящая маршрутизация событий DNS включена.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Изменяет способ передачи DNS-запросов из WSL в Windows.</value>
+    <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Файловая система</value>
@@ -1393,19 +1474,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>Начальное время ожидания автоматического прокси-сервера</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
     <value>Применимо, только если для wsl2.autoProxy установлено значение ИСТИНА. Определяет, как долго (в миллисекундах) WSL будет ждать получения информации о HTTP-прокси при запуске контейнера WSL. Если параметры прокси-сервера разрешены по истечении этого времени, экземпляр WSL необходимо перезапустить, чтобы использовать полученные параметры прокси-сервера.</value>
-    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
     <value>Сброс времени ожидания</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Начальное время ожидания автоматического прокси-сервера</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Применимо, только если для wsl2.autoProxy установлено значение ИСТИНА. Определяет, как долго (в миллисекундах) WSL будет ждать получения информации о HTTP-прокси при запуске контейнера WSL. Если параметры прокси-сервера разрешены по истечении этого времени, экземпляр WSL необходимо перезапустить, чтобы использовать полученные параметры прокси-сервера.</value>
+    <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>Командная строка ядра</value>
@@ -1581,6 +1665,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
 • Команды Docker можно запускать в WSL или Windows с помощью одной и той же управляющей программы и образов Docker.
 • Удобно обмениваться файлами и папками между Windows и Linux с помощью автоматического подключения дисков Windows в WSL.
 • Можно использовать любимые инструменты и редакторы Windows для работы с кодом и файлами Linux, и наоборот, благодаря взаимодействию через WSL.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Интеграция Docker Desktop</value>
@@ -1748,15 +1833,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_SafeMode.Header" xml:space="preserve">
     <value>Включить безопасный режим</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
     <value>Запускайте WSL в "безопасном режиме", который отключает многие функции и предназначен для восстановления дистрибутивов, находящихся в плохом состоянии.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Включить безопасный режим.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Запускайте WSL в "безопасном режиме", который отключает многие функции и предназначен для восстановления дистрибутивов, находящихся в плохом состоянии.</value>
+    <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>О службе</value>
@@ -1820,46 +1909,59 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked}Uri to Microsoft WSL issues</comment>
   </data>
   <data name="Settings_SparseVHD.Header" xml:space="preserve">
-    <value>Включить разреженный виртуальный жесткий диск по умолчанию</value>
+    <value>Включить разреженный VHD по умолчанию</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Все вновь созданные виртуальные жесткие диски будут автоматически настроены на разрежение при включении.</value>
+    <value>Все вновь созданные VHD будут автоматически настроены на разрежение при включении.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Включить разреженный виртуальный жесткий диск по умолчанию.</value>
+    <value>Включить разреженный VHD по умолчанию.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Все вновь созданные виртуальные жесткие диски будут автоматически настроены на разрежение при включении.</value>
+    <value>Все вновь созданные VHD будут автоматически настроены на разрежение при включении.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
     <value>Поменять расположение файла</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
     <value>Абсолютный путь Windows к обмену виртуальным жестким диском.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
     <value>Просмотр файлов подкачки</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Поменять расположение файла</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Абсолютный путь Windows к обмену виртуальным жестким диском.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
     <value>Размер буфера</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Объем места для обмена добавляемого в виртуальную машину WSL 2, 0 для файла переключения. Хранилище буфера — это дисковое ОЗУ, используемое при превышении ограничения на объем памяти на устройстве.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Восстановить размер</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Размер буфера</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Какой объем пространства подкачки (указан в мегабайтах) добавить к виртуальной машине WSL 2. 0 для отсутствия файла подкачки. Хранилище буфера — это дисковое ОЗУ, используемое при превышении ограничения на объем памяти на устройстве.</value>
+    <comment>"swap" refers to virtual memory swap space. This is a technical term; use the standard OS term in your locale or keep "swap".</comment>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
     <value>Включить VirtIO</value>
@@ -1872,6 +1974,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
     <value>Позволяет монтировать файловую систему 9P с узла с помощью транспорта virtio.</value>
+    <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
     <value>Время ожидания простоя виртуальной машины</value>
@@ -1951,5 +2054,1155 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
     <value>Интеграция Visual Studio</value>
+  </data>
+  <data name="MessageWslcUsage" xml:space="preserve">
+    <value>wslc — CLI контейнера WSL
+Использование:
+  wslc --help</value>
+    <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
+    <value>Сеанс не найден: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Недопустимый IP-адрес "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
+    <value>Сбой OpenSessionByName("{}")</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>Сеансы WSLC не найдены.</value>
+  </data>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>Найден {} сеанс WSLC{}:</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>Сбой завершения сеанса: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
+    <value>Стандартный сеанс не найден</value>
+  </data>
+  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
+    <value>Не удалось открыть стандартный сеанс</value>
+  </data>
+  <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
+    <value>Сбой завершения стандартного сеанса</value>
+  </data>
+  <data name="MessageWslcShellExited" xml:space="preserve">
+    <value>{} выходит с: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCreatedSession" xml:space="preserve">
+    <value>Создан сеанс: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcHeaderId" xml:space="preserve">
+    <value>Код</value>
+  </data>
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
+    <value>ИД процесса автора</value>
+  </data>
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
+    <value>Выводимое имя</value>
+  </data>
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
+    <value>Неизвестная команда: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
+    <value>Контейнер "{}" запущен и не может быть удален. Остановите контейнер перед удалением или используйте принудительное удаление (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotRunning" xml:space="preserve">
+    <value>Контейнер "{}" не запущен.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIsRunning" xml:space="preserve">
+    <value>Контейнер "{}" запущен.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
+    <value>В режиме сети контейнера сопоставление портов не поддерживается; права на порты принадлежат целевому контейнеру.</value>
+  </data>
+  <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
+    <value>Для режима сети контейнера требуется имя целевого контейнера.</value>
+  </data>
+  <data name="MessageWslcContainerModeTargetNotFound" xml:space="preserve">
+    <value>Целевой контейнер "{}" не найден.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotFound" xml:space="preserve">
+    <value>Контейнер "{}" не найден.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
+    <value>Имя сети не может быть пустым.</value>
+  </data>
+  <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
+    <value>Нераспознанная команда: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
+    <value>Обязательный аргумент не указан: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
+    <value>Аргумент предоставлен больше раз, чем разрешено: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
+    <value>Отображает справку по выбранной команде</value>
+  </data>
+  <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
+    <value>Указано несколько взаимоисключающих аргументов: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
+    <value>Аргумент {} можно использовать только с {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Usage" xml:space="preserve">
+    <value>Использование: {} {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Command" xml:space="preserve">
+    <value>команда</value>
+  </data>
+  <data name="WSLCCLI_Options" xml:space="preserve">
+    <value>параметры</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
+    <value>Доступны следующие псевдонимы команд.</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
+    <value>Применимы следующие команды:</value>
+  </data>
+  <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
+    <value>Доступны следующие подкоманды:</value>
+  </data>
+  <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
+    <value>Доступны следующие опции:</value>
+  </data>
+  <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
+    <value>Доступны следующие аргументы:</value>
+  </data>
+  <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
+    <value>Для более подробной информации о конкретной команде передайте ей аргумент справки.</value>
+  </data>
+  <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
+    <value>Имя аргумента не распознано для текущей команды: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
+    <value>Для выполнения этой команды требуются права администратора.</value>
+  </data>
+  <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
+    <value>Укажите сеанс для использования</value>
+  </data>
+  <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
+    <value>Присоединение к stdout/stderr контейнера</value>
+  </data>
+  <data name="WSLCCLI_InteractiveArgDescription" xml:space="preserve">
+    <value>Подключиться к stdin и оставить его открытым</value>
+  </data>
+  <data name="WSLCCLI_PortArgDescription" xml:space="preserve">
+    <value>Укажите порт для использования</value>
+  </data>
+  <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
+    <value>ИД контейнера</value>
+  </data>
+  <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
+    <value>Отсутствует значение аргумента: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
+    <value>Псевдоним аргумента не был распознан для текущей команды: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
+     <value>Неверный указатель аргумента: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
+     <value>Псевдоним присоединенного флага не найден: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
+     <value>Присоединенный псевдоним не является флагом: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
+     <value>Неверный указатель аргумента: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
+     <value>Аргумент флага не может содержать присоединенное значение: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
+     <value>Найден позиционный аргумент, когда не ожидалось: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
+     <value>Отсутствует имя аргумента в: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
+     <value>Не удалось разрешить переданные аргументы, начиная с аргумента: '{}'</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
+     <value>Обнаружен недопустимый дополнительный аргумент: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
+     <value>Аргументы псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>(c) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
+Сведения о конфиденциальности этого продукта см. на странице https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
+  </data>
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
+    <value>Недопустимое изображение: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidFilter" xml:space="preserve">
+    <value>Недопустимый фильтр: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidName" xml:space="preserve">
+    <value>Недопустимое имя: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePathNotAbsolute" xml:space="preserve">
+    <value>Путь не является абсолютным: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
+    <value>Том не найден: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImageNotFound" xml:space="preserve">
+    <value>Изображение "{}" не найдено.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
+    <value>Отсутствует обязательный параметр: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeOption" xml:space="preserve">
+    <value>Недопустимое значение варианта "{}": "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnknownVolumeOption" xml:space="preserve">
+    <value>Неизвестный вариант: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
+    <value>Неподдерживаемый тип тома: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
+    <value>неподдерживаемые параметры драйвера тома: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
+    <value>Том "{}" используется.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkNotFound" xml:space="preserve">
+    <value>Сеть не найдена: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
+    <value>Неподдерживаемый сетевой драйвер: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkInUse" xml:space="preserve">
+    <value>Сеть "{}" содержит активные конечные точки.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
+    <value>Сеть "{}" уже существует.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Неподдерживаемый сетевой режим: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
+    <value>Дублирующаяся сеть: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Параметры конечной точки пока не поддерживаются (сеть "{}").</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
+    <value>Не удалось создать том '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcPortInUse" xml:space="preserve">
+    <value>Порт {} уже используется, не удается запустить контейнер {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>Найдены оба файла: Dockerfile и Containerfile. Используйте -f для выбора файла</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Не удалось открыть "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportPipeNotSupported" xml:space="preserve">
+    <value>Импорт из канала не поддерживается. Перенаправьте stdin из файла.</value>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>Containerfile или Dockerfile не найдены в '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
+    <value>Сеанс WSLC не найден в "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Недопустимый формат тега изображения: "{}". Ожидаемый формат: "имя:тег"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Выполняется сохранение.</value>
+  </data>
+  <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
+    <value>WSLC — это инструмент интерфейса командной строки для контейнеров подсистемы Windows для Linux.</value>
+    <comment>{Locked="WSLC"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RootCommandLongDesc" xml:space="preserve">
+    <value>WSLC — это инструмент интерфейса командной строки для контейнеров подсистемы Windows для Linux. Он позволяет управлять и взаимодействовать с контейнерами WSL из командной строки.</value>
+    <comment>{Locked="WSLC"}{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCommandDesc" xml:space="preserve">
+    <value>Управление контейнерами.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCommandLongDesc" xml:space="preserve">
+    <value>Управляйте жизненным циклом контейнеров WSL: создавайте, запускайте, останавливайте и удаляйте их.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
+    <value>Подключить к контейнеру.</value>
+  </data>
+  <data name="WSLCCLI_ContainerAttachLongDesc" xml:space="preserve">
+    <value>Подключается к контейнеру.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCreateDesc" xml:space="preserve">
+    <value>Создать контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCreateLongDesc" xml:space="preserve">
+    <value>Создает контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecDesc" xml:space="preserve">
+    <value>Выполнить команду в запущенном контейнере.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
+    <value>Выполняет команду в запущенном контейнере.</value>
+  </data>
+  <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
+    <value>Проверить контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerInspectLongDesc" xml:space="preserve">
+    <value>Отобразить подробную информацию о контейнере.</value>
+  </data>
+  <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
+    <value>Удалить контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
+    <value>Удаляет контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
+    <value>Список контейнеров.</value>
+  </data>
+  <data name="WSLCCLI_ContainerListLongDesc" xml:space="preserve">
+    <value>Отображает список контейнеров. По умолчанию отображаются только запущенные контейнеры; используйте параметр --all чтобы включить все контейнеры.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerLogsDesc" xml:space="preserve">
+    <value>Просмотр журналов контейнера.</value>
+  </data>
+  <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
+    <value>Просмотр журналов контейнера.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Удалить все остановленные контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Удаляет все остановленные контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Объем освобожденной памяти: {:.2f} МБ</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
+    <value>Удалить контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
+    <value>Удаляет контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
+    <value>Запустить контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
+    <value>Запускает контейнер. По умолчанию контейнер запускается на переднем плане; Используйте --detach для работы в фоновом режиме.</value>
+    <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
+    <value>Запустить контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
+    <value>Запускает контейнер.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsDesc" xml:space="preserve">
+    <value>Показывать статистику использования ресурсов контейнера.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStatsLongDesc" xml:space="preserve">
+    <value>Показать моментальный снимок использования ресурсов работающего контейнера: CPU, память, сетевой ввод-вывод, блочный ввод-вывод и идентификаторы процессов.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
+    <value>Остановить контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
+    <value>Останавливает контейнеры.</value>
+  </data>
+  <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
+    <value>Управление образами.</value>
+  </data>
+  <data name="WSLCCLI_ImageCommandLongDesc" xml:space="preserve">
+    <value>Управляйте образами контейнеров: создавайте, загружайте, просматривайте и удаляйте их.</value>
+  </data>
+  <data name="WSLCCLI_ImageBuildDesc" xml:space="preserve">
+    <value>Создать образ из Dockerfile.</value>
+    <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageBuildLongDesc" xml:space="preserve">
+    <value>Создает образ из Dockerfile и каталога контекста сборки.</value>
+    <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageInspectDesc" xml:space="preserve">
+    <value>Проверить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
+    <value>Проверить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Импортировать образ из tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Импортирует содержимое tarball для создания образа файловой системы. При необходимости можно присвоить образу имя репозитория и тег.</value>
+  </data>
+  <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
+    <value>Список изображений.</value>
+  </data>
+  <data name="WSLCCLI_ImageListLongDesc" xml:space="preserve">
+    <value>Показать список изображений.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadDesc" xml:space="preserve">
+    <value>Загрузить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
+    <value>Загружает образы.</value>
+  </data>
+  <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
+    <value>Извлечь образы.</value>
+  </data>
+  <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
+    <value>Извлекает образы.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
+    <value>Удалить все неиспользуемые образы, а не только непривязанные.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
+    <value>Удалено: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
+    <value>Удаление неиспользуемых изображений.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
+    <value>Удаляет все непривязанные образы. Если аргумент --all указан, все образы, не используемые ни одним контейнером, будут удалены.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
+    <value>Объем освобожденной памяти: {:.2f} МБ</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
+    <value>Без тега: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
+    <value>Загрузить образ в реестр.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
+    <value>Загрузить образ в реестр.</value>
+  </data>
+  <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
+    <value>Удалить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageRemoveLongDesc" xml:space="preserve">
+    <value>Удаляет образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveDesc" xml:space="preserve">
+    <value>Сохранить образы.</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
+    <value>Сохраняет образы.</value>
+  </data>
+  <data name="WSLCCLI_LoginDesc" xml:space="preserve">
+    <value>Войти в реестр.</value>
+  </data>
+  <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
+    <value>Войдите в реестр. Если сервер не указан, значение по умолчанию определяется сеансом.</value>
+  </data>
+  <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
+    <value>Выйти из реестра.</value>
+  </data>
+  <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
+    <value>Выход из реестра. Если сервер не указан, значение по умолчанию определяется сеансом.</value>
+  </data>
+  <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
+    <value>Вход выполнен</value>
+  </data>
+  <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
+    <value>Удаление учетных данных для входа в {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
+    <value>Вход в {} не выполнен</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
+    <value>Не удалось проанализировать файл учетных данных "{}": возможно, файл поврежден.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
+    <value>Не удалось записать "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
+    <value>Сервер</value>
+  </data>
+  <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
+    <value>Имя пользователя</value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
+    <value>Пароль или личный маркер доступа (PAT)</value>
+    <comment>{Locked="PAT"}Acronym should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
+    <value>Получите пароль или личный маркер доступа (PAT) из stdin</value>
+    <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
+    <value>--password и --password-stdin являются взаимоисключающими</value>
+    <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
+    <value>Необходимо указать --username вместе с --password-stdin</value>
+    <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
+    <value>Имя пользователя: </value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
+    <value>Пароль: </value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
+    <value>Управление учетными данными реестра.</value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
+    <value>Управляйте учетными данными реестра, включая вход и выход из реестров контейнеров.</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Системные команды</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Системные команды управления.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Добавьте тег к изображению.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Добавляет тег к изображению.</value>
+  </data>
+  <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
+    <value>Управление сеансами.</value>
+  </data>
+  <data name="WSLCCLI_SessionCommandLongDesc" xml:space="preserve">
+    <value>Управляйте сеансами контейнеров WSL: просматривайте активные сеансы и запускайте интерактивные оболочки.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionListDesc" xml:space="preserve">
+    <value>Список сеансов.</value>
+  </data>
+  <data name="WSLCCLI_SessionListLongDesc" xml:space="preserve">
+    <value>Отображает список активных сеансов.</value>
+  </data>
+  <data name="WSLCCLI_SessionShellDesc" xml:space="preserve">
+    <value>Подключить к сеансу.</value>
+  </data>
+  <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
+    <value>Подключается к активному сеансу. Если идентификатор сеанса не указан, используется сеанс по умолчанию wslc.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
+    <value>Завершить сеанс.</value>
+  </data>
+  <data name="WSLCCLI_SessionTerminateLongDesc" xml:space="preserve">
+    <value>Завершает активный сеанс. Если сеанс не указан, будет завершен сеанс по умолчанию.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterDesc" xml:space="preserve">
+    <value>Войти во временный сеанс.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterLongDesc" xml:space="preserve">
+    <value>Создаёт непостоянный сеанс с указанным путем к хранилищу и открывает в нем оболочку. Сеанс удаляется при завершении работы оболочки. Если имя не указано, генерируется GUID и выводится в stderr.</value>
+    <comment>{Locked="GUID"}{Locked="stderr"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionEnterNameArgDescription" xml:space="preserve">
+    <value>Имя сеанса. Если этот параметр не указан, GUID создается.</value>
+    <comment>{Locked="GUID"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SettingsCommandDesc" xml:space="preserve">
+    <value>Открыть файл параметров в редакторе по умолчанию.</value>
+  </data>
+  <data name="WSLCCLI_SettingsCommandLongDesc" xml:space="preserve">
+    <value>Открытие wslc параметров пользователя в редакторе по умолчанию для .yaml файлов.
+При первом запуске создает файл со всеми параметрами, заданным по умолчанию.</value>
+    <comment>{Locked="wslc"}{Locked=".yaml"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SettingsResetDesc" xml:space="preserve">
+    <value>Сбросить настройки к встроенным значениям по умолчанию.</value>
+  </data>
+  <data name="WSLCCLI_SettingsResetLongDesc" xml:space="preserve">
+    <value>Перезаписывает файл настроек шаблоном по умолчанию с комментариями.</value>
+  </data>
+  <data name="WSLCCLI_SettingsResetConfirm" xml:space="preserve">
+    <value>Параметры сброшены к значениям по умолчанию.</value>
+  </data>
+  <data name="WSLCCLI_VersionDesc" xml:space="preserve">
+    <value>Отображение сведений о версии.</value>
+  </data>
+  <data name="WSLCCLI_VersionLongDesc" xml:space="preserve">
+    <value>Показать информацию о версии этого инструмента.</value>
+  </data>
+  <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
+    <value>Показать все, независимо от состояния.</value>
+  </data>
+  <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
+    <value>Задать переменные времени сборки (KEY=VALUE)</value>
+    <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
+    <value>Всегда пытайтесь загрузить более новую версию образа</value>
+  </data>
+  <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
+    <value>Настройка целевой стадии сборки для сборки</value>
+  </data>
+  <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
+    <value>Команда для выполнения</value>
+  </data>
+  <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
+    <value>Удалить контейнеры, даже если они запущены</value>
+  </data>
+  <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
+    <value>Запустить контейнер в отсоединённом режиме.</value>
+  </data>
+  <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
+    <value>Указывает исполняемый файл процесса инициализации контейнера.</value>
+  </data>
+  <data name="WSLCCLI_EnvArgDescription" xml:space="preserve">
+    <value>Пары Key=Value для переменных среды</value>
+    <comment>{Locked="Key=Value"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EnvFileArgDescription" xml:space="preserve">
+    <value>Файл с парами key=value переменных env.</value>
+    <comment>{Locked="key=value"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FileArgDescription" xml:space="preserve">
+    <value>Путь к Dockerfile (используйте "-" для чтения из stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FilterArgDescription" xml:space="preserve">
+    <value>Отфильтровать вывод по заданным условиям</value>
+  </data>
+  <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
+    <value>Недопустимый аргумент "{}" для '-f, флаг --filter': неправильный формат фильтра (ожидается имя=значение)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+  <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
+    <value>Отслеживать вывод журнала.</value>
+  </data>
+  <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
+    <value>Формат вывода (json или table) (по умолчанию: table)</value>
+    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
+    <value>Аргументы для передачи процессу инициализации контейнера.</value>
+  </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Недопустимое значение {}: "{}". Поддерживается только "all".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
+    <value>Удалять образы, даже если они используются</value>
+  </data>
+  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
+    <value>Имя образа</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>Файл или -, чтобы читать из stdin</value>
+  </data>
+  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
+    <value>Указывает путь к tar-архиву с образом</value>
+  </data>
+  <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
+    <value>Настройка метаданных для объекта</value>
+  </data>
+  <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
+    <value>Ключ метки не может быть пустым</value>
+  </data>
+  <data name="WSLCCLI_LastArgDescription" xml:space="preserve">
+    <value>Показать n последних созданных контейнеров (включая все состояния)</value>
+  </data>
+  <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
+    <value>Показать последний созданный контейнер (включая все состояния)</value>
+  </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Имя узла контейнера</value>
+  </data>
+  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
+    <value>Имя контейнера</value>
+  </data>
+  <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
+    <value>Не использовать кэш при сборке образа</value>
+  </data>
+  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
+    <value>Не удаляйте родительские файлы без тега</value>
+  </data>
+  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
+    <value>Не обрезайте вывод</value>
+  </data>
+  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
+    <value>Путь к сохранённому образу.</value>
+  </data>
+  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
+    <value>Путь к каталогу контекста сборки</value>
+  </data>
+  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
+    <value>Опубликовать порт из контейнера на узел</value>
+  </data>
+  <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
+    <value>Опубликовать все раскрытые порты на случайных портах узла</value>
+  </data>
+  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
+    <value>Выводит только идентификаторы контейнеров</value>
+  </data>
+  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
+    <value>Удалить контейнер после его остановки</value>
+  </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Сигнал для остановки контейнера</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Размер /dev/shm (например, 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
+    <value>ИД сеанса</value>
+  </data>
+  <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
+    <value>Путь к хранилищу сеанса</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Сигнал для отправки</value>
+  </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>Текущая или существующая ссылка на изображение в формате image-name[:tag]</value>
+  </data>
+  <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
+    <value>Тег для созданного образа</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Число строк, отображаемых с конца журналов</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Показывать метки времени в выводе журнала</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Показать журналы с метки времени (например, секунды эпохи Unix)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Показать журналы до метки времени (например, секунды эпохи Unix)</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>Новая ссылка на изображение в формате image-name[:tag]</value>
+  </data>
+  <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
+    <value>Время ожидания в секундах перед выполнением (по умолчанию 5).</value>
+  </data>
+  <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
+    <value>Открыть TTY с процессом контейнера.</value>
+    <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VerboseArgDescription" xml:space="preserve">
+    <value>Вывести подробные данные</value>
+  </data>
+  <data name="WSLCCLI_VersionArgDescription" xml:space="preserve">
+    <value>Показать информацию о версии этого инструмента</value>
+  </data>
+  <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
+    <value>Привязать том к контейнеру.</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
+    <value>Рабочий каталог внутри контейнера</value>
+  </data>
+  <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
+    <value>Записать идентификатор контейнера по указанному пути</value>
+  </data>
+  <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
+    <value>IP-адрес сервера доменных имен DNS в resolv.conf</value>
+    <comment>{Locked="resolv.conf"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSDomainArgDescription" xml:space="preserve">
+    <value>Установить домен DNS по умолчанию</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSOptionArgDescription" xml:space="preserve">
+    <value>Настройка параметров DNS</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSSearchArgDescription" xml:space="preserve">
+    <value>Настройка доменов поиска DNS</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
+    <value>Доменное имя контейнера</value>
+  </data>
+  <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
+    <value>Идентификатор группы процесса</value>
+  </data>
+  <data name="WSLCCLI_NoDNSArgDescription" xml:space="preserve">
+    <value>Конфигурация DNS в контейнере отсутствует.</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
+    <value>Тип прогресса (формат: none|ansi) (по умолчанию: ansi)</value>
+    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
+    <value>Политика извлечения образов (always|missing|never) (по умолчанию: never).</value>
+    <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
+    <value>Использовать эту схему для подключения к реестру.</value>
+  </data>
+  <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
+    <value>Подключить tmpfs к контейнеру по указанному пути</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
+    <value>Идентификатор пользователя для процесса (name|uid|uid:gid)</value>
+    <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
+    <value>Предоставить контейнеру возможности виртуализации</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
+    <value>Аргументы для передачи команде, выполняемой внутри контейнера</value>
+  </data>
+  <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
+    <value>Показать подробные сведения о перечисленных сеансах.</value>
+  </data>
+  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
+    <value>Указан недопустимый тип формата. Поддерживаемые типы формата: json, table.</value>
+    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
+    <value>Недопустимое значение {}: {} не является распознанным типом проверки. Поддерживаемые типы проверки: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
+    <value>Недопустимое значение {}: {} не является распознанным именем или номером сигнала (пример: SIGKILL, kill или 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Недопустимое значение аргумента {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
+    <value>Недопустимое значение {} {} находится за пределами допустимого диапазона ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Недопустимое значение аргумента {}: "{}". Ожидается объем памяти (например, 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID-файл "{}" уже существует</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
+    <value>Образ '{}' не найден, выполняется загрузка</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
+    <value>Ключ переменной среды не может быть пустым</value>
+  </data>
+  <data name="WSLCCLI_EnvKeyWhitespaceError" xml:space="preserve">
+    <value>Ключ переменной среды "{}" не может содержать пробелы</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
+    <value>Запрошена загрузка, но входные данные не предоставлены.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Управление сетями.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>Управляйте жизненным циклом сетей WSL, включая их создание, проверку, вывод списка и удаление.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Создать сеть.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Создает новую сеть.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Укажите имя сетевого драйвера (по умолчанию: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Параметр сетевых метаданных</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Удалите одну или несколько сетей.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Удаляет одну или несколько сетей.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>Отобразить подробные сведения об одной или нескольких сетях.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>Отобразить подробные сведения об одной или нескольких сетях.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>Перечислить сети.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Перечислить все сети в сеансе.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Сетевое имя</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Выводит только сетевые имена</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
+    <value>Управление томами.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
+    <value>Управляйте жизненным циклом томов WSL: создавайте, проверяйте, перечисляйте и удаляйте их.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
+    <value>Создать том.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
+    <value>Создает именованный том, который можно подключить к контейнерам.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
+    <value>Удалить один или несколько томов.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
+    <value>Удаляет один или несколько томов. Том нельзя удалить, если он используется контейнером.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
+    <value>Отобразить подробную информацию об одном или нескольких томах.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectLongDesc" xml:space="preserve">
+    <value>Отобразить подробную информацию об одном или нескольких томах.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
+    <value>Список томов.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
+    <value>Перечислить все тома в сеансе.</value>
+  </data>
+  <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
+    <value>Имя тома</value>
+  </data>
+  <data name="WSLCCLI_DriverOptionDescription" xml:space="preserve">
+    <value>Укажите имя драйвера тома, например, 'guest' или 'vhd' (по умолчанию: guest)</value>
+    <comment>{Locked="guest"}{Locked="vhd"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
+    <value>Настройка параметров драйвера</value>
+  </data>
+  <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
+    <value>Вывести только имена томов</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
+    <value>Невозможно записать образ в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
+  </data>
+  <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
+    <value>Ожидаемый формат: host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <comment>Usage string for volume mount specification.</comment>
+  </data>
+  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
+    <value>Недопустимые спецификации тома: "{}". {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
+    <value>Недопустимые спецификации тома: "{}". Путь к узлу не может быть пустым. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
+    <value>Недопустимые спецификации тома: "{}". Путь контейнера не может быть пустым. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
+    <value>Недопустимые спецификации тома: "{}". Путь к контейнеру должен быть абсолютным (начинаться с "/"). {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
+    <value>Недопустимые спецификации тома: "{}". Путь к узлу "{}" не является допустимым путем Windows.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
+    <value>Имя или идентификатор объекта любого типа.</value>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>Тип объекта для проверки</value>
+  </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Проверка объектов.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Проверка объектов.</value>
+  </data>
+  <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
+    <value>Объект не найден: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TableHeaderContainerId" xml:space="preserve">
+    <value>ИД КОНТЕЙНЕРА</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
+    <value>ИМЯ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
+    <value>ОБРАЗ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
+    <value>СОЗДАНО</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderStatus" xml:space="preserve">
+    <value>СТАТУС</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
+    <value>ПОРТЫ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
+    <value>ЦП %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemUsageLimit" xml:space="preserve">
+    <value>ИСПОЛЬЗОВАНИЕ / ЛИМИТ ПАМ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderMemPercent" xml:space="preserve">
+    <value>ПАМ %</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetIo" xml:space="preserve">
+    <value>СЕТЬ ВВОД-ВЫВОД</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderBlockIo" xml:space="preserve">
+    <value>БЛОЧНЫЙ ВВОД-ВЫВОД</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
+    <value>Предупреждение: недопустимое значение параметра "{}" в {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
+    <value>Предупреждение: недопустимый тип для параметра "{}" в {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
+    <value>Предупреждение: нестроковый ключ в разделе "{}" в {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
+    <value>Предупреждение: неизвестный раздел параметров "{}" в {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
+    <value>Предупреждение: неизвестный параметр "{}" в {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
+    <value>Предупреждение: не удалось открыть файл параметров в {}. Ошибка: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_ParseError" xml:space="preserve">
+    <value>Внимание! Не удалось проанализировать файл параметров в {}. Ошибка: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
+    <value>Предупреждение: файл параметров в {} пуст или имеет недопустимую структуру. Ожидается сопоставление YAML.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>Не удалось восстановить контейнер "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>Не удалось восстановить сеть "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>Не удалось восстановить том "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>Не удалось инициализировать переключение</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>Не удалось восстановить метку времени для контейнера "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>Не удалось проанализировать ход импорта образа</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>Не удалось отключить том "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>Не удалось остановить контейнер '{}' после отклонения подключаемого модуля</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>Не удалось освободить ресурсы узла для тома "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

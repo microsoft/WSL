@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName><!-- _locComment_text='{Locked="WSL"}' -->WSL</displayName>
+  <description><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
+
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir el Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Cuando se configura como deshabilitada, esta directiva no permite el acceso a las distribuciones de Linux en ejecución en Windows Subsystem for Linux en todos los usuarios del equipo.</string>
+
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir la versión incluida de Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la versión incluida (componente opcional) del Windows Subsystem for Linux. Si esta directiva está deshabilitada, solo se puede usar la versión de WSL disponible en la Store.</string>
+
+        <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Permitir WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita WSL1. Cuando se deshabilita, solo se pueden usar distribuciones de WSL2.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Permitir la configuración personalizada del kernel</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración personalizada del kernel a través de .wslconfig (wsl2.kernel). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Permitir la configuración personalizada de la distribución del sistema</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración personalizada de la distribución del sistema a través de .wslconfig (wsl2.systemDistro). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Permitir la configuración de la línea de comandos del kernel</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración de la línea de comandos del kernel a través de .wslconfig (wsl2.kernelCommandLine). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="AllowDebugShell">Permitir el shell de depuración</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita el shell de depuración (wsl.exe --debug-shell). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Permitir la virtualización anidada</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración de la virtualización anidada a través de .wslconfig (wsl2.nestedVirtualization). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Permitir depuración del kernel</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración de depuración del kernel mediante .wslconfig (wsl2.kernelDebugPort). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Permitir configuración de red personalizada</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración de red personalizada a través de .wslconfig (wsl2.networkingMode). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Permitir que el usuario configure el firewall</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Cuando se establece en deshabilitada, esta directiva deshabilita la configuración personalizada del firewall a través de .wslconfig (wsl2.firewall). Esta directiva solo se aplica al Store WSL.</string>
+
+        <string id="AllowDiskMount">Permitir montaje directo de disco</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Configurar el modo de red predeterminado</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment_text='{Locked="WSL2"}' -->Esta directiva especifica el modo de red predeterminado que se usará para WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+
+        <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Contenedor WSL</string>
+
+        <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Permitir contenedor WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Esta directiva controla si se puede usar el contenedor de WSL en esta máquina. Cuando está habilitada o no se configura, los usuarios y las aplicaciones de Windows pueden ejecutar contenedores de Linux a través de WSL. Cuando se configura como deshabilitada, el contenedor de WSL se bloquea para todos los usuarios y las aplicaciones de Windows no pueden ejecutar contenedores de Linux. Advertencia: configurar esta opción como "Disabled" puede interrumpir las aplicaciones de Windows que dependen de contenedores de Linux.</string>
+
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Lista de permitidos para registros de contenedor WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Cuando se habilita, el contenedor WSL solo podrá extraer imágenes de los registros que se enumeran aquí. Esto afecta tanto a la CLI del contenedor WSL como a todas las aplicaciones que usan la API del contenedor WSL.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Modo de red predeterminado</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Registros permitidos</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

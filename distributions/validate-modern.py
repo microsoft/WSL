@@ -391,7 +391,7 @@ def read_tar(node, file, elf_magic: str):
                 warning(node, f'file: "{path}" has unexpected gid: {info.gid} (expected: {gid})')
 
             if max_size is not None and info.size > max_size:
-                error(node, f'file: "{path}" is too big (info.size), max: {max_size}')
+                error(node, f'file: "{path}" is too big ({info.size}), max: {max_size}')
 
             if magic is not None or parse_method is not None:
                 content = tar.extractfile(real_path)
@@ -409,12 +409,12 @@ def read_tar(node, file, elf_magic: str):
             return True
 
         def validate_config(path: str, valid_keys: list):
-            _, path = get_tar_file(tar, path, follow_symlink=True)
-            if path is None:
-                error(node, f'File "{file}" not found in tar')
+            _, real_path = get_tar_file(tar, path, follow_symlink=True)
+            if real_path is None:
+                error(node, f'File "{path}" not found in tar')
                 return None
 
-            content = tar.extractfile(path)
+            content = tar.extractfile(real_path)
             config = configparser.ConfigParser()
             config.read_string(content.read().decode())
 

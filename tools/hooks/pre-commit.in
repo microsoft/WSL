@@ -13,7 +13,7 @@
 
 MODE="@WSL_PRE_COMMIT_MODE@"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-CLANG_FORMAT="$REPO_ROOT/tools/clang-format.exe"
+CLANG_FORMAT="@LLVM_INSTALL_DIR@/clang-format.exe"
 
 # --- Collect staged C/C++ source files ---
 STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cpp|cxx|h|hpp|hxx)$')

@@ -444,7 +444,7 @@ Return Value:
     constexpr auto Usage = std::bind(Localization::MessageWslPathUsage, Localization::Options::Default);
 
     parser.AddPositionalArgument(OriginalPath, 0);
-    parser.AddArgument(SetFlag<int, TRANSLATE_FLAG_ABSOLUTE>{Flags}, nullptr, TRANSLATE_MODE_ABSOLUTE);
+    parser.AddArgument(SetFlag<TRANSLATE_FLAG_ABSOLUTE, int>{Flags}, nullptr, TRANSLATE_MODE_ABSOLUTE);
     parser.AddArgument(UniqueSetValue<char, TRANSLATE_MODE_UNIX>{Mode, Usage}, nullptr, TRANSLATE_MODE_UNIX);
     parser.AddArgument(UniqueSetValue<char, TRANSLATE_MODE_WINDOWS>{Mode, Usage}, nullptr, TRANSLATE_MODE_WINDOWS);
     parser.AddArgument(UniqueSetValue<char, TRANSLATE_MODE_MIXED>{Mode, Usage}, nullptr, TRANSLATE_MODE_MIXED);

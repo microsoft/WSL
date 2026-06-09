@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.WSL.Containers</id>
+    <version>${WSL_NUGET_PACKAGE_VERSION}</version>
+    <authors>Microsoft</authors>
+    <projectUrl>https://github.com/microsoft/WSL</projectUrl>
+    <description>WSL Containers SDK (Preview - API subject to breaking changes)</description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <tags>WSL</tags>
+    <language>en-us</language>
+    <license type="expression">MIT</license>
+    <readme>docs\README.MD</readme>
+    <dependencies>
+      <group targetFramework="${WSL_NUGET_TARGET_FRAMEWORK}" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\WslcSDK\wslcsdk.h" target="include"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\${TARGET_PLATFORM}\${CMAKE_BUILD_TYPE}\Microsoft.WSL.Containers.winmd" target="winmd\Microsoft.WSL.Containers.winmd"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Containers\**" exclude="**\net\**"/>
+${NUGET_SDKCS_FILE}
+${NUGET_X64_RUNTIMES}
+${NUGET_ARM64_RUNTIMES}
+  </files>
+</package>

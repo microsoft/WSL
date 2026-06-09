@@ -223,12 +223,6 @@ private:
 
     bool IsDnsTunnelingSupported() const;
 
-    bool IsDisableVgpuSettingsSupported() const;
-
-    bool IsVirtioSerialConsoleSupported() const;
-
-    bool IsVmemmSuffixSupported() const;
-
     _Requires_lock_held_(m_lock)
     DiskMountResult MountDiskLockHeld(
         _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
@@ -283,7 +277,7 @@ private:
     wsl::core::Config m_vmConfig;
     std::wstring m_comPipe0;
     std::wstring m_comPipe1;
-    int m_coldDiscardShiftSize;
+    int m_pageReportingOrder;
     WslTraceLoggingClient m_traceClient;
     std::filesystem::path m_rootFsPath;
     std::filesystem::path m_tempPath;
@@ -294,6 +288,7 @@ private:
     bool m_tempDirectoryCreated;
     bool m_enableInboxGpuLibs;
     bool m_defaultKernel = true;
+    bool m_privateKernelModules = false;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
@@ -309,6 +304,9 @@ private:
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;
+    uint64_t m_hvPciSwiotlbBase = 0;
+    uint64_t m_hvPciSwiotlbSize = 0;
+    std::wstring m_swiotlbOption;
     std::wstring m_sharedMemoryRoot;
     std::filesystem::path m_installPath;
     std::wstring m_userProfile;
@@ -324,6 +322,10 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
+
+    // Job object that terminates child processes (wslhost.exe, wslrelay.exe)
+    // when the VM shuts down.
+    wil::unique_handle m_processJobObject;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);

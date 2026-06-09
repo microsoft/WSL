@@ -63,21 +63,31 @@ public:
     void SendResultMessage(TResult value);
 
     template <typename TMessage>
-    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveOrClosed(TTimeout timeout = DefaultSocketTimeout);
+    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveOrClosed();
 
     template <typename TMessage>
-    TMessage& Receive(gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout);
+    TMessage& Receive(gsl::span<gsl::byte>* responseSpan = nullptr);
 
 private:
-    Transaction(SocketChannel& channel, uint32_t id) :
-        m_channel(channel), m_id(id), m_step(static_cast<uint32_t>(TRANSACTION_STEP::REQUEST))
+    Transaction(SocketChannel& channel, uint32_t id, TTimeout timeout) :
+        m_channel(channel), m_id(id), m_step(static_cast<uint32_t>(TRANSACTION_STEP::REQUEST)), m_deadline(ComputeDeadline(timeout))
     {
     }
+
+    TTimeout RemainingTimeout() const;
+
+    static std::optional<std::chrono::steady_clock::time_point> ComputeDeadline(TTimeout timeout);
 
     SocketChannel& m_channel;
     uint32_t m_id;
     /** Use uint32_t as step can go beyond FIRST_REPLY */
     uint32_t m_step;
+    std::optional<std::chrono::steady_clock::time_point> m_deadline;
+
+#ifndef WIN32
+    // This is required because the Linux timeout logic requires a pointer. Returning a pointer is OK because only thread can use a transaction at a given time.
+    mutable timeval m_timeoutStorage{};
+#endif
 };
 
 class SocketChannel
@@ -99,7 +109,8 @@ public:
         m_socket = std::move(other.m_socket);
 
 #ifdef WIN32
-        m_exitEvent = std::move(other.m_exitEvent);
+        m_exitEvents = std::move(other.m_exitEvents);
+        m_pendingBytes = std::move(other.m_pendingBytes);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -109,22 +120,33 @@ public:
         return *this;
     }
 
-    // Note: 'name' must be a global string, since SocketChannel doesn't make a copy of it.
-    SocketChannel(TSocket&& socket, const char* name) : m_socket(std::move(socket)), m_name(name)
+    SocketChannel(TSocket&& socket, std::string&& name) : m_socket(std::move(socket)), m_name(std::move(name))
     {
     }
 
 #ifdef WIN32
 
-    SocketChannel(TSocket&& socket, const char* name, HANDLE exitEvent) :
-        m_socket(std::move(socket)), m_exitEvent(exitEvent), m_name(name)
+    SocketChannel(TSocket&& socket, std::string&& name, std::vector<HANDLE>&& exitEvents) :
+        m_socket(std::move(socket)), m_exitEvents(std::move(exitEvents)), m_name(std::move(name))
     {
+    }
+
+    std::vector<HANDLE> SetExitEvents(std::vector<HANDLE>&& exitEvents)
+    {
+        std::vector<HANDLE> oldEvents;
+        std::swap(oldEvents, m_exitEvents);
+        return oldEvents;
+    }
+
+    const std::vector<HANDLE>& GetExitEvents() const
+    {
+        return m_exitEvents;
     }
 
 #endif
 
     template <typename TMessage>
-    void SendMessage(gsl::span<gsl::byte> span, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0)
+    void SendMessage(gsl::span<gsl::byte> span, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0, TTimeout timeout = DefaultSocketTimeout)
     {
         // Ensure that no other thread is using this channel.
         const std::unique_lock<std::mutex> lock{m_sendMutex, std::try_to_lock};
@@ -133,7 +155,7 @@ public:
 
 #ifdef WIN32
 
-            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs, message type: %hs", m_name, ToString(TMessage::Type));
+            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs, message type: %hs", m_name.c_str(), ToString(TMessage::Type));
 
 #else
 
@@ -143,7 +165,7 @@ public:
 #endif
         }
 
-        THROW_INVALID_ARG_IF(m_name == nullptr || span.size() < sizeof(TMessage));
+        THROW_INVALID_ARG_IF(m_name.empty() || span.size() < sizeof(TMessage));
 
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
@@ -162,13 +184,15 @@ public:
 
 #ifdef WIN32
 
-        auto sentBytes = wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+        auto io = CreateIO();
+        io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
+
+        io.Run(TimeoutToMilliseconds(timeout));
 
         WSL_LOG(
             "SentMessage",
-            TraceLoggingValue(m_name, "Name"),
-            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"),
-            TraceLoggingValue(sentBytes, "SentBytes"));
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"));
 
 #else
 
@@ -200,21 +224,28 @@ public:
     }
 
     template <typename TMessage>
-    void SendMessage(TMessage& message, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0)
+    void SendMessage()
+    {
+        TMessage message;
+        SendMessage(message);
+    }
+
+    template <typename TMessage>
+    void SendMessage(TMessage& message, uint32_t transactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE), uint32_t transactionId = 0, TTimeout timeout = DefaultSocketTimeout)
     {
         // Catch situations where the other SendMessage() method should be used
         const auto& header = GetMessageHeader(message);
         if (header.MessageSize != sizeof(message))
         {
 #ifdef WIN32
-            THROW_HR_MSG(E_INVALIDARG, "Incorrect header size for message type: %u on channel: %hs", header.MessageType, m_name);
+            THROW_HR_MSG(E_INVALIDARG, "Incorrect header size for message type: %u on channel: %hs", header.MessageType, m_name.c_str());
 #else
             LOG_ERROR("Incorrect header size for message type: {} on channel: {}", header.MessageType, m_name);
             THROW_ERRNO(EINVAL);
 #endif
         }
 
-        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message), transactionStep, transactionId);
+        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message), transactionStep, transactionId, timeout);
     }
 
     template <typename TResult>
@@ -234,7 +265,7 @@ public:
         uint32_t expectedTransactionStep = static_cast<uint32_t>(TRANSACTION_STEP::NONE),
         uint32_t expectedTransactionId = 0)
     {
-        WI_ASSERT(m_name != nullptr);
+        WI_ASSERT(!m_name.empty());
 
         // Ensure that no other thread is using this channel.
         const std::unique_lock<std::mutex> lock{m_receiveMutex, std::try_to_lock};
@@ -243,7 +274,7 @@ public:
 
 #ifdef WIN32
 
-            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs", m_name);
+            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs", m_name.c_str());
 #else
 
             LOG_ERROR("Incorrect channel usage detected on channel: {}", m_name);
@@ -261,14 +292,19 @@ public:
                 m_received_non_transaction_messages++;
             }
 
-            receivedSpan = ReceiveImpl(TMessage::Type, timeout);
+            receivedSpan = ReceiveImpl(timeout);
             if (receivedSpan.empty())
             {
 
 #ifdef WIN32
                 if (errno == HCS_E_CONNECTION_TIMEOUT)
                 {
-                    THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %u, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
+                    THROW_HR_MSG(
+                        HCS_E_CONNECTION_TIMEOUT,
+                        "Timeout: %u, expected type: %hs, channel: %hs",
+                        timeout,
+                        ToString(TMessage::Type),
+                        m_name.c_str());
                 }
 #endif
 
@@ -279,7 +315,7 @@ public:
             if (header == nullptr)
             {
 #ifdef WIN32
-                THROW_HR_MSG(E_UNEXPECTED, "Message too small for header: %zd, channel: %hs", receivedSpan.size(), m_name);
+                THROW_HR_MSG(E_UNEXPECTED, "Message too small for header: %zd, channel: %hs", receivedSpan.size(), m_name.c_str());
 #else
                 LOG_ERROR("Message too small for header: {}, channel: {}", receivedSpan.size(), m_name);
                 THROW_ERRNO(EINVAL);
@@ -297,7 +333,7 @@ public:
                         THROW_HR_MSG(
                             E_UNEXPECTED,
                             "Unexpected transaction message received on non-transaction channel: %hs, message type: %hs",
-                            m_name,
+                            m_name.c_str(),
                             ToString(header->MessageType));
 #else
                         LOG_ERROR(
@@ -315,7 +351,7 @@ public:
                             "Unexpected non-transaction message id: %u, expected: %u, channel: %hs",
                             header->TransactionId,
                             m_received_non_transaction_messages,
-                            m_name);
+                            m_name.c_str());
 #else
                         LOG_ERROR("Unexpected non-transaction message id: {}, expected: {}, channel: {}", header->TransactionId, m_received_non_transaction_messages, m_name);
                         THROW_ERRNO(EINVAL);
@@ -332,7 +368,7 @@ public:
 #ifdef WIN32
                 WSL_LOG(
                     "DiscardStaleNonTransactionMessage",
-                    TraceLoggingValue(m_name, "Name"),
+                    TraceLoggingValue(m_name.c_str(), "Name"),
                     TraceLoggingValue(ToString(header->MessageType), "MessageType"),
                     TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                     TraceLoggingValue(header->TransactionId, "StaleNonTransactionId"),
@@ -358,7 +394,7 @@ public:
 #ifdef WIN32
                     WSL_LOG(
                         "DiscardOutOfOrderTransactionMessage",
-                        TraceLoggingValue(m_name, "Name"),
+                        TraceLoggingValue(m_name.c_str(), "Name"),
                         TraceLoggingValue(ToString(header->MessageType), "MessageType"),
                         TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                         TraceLoggingValue(header->TransactionStep, "StaleTransactionStep"),
@@ -385,7 +421,7 @@ public:
 #ifdef WIN32
                 WSL_LOG(
                     "DiscardStaleTransactionMessage",
-                    TraceLoggingValue(m_name, "Name"),
+                    TraceLoggingValue(m_name.c_str(), "Name"),
                     TraceLoggingValue(ToString(header->MessageType), "MessageType"),
                     TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                     TraceLoggingValue(header->TransactionId, "StaleTransactionId"),
@@ -407,7 +443,12 @@ public:
             {
                 // Message is from the future.
 #ifdef WIN32
-                THROW_HR_MSG(E_UNEXPECTED, "Unexpected transaction message id: %u, expected: %u, channel: %hs", header->TransactionId, expectedTransactionId, m_name);
+                THROW_HR_MSG(
+                    E_UNEXPECTED,
+                    "Unexpected transaction message id: %u, expected: %u, channel: %hs",
+                    header->TransactionId,
+                    expectedTransactionId,
+                    m_name.c_str());
 #else
                 LOG_ERROR("Unexpected transaction message id: {}, expected: {}, channel: {}", header->TransactionId, expectedTransactionId, m_name);
                 THROW_ERRNO(EINVAL);
@@ -418,7 +459,12 @@ public:
             {
                 // Broken transaction.
 #ifdef WIN32
-                THROW_HR_MSG(E_UNEXPECTED, "Unexpected transaction message step: %u, expected: %u, channel: %hs", header->TransactionStep, expectedTransactionStep, m_name);
+                THROW_HR_MSG(
+                    E_UNEXPECTED,
+                    "Unexpected transaction message step: %u, expected: %u, channel: %hs",
+                    header->TransactionStep,
+                    expectedTransactionStep,
+                    m_name.c_str());
 #else
                 LOG_ERROR("Unexpected transaction message step: {}, expected: {}, channel: {}", header->TransactionStep, expectedTransactionStep, m_name);
                 THROW_ERRNO(EINVAL);
@@ -434,7 +480,11 @@ public:
         {
 #ifdef WIN32
             THROW_HR_MSG(
-                E_UNEXPECTED, "Message size is too small: %zd, expected type: %hs, channel: %hs", receivedSpan.size(), ToString(TMessage::Type), m_name);
+                E_UNEXPECTED,
+                "Message size is too small: %zd, expected type: %hs, channel: %hs",
+                receivedSpan.size(),
+                ToString(TMessage::Type),
+                m_name.c_str());
 #else
             LOG_ERROR("MessageSize is too small: {}, expected type: {}, channel: {}", receivedSpan.size(), ToString(TMessage::Type), m_name);
             THROW_ERRNO(EINVAL);
@@ -445,7 +495,9 @@ public:
 
 #ifdef WIN32
         WSL_LOG(
-            "ReceivedMessage", TraceLoggingValue(m_name, "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
+            "ReceivedMessage",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
 #else
         if (LoggingEnabled())
         {
@@ -466,7 +518,7 @@ public:
         if (message == nullptr)
         {
 #ifdef WIN32
-            THROW_HR_MSG(E_UNEXPECTED, "Expected message %hs, but socket %hs was closed", ToString(TMessage::Type), m_name);
+            THROW_HR_MSG(E_UNEXPECTED, "Expected message %hs, but socket %hs was closed", ToString(TMessage::Type), m_name.c_str());
 #else
             LOG_ERROR("ExpectedMessage {}, but socket {} was closed", ToString(TMessage::Type), m_name);
             THROW_ERRNO(EINVAL);
@@ -481,24 +533,24 @@ public:
         return *message;
     }
 
-    Transaction StartTransaction()
+    Transaction StartTransaction(TTimeout timeout = DefaultSocketTimeout)
     {
         uint32_t transactionId = m_transaction_id_seed++;
-        return wsl::shared::Transaction(*this, transactionId);
+        return wsl::shared::Transaction(*this, transactionId, timeout);
     }
 
-    Transaction ReceiveTransaction()
+    Transaction ReceiveTransaction(TTimeout timeout = DefaultSocketTimeout)
     {
         // Transaction id should follow the received one on the receive end.
-        return wsl::shared::Transaction(*this, 0);
+        return wsl::shared::Transaction(*this, 0, timeout);
     }
 
     template <typename TSentMessage>
     typename TSentMessage::TResponse& Transaction(gsl::span<gsl::byte> message, gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout)
     {
-        auto transaction = StartTransaction();
-        transaction.Send<TSentMessage>(message);
-        return transaction.Receive<typename TSentMessage::TResponse>(responseSpan, timeout);
+        auto transaction = StartTransaction(timeout);
+        transaction.template Send<TSentMessage>(message);
+        return transaction.template Receive<typename TSentMessage::TResponse>(responseSpan);
     }
 
     template <typename TSentMessage>
@@ -509,6 +561,15 @@ public:
         return Transaction<TSentMessage>(gslhelpers::struct_as_writeable_bytes(message), responseSpan, timeout);
     }
 
+    template <typename TSentMessage>
+    TSentMessage::TResponse& Transaction(TTimeout timeout = DefaultSocketTimeout)
+    {
+        TSentMessage message{};
+        message.Header.MessageSize = sizeof(message);
+        message.Header.MessageType = TSentMessage::Type;
+        return Transaction<TSentMessage>(message, nullptr, timeout);
+    }
+
     void Close()
     {
         m_socket.reset();
@@ -517,6 +578,16 @@ public:
     auto Socket() const
     {
         return m_socket.get();
+    }
+
+    auto Release()
+    {
+        return std::move(m_socket);
+    }
+
+    bool Connected() const
+    {
+        return m_socket.get() >= 0;
     }
 
     void IgnoreSequenceNumbers()
@@ -535,15 +606,48 @@ public:
 
 private:
 #ifdef WIN32
-
-    gsl::span<gsl::byte> ReceiveImpl(auto expectedMessage, TTimeout timeout)
+    windows::common::io::MultiHandleWait CreateIO() const
     {
-        return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, m_exitEvent, timeout);
+        wsl::windows::common::io::MultiHandleWait io;
+
+        for (const auto event : m_exitEvents)
+        {
+            io.AddHandle(
+                std::make_unique<windows::common::io::EventHandle>(
+                    event,
+                    [this, event]() { THROW_HR_MSG(E_ABORT, "Exit event 0x%p signaled on channel: %hs", event, m_name.c_str()); }),
+                windows::common::io::MultiHandleWait::CancelOnCompleted | windows::common::io::MultiHandleWait::NeedNotComplete);
+        }
+
+        return io;
+    }
+
+    static std::optional<std::chrono::milliseconds> TimeoutToMilliseconds(TTimeout timeout)
+    {
+        if (timeout == INFINITE)
+        {
+            return std::nullopt;
+        }
+
+        return std::chrono::milliseconds{timeout};
+    }
+
+    gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
+    {
+        auto io = CreateIO();
+
+        gsl::span<gsl::byte> message;
+        io.AddHandle(std::make_unique<windows::common::io::ReadSocketMessageHandle>(
+            m_socket.get(), m_buffer, m_pendingBytes, [&message](auto& received) { message = received; }));
+
+        io.Run(TimeoutToMilliseconds(timeout));
+
+        return message;
     }
 
 #else
 
-    gsl::span<gsl::byte> ReceiveImpl(auto expectedMessage, TTimeout timeout)
+    gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
     {
         return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, timeout);
     }
@@ -566,7 +670,7 @@ private:
                 header.TransactionId,
                 header.TransactionStep,
                 expected,
-                m_name);
+                m_name.c_str());
 #else
 
             LOG_ERROR(
@@ -618,22 +722,65 @@ private:
 
 #ifdef WIN32
 
-    HANDLE m_exitEvent{};
+    std::vector<HANDLE> m_exitEvents;
+    std::vector<gsl::byte> m_pendingBytes;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;
     uint32_t m_received_non_transaction_messages = 0;
     std::atomic<uint32_t> m_transaction_id_seed = 0;
     bool m_ignore_sequence = false;
-    const char* m_name{};
+    std::string m_name{};
     std::mutex m_sendMutex;
     std::mutex m_receiveMutex;
 };
 
+inline std::optional<std::chrono::steady_clock::time_point> Transaction::ComputeDeadline(TTimeout timeout)
+{
+#ifdef WIN32
+    if (timeout == INFINITE)
+    {
+        return std::nullopt;
+    }
+
+    return std::chrono::steady_clock::now() + std::chrono::milliseconds{timeout};
+#else
+    if (timeout == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    return std::chrono::steady_clock::now() + std::chrono::seconds{timeout->tv_sec} + std::chrono::microseconds{timeout->tv_usec};
+#endif
+}
+
+inline TTimeout Transaction::RemainingTimeout() const
+{
+    if (!m_deadline.has_value())
+    {
+        return DefaultSocketTimeout;
+    }
+
+#ifdef WIN32
+
+    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
+    return remaining.count() > 0 ? static_cast<DWORD>(remaining.count()) : 0;
+
+#else
+
+    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
+
+    m_timeoutStorage.tv_sec = static_cast<time_t>(remaining.count() / 1000);
+    m_timeoutStorage.tv_usec = static_cast<suseconds_t>((remaining.count() % 1000) * 1000);
+    return &m_timeoutStorage;
+
+#endif
+}
+
 template <typename TMessage>
 void Transaction::Send(gsl::span<gsl::byte> span)
 {
-    m_channel.SendMessage<TMessage>(span, m_step, m_id);
+    m_channel.SendMessage<TMessage>(span, m_step, m_id, RemainingTimeout());
     m_step++;
 }
 
@@ -655,9 +802,9 @@ void Transaction::SendResultMessage(TResult value)
 }
 
 template <typename TMessage>
-std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed(TTimeout timeout)
+std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed()
 {
-    auto result = m_channel.ReceiveMessageOrClosed<TMessage>(timeout, m_step, m_id);
+    auto result = m_channel.ReceiveMessageOrClosed<TMessage>(RemainingTimeout(), m_step, m_id);
     if (m_step == static_cast<uint32_t>(TRANSACTION_STEP::REQUEST) && result.first != nullptr)
     {
         // Use the request's id for the reply side transaction.
@@ -669,9 +816,9 @@ std::pair<TMessage*, gsl::span<gsl::byte>> Transaction::ReceiveOrClosed(TTimeout
 }
 
 template <typename TMessage>
-TMessage& Transaction::Receive(gsl::span<gsl::byte>* responseSpan, TTimeout timeout)
+TMessage& Transaction::Receive(gsl::span<gsl::byte>* responseSpan)
 {
-    auto& message = m_channel.ReceiveMessage<TMessage>(responseSpan, timeout, m_step, m_id);
+    auto& message = m_channel.ReceiveMessage<TMessage>(responseSpan, RemainingTimeout(), m_step, m_id);
     if (m_step == static_cast<uint32_t>(TRANSACTION_STEP::REQUEST))
     {
         // Use the request's id for the reply side transaction.

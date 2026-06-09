@@ -952,13 +952,17 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
 
     // Restore the original VHD owner on the moved file.
+    // Run as self (SYSTEM) for both the file open and the SetSecurityInfo call,
+    // because after a cross-volume MoveFileEx the new file's owner may be
+    // BUILTIN\Administrators and the impersonated user token may lack WRITE_OWNER.
     auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
+        auto runAsSelf = wil::run_as_self();
+        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
+
         wil::unique_hfile vhdHandle(CreateFileW(
             vhdPath.c_str(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
         THROW_LAST_ERROR_IF(!vhdHandle);
 
-        auto runAsSelf = wil::run_as_self();
-        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
         THROW_IF_WIN32_ERROR(
             ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
     };
@@ -2208,7 +2212,7 @@ try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"Telemetry");
 
-    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", m_vmTerminating.get());
+    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", {m_vmTerminating.get()});
 
     // Check if drvfs notifications are enabled for the user.
     bool drvFsNotifications{};
@@ -3814,11 +3818,12 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
         {
-            THROW_HR_MSG(
-                (configuration.State == LxssDistributionStateInstalled) ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_ILLEGAL_STATE_CHANGE,
-                "%ls already registered (state = %d)",
-                Name,
-                configuration.State);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
+                configuration.State == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
         }
 
         if (Path != nullptr)
@@ -3830,8 +3835,9 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             }
 
             // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_IF(
+            THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
                 wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
         }
     }

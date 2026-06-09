@@ -872,6 +872,13 @@ class MountTests
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         // Attempt to mount a disk with only a WSL1 distro
         wsl::windows::common::SvcComm service;
+
+        if (std::ranges::any_of(service.EnumerateDistributions(), [](const auto& e) { return e.Version != 1; }))
+        {
+            LogSkipped("Skipping test because a WSL2 distro is present");
+            return;
+        }
+
         VERIFY_ARE_EQUAL(service.AttachDisk(L"Dummy", LXSS_ATTACH_MOUNT_FLAGS_PASS_THROUGH), WSL_E_WSL2_NEEDED);
     }
 

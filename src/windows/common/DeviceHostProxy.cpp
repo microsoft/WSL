@@ -26,6 +26,11 @@ DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId
     m_systemId{VmId}, m_runtimeId{RuntimeId}, m_system{wsl::windows::common::hcs::OpenComputeSystem(VmId.c_str(), GENERIC_ALL)}, m_shutdown{false}
 {
     m_devicesShutdown = false;
+    m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
+
+    // Create a job object that will terminate device host processes when this proxy is destroyed
+    // (i.e., when the VM shuts down).
+    m_jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag)
@@ -64,6 +69,30 @@ GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9Fi
     return instanceId;
 }
 
+void DeviceHostProxy::RemoveDevice(const GUID& Type, const GUID& InstanceId)
+{
+    {
+        auto lock = m_devicesLock.lock_exclusive();
+        THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+        THROW_HR_IF(E_INVALIDARG, m_devices.find(InstanceId) == m_devices.end());
+
+        m_devices.erase(InstanceId);
+    }
+
+    // N.B. Removing the FlexIov device is best effort since not all versions of Windows support it.
+    try
+    {
+        ModifySettingRequest<FlexibleIoDevice> request;
+        request.RequestType = ModifyRequestType::Remove;
+        request.ResourcePath = L"VirtualMachine/Devices/FlexibleIov/";
+        request.ResourcePath += wsl::shared::string::GuidToString<wchar_t>(InstanceId, wsl::shared::string::GuidToStringFlags::None);
+        request.Settings.EmulatorId = Type;
+        request.Settings.HostingModel = FlexibleIoDeviceHostingModel::ExternalRestricted;
+        wsl::windows::common::hcs::ModifyComputeSystem(m_system.get(), wsl::shared::ToJsonW(request).c_str());
+    }
+    CATCH_LOG()
+}
+
 void DeviceHostProxy::AddRemoteFileSystem(const GUID& ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs)
 {
     auto lock = m_lock.lock_exclusive();
@@ -75,7 +104,7 @@ void DeviceHostProxy::AddRemoteFileSystem(const GUID& ImplementationClsid, const
         THROW_HR_IF(E_INVALIDARG, entry.ImplementationClsid == ImplementationClsid && entry.Tag == Tag);
     }
 
-    m_fileSystems.emplace_back(ImplementationClsid, Tag, Plan9Fs);
+    m_fileSystems.emplace_back(ImplementationClsid, Tag, Plan9Fs, m_git.get());
 }
 
 wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag)
@@ -87,7 +116,13 @@ wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& 
     {
         if (entry.ImplementationClsid == ImplementationClsid && entry.Tag == Tag)
         {
-            return entry.Instance;
+            // Retrieve the instance from the global interface table to ensure the correct apartment/thread affinity.
+            // This is required because we might be running under MTA or NA depending on which class we were called from.
+
+            wil::com_ptr<IPlan9FileSystem> instance;
+            THROW_IF_FAILED(
+                m_git->GetInterfaceFromGlobal(entry.Cookie, __uuidof(IPlan9FileSystem), reinterpret_cast<void**>(instance.put())));
+            return instance;
         }
     }
 
@@ -121,6 +156,15 @@ try
     const wil::com_ptr<IVmDeviceHost> remoteHost = DeviceHost;
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
+
+    // Add the device host process to the job object so it is terminated when the VM shuts down.
+    wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
+    LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
+    if (process)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_jobObject.get(), process.get()));
+    }
+
     return S_OK;
 }
 CATCH_RETURN()

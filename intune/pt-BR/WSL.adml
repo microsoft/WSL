@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName><!-- _locComment_text='{Locked="WSL"}' -->WSL</displayName>
+  <description><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Windows Subsystem for Linux</string>
+
+        <string id="AllowWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir o Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Quando definida como desabilitada, essa política desabilita o acesso à execução de distribuições do Linux no Windows Subsystem for Linux para todos os usuários no computador.</string>
+
+        <string id="AllowInboxWSL"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}' -->Permitir a versão da Caixa de Entrada do Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain"><!-- _locComment_text='{Locked="Windows Subsystem for Linux"}{Locked="WSL"}' -->Quando definida como desabilitada, essa política desabilita a versão da caixa de entrada (componente opcional) do Windows Subsystem for Linux. Se essa política estiver desabilitada, somente a versão de repositório do WSL poderá ser usada.</string>
+
+        <string id="AllowWSL1"><!-- _locComment_text='{Locked="WSL1"}' -->Permitir WSL1</string>
+        <string id="AllowWSL1Explain"><!-- _locComment_text='{Locked="WSL1"}{Locked="WSL2"}' -->Quando definida como desabilitada, essa política desabilita o WSL1. Quando desabilitado, somente distribuições WSL2 podem ser usadas.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Permitir configuração de kernel personalizada</string>
+        <string id="CustomKernelExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernel"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração personalizada do kernel por meio de .wslconfig (wsl2.kernel). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Permitir configuração de distribuição do sistema personalizada</string>
+        <string id="CustomSystemDistroExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.systemDistro"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de distribuição do sistema personalizada por meio de .wslconfig (wsl2.systemDistro). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Permitir configuração de linha de comando do kernel</string>
+        <string id="CustomKernelCommandLineExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelCommandLine"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de linha de comando do kernel por meio de .wslconfig (wsl2.kernelCommandLine). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="AllowDebugShell">Permitir o shell de depuração</string>
+        <string id="AllowDebugShellExplain"><!-- _locComment_text='{Locked="wsl.exe"}{Locked="debug-shell"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita o shell de depuração (wsl.exe --debug-shell). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Permitir virtualização aninhada</string>
+        <string id="NestedVirtualizationExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.nestedVirtualization"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de virtualização aninhada por meio de .wslconfig (wsl2.nestedVirtualization). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Permitir depuração de kernel</string>
+        <string id="KernelDebugExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.kernelDebugPort"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de depuração de kernel por meio de .wslconfig (wsl2.kernelDebugPort). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Permitir configuração de rede personalizada</string>
+        <string id="CustomNetworkingExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.networkingMode"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de rede personalizada por meio de .wslconfig (wsl2.networkingMode). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Permitir que o usuário defina a configuração do firewall</string>
+        <string id="FirewallExplain"><!-- _locComment_text='{Locked=".wslconfig"}{Locked="wsl2.firewall"}{Locked="Store WSL"}' -->Quando definida como desabilitada, essa política desabilita a configuração de firewall por meio de .wslconfig (wsl2.firewall). Essa política só se aplica ao Store WSL.</string>
+
+        <string id="AllowDiskMount">Permitir montagem de disco de passagem</string>
+        <string id="AllowDiskMountExplain"><!-- _locComment_text='{Locked="WSL2"}{Locked="wsl.exe"}{Locked="mount"}{Locked="Store WSL"}' -->When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Configurar o modo de rede padrão</string>
+        <string id="DefaultNetworkingModeExplain"><!-- _locComment_text='{Locked="WSL2"}' -->Esta política especifica o modo de rede padrão a ser usado para WSL2.</string>
+        <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
+        <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
+        <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+
+        <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Contêiner WSL</string>
+
+        <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Permitir contêiner WSL</string>
+        <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Essa política controla se o contêiner WSL pode ser usado neste computador. Quando habilitados ou não configurados, os usuários e aplicativos do Windows podem executar contêineres do Linux por meio do WSL. Quando definido como desabilitado, o contêiner WSL é bloqueado para todos os usuários e os aplicativos do Windows não podem executar contêineres do Linux. Aviso: definir isso como 'Disabled' pode interromper aplicativos do Windows que dependem de contêineres do Linux.</string>
+
+        <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Lista de permissões para registros de contêiner do WSL</string>
+        <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Quando habilitado, o contêiner WSL só terá permissão para extrair imagens dos registros listados aqui. Isso afeta a CLI do contêiner do WSL e todos os aplicativos que usam a API de contêiner do WSL.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Modo de Rede Padrão</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerRegistryAllowlist">
+        <listBox refId="WSLContainerRegistryAllowlist_Input">Registros permitidos</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>
