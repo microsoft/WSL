@@ -327,6 +327,7 @@ void WSLCSessionManagerImpl::CreateSession(
         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(resolvedDisplayName.c_str(), "Name"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),

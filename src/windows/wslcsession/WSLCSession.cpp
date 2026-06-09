@@ -1704,6 +1704,7 @@ try
         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
