@@ -9838,13 +9838,12 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            // Verify a warning was emitted for the missing volume. The reason text is dynamic,
-            // so match on the localized prefix (name + empty reason) rather than the full string.
+            // Verify the warning matches the expected localized message for the missing volume.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedPrefix = std::format(
-                L"wsl: {}", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery", L""));
+            auto expectedWarning =
+                std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery"));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w.starts_with(expectedPrefix); }));
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));

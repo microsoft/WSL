@@ -107,8 +107,6 @@ private:
     DockerHTTPClient& m_dockerClient;
     bool m_attached;
 
-    // Default {S_OK, ""} when the volume opened successfully; otherwise {Code, Message} describing
-    // why the backing storage could not be recovered (e.g. the .vhdx file is missing).
     std::pair<HRESULT, std::string> m_status;
 };
 

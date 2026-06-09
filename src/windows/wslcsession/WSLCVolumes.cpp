@@ -44,9 +44,8 @@ WSLCVolumes::WSLCVolumes(
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover volume: %hs", volume.Name.c_str());
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcFailedToRecoverVolume(
-                wsl::shared::string::MultiByteToWide(volume.Name),
-                wsl::windows::common::wslutil::GetErrorString(wil::ResultFromCaughtException())));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(volume.Name)));
         }
     }
 }
@@ -212,10 +211,7 @@ std::pair<HRESULT, std::string> WSLCVolumes::GetVolumeStatus(const std::string& 
     auto lock = m_lock.lock_shared();
 
     auto it = m_volumes.find(Name);
-    if (it == m_volumes.end())
-    {
-        return {E_FAIL, {}};
-    }
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
 
     return it->second->Status();
 }

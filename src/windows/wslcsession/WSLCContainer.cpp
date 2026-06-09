@@ -747,10 +747,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_initProcessControl = nullptr;
     });
 
-    // Refuse to start if any referenced named volume is not available (e.g. its backing VHD was
-    // removed while the service was down). The container can still be opened and deleted, but it
-    // cannot run without its volumes. Emit a warning with the reason for each unavailable volume,
-    // then fail with the full list so the user sees everything at once.
+    // Refuse to start if any referenced named volume is in a failed state.
     std::vector<std::string> unavailableVolumes;
     for (const auto& volumeName : m_namedVolumes)
     {

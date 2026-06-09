@@ -210,8 +210,6 @@ private:
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
 
-    // Names of the docker named volumes this container references. Used at Start()
-    // to refuse running when a referenced volume is not available.
     std::vector<std::string> m_namedVolumes;
     WSLCVolumes& m_volumes;
 

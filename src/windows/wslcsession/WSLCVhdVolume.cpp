@@ -254,11 +254,11 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
     }
     catch (...)
     {
-        // The backing VHD could not be attached or mountedTrack the volume in an errored state so the user can still inspect and
-        // delete it; containers that reference it should refuse to start.
+        // The backing VHD could not be attached or mounted. Track the volume in an errored state so the user can still inspect
+        // and delete it; containers that reference it should refuse to start. The reason is surfaced via Inspect(), not the warning.
         const auto hr = wil::ResultFromCaughtException();
         const auto message = wslutil::GetErrorString(hr);
-        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(Volume.Name), message));
+        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(Volume.Name)));
         status = {hr, wsl::shared::string::WideToMultiByte(message)};
     }
 
@@ -308,7 +308,6 @@ std::string WSLCVhdVolumeImpl::Inspect() const
     };
 
     // Surface the recovery failure so callers can see why the volume is unusable.
-    // The presence of an "Error" entry indicates the volume is not available.
     if (FAILED(m_status.first))
     {
         inspect.Status->emplace("Error", m_status.second);
