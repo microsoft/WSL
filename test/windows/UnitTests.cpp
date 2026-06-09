@@ -3048,6 +3048,79 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
+    WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
+    {
+        // Regression test for #40716: if the VHD's owner is BUILTIN\Administrators
+        // (as happens after a cross-volume MoveFileEx from an elevated context),
+        // the move must still succeed because setVhdOwner runs as SYSTEM.
+        constexpr auto name = L"move-admin-owner-test-distro";
+        constexpr auto firstFolder = L"move-admin-owner-first";
+        constexpr auto secondFolder = L"move-admin-owner-second";
+
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(firstFolder);
+            std::filesystem::remove_all(secondFolder);
+        });
+
+        // Move to first folder so we know where the VHD is.
+        WslShutdown();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, firstFolder)), 0L);
+
+        auto vhdPath = std::format(L"{}\\ext4.vhdx", firstFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        // Simulate cross-volume MoveFileEx side-effect: change VHD owner to BUILTIN\Administrators.
+        {
+            BYTE adminsSidBuffer[SECURITY_MAX_SID_SIZE];
+            DWORD sidSize = sizeof(adminsSidBuffer);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidBuffer, &sidSize));
+
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(vhdPath.c_str()), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, adminsSidBuffer, nullptr, nullptr, nullptr));
+
+            // Verify it took effect.
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                vhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidBuffer));
+        }
+
+        // Now move again as non-elevated. Before the fix, this would fail with E_ACCESSDENIED
+        // because CreateFileW(WRITE_OWNER) was called under user impersonation.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        WslShutdown();
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, secondFolder), nullptr, nullptr, nullptr, nonElevatedToken.get()), 0L);
+
+        auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
+
+        // Verify the VHD owner was preserved. The code reads the owner before
+        // MoveFileEx and restores it afterward. Since we set the owner to
+        // Administrators before this move, it should still be Administrators.
+        {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                newVhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            BYTE adminsSidCheck[SECURITY_MAX_SID_SIZE] = {};
+            DWORD sidSize = sizeof(adminsSidCheck);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidCheck, &sidSize));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidCheck));
+        }
+
+        // Validate distro still works.
+        WslShutdown();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+    }
+
     WSL2_TEST_METHOD(Resize)
     {
         constexpr auto name = L"resize-test-distro";

@@ -17,6 +17,7 @@ Abstract:
 #include "ContainerModel.h"
 #include "InspectModel.h"
 #include <string>
+#include <tuple>
 #include <vector>
 #include <charconv>
 #include <wslc.h>
@@ -64,6 +65,12 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
 
 void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstring& argName);
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName);
+int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName = {});
+
+void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring& argName);
+std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
