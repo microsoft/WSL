@@ -2054,6 +2054,10 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* 
 {
     WSLCExecutionContext context(&m_session);
 
+    RETURN_HR_IF_NULL(E_POINTER, Stdin);
+    RETURN_HR_IF_NULL(E_POINTER, Stdout);
+    RETURN_HR_IF_NULL(E_POINTER, Stderr);
+
     *Stdin = {};
     *Stdout = {};
     *Stderr = {};
@@ -2092,6 +2096,8 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 {
     WSLCExecutionContext context(&m_session);
 
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+
     *Process = nullptr;
 
     HRESULT hr = CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
@@ -2117,6 +2123,10 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
 {
     WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     *Process = nullptr;
     return CallImpl(&WSLCContainerImpl::Exec, Options, DetachKeys, Process);
@@ -2150,6 +2160,8 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
     WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
     *Output = nullptr;
 
@@ -2226,6 +2238,8 @@ HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
 {
     WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Id);
 
     const auto hr = wil::ResultFromException([&] {
         auto [lock, impl] = LockImpl();

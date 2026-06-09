@@ -266,6 +266,14 @@ try
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, WI_IsAnyFlagSet(Settings->FeatureFlags, ~WSLCFeatureFlagsValid), "Invalid feature flags: 0x%x", Settings->FeatureFlags);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
+        "Invalid storage flags: 0x%x",
+        Settings->StorageFlags);
+
     // Set up a warning context for the duration of initialization so that non-fatal
     // failures (e.g., container/volume/network recovery) are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
@@ -439,6 +447,8 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
 HRESULT WSLCSession::GetId(ULONG* Id)
 {
+    RETURN_HR_IF_NULL(E_POINTER, Id);
+
     *Id = m_id;
 
     return S_OK;
@@ -1672,7 +1682,17 @@ try
     WSLCExecutionContext context(this, WarningCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
-    THROW_HR_IF(E_POINTER, containerOptions->Image == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(containerOptions->Flags, ~WSLCContainerFlagsValid),
+        "Invalid container flags: 0x%x",
+        containerOptions->Flags);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(containerOptions->InitProcessOptions.Flags, ~WSLCProcessFlagsValid),
+        "Invalid process flags: 0x%x",
+        containerOptions->InitProcessOptions.Flags);
 
     auto lock = m_lock.lock_shared();
 
@@ -1775,6 +1795,9 @@ HRESULT WSLCSession::OpenContainer(LPCSTR Id, IWSLCContainer** Container)
 try
 {
     WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Id);
+    RETURN_HR_IF_NULL(E_POINTER, Container);
 
     ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
@@ -1990,6 +2013,11 @@ HRESULT WSLCSession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLCPro
 try
 {
     WSLCExecutionContext context(this);
+
+    THROW_HR_IF_NULL(E_POINTER, Executable);
+    THROW_HR_IF_NULL(E_POINTER, Options);
+    THROW_HR_IF_NULL(E_POINTER, Process);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     if (Errno != nullptr)
     {
@@ -2600,6 +2628,9 @@ try
 {
     WSLCExecutionContext context(this);
 
+    RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
+    RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -2611,6 +2642,8 @@ HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath)
 try
 {
     WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
@@ -2826,6 +2859,8 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
+    RETURN_HR_IF_NULL(E_POINTER, State);
+
     *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }

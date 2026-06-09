@@ -451,6 +451,39 @@ class WSLCTests
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
+
+        // Reject invalid session flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-session-flags");
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, static_cast<WSLCSessionFlags>(0x4), nullptr, &session));
+        }
+
+        // Reject invalid feature flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
+            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x20);
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        }
+
+        // Reject NULL output pointers across the session manager API.
+        {
+            auto settings = GetDefaultSessionSettings(L"null-out-session");
+            VERIFY_ARE_EQUAL(
+                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSession(0, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSessionByName(c_testSessionName, nullptr));
+
+            WSLCSessionListEntry* entries = nullptr;
+            ULONG count = 0;
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->ListSessions(nullptr, &count));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->ListSessions(&entries, nullptr));
+        }
+
+        // The session object must reject NULL output pointers.
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
     }
 
     struct VmInfo
@@ -3585,6 +3618,15 @@ class WSLCTests
 
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
     {
+        // Reject invalid process flags.
+        {
+            WSLCProcessOptions options{};
+            options.Flags = static_cast<WSLCProcessFlags>(0x4);
+            wil::com_ptr<IWSLCProcess> process;
+            int err = 0;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, &process, &err));
+        }
+
         // Simple case
         {
             auto result = ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
@@ -3626,6 +3668,17 @@ class WSLCTests
             // Validate that a null out handle is rejected.
 
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            // Validate that every IWSLCProcess output pointer is rejected when null.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetExitEvent(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetPid(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetState(nullptr, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetFlags(nullptr));
+
+            // GetFlags succeeds with a valid pointer and reports the launched flags.
+            WSLCProcessFlags flags{};
+            VERIFY_SUCCEEDED(process.Get().GetFlags(&flags));
+            VERIFY_IS_TRUE(WI_IsFlagSet(flags, WSLCProcessFlagsStdin));
         }
 
         // Create a stuck process and kill it.
@@ -5108,6 +5161,25 @@ class WSLCTests
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().GetInitProcess(nullptr));
         }
 
+        // Validate that CreateContainer rejects a null image and invalid flags.
+        {
+            WSLCContainerOptions options{};
+            wil::com_ptr<IWSLCContainer> container;
+
+            // A null Image field is rejected with E_POINTER.
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            // Invalid container flags are rejected with E_INVALIDARG.
+            options.Image = "debian:latest";
+            options.Flags = static_cast<WSLCContainerFlags>(0x10);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            // Invalid init process flags are rejected with E_INVALIDARG.
+            options.Flags = WSLCContainerFlagsNone;
+            options.InitProcessOptions.Flags = static_cast<WSLCProcessFlags>(0x4);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+        }
+
         // Validate that env is correctly wired.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-env", {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}});
@@ -5600,6 +5672,13 @@ class WSLCTests
 
         // Test error paths
         {
+            // A null id and a null output pointer are rejected by the marshaller.
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->OpenContainer(nullptr, &container));
+                VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->OpenContainer("named-container", nullptr));
+            }
+
             expectOpen("", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: ''");
 
@@ -6854,6 +6933,10 @@ class WSLCTests
             launcher.AddTmpfs("/mnt/wslc-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
+
+            // Validate that inspect fails with a null pointer.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Inspect(nullptr));
+
             auto details = container.Inspect();
 
             // Verify basic container metadata.
@@ -6954,6 +7037,19 @@ class WSLCTests
             auto process = WSLCProcessLauncher({}, {"echo", "OK"}).Launch(container.Get());
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
+        }
+
+        // Validate that Exec rejects invalid flags and a null output pointer.
+        {
+            WSLCProcessOptions options{};
+            wil::com_ptr<IWSLCProcess> process;
+
+            // A null output pointer is rejected by the marshaller.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Exec(&options, nullptr, nullptr));
+
+            // Invalid process flags are rejected with E_INVALIDARG.
+            options.Flags = static_cast<WSLCProcessFlags>(0x4);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Exec(&options, nullptr, &process));
         }
 
         // Validate that the working directory is correctly wired.
