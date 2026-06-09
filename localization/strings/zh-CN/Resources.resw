@@ -924,6 +924,10 @@ Windows: {}</value>
     <value>DNS 隧道不受支持</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows 主机文件太大，不会反映在 WSL 中。请考虑减小 %SystemRoot%\System32\drivers\etc\hosts 的大小</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>使用镜像网络模式时，wsl2.localhostForwarding 设置无效</value>
   </data>
@@ -2371,6 +2375,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>无效的图像标签格式：'{}'。预期格式为 'name:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>正在保存。</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC 是适用于 Linux 的 Windows 子系统容器 CLI 工具。</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2964,6 +2971,50 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>请求了加载但未提供输入。</value>
   </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>管理网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>管理 WSL 网络的生命周期，包括创建、检查、列出和删除网络。</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>创建网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>创建一个新网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>指定网络驱动程序名称(默认值: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>网络元数据设置</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>移除一个或多个网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>移除一个或多个网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>显示一个或多个网络的详细信息。</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>显示一个或多个网络的详细信息。</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>列出网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>列出会话中的所有网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>网络名称</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>仅输出网络名称</value>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>管理卷。</value>
   </data>
@@ -3120,29 +3171,29 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
-    <value>Failed to recover container '{}'</value>
+    <value>未能恢复容器 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
-    <value>Failed to recover network '{}'</value>
+    <value>未能恢复网络 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
-    <value>Failed to recover volume '{}'</value>
+    <value>未能恢复卷 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
-    <value>Failed to initialize swap</value>
+    <value>未能初始化交换</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
-    <value>Failed to restore timestamp for container '{}'</value>
+    <value>未能还原容器 '{}' 的时间戳</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
-    <value>Failed to parse image import progress</value>
+    <value>未能分析映像导入进度</value>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
-    <value>Failed to unmount volume '{}': {}</value>
+    <value>未能卸载卷 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">

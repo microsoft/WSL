@@ -924,6 +924,10 @@ Fallback auf NAT-Netzwerk.</value>
     <value>DNS-Tunneln wird nicht unterstützt</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Die Windows-Hostdatei ist zu groß und wird nicht in WSL wiedergegeben. Erwägen Sie eine Verkleinerung der %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Die Einstellung "wsl2.localhostForwarding" hat keine Auswirkungen, wenn der gespiegelte Netzwerkmodus verwendet wird.</value>
   </data>
@@ -2371,6 +2375,9 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Ungültiges Bild-Tag-Format: „{}“. Erwartetes Format ist „name:tag“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Speichern wird ausgeführt.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC ist das Windows-Subsystem für Linux Container-CLI-Tool.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2964,6 +2971,50 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Laden angefordert, aber keine Eingabe bereitgestellt.</value>
   </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Netzwerke verwalten.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>Verwalten Sie den Lebenszyklus WSL Netzwerks, einschließlich Erstellen, Überprüfen, Auflisten und Löschen.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Erstellen Sie ein Netzwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Erstellt ein neues Netzwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Geben Sie den Namen des Netzwerktreibers an (Standard: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Einstellung für Netzwerkmetadaten</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Ein oder mehrere Netzwerke entfernen.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Entfernt ein oder mehrere Netzwerke.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>Zeigt detaillierte Informationen zu einem oder mehreren Netzwerken an.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>Zeigt detaillierte Informationen zu einem oder mehreren Netzwerken an.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>Listet Netzwerke auf.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Listet alle Netzwerke in der Sitzung auf.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Netzwerkname</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Gibt nur die Netzwerknamen aus</value>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes verwalten.</value>
   </data>
@@ -3120,33 +3171,33 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
-    <value>Failed to recover container '{}'</value>
+    <value>Fehler beim Wiederherstellen des Containers „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
-    <value>Failed to recover network '{}'</value>
+    <value>Fehler beim Wiederherstellen des Netzwerks „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
-    <value>Failed to recover volume '{}'</value>
+    <value>Fehler beim Wiederherstellen des Volumes „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
-    <value>Failed to initialize swap</value>
+    <value>Fehler beim Initialisieren der Swap-Datei</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
-    <value>Failed to restore timestamp for container '{}'</value>
+    <value>Fehler beim Wiederherstellen des Zeitstempels für den Container „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
-    <value>Failed to parse image import progress</value>
+    <value>Fehler beim Parsen des Bildimportfortschritts</value>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
-    <value>Failed to unmount volume '{}': {}</value>
+    <value>Fehler beim Aufheben der Einbindung des Volumes „{}“: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
-    <value>Failed to stop container '{}' after plugin rejection</value>
+    <value>Fehler beim Beenden des Containers „{}“ nach der Ablehnung des Plug-Ins</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">

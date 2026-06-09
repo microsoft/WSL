@@ -266,6 +266,14 @@ try
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, WI_IsAnyFlagSet(Settings->FeatureFlags, ~WSLCFeatureFlagsValid), "Invalid feature flags: 0x%x", Settings->FeatureFlags);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
+        "Invalid storage flags: 0x%x",
+        Settings->StorageFlags);
+
     // Set up a warning context for the duration of initialization so that non-fatal
     // failures (e.g., container/volume/network recovery) are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
@@ -273,6 +281,7 @@ try
     // N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_creatorProcessName = Settings->CreatorProcessName ? Settings->CreatorProcessName : L"";
     m_featureFlags = Settings->FeatureFlags;
     m_pluginNotifier = PluginNotifier;
 
@@ -283,7 +292,7 @@ try
         "SessionInitialized",
         TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
-        TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
+        TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
@@ -438,6 +447,8 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
 HRESULT WSLCSession::GetId(ULONG* Id)
 {
+    RETURN_HR_IF_NULL(E_POINTER, Id);
+
     *Id = m_id;
 
     return S_OK;
@@ -1200,6 +1211,39 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::SaveImages(WSLCHandle OutHandle, const WSLCStringArray* ImageNames, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ImageNames);
+    RETURN_HR_IF(E_INVALIDARG, ImageNames->Count == 0);
+    RETURN_HR_IF(E_INVALIDARG, ImageNames->Count > WSLC_MAX_SAVE_IMAGES_COUNT);
+    RETURN_HR_IF_NULL(E_INVALIDARG, ImageNames->Values);
+
+    std::vector<std::string> names;
+    names.reserve(ImageNames->Count);
+    for (ULONG i = 0; i < ImageNames->Count; i += 1)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, ImageNames->Values[i]);
+        const size_t length = strlen(ImageNames->Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, length == 0);
+        RETURN_HR_IF(E_INVALIDARG, length > WSLC_MAX_IMAGE_NAME_LENGTH);
+        names.emplace_back(ImageNames->Values[i]);
+    }
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto retVal = m_dockerClient->SaveImages(names);
+    SaveImageImpl(retVal, OutHandle, CancelEvent);
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent)
 {
     auto userHandle = OpenUserHandle(OutputHandle);
@@ -1636,17 +1680,43 @@ HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOption
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
-
-    RETURN_HR_IF_NULL(E_POINTER, containerOptions);
-
-    // Validate that Image is not null.
-    RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
+    THROW_HR_IF_NULL(E_POINTER, containerOptions);
+    THROW_HR_IF_NULL(E_POINTER, Container);
+    THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(containerOptions->Flags, ~WSLCContainerFlagsValid),
+        "Invalid container flags: 0x%x",
+        containerOptions->Flags);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(containerOptions->InitProcessOptions.Flags, ~WSLCProcessFlagsValid),
+        "Invalid process flags: 0x%x",
+        containerOptions->InitProcessOptions.Flags);
 
     auto lock = m_lock.lock_shared();
 
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
+
+    // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
+    WSL_LOG_TELEMETRY(
+        "WSLCCreateContainer",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
+        TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(containerOptions->Image, "Image"),
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
+
+    return result;
+}
+CATCH_RETURN();
+
+void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
@@ -1654,9 +1724,7 @@ try
         ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
 
-    RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
-
-    // TODO: Log entrance into the function.
+    THROW_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
     try
     {
@@ -1708,8 +1776,6 @@ try
         WI_ASSERT(inserted);
 
         it->second->CopyTo(Container);
-
-        return S_OK;
     }
     catch (const DockerHTTPException& e)
     {
@@ -1724,12 +1790,14 @@ try
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::OpenContainer(LPCSTR Id, IWSLCContainer** Container)
 try
 {
     WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Id);
+    RETURN_HR_IF_NULL(E_POINTER, Container);
 
     ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
@@ -1945,6 +2013,11 @@ HRESULT WSLCSession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLCPro
 try
 {
     WSLCExecutionContext context(this);
+
+    THROW_HR_IF_NULL(E_POINTER, Executable);
+    THROW_HR_IF_NULL(E_POINTER, Options);
+    THROW_HR_IF_NULL(E_POINTER, Process);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     if (Errno != nullptr)
     {
@@ -2555,6 +2628,9 @@ try
 {
     WSLCExecutionContext context(this);
 
+    RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
+    RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -2566,6 +2642,8 @@ HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath)
 try
 {
     WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
@@ -2781,6 +2859,8 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
+    RETURN_HR_IF_NULL(E_POINTER, State);
+
     *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }
