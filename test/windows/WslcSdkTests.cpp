@@ -346,7 +346,11 @@ class WslcSdkTests
                 info->timestamp});
         };
 
-        std::filesystem::path extraStorage = m_storagePath / "wslc-crashcb-storage";
+        std::filesystem::path extraStorage = m_storagePath / "wslc-crash-callback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(extraStorage, ec);
+        });
 
         WslcSessionSettings sessionSettings;
         VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-crashcb-test", extraStorage.c_str(), &sessionSettings));
