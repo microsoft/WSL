@@ -106,13 +106,33 @@ public:
     void Collect() override;
     HANDLE GetHandle() const override;
 
-private:
+protected:
     HandleWrapper Handle;
+    OVERLAPPED Overlapped{};
+
+private:
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
-    OVERLAPPED Overlapped{};
     BufferWrapper Buffer{LX_RELAY_BUFFER_SIZE};
     LARGE_INTEGER Offset{};
+};
+
+// A ReadHandle for a server named pipe. It waits for a client to connect (ConnectNamedPipe) before
+// reading, so it can be scheduled directly with a freshly created server pipe. The connect reuses the
+// base read handle's overlapped and event, so the base destructor cancels a pending connect correctly.
+class ReadNamedPipe : public ReadHandle
+{
+public:
+    NON_COPYABLE(ReadNamedPipe);
+    NON_MOVABLE(ReadNamedPipe);
+
+    ReadNamedPipe(HandleWrapper&& Pipe, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+
+    void Schedule() override;
+    void Collect() override;
+
+private:
+    bool m_connected = false;
 };
 
 class SingleAcceptHandle : public OverlappedIOHandle

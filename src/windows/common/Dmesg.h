@@ -58,11 +58,16 @@ private:
         wil::unique_handle&& OutputHandle = {});
 
     HRESULT Start(bool EnableEarlyBootConsole);
-    std::pair<std::wstring, std::thread> StartDmesgThread(InputSource Source);
+
+    // Runs the single-threaded overlapped IO loop that reads from the console pipes.
+    void Run();
+
+    // Creates a server named pipe for a console and returns its name and handle.
+    static std::pair<std::wstring, wil::unique_hfile> CreateConsolePipe();
+
     void ProcessInput(InputSource Source, const gsl::span<char>& Input);
     void WriteToCom1(const gsl::span<char>& Input);
 
-    wil::srwlock m_lock;
     std::wstring m_com1PipeName;
     std::wstring m_earlyConsoleName;
     std::wstring m_virtioConsoleName;
@@ -70,17 +75,18 @@ private:
     wil::unique_event m_threadExit;
     std::vector<HANDLE> m_exitEvents;
     wil::unique_hfile m_com1Pipe;
+    wil::unique_hfile m_earlyConsolePipe;
+    wil::unique_hfile m_virtioConsolePipe;
     GUID m_runtimeId{};
     wil::unique_event m_overlappedEvent;
-    _Guarded_by_(m_lock) OVERLAPPED m_overlapped {};
+    OVERLAPPED m_overlapped{};
     RingBuffer m_dmesgBuffer{LX_RELAY_BUFFER_SIZE};
     RingBuffer m_dmesgEarlyBuffer{LX_RELAY_BUFFER_SIZE};
     bool m_debugConsole;
     bool m_telemetry;
-    std::atomic<bool> m_earlyConsoleTransition = false;
-    bool m_pipeServer;
-    bool m_waitForConnection;
-    std::thread m_earlyConsoleWorker;
-    std::thread m_virtioWorker;
+    bool m_earlyConsoleTransition = false;
+    bool m_pipeServer = false;
+    bool m_waitForConnection = false;
+    std::thread m_worker;
     wil::unique_handle m_outputHandle = nullptr;
 };

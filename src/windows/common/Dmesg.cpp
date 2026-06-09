@@ -15,6 +15,11 @@ Abstract:
 #include "precomp.h"
 #include "Dmesg.h"
 
+using wsl::windows::common::io::EventHandle;
+using wsl::windows::common::io::HandleWrapper;
+using wsl::windows::common::io::MultiHandleWait;
+using wsl::windows::common::io::ReadNamedPipe;
+
 DmesgCollector::DmesgCollector(
     GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
     m_com1PipeName(Com1PipeName),
@@ -33,14 +38,9 @@ DmesgCollector::DmesgCollector(
 DmesgCollector::~DmesgCollector()
 {
     m_threadExit.SetEvent();
-    if (m_earlyConsoleWorker.joinable())
+    if (m_worker.joinable())
     {
-        m_earlyConsoleWorker.join();
-    }
-
-    if (m_virtioWorker.joinable())
-    {
-        m_virtioWorker.join();
+        m_worker.join();
     }
 }
 
@@ -64,7 +64,7 @@ std::shared_ptr<DmesgCollector> DmesgCollector::Create(
     return dmesgCollector;
 }
 
-std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSource Source)
+std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe()
 {
     std::wstring pipeName = wsl::windows::common::helpers::GetUniquePipeName();
     wil::unique_hfile pipe(CreateNamedPipeW(
@@ -72,43 +72,49 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    auto workerThread = std::thread([this, Source, Pipe = std::move(pipe)]() {
-        try
-        {
-            wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
-
-            // When the pipe connects, start reading data.
-            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, m_exitEvents);
-
-            std::vector<char> buffer(LX_RELAY_BUFFER_SIZE);
-            const auto allBuffer = gsl::make_span(buffer);
-            OVERLAPPED overlapped = {};
-            const wil::unique_event overlappedEvent(wil::EventOptions::ManualReset);
-            overlapped.hEvent = overlappedEvent.get();
-            for (;;)
-            {
-                overlappedEvent.ResetEvent();
-                const auto bytesRead = wsl::windows::common::relay::InterruptableRead(
-                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), m_exitEvents, &overlapped);
-
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                auto validBuffer = allBuffer.subspan(0, bytesRead);
-                ProcessInput(Source, validBuffer);
-            }
-        }
-        catch (...)
-        {
-            auto error = wil::ResultFromCaughtException();
-            LOG_HR_IF(error, error != E_ABORT); // E_ABORT is expected during shutdown.
-        }
-    });
-
-    return std::pair{std::move(pipeName), std::move(workerThread)};
+    return {std::move(pipeName), std::move(pipe)};
 }
+
+void DmesgCollector::Run()
+try
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
+
+    MultiHandleWait io;
+
+    // N.B. The reads use IgnoreErrors so a failure on one console doesn't tear down collection on the other.
+    if (m_earlyConsolePipe)
+    {
+        io.AddHandle(
+            std::make_unique<ReadNamedPipe>(
+                HandleWrapper{std::move(m_earlyConsolePipe)},
+                [this](const gsl::span<char>& Input) {
+                    if (!Input.empty())
+                    {
+                        ProcessInput(DmesgCollectorEarlyConsole, Input);
+                    }
+                }),
+            MultiHandleWait::IgnoreErrors | MultiHandleWait::NeedNotComplete);
+    }
+
+    io.AddHandle(
+        std::make_unique<ReadNamedPipe>(
+            HandleWrapper{std::move(m_virtioConsolePipe)},
+            [this](const gsl::span<char>& Input) {
+                if (!Input.empty())
+                {
+                    ProcessInput(DmesgCollectorConsole, Input);
+                }
+            }),
+        MultiHandleWait::IgnoreErrors | MultiHandleWait::NeedNotComplete);
+
+    // The loop runs until either exit event is signaled.
+    io.AddHandle(std::make_unique<EventHandle>(m_threadExit.get()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<EventHandle>(m_exitEvent.get()), MultiHandleWait::CancelOnCompleted);
+
+    io.Run({});
+}
+CATCH_LOG()
 
 void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Input)
 {
@@ -171,7 +177,6 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
 
 void DmesgCollector::WriteToCom1(const gsl::span<char>& Input)
 {
-    auto lock = m_lock.lock_exclusive();
     if (!m_com1Pipe)
     {
         return;
@@ -242,10 +247,12 @@ try
 
     if (EnableEarlyBootConsole)
     {
-        std::tie(m_earlyConsoleName, m_earlyConsoleWorker) = StartDmesgThread(DmesgCollectorEarlyConsole);
+        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe();
     }
 
-    std::tie(m_virtioConsoleName, m_virtioWorker) = StartDmesgThread(DmesgCollectorConsole);
+    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe();
+
+    m_worker = std::thread([this]() { Run(); });
     return S_OK;
 }
 CATCH_RETURN()

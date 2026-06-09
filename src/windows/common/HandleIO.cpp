@@ -14,6 +14,7 @@ using wsl::windows::common::io::LineBasedReadHandle;
 using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::ReadNamedPipe;
 using wsl::windows::common::io::ReadSocketMessageHandle;
 using wsl::windows::common::io::SingleAcceptHandle;
 using wsl::windows::common::io::WriteHandle;
@@ -302,6 +303,61 @@ void ReadHandle::Collect()
 HANDLE ReadHandle::GetHandle() const
 {
     return Event.get();
+}
+
+// ReadNamedPipe
+
+ReadNamedPipe::ReadNamedPipe(HandleWrapper&& Pipe, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+    ReadHandle(std::move(Pipe), std::move(OnRead))
+{
+}
+
+void ReadNamedPipe::Schedule()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        // N.B. The connect reuses the base read handle's overlapped (and thus its event/GetHandle()).
+        if (!ConnectNamedPipe(Handle.Get(), &Overlapped))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                State = IOHandleStatus::Pending;
+                return;
+            }
+
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+    }
+
+    ReadHandle::Schedule();
+}
+
+void ReadNamedPipe::Collect()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        DWORD bytes{};
+        if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytes, FALSE))
+        {
+            const auto error = GetLastError();
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+
+        // Transition back to standby so the IO loop schedules the first read.
+        State = IOHandleStatus::Standby;
+        return;
+    }
+
+    ReadHandle::Collect();
 }
 
 // SingleAcceptHandle
