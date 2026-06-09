@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
     - 'localization/strings/en-US/Resources.resw'
+    - 'intune/en-US/WSL.adml'
 
 # Schedule nightly build
 # Cron syntax: "mm HH DD MM DW" = minutes, hours, days, months, day of week (UTC time)
@@ -17,8 +18,13 @@ schedules:
     - "master"
   always: true
 
+# Build.SourceBranchName is only the leaf segment of the ref (e.g.
+# 'loc-pipeline-debug' for refs/heads/user/benhill/loc-pipeline-debug), which
+# fails GitHub's pulls API with a 422 'base invalid' when the branch name
+# contains slashes. Strip 'refs/heads/' from the full ref instead so the PR
+# targets the actual branch the pipeline ran against.
 variables:
-  targetBranch: ${{ variables['Build.SourceBranchName'] }}
+  targetBranch: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
 
 pool:
   vmImage: 'windows-latest'
@@ -32,17 +38,20 @@ steps:
   inputs:
     environment: 'PRODEXT'
     teamId: '38646'
+    serviceTreeId: 'd8846bef-e9b5-4542-bcfc-98ebabac8a7b'
     authType: 'FederatedIdentity'
     FederatedIdentityServiceConnection: 'Azure-Connection'
     isPreview: false
     resourceFilePath: |
       localization\strings\en-US\Resources.resw;O:localization\strings\
       storebroker\PDPs\en-us\PDP.xml;O:storebroker\PDPs\
+      intune\en-US\WSL.adml;O:intune\
     localizationTarget: true
     pseudoSetting: 'Excluded'
     cultureMappingType: 'None'
 
 - task: PipAuthenticate@1
+  condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   inputs:
     artifactFeeds: 'wsl'
 
@@ -51,6 +60,7 @@ steps:
             python tools/devops/create-change.py . "$env:token" "WSL localization"  "Localization change from build: $env:buildId" "user/localization/$env:buildId" "$env:targetBranch"
 
   displayName: Create pull request
+  condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   env:
       token: $(GithubPRToken)
       buildId: $(Build.BuildId)

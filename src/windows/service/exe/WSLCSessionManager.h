@@ -60,6 +60,14 @@ struct SessionEntry
     DWORD CreatorPid = 0;
     std::wstring DisplayName;
     CallingProcessTokenInfo Owner;
+
+    Microsoft::WRL::ComPtr<IWSLCPluginNotifier> PluginNotifier;
+
+    // Whether OnSessionStopping has been fired already; ensures it is fired exactly once.
+    bool StoppingNotified = false;
+
+    wil::shared_handle UserToken;
+    std::vector<BYTE> UserSid;
 };
 
 class WSLCSessionManagerImpl
@@ -68,15 +76,23 @@ public:
     NON_COPYABLE(WSLCSessionManagerImpl);
     NON_MOVABLE(WSLCSessionManagerImpl);
 
-    WSLCSessionManagerImpl() = default;
+    WSLCSessionManagerImpl();
     ~WSLCSessionManagerImpl();
 
-    void GetVersion(_Out_ WSLCVersion* Version);
-    void CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession);
-    void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession);
-    void ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount);
+    void CreateSession(
+        _In_ const WSLCSessionSettings* WslcSessionSettings,
+        _In_ WSLCSessionFlags Flags,
+        _In_opt_ IWarningCallback* WarningCallback,
+        _Out_ IWSLCSession** WslcSession);
+    void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession);
+    void ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount);
     void OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
+
+    // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
+    wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
+
+    static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:
     // Resolves the default session name for a caller: appends the username
@@ -110,7 +126,9 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
-                // Session is gone, drop the persistent reference if any.
+                // Session is gone: notify plugins (if not already), then drop persistent reference if any.
+                NotifySessionStoppingLockHeld(entry);
+
                 auto remove =
                     std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == entry.SessionId; });
                 m_persistentSessions.erase(remove.begin(), remove.end());
@@ -147,10 +165,12 @@ private:
 
     void AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory);
     WSLCSessionInitSettings CreateSessionSettings(
-        _In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
+        _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
     void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
+
+    void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;
@@ -181,9 +201,11 @@ public:
     WSLCSessionManager(wsl::windows::service::wslc::WSLCSessionManagerImpl* Impl);
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession) override;
-    IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession) override;
-    IFACEMETHOD(ListSessions)(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount) override;
+    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
+    IFACEMETHOD(CreateSession)(
+        const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
+    IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
+    IFACEMETHOD(ListSessions)(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
 };

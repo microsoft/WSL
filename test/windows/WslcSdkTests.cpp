@@ -85,12 +85,12 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
 
     // Read stdout / stderr concurrently so that full pipe buffers do not stall the process.
     ProcessOutput output;
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
         std::move(ownedStdout), [&](const auto& buffer) { output.stdoutOutput.append(buffer.data(), buffer.size()); }));
 
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
         std::move(ownedStderr), [&](const auto& buffer) { output.stderrOutput.append(buffer.data(), buffer.size()); }));
 
     auto timeoutTime = std::chrono::steady_clock::now() + timeout;
@@ -1870,6 +1870,73 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(stdoutData.size(), c_expectedBytes);
     }
 
+    WSLC_TEST_METHOD(ReleaseFromIOCallbackFails)
+    {
+        struct Context
+        {
+            std::atomic<WslcProcess> process{nullptr};
+            std::atomic<WslcContainer> container{nullptr};
+            std::atomic<HRESULT> releaseProcessHr{S_OK};
+            std::atomic<HRESULT> releaseContainerHr{S_OK};
+            std::atomic<bool> captured{false};
+            wil::unique_event done{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            auto* cx = static_cast<Context*>(c);
+
+            // Wait until the test thread has published both handles before sampling.
+            auto process = cx->process.load(std::memory_order_acquire);
+            auto container = cx->container.load(std::memory_order_acquire);
+            if (!process || !container)
+            {
+                return;
+            }
+
+            // Only capture on the first eligible callback; later callbacks no-op.
+            bool expected = false;
+            if (!cx->captured.compare_exchange_strong(expected, true))
+            {
+                return;
+            }
+
+            // Both calls should fail with ERROR_INVALID_HANDLE_STATE without consuming the handles.
+            cx->releaseProcessHr.store(WslcReleaseProcess(process));
+            cx->releaseContainerHr.store(WslcReleaseContainer(container));
+            cx->done.SetEvent();
+        };
+
+        // Continuous writer for the init process so onStdOut fires repeatedly.
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "while true; do echo LINE; sleep 0.05; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        UniqueProcess process;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+        // Publish handles to the callback now that both are valid.
+        ctx.container.store(container.get(), std::memory_order_release);
+        ctx.process.store(process.get(), std::memory_order_release);
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.done.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        VERIFY_ARE_EQUAL(ctx.releaseProcessHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        VERIFY_ARE_EQUAL(ctx.releaseContainerHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+    }
+
     // -----------------------------------------------------------------------
     // Storage tests
     // -----------------------------------------------------------------------
@@ -1992,13 +2059,95 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
-        // Negative: fixed VHD type is not yet supported.
+        // Negative: invalid VHD type must fail.
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
             vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = static_cast<WslcVhdType>(42);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: fixed-allocation VHD; on-disk file size must be >= SizeBytes.
+        {
+            constexpr auto c_fixedVolumeName = "wslc-sdk-vhd-fixed";
+            constexpr auto c_fixedSizeBytes = 64ull * _1MB;
+            WslcVhdRequirements vhd{};
+            vhd.name = c_fixedVolumeName;
+            vhd.sizeBytes = c_fixedSizeBytes;
             vhd.type = WSLC_VHD_TYPE_FIXED;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, nullptr)); });
+
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_fixedVolumeName) + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
+        }
+
+        // Positive: owner flags are honored — uid/gid baked into the volume root
+        // inode at mkfs time. Verify by stat-ing the mount inside a container.
+        {
+            constexpr auto c_ownedVolumeName = "wslc-sdk-vhd-owned";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_ownedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_OWNER;
+            vhd.uid = 65534; // nobody
+            vhd.gid = 65534; // nogroup
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_ownedVolumeName, nullptr)); });
+
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/usr/bin/stat", "-c", "%u %g", "/data"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_ownedVolumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = FALSE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "65534 65534\n");
+        }
+
+        // Negative: unknown flag bits are rejected.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = static_cast<WslcVhdRequirementsFlags>(0x80000000);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: flags=NONE silently ignores uid/gid (volume defaults to root:root).
+        {
+            constexpr auto c_unflaggedVolumeName = "wslc-sdk-vhd-unflagged";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_unflaggedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_NONE;
+            vhd.uid = 1000;
+            vhd.gid = 1000;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            wil::unique_cotaskmem_string deleteErr;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_unflaggedVolumeName, &deleteErr));
         }
     }
 
@@ -2427,9 +2576,11 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
         THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
 
-        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
+        // Validate /dev/dxg is available and the dynamic linker is configured to resolve the WSL
+        // GPU libraries.
         {
-            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
+            const char* initArgv[] = {
+                "/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"};
 
             auto output = RunContainerAndCapture(
                 gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);

@@ -245,6 +245,13 @@ Abstract:
 
 #define LX_INIT_WSL_USER_GENERATOR "wsl-user-generator"
 
+#define LX_INIT_WSL_INIT_WATCHER "init-watcher"
+
+#define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
+
+#define LX_WSLC_CDI_KIND "microsoft.com/wslc"
+#define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
+
 //
 // WSL2-specific environment variables.
 //
@@ -275,6 +282,7 @@ Abstract:
 #define INIT_BPF_FD_ARG "--bpf-fd"
 #define INIT_NETLINK_FD_ARG "--netlink-fd"
 #define INIT_PORT_TRACKER_LOCALHOST_RELAY "--localhost-relay"
+#define INIT_PORT_TRACKER_NETWORKING_MODE_ARG "--networking-mode"
 
 #define DECLARE_MESSAGE_CTOR(Name) \
     Name() \
@@ -400,6 +408,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCWatchProcesses,
     LxMessageWSLCProcessExited,
     LxMessageWSLCUnixConnect,
+    LxMessageWSLCGetGuestCapabilities,
+    LxMessageWSLCGetGuestCapabilitiesResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -510,6 +520,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCWatchProcesses)
         X(LxMessageWSLCProcessExited)
         X(LxMessageWSLCUnixConnect)
+        X(LxMessageWSLCGetGuestCapabilities)
+        X(LxMessageWSLCGetGuestCapabilitiesResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1427,9 +1439,11 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header;
     bool SeccompAvailable;
+    uint64_t HvPciSwiotlbBase;
+    uint64_t HvPciSwiotlbSize;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), BUFFER_FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1831,6 +1845,29 @@ struct WSLC_UNIX_CONNECT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES_RESULT
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilitiesResult;
+
+    MESSAGE_HEADER Header{};
+    uint64_t HvPciSwiotlbBase{};
+    uint64_t HvPciSwiotlbSize{};
+
+    PRETTY_PRINT(FIELD(Header), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilities;
+    using TResponse = WSLC_GET_GUEST_CAPABILITIES_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_GET_GUEST_CAPABILITIES);
+
+    MESSAGE_HEADER Header{};
+
+    PRETTY_PRINT(FIELD(Header));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

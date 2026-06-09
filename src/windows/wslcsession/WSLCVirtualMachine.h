@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCContainerMetadata.h"
 #include <thread>
 #include <filesystem>
+#include <optional>
 
 namespace wsl::windows::service::wslc {
 
@@ -120,7 +121,7 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings);
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -134,6 +135,7 @@ public:
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
     void OnProcessReleased(int Pid);
+    void OnSessionTerminated();
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
     std::shared_ptr<VmPortAllocation> AllocatePort(int Family, int Protocol);
@@ -147,7 +149,7 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
-    void Ext4Format(_In_ const std::string& Device);
+    void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
@@ -172,6 +174,11 @@ private:
 
     // Initial setup during Connect()
     void ConfigureNetworking();
+
+    // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
+    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
+    // can include the swiotlb token. Called after the root filesystem is mounted.
+    void ReadGuestCapabilities();
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
@@ -223,8 +230,21 @@ private:
     std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
+    HANDLE m_sessionTerminatingEvent{};
 
     wsl::shared::SocketChannel m_initChannel;
+    DWORD m_initChannelTimeout = 30 * 1000;
+
+    // Swiotlb pool reserved by the guest kernel (zero when the kernel lacks the WSL patch).
+    uint64_t m_hvPciSwiotlbBase = 0;
+    uint64_t m_hvPciSwiotlbSize = 0;
+
+    // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
+    // Declared before the port relay pipes so it is destroyed after them: any remaining
+    // wslrelay.exe is given the chance to exit via the closed pipes / signaled terminating
+    // event before the job-close kill kicks in.
+    wil::unique_handle m_processJobObject;
+
     wil::unique_handle m_portRelayChannelRead;
     wil::unique_handle m_portRelayChannelWrite;
 

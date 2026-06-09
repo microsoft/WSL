@@ -25,8 +25,8 @@ public:
     IORelay();
     ~IORelay();
 
-    void AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles);
-    void AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle);
+    void AddHandles(std::vector<std::unique_ptr<common::io::OverlappedIOHandle>>&& Handles);
+    void AddHandle(std::unique_ptr<common::io::OverlappedIOHandle>&& Handle);
 
     void Stop();
 
@@ -36,7 +36,7 @@ private:
 
     std::mutex m_pendingHandlesLock;
     wil::unique_event m_refreshEvent{wil::EventOptions::None};
-    std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> m_pendingHandles;
+    std::vector<std::unique_ptr<common::io::OverlappedIOHandle>> m_pendingHandles;
 
     std::thread m_thread;
     std::atomic<bool> m_exit = false;

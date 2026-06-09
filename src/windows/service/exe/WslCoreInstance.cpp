@@ -28,7 +28,8 @@ WslCoreInstance::WslCoreInstance(
     _In_ ULONG FeatureFlags,
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
-    _Out_opt_ ULONG* ConnectPort) :
+    _Out_opt_ ULONG* ConnectPort,
+    _In_opt_ HANDLE JobObject) :
     LxssRunningInstance(IdleTimeout),
     m_featureFlags(FeatureFlags),
     m_instanceId(InstanceId),
@@ -38,7 +39,8 @@ WslCoreInstance::WslCoreInstance(
     m_initializeDrvFs(DrvFsCallback),
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
-    m_socketTimeout(SocketTimeout)
+    m_socketTimeout(SocketTimeout),
+    m_jobObject(JobObject)
 {
     // Establish a communication channel with the init daemon.
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
@@ -125,7 +127,9 @@ WslCoreInstance::WslCoreInstance(
                 DrvFsCallback,
                 systemDistroFeatureFlags,
                 m_socketTimeout,
-                IdleTimeout);
+                IdleTimeout,
+                nullptr,
+                JobObject);
         }
         CATCH_LOG()
     }
@@ -271,7 +275,7 @@ void WslCoreInstance::CreateLxProcess(
 
 void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::service::DistributionRegistration&& registration)
 {
-    wsl::shared::SocketChannel channel(std::move(Socket), "OOBE", m_destroyingEvent.get());
+    wsl::shared::SocketChannel channel(std::move(Socket), "OOBE", {m_destroyingEvent.get()});
 
     const auto* oobeResult = channel.ReceiveMessageOrClosed<LX_INIT_OOBE_RESULT>().first;
 
@@ -419,7 +423,7 @@ void WslCoreInstance::Initialize()
         {
             const wil::unique_socket socket{wsl::windows::common::hvsocket::Connect(m_runtimeId, response.InteropPort)};
             wil::unique_handle info{wsl::windows::common::helpers::LaunchInteropServer(
-                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get())};
+                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get(), m_jobObject)};
         }
         CATCH_LOG()
     }
@@ -475,9 +479,9 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
             terminateMessage.Header.MessageSize = sizeof(terminateMessage);
             terminateMessage.Force = Force;
 
-            auto transaction = m_initChannel->GetChannel().StartTransaction();
+            auto transaction = m_initChannel->GetChannel().StartTransaction(m_socketTimeout);
             transaction.Send(terminateMessage);
-            auto [message, span] = transaction.ReceiveOrClosed<RESULT_MESSAGE<bool>>(m_socketTimeout);
+            auto [message, span] = transaction.ReceiveOrClosed<RESULT_MESSAGE<bool>>();
             if (message)
             {
                 shutdown = message->Result;

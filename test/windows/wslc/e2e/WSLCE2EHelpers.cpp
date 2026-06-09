@@ -52,7 +52,7 @@ namespace {
     {
         const auto sessionManager = OpenSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -244,6 +244,36 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
     }
 }
 
+void VerifyNetworkIsListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Network '{}' not found in network list output", networkName).c_str());
+}
+
+void VerifyNetworkIsNotListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            VERIFY_FAIL(std::format(L"Network '{}' found in network list output", networkName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -278,34 +308,30 @@ wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName)
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = RunWslc(L"container list --no-trunc --all");
-    listResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto stdoutLines = listResult.GetStdoutLines();
-    for (const auto& line : stdoutLines)
+    const auto name = wsl::shared::string::WideToMultiByte(containerName);
+    const auto containers = ListAllContainers();
+    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Name == name; });
+    if (it == containers.end())
     {
-        if (line.find(containerName) != std::wstring::npos)
-        {
-            if (line.find(L"running") != std::wstring::npos)
-            {
-                auto result = RunWslc(std::format(L"container kill {}", containerName));
-                // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
-                if (result.ExitCode != 0 &&
-                    (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
-                {
-                    result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-                }
-            }
+        return;
+    }
 
-            auto result = RunWslc(std::format(L"container remove --force {}", containerName));
-            // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
-            if (result.ExitCode != 0 &&
-                (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
-            {
-                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-            }
-            break;
+    if (it->State == WSLCContainerState::WslcContainerStateRunning)
+    {
+        auto result = RunWslc(std::format(L"container kill {}", containerName));
+        // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
+        if (result.ExitCode != 0 &&
+            (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+        {
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
         }
+    }
+
+    auto result = RunWslc(std::format(L"container remove --force {}", containerName));
+    // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
+    if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+    {
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 }
 
@@ -394,7 +420,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         targetSession = std::format(L"{}-{}", baseName, username);
     }
 
-    auto listResult = RunWslc(L"session list");
+    auto listResult = RunWslc(L"system session list");
     listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();
@@ -403,7 +429,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         // Check if the line ends with the target session name
         if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
         {
-            auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
+            auto result = RunWslc(std::format(L"system session terminate \"{}\"", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
@@ -426,6 +452,31 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
     }
 }
 
+void EnsureNetworkDoesNotExist(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            auto deleteResult = RunWslc(std::format(L"network rm {}", networkName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+wslc_schema::Network InspectNetwork(const std::wstring& networkName)
+{
+    auto result = RunWslc(std::format(L"network inspect {}", networkName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::Network>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 {
     // Ensure the default elevated session exists before opening it via COM.
@@ -444,7 +495,17 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 
 std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
 {
-    EnsureImageIsLoaded({L"wslc-registry", L"latest", GetTestImagePath("wslc-registry:latest")});
+    // Check if the registry image is already loaded on this session.
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+    THROW_IF_FAILED(session.ListImages(nullptr, &images, images.size_address<ULONG>()));
+
+    bool found = std::ranges::any_of(
+        std::span{images.get(), images.size()}, [](const auto& e) { return std::strcmp(e.Image, "wslc-registry:latest") == 0; });
+
+    if (!found)
+    {
+        LoadTestImage(session, "wslc-registry:latest");
+    }
 
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 

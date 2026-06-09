@@ -82,3 +82,48 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
         SOURCES ${idl_files_with_proxy} ${idl_files_no_proxy})
 
 endfunction()
+
+function(add_idl_winrt target idl_file)
+    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+    file(TO_NATIVE_PATH ${OUTPUT_DIR} OUTPUT_DIR) # midl is picky about path formats
+    file(MAKE_DIRECTORY ${OUTPUT_DIR})
+
+    set(IDL_DEFINITIONS "")
+
+    get_directory_property(IDL_DEFS COMPILE_DEFINITIONS )
+    foreach(e ${IDL_DEFS})
+        set(IDL_DEFINITIONS ${IDL_DEFINITIONS} /D${e})
+    endforeach()
+
+    string(TOLOWER ${TARGET_PLATFORM} IDL_ENV)
+
+    cmake_host_system_information(
+        RESULT WINDOWS_SDK_DIR
+        QUERY WINDOWS_REGISTRY "HKLM/SOFTWARE/Microsoft/Windows Kits/Installed Roots"
+        VALUE "KitsRoot10")
+    set(WINRT_METADATA_DIR "${WINDOWS_SDK_DIR}\\UnionMetadata\\${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+    set(WINRT_REFERENCE "${WINRT_METADATA_DIR}\\Windows.winmd")
+    set(WINRT_INCLUDE "${WINDOWS_SDK_DIR}\\Include\\${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}\\winrt")
+
+    cmake_path(GET idl_file STEM IDL_NAME)
+
+    set(IDL_WINMD ${OUTPUT_DIR}/${IDL_NAME}.winmd)
+
+    add_custom_command(
+        OUTPUT ${IDL_WINMD}
+        COMMAND midl /nologo /nomidl /winrt /metadata_dir "${WINRT_METADATA_DIR}" /reference "${WINRT_REFERENCE}" /I "${WINRT_INCLUDE}" /env "${IDL_ENV}" /h nul /winmd ${IDL_WINMD} ${idl_file} ${IDL_DEFINITIONS}
+        COMMAND cppwinrt -input ${IDL_WINMD} -reference "${WINRT_REFERENCE}" -output ${OUTPUT_DIR} -comp ${OUTPUT_DIR}/implementation_base -optimize -pch precomp.h -prefix
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+        DEPENDS ${idl_file}
+        MAIN_DEPENDENCY ${idl_file}
+        VERBATIM
+    )
+
+    set_source_files_properties(${IDL_WINMD} PROPERTIES GENERATED TRUE)
+
+    add_custom_target(${target}
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${target}
+        DEPENDS ${IDL_WINMD}
+        SOURCES ${idl_file})
+
+endfunction()
