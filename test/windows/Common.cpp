@@ -1390,6 +1390,48 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+HostFileChange::HostFileChange(const std::filesystem::path& Path, const std::string& NewContent) : m_path(Path)
+{
+    std::error_code ec;
+    if (std::filesystem::exists(m_path, ec))
+    {
+        std::ifstream file(m_path, std::ios::binary);
+        THROW_HR_IF(E_FAIL, !file.is_open());
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        m_originalContent = buffer.str();
+    }
+
+    Update(NewContent);
+}
+
+HostFileChange::~HostFileChange()
+{
+    std::error_code ec;
+    if (m_originalContent.has_value())
+    {
+        std::filesystem::create_directories(m_path.parent_path(), ec);
+        std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        if (file.is_open())
+        {
+            file.write(m_originalContent->data(), static_cast<std::streamsize>(m_originalContent->size()));
+        }
+    }
+    else
+    {
+        std::filesystem::remove(m_path, ec);
+    }
+}
+
+void HostFileChange::Update(const std::string& NewContent) const
+{
+    std::error_code ec;
+    std::filesystem::create_directories(m_path.parent_path(), ec);
+    std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+    THROW_HR_IF(E_FAIL, !file.is_open());
+    file.write(NewContent.data(), static_cast<std::streamsize>(NewContent.size()));
+}
+
 std::wstring ReadFileContent(const std::string& Path)
 {
     std::ifstream configRead(Path);
