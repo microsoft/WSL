@@ -141,7 +141,7 @@ class WSLCE2EImageListTests
         const auto result = RunWslc(L"image list --filter color=blue");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid image filter"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Filter_Reference)
