@@ -416,6 +416,9 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
         // From the host side, verify we can connect to both ports
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort2).c_str(), HTTP_STATUS_OK, true);
@@ -466,6 +469,9 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {} {} {}", WslcContainerName, ContainerTestPort, PythonImage.NameAndTag(), GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
         // Inspect the container to find the allocated host port
         auto inspectContainer = InspectContainer(WslcContainerName);
@@ -522,6 +528,9 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
         // Verify we can connect to the server via the specified host IP.
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
 
@@ -547,6 +556,9 @@ class WSLCE2EContainerRunTests
             PythonImage.NameAndTag(),
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
         // Verify we can connect to the server from the host side
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);

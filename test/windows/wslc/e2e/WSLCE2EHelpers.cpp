@@ -514,7 +514,7 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
 
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
-    return std::format(L"python3 -m http.server {}", port);
+    return std::format(L"python3 -u -m http.server {}", port);
 }
 
 std::wstring GetPythonUdpEchoServerScript(uint16_t port)
