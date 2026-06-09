@@ -971,9 +971,19 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         SignalArg = Signal;
     }
 
+    std::optional<ULONG> TimeoutArg;
+    if (TimeoutSeconds >= 0)
+    {
+        TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+    }
+
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
     bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
+
+    // True when we delivered an explicit stop-signal override through the /kill endpoint
+    // instead of /stop (see below). Drives the SIGKILL fallback and error handling.
+    bool signalDelivered = false;
 
     try
     {
@@ -986,31 +996,57 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
                 return;
             }
         }
+        else if (SignalArg.has_value())
+        {
+            // podman's compat /containers/{id}/stop endpoint ignores the "signal" query
+            // parameter (dockerd has honored it since API v1.42) and always stops the
+            // container with its configured StopSignal. To honor an explicit stop-signal
+            // override we deliver the signal ourselves via the /kill endpoint, then fall
+            // back to SIGKILL after the timeout below if the container is still running.
+            m_dockerClient.SignalContainer(m_id, SignalArg);
+            signalDelivered = true;
+        }
         else
         {
-            std::optional<ULONG> TimeoutArg;
-            if (TimeoutSeconds >= 0)
-            {
-                TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
-            }
-
-            m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+            m_dockerClient.StopContainer(m_id, std::nullopt, TimeoutArg);
         }
     }
     catch (const DockerHTTPException& e)
     {
-        // HTTP 304 is returned when the container is already stopped.
-        if (Kill || e.StatusCode() != 304)
+        // HTTP 304 is returned by /stop when the container is already stopped.
+        if (Kill || signalDelivered || e.StatusCode() != 304)
         {
             THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
         }
     }
 
-    // Wait for the stop event to get the Docker timestamp.
+    // Wait for the stop event to get the Docker timestamp. We must not call OnStopped() until the
+    // container has actually stopped: /kill is asynchronous (it only delivers the signal), unlike
+    // /stop which blocks until the container exits. TimeoutSeconds is the GRACEFUL window before
+    // escalating to SIGKILL for a non-SIGKILL override; it must not shorten the wait for the actual
+    // stop in the SIGKILL or normal-stop cases (TimeoutSeconds can legitimately be 0 = "kill now").
     std::optional<std::uint64_t> stopTimestamp;
-    if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
+    const bool gracefulOverride = signalDelivered && SignalArg.value_or(WSLCSignalSIGKILL) != WSLCSignalSIGKILL;
+    const auto firstWait = (gracefulOverride && TimeoutSeconds >= 0) ? std::chrono::seconds(TimeoutSeconds) : 60s;
+    if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), firstWait))
     {
         stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
+    }
+    else if (gracefulOverride)
+    {
+        // The override signal didn't stop the container within its graceful window. Escalate to
+        // SIGKILL to honor Stop()'s "force-kill after timeout" contract (podman's /stop would do
+        // this internally, but we bypassed it to deliver the override signal via /kill).
+        try
+        {
+            m_dockerClient.SignalContainer(m_id, WSLCSignalSIGKILL);
+        }
+        CATCH_LOG();
+
+        if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
+        {
+            stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
+        }
     }
 
     comWrapper = OnStopped(stopTimestamp);

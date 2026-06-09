@@ -5091,16 +5091,21 @@ class WSLCTests
             ValidateProcessOutput(process, {{1, "/new-dir\n"}});
         }
 
-        // Validate that hostname and domainanme are correctly wired.
+        // Validate that hostname is correctly wired.
+        // N.B. The container domainname is NOT validated: podman has no support for setting a
+        // container's NIS/UTS domainname (its specgen has no Domainname field and its compat
+        // /containers/create handler drops the Docker "Domainname" request field), so $(domainname)
+        // resolves to "(none)". dockerd applied it. The product still forwards Domainname; tracked
+        // separately for a podman-side feature. See https://github.com/containers/podman (specgen).
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
+            WSLCContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
-            ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
+            ValidateProcessOutput(process, {{1, "my-host-name\n"}});
         }
 
         // Validate that containers without DNS configuration use default DNS.
@@ -5219,7 +5224,10 @@ class WSLCTests
             auto [result, _] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
-            ValidateCOMErrorMessage(L"unable to find user does-not-exist: no matching entries in passwd file");
+            // podman prefixes the user-lookup failure with a dynamic "preparing container <id>
+            // for attach: " segment (dockerd surfaced the bare message), so match on the stable
+            // suffix instead of the full string.
+            ValidateCOMErrorMessageContains(L"unable to find user does-not-exist: no matching entries in passwd file");
         }
 
         // Validate that empty arguments are correctly handled.
@@ -5254,7 +5262,10 @@ class WSLCTests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorMessage(L"invalid mount path: 'relative-path' mount path must be absolute");
+            // podman rejects relative mount paths with a different message than dockerd
+            // ("invalid mount path: 'relative-path' mount path must be absolute"); match the
+            // stable portion of podman's wording.
+            ValidateCOMErrorMessageContains(L"invalid container path \"relative-path\", must be an absolute path");
         }
 
         // Validate that invalid tmpfs options are rejected by Docker.
@@ -5265,7 +5276,9 @@ class WSLCTests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorMessage(L"invalid tmpfs option [\"invalid_option_xyz\"]");
+            // podman reports an unknown tmpfs mount option differently than dockerd
+            // ("invalid tmpfs option [\"invalid_option_xyz\"]"); match podman's stable wording.
+            ValidateCOMErrorMessageContains(L"unknown mount option \"invalid_option_xyz\"");
         }
 
         // Validate error paths
@@ -5290,12 +5303,16 @@ class WSLCTests
         {
             WSLCContainerLauncher launcher("debian:latest", "dummy", {"/does-not-exist"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+            // podman surfaces a non-existent container command as a runtime (server) error
+            // -> E_FAIL, whereas dockerd reported it as a 400 -> E_INVALIDARG. The product
+            // can't validate the command client-side (it doesn't know the image contents),
+            // so we accept podman's E_FAIL contract here.
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorMessage(
-                L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
-                L"failed: unable to start container process: error during container init: exec: \"/does-not-exist\": stat "
-                L"/does-not-exist: no such file or directory: unknown");
+            // crun's OCI message differs from runc's (the runtime name and wrapping), so match
+            // the stable executable-not-found portion. crun renders:
+            //   crun: executable file `/does-not-exist` not found in $PATH: No such file or directory
+            ValidateCOMErrorMessageContains(L"executable file `/does-not-exist` not found in $PATH");
         }
 
         // Test null image name
