@@ -2765,7 +2765,7 @@ class WSLCTests
         };
 
         class DECLSPEC_UUID("8C5A7B14-9D26-4FAE-AB31-7E5BC23F4802") CallbackInstance
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback, IFastRundown>
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback, IFastRundown, Microsoft::WRL::FtmBase>
         {
         public:
             CallbackInstance(std::promise<Invocation>& promise, wil::unique_event& release) :
