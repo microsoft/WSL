@@ -3624,7 +3624,7 @@ class WSLCTests
             options.Flags = static_cast<WSLCProcessFlags>(0x4);
             wil::com_ptr<IWSLCProcess> process;
             int err = 0;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, &process, &err));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, 0, 0, &process, &err));
         }
 
         // Simple case
