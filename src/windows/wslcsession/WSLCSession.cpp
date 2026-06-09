@@ -1771,8 +1771,15 @@ try
         }
         catch (DockerHTTPException& e)
         {
+            // podman returns 404 for BOTH a missing container and an ambiguous prefix (dockerd used
+            // 400 for ambiguous), distinguishable only by the message ("more than one result for
+            // container ..." vs "no such container"). Check ambiguity first, then fall back to
+            // not-found.
+            const bool ambiguous = e.StatusCode() == 400 ||
+                (e.HasErrorMessage() &&
+                 e.DockerMessage<docker_schema::ErrorResponse>().message.find("more than one result") != std::string::npos);
+            RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, ambiguous, "Ambiguous prefix: '%hs'", Id);
             THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), e.StatusCode() == 404);
-            RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, e.StatusCode() == 400, "Ambiguous prefix: '%hs'", Id);
 
             THROW_HR_MSG(E_FAIL, "Unexpected error inspecting container '%hs': %hs", Id, e.what());
         }

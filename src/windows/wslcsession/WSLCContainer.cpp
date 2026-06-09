@@ -1361,7 +1361,22 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcInspect.HostConfig.Ulimits.reserve(dockerInspect.HostConfig.Ulimits->size());
         for (const auto& ulimit : dockerInspect.HostConfig.Ulimits.value())
         {
-            wslcInspect.HostConfig.Ulimits.push_back({ulimit.Name, ulimit.Soft, ulimit.Hard});
+            // podman's inspect reports ulimit names as the rlimit constant (e.g. "RLIMIT_NOFILE"),
+            // while dockerd and our API contract use the short lowercase form ("nofile"). Normalize
+            // back to the Docker name so a create/inspect round-trip is stable.
+            std::string name = ulimit.Name;
+            if (name.starts_with("RLIMIT_"))
+            {
+                name = name.substr(7);
+                for (auto& c : name)
+                {
+                    if (c >= 'A' && c <= 'Z')
+                    {
+                        c = static_cast<char>(c - 'A' + 'a');
+                    }
+                }
+            }
+            wslcInspect.HostConfig.Ulimits.push_back({std::move(name), ulimit.Soft, ulimit.Hard});
         }
     }
 
