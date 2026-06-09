@@ -143,6 +143,9 @@ void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
 std::wstring GetPythonHttpServerScript(uint16_t port);
+std::wstring GetPythonUdpEchoServerScript(uint16_t port);
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family = AF_INET);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>

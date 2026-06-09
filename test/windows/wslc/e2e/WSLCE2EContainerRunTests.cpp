@@ -443,7 +443,9 @@ class WSLCE2EContainerRunTests
         auto startResult = RunWslc(std::format(L"container start {}", containerId));
         startResult.Verify(
             {.Stderr = std::format(
-                 L"Port 127.0.0.1:{}/tcp is already in use, cannot start container {}\r\nError code: ERROR_ALREADY_EXISTS\r\n", HostTestPort1, containerId),
+                 L"Failed to map port '127.0.0.1:{}/tcp', Only one usage of each socket address (protocol/network "
+                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
+                 HostTestPort1),
              .ExitCode = 1});
 
         // Clean up the created container
@@ -481,17 +483,57 @@ class WSLCE2EContainerRunTests
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_UDP)
     {
-        auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with a UDP echo server listening on a port.
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{}/udp {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonUdpEchoServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Send a datagram from the host and verify the container echoes it back uppercased.
+        SendUdpAndReceive(HostTestPort1, "hello", "HELLO");
+
+        // Verify the UDP port mapping is reflected in the container inspect data.
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/udp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_HostIP)
     {
-        auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with a server listening on a port, bound to a specific host IP (127.0.0.1).
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p 127.0.0.1:{}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify we can connect to the server via the specified host IP.
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        // Verify the port mapping reflects the specific host IP binding.
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)

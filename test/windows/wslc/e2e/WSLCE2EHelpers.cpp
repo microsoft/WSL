@@ -516,4 +516,48 @@ std::wstring GetPythonHttpServerScript(uint16_t port)
 {
     return std::format(L"python3 -m http.server {}", port);
 }
+
+std::wstring GetPythonUdpEchoServerScript(uint16_t port)
+{
+    // Inline Python UDP echo server: echoes each received datagram back uppercased, forever.
+    return std::format(
+        L"python3 -c \"import socket;"
+        L"s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);"
+        L"s.bind(('0.0.0.0',{}));"
+        L"[s.sendto(d.upper(),a) for d,a in iter(lambda:s.recvfrom(1024),0)]\"",
+        port);
+}
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family)
+{
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+    INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&addr));
+    SS_PORT(&addr) = htons(hostPort);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    do
+    {
+        wil::unique_socket sock{::socket(family, SOCK_DGRAM, IPPROTO_UDP)};
+        THROW_LAST_ERROR_IF(!sock);
+
+        DWORD timeout = 1000;
+        THROW_LAST_ERROR_IF(
+            setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        if (sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) !=
+            SOCKET_ERROR)
+        {
+            char buf[1024];
+            const int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
+            if (received != SOCKET_ERROR && received > 0 && std::string(buf, received) == expectedReply)
+            {
+                return std::string(buf, received);
+            }
+        }
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    VERIFY_FAIL(L"Timed out waiting for expected UDP echo reply from container");
+    return {};
+}
 } // namespace WSLCE2ETests

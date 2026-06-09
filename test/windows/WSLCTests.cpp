@@ -7474,32 +7474,6 @@ class WSLCTests
 
         auto hostIp = getHostAdapterIpv4();
 
-        // Sends a UDP datagram and waits for a reply. Returns the reply payload.
-        auto sendUdpAndReceive = [](uint16_t port, int family, const std::string& payload) -> std::string {
-            SOCKADDR_INET addr{};
-            addr.si_family = static_cast<ADDRESS_FAMILY>(family);
-            INETADDR_SETLOOPBACK((PSOCKADDR)&addr);
-            SS_PORT(&addr) = htons(port);
-
-            wil::unique_socket sock{socket(family, SOCK_DGRAM, IPPROTO_UDP)};
-            THROW_LAST_ERROR_IF(!sock);
-
-            // Set a receive timeout so the test doesn't hang if the reply never arrives.
-            DWORD timeout = 5000;
-            THROW_LAST_ERROR_IF(
-                setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
-
-            THROW_LAST_ERROR_IF(
-                sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) ==
-                SOCKET_ERROR);
-
-            char buf[1024];
-            int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
-            THROW_LAST_ERROR_IF(received == SOCKET_ERROR);
-
-            return std::string(buf, received);
-        };
-
         struct PortMapping
         {
             uint16_t HostPort;
@@ -7641,8 +7615,7 @@ class WSLCTests
                 auto container = launcher.Launch(*session);
                 WaitForOutput(container.GetInitProcess().GetStdHandle(1), "UDP listening");
 
-                auto reply = sendUdpAndReceive(1265, AF_INET, "hello");
-                VERIFY_ARE_EQUAL(reply, "HELLO");
+                WSLCE2ETests::SendUdpAndReceive(1265, "hello", "HELLO");
             }
 
             // Validate that trying to bind an address that the host doesn't have fails:
