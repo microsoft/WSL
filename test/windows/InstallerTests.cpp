@@ -358,11 +358,13 @@ class InstallerTests
         THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), rec.get()));
 
         MSIHANDLE hResult = 0;
-        if (MsiViewFetch(view.get(), &hResult) == ERROR_NO_MORE_ITEMS)
+        auto fetchResult = MsiViewFetch(view.get(), &hResult);
+        if (fetchResult == ERROR_NO_MORE_ITEMS)
         {
             return -1;
         }
 
+        THROW_IF_WIN32_ERROR(fetchResult);
         unique_msi_handle result{hResult};
         return MsiRecordGetInteger(result.get(), 1);
     }
@@ -716,7 +718,7 @@ class InstallerTests
             output);
     }
 
-    TEST_METHOD(MsiUpgradeRollbackRestoresFiles)
+    TEST_METHOD(MsiRemoveExistingProductsScheduledInsideTransaction)
     {
         // Verify that RemoveExistingProducts is scheduled inside the MSI transaction
         // (between InstallInitialize and InstallFinalize). This is the effect of
