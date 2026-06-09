@@ -213,6 +213,13 @@ private:
     DockerEventTracker::EventTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
     WSLCContainerNetworkType m_networkingMode{};
+
+    // The Docker-semantic network mode requested at create time (network name for a custom
+    // network, otherwise "bridge"/"host"/"none"/"container:<id>"). podman's compat inspect
+    // collapses any bridge-driver network to "bridge", losing the network name, so we echo
+    // this back on inspect to preserve the Docker contract. Empty for recovered containers
+    // (Open()), where we fall back to podman's reported value.
+    std::optional<std::string> m_requestedNetworkMode;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer

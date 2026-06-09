@@ -1003,8 +1003,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
             // container with its configured StopSignal. To honor an explicit stop-signal
             // override we deliver the signal ourselves via the /kill endpoint, then fall
             // back to SIGKILL after the timeout below if the container is still running.
-            m_dockerClient.SignalContainer(m_id, SignalArg);
+            // N.B. Set the flag BEFORE the call so the catch recognizes the /kill path even
+            // when SignalContainer throws (e.g. 409 Conflict when the container already stopped).
             signalDelivered = true;
+            m_dockerClient.SignalContainer(m_id, SignalArg);
         }
         else
         {
@@ -1013,8 +1015,14 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
     catch (const DockerHTTPException& e)
     {
-        // HTTP 304 is returned by /stop when the container is already stopped.
-        if (Kill || signalDelivered || e.StatusCode() != 304)
+        // The container is already in the desired (stopped) state when /stop returns 304 Not
+        // Modified, or when the /kill override returns 409 Conflict (podman's KillContainer maps
+        // ErrCtrStopped / ErrCtrStateInvalid to 409). Stop() is idempotent, so neither is a
+        // failure. This matters for a short-lived container that exits on its own between our
+        // state check and the HTTP call (m_state still Running, but podman already stopped it).
+        // Kill() keeps its original strict behavior.
+        const bool alreadyStopped = !Kill && (signalDelivered ? e.StatusCode() == 409 : e.StatusCode() == 304);
+        if (!alreadyStopped)
         {
             THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
         }
@@ -1341,7 +1349,10 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.State.StartedAt = dockerInspect.State.StartedAt;
     wslcInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
 
-    wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
+    // Echo the network mode requested at create time so a custom network reports its name (the
+    // Docker contract) instead of podman's collapsed "bridge". Falls back to podman's reported
+    // value for recovered containers, where m_requestedNetworkMode is unset.
+    wslcInspect.HostConfig.NetworkMode = m_requestedNetworkMode.value_or(dockerInspect.HostConfig.NetworkMode);
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
 
@@ -1792,6 +1803,10 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         ParseDockerTimestamp(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
+
+    // Preserve the Docker-semantic network mode we requested; podman's inspect would otherwise
+    // report any bridge-driver network (default or custom) as just "bridge" (see member doc).
+    container->m_requestedNetworkMode = networkMode;
 
     deleteOnFailure.release();
     return container;

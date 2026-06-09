@@ -2353,9 +2353,15 @@ try
     }
     catch (const DockerHTTPException& e)
     {
-        // Docker returns 403 when the network has active endpoints.
+        // An in-use network is reported differently by the two backends: dockerd returns 403,
+        // while podman returns 500 with a "network is being used" message ("<name> has associated
+        // containers with it..."). 500 is too generic to map blindly, so for podman we match the
+        // message; dockerd's 403 is mapped directly.
+        const bool networkInUse = e.StatusCode() == 403 ||
+            (e.HasErrorMessage() &&
+             e.DockerMessage<docker_schema::ErrorResponse>().message.find("is being used") != std::string::npos);
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 403);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), networkInUse);
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
     }

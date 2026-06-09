@@ -6914,13 +6914,13 @@ class WSLCTests
         {
             WSLCProcessLauncher launcher({}, {"/not-found"});
 
+            // crun reports a missing executable as exit 127 ("command not found"), where runc/docker
+            // used 126, and emits its own message on stderr (fd 2) with non-deterministic attach
+            // noise appended, so match the stable substring rather than the whole output.
             auto process = launcher.Launch(container.Get());
-            ValidateProcessOutput(
-                process,
-                {{1,
-                  "OCI runtime exec failed: exec failed: unable to start container process: exec: \"/not-found\": stat "
-                  "/not-found: no such file or directory: unknown\r\n"}},
-                126);
+            auto result = process.WaitAndCaptureOutput(INFINITE);
+            VERIFY_ARE_EQUAL(result.Code, 127);
+            VERIFY_IS_TRUE(result.Output[2].find("executable file `/not-found` not found in $PATH") != std::string::npos);
         }
 
         // Validate that setting invalid current directory returns the correct error.
@@ -6928,13 +6928,11 @@ class WSLCTests
             WSLCProcessLauncher launcher({}, {"/bin/cat"});
             launcher.SetWorkingDirectory("/notfound");
 
+            // crun: chdir failure -> exit 127 (runc/docker was 126), message on stderr.
             auto process = launcher.Launch(container.Get());
-            ValidateProcessOutput(
-                process,
-                {{1,
-                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set in "
-                  "config.json failed: no such file or directory: unknown\r\n"}},
-                126);
+            auto result = process.WaitAndCaptureOutput(INFINITE);
+            VERIFY_ARE_EQUAL(result.Code, 127);
+            VERIFY_IS_TRUE(result.Output[2].find("chdir to `/notfound`: No such file or directory") != std::string::npos);
         }
 
         // Validate that invalid usernames are correctly handled.
@@ -6942,8 +6940,12 @@ class WSLCTests
             WSLCProcessLauncher launcher({}, {"/bin/cat"});
             launcher.SetUser("does-not-exist");
 
-            auto process = launcher.Launch(container.Get());
-            ValidateProcessOutput(process, {{1, "unable to find user does-not-exist: no matching entries in passwd file\r\n"}}, 126);
+            // podman rejects the exec up-front when the user doesn't exist, so the launch fails
+            // (E_FAIL) instead of docker's behavior of starting the process and exiting 126.
+            // N.B. The process launcher does not surface the underlying "unable to find user"
+            // message as COM error info for exec, so we only assert the failure here.
+            auto [hresult, process] = launcher.LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
         }
 
         // Validate that an exec'd command returns when the container is stopped.
