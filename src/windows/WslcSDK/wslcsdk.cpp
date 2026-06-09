@@ -100,14 +100,14 @@ WSLCSignal Convert(WslcSignal signal)
     }
 }
 
-WSLCContainerNetworkType Convert(WslcContainerNetworkingMode mode)
+PCSTR Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
     case WSLC_CONTAINER_NETWORKING_MODE_NONE:
-        return WSLCContainerNetworkTypeNone;
+        return "none";
     case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
-        return WSLCContainerNetworkTypeBridged;
+        return "bridge";
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
@@ -445,7 +445,8 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -737,7 +738,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = WSLCContainerNetworkTypeNone;
+    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -866,7 +867,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
+    // SDK only exposes the network mode (no additional endpoints today).
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -874,7 +876,7 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -902,7 +904,7 @@ try
     // TODO: Consider if we should just override flags when callbacks were provided instead.
     RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr, nullptr))))
     {
         if (hasIOCallback)
         {
@@ -977,7 +979,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(containerSettings);
 
-    internalType->networking = Convert(networkingMode);
+    internalType->networkMode = Convert(networkingMode);
 
     return S_OK;
 }
@@ -1374,7 +1376,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1384,7 +1386,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1422,7 +1424,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1501,7 +1503,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 

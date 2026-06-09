@@ -44,6 +44,7 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(AlpineImage);
         EnsureImageIsDeleted(DebianImage);
+        EnsureNetworkDoesNotExist(TestNetworkName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
@@ -58,6 +59,7 @@ class WSLCE2EContainerCreateTests
         VolumeTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         VolumeTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureNetworkDoesNotExist(TestNetworkName);
         return true;
     }
 
@@ -467,10 +469,13 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt, true);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
 
         session.ExpectStdout(expectedPrompt);
 
@@ -768,9 +773,66 @@ class WSLCE2EContainerCreateTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_DefaultIsBridge)
+    {
+        auto result = RunWslc(std::format(L"container create --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_HostMode_Rejected)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_HostMode_WithMultipleNetworks_Rejected)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --network bridge --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_UserDefinedNetwork)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container create --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_EmptyValue_Rejected)
+    {
+        auto result = RunWslc(std::format(L"container create --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid network value: network name cannot be empty or whitespace\r\n", .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_NonexistentNetwork_Rejected)
+    {
+        auto result = RunWslc(
+            std::format(L"container create --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
+
+    // Test network name
+    const std::wstring TestNetworkName = L"wslc-test-network";
 
     // Test environment variables
     const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";
@@ -828,6 +890,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
                 << L"  --cidfile         Write the container ID to the provided path\r\n"
+                << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
                 << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
                 << L"  --dns-option      Set DNS options\r\n"
                 << L"  --dns-search      Set DNS search domains\r\n"
@@ -839,7 +902,9 @@ private:
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
+                << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --network         Connect a container to a network\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
@@ -848,6 +913,7 @@ private:
                 << L"  --stop-signal     Signal to stop the container\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
+                << L"  --ulimit          Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"

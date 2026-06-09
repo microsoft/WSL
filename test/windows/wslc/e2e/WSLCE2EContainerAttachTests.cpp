@@ -57,15 +57,13 @@ class WSLCE2EContainerAttachTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
         const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
 
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");

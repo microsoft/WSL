@@ -31,14 +31,15 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     return Offset;
 }
 
-void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
+DWORD CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
 {
     DWORD bytesTransferred{};
-    if (CancelIoEx((HANDLE)Handle, &Overlapped))
+    if (CancelIoEx((HANDLE)Handle, &Overlapped) || GetLastError() == ERROR_NOT_FOUND)
     {
         if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
         {
-            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
+            DWORD flagsReturned{};
+            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, &flagsReturned))
             {
                 auto error = WSAGetLastError();
                 LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && error != WSAECONNRESET);
@@ -56,9 +57,10 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
     }
     else
     {
-        // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        LOG_LAST_ERROR_MSG("Unexpected error while cancelling IO on handle: 0x%p", (void*)Handle);
     }
+
+    return bytesTransferred;
 }
 
 inline void UnregisterWait(HANDLE waitHandle) noexcept
@@ -528,8 +530,11 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 // ReadSocketMessageHandle
 
 ReadSocketMessageHandle::ReadSocketMessageHandle(
-    HandleWrapper&& MovedSocket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
-    Socket(std::move(MovedSocket)), Buffer(Buffer), OnMessage(std::move(OnMessage))
+    HandleWrapper&& MovedSocket,
+    std::vector<gsl::byte>& Buffer,
+    std::vector<gsl::byte>& PendingBytes,
+    std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
+    Socket(std::move(MovedSocket)), Buffer(Buffer), PendingBytes(PendingBytes), OnMessage(std::move(OnMessage))
 {
     Overlapped.hEvent = Event.get();
 
@@ -537,13 +542,53 @@ ReadSocketMessageHandle::ReadSocketMessageHandle(
     {
         Buffer.resize(sizeof(MESSAGE_HEADER));
     }
+
+    if (PendingBytes.empty())
+    {
+        return;
+    }
+
+    // If bytes from a previously cancelled transaction are passed, process them now.
+    if (Buffer.size() < PendingBytes.size())
+    {
+        Buffer.resize(PendingBytes.size());
+    }
+
+    std::copy(PendingBytes.begin(), PendingBytes.end(), Buffer.begin());
+    CurrentOffset = PendingBytes.size();
+    PendingBytes.clear();
+
+    if (CurrentOffset < sizeof(MESSAGE_HEADER))
+    {
+        BytesRemaining = sizeof(MESSAGE_HEADER) - CurrentOffset;
+    }
+    else
+    {
+        BytesRemaining = 0;
+    }
 }
 
 ReadSocketMessageHandle::~ReadSocketMessageHandle()
 {
-    if (State == IOHandleStatus::Pending)
+    if (State != IOHandleStatus::Completed)
     {
-        CancelPendingIo((SOCKET)Socket.Get(), Overlapped);
+        auto pendingSize = CurrentOffset;
+
+        if (State == IOHandleStatus::Pending)
+        {
+            // Cancel the pending receive and move any bytes already buffered for the in-flight message into PendingBytes
+            const auto socket = reinterpret_cast<SOCKET>(Socket.Get());
+            pendingSize += CancelPendingIo(socket, Overlapped);
+        }
+
+        if (pendingSize > 0)
+        {
+            WI_ASSERT(pendingSize <= Buffer.size());
+            PendingBytes.assign(Buffer.begin(), Buffer.begin() + pendingSize);
+
+            WSL_LOG(
+                "CanceledMessageRead", TraceLoggingValue(pendingSize, "TotalBytes"), TraceLoggingValue(Socket.Get(), "Socket"));
+        }
     }
 }
 
@@ -601,19 +646,17 @@ void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
         return;
     }
 
+    ProcessChunk();
+}
+
+bool ReadSocketMessageHandle::ProcessChunk()
+{
+    const auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
+
     if (ReadingHeader)
     {
-        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
-
         THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER), "Unexpected message size: %u", messageSize);
-        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024, "Message size too large: %u", messageSize);
-
-        if (messageSize == sizeof(MESSAGE_HEADER))
-        {
-            OnMessage(gsl::make_span(Buffer.data(), messageSize));
-            State = IOHandleStatus::Completed;
-            return;
-        }
+        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 16 * 1024 * 1024, "Message size too large: %u", messageSize);
 
         if (Buffer.size() < messageSize)
         {
@@ -621,20 +664,32 @@ void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
         }
 
         ReadingHeader = false;
-        CurrentOffset = sizeof(MESSAGE_HEADER);
-        BytesRemaining = messageSize - sizeof(MESSAGE_HEADER);
+        if (CurrentOffset < messageSize)
+        {
+            BytesRemaining = messageSize - CurrentOffset;
+        }
+
+        if (BytesRemaining > 0)
+        {
+            return true;
+        }
     }
-    else
-    {
-        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
-        OnMessage(gsl::make_span(Buffer.data(), messageSize));
-        State = IOHandleStatus::Completed;
-    }
+
+    OnMessage(gsl::make_span(Buffer.data(), messageSize));
+    State = IOHandleStatus::Completed;
+    return false;
 }
 
 void ReadSocketMessageHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+
+    // Process previously received bytes, if any.
+    if (BytesRemaining == 0 && !ProcessChunk())
+    {
+        return; // Message has been fully received, no need to schedule a receive.
+    }
+
     ScheduleRecv();
 }
 

@@ -110,6 +110,67 @@ class WSLCE2EImagePruneTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Prune_Filter_MalformedValue)
+    {
+        // Filter values must be of the form key=value; bare keys are rejected by the CLI.
+        const auto result = RunWslc(L"image prune --filter label");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"label") + L"\r\n", .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Prune_Filter_InvalidKey)
+    {
+        // Filter keys are validated by the Docker daemon, which rejects unknown keys.
+        const auto result = RunWslc(L"image prune --filter color=blue");
+        VERIFY_ARE_EQUAL(1, result.ExitCode);
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Prune_Filter_LabelPreservesDangling)
+    {
+        // Create a dangling debian image (same trick as WSLCE2E_Image_Prune_DanglingImage).
+        EnsureImageIsLoaded(AlpineImage);
+        auto cleanup = wil::scope_exit([&]() {
+            RunWslc(L"image prune");
+            RunWslc(L"image delete prune-target:v1");
+            EnsureImageIsDeleted(AlpineImage);
+            EnsureImageIsLoaded(DebianImage);
+        });
+
+        RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"image delete {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"image tag {} prune-target:v1", AlpineImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Prune only dangling images carrying a label the dangling image does NOT have.
+        // Multiple --filter label= values are AND'd by the daemon; the dangling image
+        // matches neither, so it must survive this prune.
+        auto filteredPrune = RunWslc(L"image prune --filter label=wslc.test.never=present --filter label=wslc.test.also=missing");
+        filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
+        for (const auto& line : filteredPrune.GetStdoutLines())
+        {
+            VERIFY_IS_FALSE(
+                line.find(L"Deleted:") != std::wstring::npos, L"Filtered prune should not have deleted the dangling image");
+            VERIFY_IS_FALSE(
+                line.find(L"Untagged:") != std::wstring::npos, L"Filtered prune should not have untagged the dangling image");
+        }
+
+        // A subsequent unfiltered prune should still find and remove the dangling image,
+        // proving the filter — not the absence of dangling images — was the reason nothing
+        // was pruned above.
+        auto unfilteredPrune = RunWslc(L"image prune");
+        unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
+        bool foundDeleted = false;
+        for (const auto& line : unfilteredPrune.GetStdoutLines())
+        {
+            if (line.find(L"Deleted:") != std::wstring::npos || line.find(L"Untagged:") != std::wstring::npos)
+            {
+                foundDeleted = true;
+                break;
+            }
+        }
+        VERIFY_IS_TRUE(foundDeleted, L"Expected the dangling image to be pruned by the unfiltered call");
+    }
+
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
@@ -151,9 +212,10 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -a,--all   " << Localization::WSLCCLI_ImagePruneAllArgDescription() << L"\r\n"
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
+                << L"  -a,--all     " << Localization::WSLCCLI_ImagePruneAllArgDescription() << L"\r\n"
+                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
+                << L"  --session    " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
+                << L"  -?,--help    " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
                 << L"\r\n";
         return options.str();
     }

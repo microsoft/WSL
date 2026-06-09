@@ -227,6 +227,21 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImages(const std::vector<std::string>& NamesOrIds)
+{
+    auto url = URL::Create("/images/get");
+    for (const auto& name : NamesOrIds)
+    {
+        // 'names' is a repeated query parameter.
+        // See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Image/operation/ImageGet
+        url.SetParameter("names", name);
+    }
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket)};
+}
+
 docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/prune");
@@ -340,7 +355,10 @@ docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string
 {
     auto url = URL::Create("/containers/{}/stats", Id);
     url.SetParameter("stream", false);
-    url.SetParameter("one-shot", true);
+
+    // Intentionally omit one-shot=true: the Docker engine blocks internally for ~1s
+    // to collect a prior sample, and returns a single response with both cpu_stats and
+    // precpu_stats correctly populated — giving a valid delta for CPU % calculation.
     return Transaction<EmptyRequest, docker_schema::ContainerStats>(verb::get, url);
 }
 
@@ -429,6 +447,16 @@ docker_schema::CreateNetworkResponse DockerHTTPClient::CreateNetwork(const docke
 void DockerHTTPClient::RemoveNetwork(const std::string& Name)
 {
     Transaction(verb::delete_, URL::Create("/networks/{}", Name));
+}
+
+void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/connect", NetworkName), Request);
+}
+
+void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
 }
 
 std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
