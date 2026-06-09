@@ -38,9 +38,10 @@ struct ErrorResponse
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
+    std::optional<std::string> status;
     std::optional<ErrorResponse> errorDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, status, errorDetail);
 };
 
 struct EmptyRequest
@@ -159,6 +160,14 @@ struct Network
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+};
+
+struct ContainerNetworkRequest
+{
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
 };
 
 struct EmptyObject

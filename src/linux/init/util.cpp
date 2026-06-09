@@ -3168,8 +3168,21 @@ try
     }
     else
     {
+        auto matchesPrefix = [Path](const std::string_view& prefix) {
+            if (!wsl::shared::string::StartsWith(Path, prefix, true))
+            {
+                return false;
+            }
+
+            // Validate that the next character is a path separator or the end of the string to prevent matching other distribution paths like:
+            // \\wsl.localhost\<distro-name>-<suffix>
+
+            auto nextChar = Path[prefix.size()];
+            return nextChar == '\0' || nextChar == PATH_SEP || nextChar == PATH_SEP_NT;
+        };
+
         auto PrefixLength = Prefix.length();
-        if (!wsl::shared::string::StartsWith(Path, Prefix, true))
+        if (!matchesPrefix(Prefix))
         {
             //
             // Check the old \\wsl$ prefix if it's not \\wsl.localhost.
@@ -3177,7 +3190,7 @@ try
 
             std::string CompatPrefix{PLAN9_RDR_COMPAT_PREFIX};
             CompatPrefix += DistributionName;
-            if (!wsl::shared::string::StartsWith(Path, CompatPrefix, true))
+            if (!matchesPrefix(CompatPrefix))
             {
                 return {};
             }
