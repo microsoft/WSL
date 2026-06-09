@@ -2119,6 +2119,10 @@ Użycie:
     <value>Kontener „{}” jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>Adres ContainerIpAddress nie jest jeszcze obsługiwany.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapowania portów nie są obsługiwane w trybie sieci kontenerów; porty są własnością kontenera docelowego.</value>
   </data>
@@ -2329,6 +2333,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nieobsługiwany tryb sieciowy: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Dodatkowe sieci nie są dozwolone, gdy trybem sieci podstawowej jest „host” lub „none”.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Zduplikowana sieć: „{}”</value>
@@ -2708,6 +2716,14 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Polecenie do uruchomienia</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Liczba procesorów (np. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Nieprawidłowa wartość argumentu {}: "{}". Oczekiwano dodatniej liczby procesorów (np. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Usuń kontenery, nawet jeśli są uruchomione</value>
   </data>
@@ -2777,11 +2793,25 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Pokaż ostatnio utworzony kontener (zawiera wszystkie stany)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Memory limit (e.g. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nazwa hosta kontenera</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Nazwa kontenera</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Connect a container to a network</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Nieprawidłowa wartość {}: nazwa sieci nie może być pusta ani zawierać białych znaków</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>host mode networking is not supported</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Nie używaj pamięci podręcznej podczas kompilowania obrazu</value>
@@ -2866,6 +2896,10 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Katalog roboczy wewnątrz kontenera</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Nieprawidłowa wartość {}: katalog roboczy nie może być pusty ani zawierać białych znaków</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Zapisz identyfikator kontenera w podanej ścieżce</value>
   </data>
@@ -2909,6 +2943,14 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Zamontuj tmpfs w kontenerze w podanej ścieżce</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit options (format: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], użyj -1 dla unlimited)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (use -1 for unlimited)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>Identyfikator użytkownika dla procesu (name|uid|uid:gid)</value>

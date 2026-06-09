@@ -2119,6 +2119,10 @@ Kullanım:
     <value>'{}' kapsayıcısı çalışıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress henüz desteklenmiyor.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Bağlantı noktası eşlemeleri kapsayıcı ağ modunda desteklenmez; bağlantı noktalarının sahibi hedef kapsayıcıdır.</value>
   </data>
@@ -2329,6 +2333,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Birincil ağ modu 'host' veya 'none' olduğunda ek ağlara izin verilmez.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Yinelenen ağ: '{}'</value>
@@ -2708,6 +2716,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Çalıştırılacak komut</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>CPU sayısı (ör. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Çalışıyor olsa bile kapsayıcıları sil</value>
   </data>
@@ -2777,11 +2793,25 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>En son oluşturulan kapsayıcıyı göster (tüm durumları içerir)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Memory limit (e.g. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Kapsayıcı ana bilgisayar adı</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Kapsayıcının adı</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Connect a container to a network</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: ağ adı boş veya boşluk olamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>host mode networking is not supported</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Görüntüyü oluştururken önbelleği kullanma</value>
@@ -2866,6 +2896,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Kapsayıcı içindeki çalışma dizini</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: çalışma dizini boş veya boşluk olamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Kapsayıcı kimliğini verilen yola yazın</value>
   </data>
@@ -2909,6 +2943,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Belirtilen yoldaki kapsayıcıya tmpfs bağla</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit seçenekleri (biçim: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], sınırsız için -1 kullanın)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Beklenen &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (sınırsız için -1 kullanın)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>İşlemin kullanıcı kimliği (name|uid|uid:gid)</value>

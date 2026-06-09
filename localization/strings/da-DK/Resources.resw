@@ -2119,6 +2119,10 @@ Brug:
     <value>Objektbeholderen "{}" kører.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress understøttes endnu ikke.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttilknytninger understøttes ikke med objektbeholdernetværkstilstand. Porte ejes af destinationsbeholderen.</value>
   </data>
@@ -2329,6 +2333,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Ikke-understøttet netværkstilstand: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Yderligere netværk er ikke tilladt, når den primære netværkstilstand er 'host' eller 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplikeret netværk: '{}'</value>
@@ -2708,6 +2716,14 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Kommandoen der skal køres</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Antal CPU'er (f.eks. 0.5, 1 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Ugyldig {}-argumentværdi: '{}'. Forventede et positivt antal CPU'er (f.eks. 0.5, 1 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Slet objektbeholdere, selvom de kører</value>
   </data>
@@ -2777,11 +2793,25 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Vis den senest oprettede objektbeholder (omfatter alle tilstande)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Memory limit (e.g. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Navn på objektbeholder-vært</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Objektbeholderens navn</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Connect a container to a network</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Ugyldig {}-værdi: Netværksnavnet må ikke være tomt eller indeholde mellemrum</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>host mode networking is not supported</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Brug ikke cache, når du opretter billedet</value>
@@ -2866,6 +2896,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbejdsmappe inde i objektbeholderen</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Ugyldig {}-værdi: Arbejdsmappen må ikke være tom eller indeholde mellemrum</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Skriv container-id'et til den angivne sti</value>
   </data>
@@ -2909,6 +2943,14 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Monter tmpfs i objektbeholderen på den angivne sti</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit-indstillinger (format: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], brug -1 til ubegrænset)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Ugyldig {}-argumentværdi: '{}'. Forventet &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (brug -1 til ubegrænset)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>Bruger-id for processen (name|uid|uid:gid)</value>
