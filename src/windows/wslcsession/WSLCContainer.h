@@ -93,7 +93,7 @@ public:
 
     ~WSLCContainerImpl();
 
-    void Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys);
+    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
@@ -102,11 +102,13 @@ public:
     void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
     void GetInitProcess(_Out_ IWSLCProcess** process) const;
-    void Exec(_In_ const WSLCProcessOptions* Options, LPCSTR DetachKeys, _Out_ IWSLCProcess** Process);
+    void Exec(_In_ const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process);
     void Inspect(LPSTR* Output) const;
     void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
+    void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
+    void DisconnectFromNetwork(LPCSTR NetworkName);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -236,14 +238,16 @@ public:
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
-    IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ LPCSTR DetachKeys, _Out_ IWSLCProcess** Process) override;
-    IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ LPCSTR DetachKeys, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
+    IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

@@ -144,6 +144,8 @@ public:
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -187,6 +189,8 @@ private:
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
         _In_ const std::vector<WSLCProcessFd>& Fds = {},
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 

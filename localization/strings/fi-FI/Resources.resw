@@ -918,6 +918,10 @@ Palataan nat-verkkopalveluun.</value>
     <value>DNS-tunnelointia ei tueta</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windowsin hosts-tiedosto on liian suuri, eikä se näy WSL:ssä. Harkitse %SystemRoot%\System32\drivers\etc\hosts-tiedoston koon pienentämistä</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>wsl2.localhostForwarding-asetuksella ei ole vaikutusta käytettäessä peilatun verkon tilaa</value>
   </data>
@@ -2323,7 +2327,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
-    <value>Unsupported network mode: '{}'</value>
+    <value>Verkkotilaa ei tueta: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
@@ -2364,6 +2368,9 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Virheellinen kuvatunnisteen muoto: '{}'. Odotettu muoto on name:tag</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Tallennus on meneillään.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC on Windows-alijärjestelmä Linuxille Container CLI -työkalu.</value>
@@ -2958,6 +2965,50 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Pyydettiin latausta, mutta syötettä ei annettu.</value>
   </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Hallitse verkkoja.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>Hallitse WSL-verkkojen elinkaarta, mukaan lukien niiden luomista, tarkastamista, luetteloimista ja poistamista.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Luo verkko.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Luo uuden verkon.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Määritä verkko-ohjaimen nimi (oletus: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Verkon metatietoasetus</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Poista vähintään yksi verkko.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Poista vähintään yhden verkon.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>Näytä yksityiskohtaisia tietoja yhdestä tai useammasta verkosta.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>Näytä yksityiskohtaisia tietoja yhdestä tai useammasta verkosta.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>Luettelee verkot.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Luettelee istunnon kaikki verkot.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Verkon nimi</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Antaa tuloksena pelkät verkkojen nimet</value>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Hallitse asemia.</value>
   </data>
@@ -3111,6 +3162,40 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
     <value>Varoitus: Asetustiedosto kohdassa {} on tyhjä tai siinä on virheellinen rakenne. Odotettiin YAML-yhdistämismääritystä.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>Säilön {} palauttaminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>Verkon {} palauttaminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>Aseman {} palauttaminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>Vaihdon alustaminen epäonnistui</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>Säilön {} aikaleiman palauttaminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>Kuvan tuonnin etenemisen jäsentäminen epäonnistui</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>Aseman {}: {} irrottaminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>Säilön {} pysäyttäminen epäonnistui laajennuksen hylkäämisen jälkeen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>Aseman {} isäntäresurssien vapauttaminen epäonnistui</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

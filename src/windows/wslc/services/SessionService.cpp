@@ -57,6 +57,7 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console{};
+    console.SetInteractiveMode();
     const auto windowSize = console.GetWindowSize();
 
     const std::string shell = "/bin/sh";
@@ -142,7 +143,7 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     const auto windowSize = console.GetWindowSize();
     launcher.SetTtySize(windowSize.Y, windowSize.X);
 
-    return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.get()));
+    return ConsoleService::AttachToCurrentConsole(console, launcher.Launch(*session.get()));
 }
 
 std::vector<SessionInformation> SessionService::List()

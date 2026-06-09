@@ -259,7 +259,11 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
     }
 
-    result = container.value().Get().Start(Flags, nullptr, WarningCallback);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+
+    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }

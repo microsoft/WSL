@@ -123,9 +123,6 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
-    // Record that we initiated this create so OnVolumeEvent ignores the matching docker event.
-    m_expectedEvents.emplace_back(name, VolumeEvent::Create);
-
     return info;
 }
 
@@ -273,6 +270,16 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     try
     {
         OpenVolumeExclusiveLockHeld(m_dockerClient.InspectVolume(volumeName));
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // A 404 here is expected when a late `create` event arrives after the volume has already
+        // been deleted (e.g. user calls CreateVolume then DeleteVolume; the create event from
+        // docker can race in after the delete has been processed).
+        if (e.StatusCode() != 404)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to open volume: %hs", volumeName.c_str());
+        }
     }
     CATCH_LOG_MSG("Failed to open volume: %hs", volumeName.c_str());
 }
