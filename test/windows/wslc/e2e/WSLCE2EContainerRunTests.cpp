@@ -529,7 +529,10 @@ class WSLCE2EContainerRunTests
             std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
+
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt, true);
         session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
@@ -565,6 +568,21 @@ class WSLCE2EContainerRunTests
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
         session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_TerminalSize)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        constexpr SHORT columns = 42;
+        constexpr SHORT rows = 43;
+        const auto commandLine = std::format(
+            L"container run --rm -it --name {} {} /bin/sh -c \"while true; do stty size; sleep 1; done\"",
+            WslcContainerName,
+            DebianImage.NameAndTag());
+
+        auto session = RunWslcInteractive(commandLine, ElevationType::Elevated, PseudoConsole{columns, rows});
+        VerifyPseudoConsoleTtySize(session, columns, rows);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)

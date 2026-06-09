@@ -192,6 +192,8 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
+void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
+
 // Starts a local registry container with host networking using the COM API.
 // Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
