@@ -1699,9 +1699,9 @@ try
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateContainer",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(result, "Result"),
         TraceLoggingValue(containerOptions->Image, "Image"),

@@ -322,9 +322,9 @@ void WSLCSessionManagerImpl::CreateSession(
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateSession",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(resolvedDisplayName.c_str(), "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
