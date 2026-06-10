@@ -8203,8 +8203,11 @@ class WSLCTests
 
             // Close the writer.
             writer->SetCompleteOnDrained(true);
-            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            std::string exit = "exit";
+            writer->Push(gsl::make_span(exit.data(), exit.size()));
 
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.Expect(exit);
             reader.ExpectClosed();
         }
     }
