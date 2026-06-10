@@ -56,7 +56,6 @@ private:
 
     void Run();
 
-    // Creates a server named pipe for a console and returns its name and handle.
     static std::pair<std::wstring, wil::unique_hfile> CreateConsolePipe();
 
     void ProcessInput(InputSource Source, const gsl::span<char>& Input);

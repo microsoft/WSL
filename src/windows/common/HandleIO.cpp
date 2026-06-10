@@ -319,7 +319,6 @@ void ReadNamedPipe::Schedule()
     {
         WI_ASSERT(State == IOHandleStatus::Standby);
 
-        // N.B. The connect reuses the base read handle's overlapped (and thus its event/GetHandle()).
         if (!ConnectNamedPipe(Handle.Get(), &Overlapped))
         {
             const auto error = GetLastError();
@@ -825,7 +824,6 @@ void WriteHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
 
-    // Bring any queued data into the active buffer once the previous write has fully drained.
     if (!Pending.empty())
     {
         Buffer.Append(gsl::make_span(Pending));
@@ -892,8 +890,6 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     // Put any pending output to a different buffer, since the active buffer could be in the middle of a write.
     Pending.insert(Pending.end(), Content.begin(), Content.end());
 
-    // A reusable writer parks in Idle when drained; queueing data returns it to Standby so the loop schedules
-    // the write. A write that is still Pending stays Pending; the queued bytes are appended when it next drains.
     if (State == IOHandleStatus::Idle)
     {
         State = IOHandleStatus::Standby;
@@ -902,7 +898,6 @@ void WriteHandle::Push(const gsl::span<char>& Content)
 
 size_t WriteHandle::PendingBytes() const
 {
-    // Bytes still queued (Pending) plus bytes in the active buffer that have not yet been written (Buffer).
     return Pending.size() + Buffer.Size();
 }
 
@@ -1002,7 +997,6 @@ void WriteNamedPipe::Collect()
         return;
     }
 
-    // Complete a pending write. On failure, reconnect (if enabled) rather than removing this handle.
     try
     {
         Write->Collect();
@@ -1043,7 +1037,7 @@ size_t WriteNamedPipe::PendingBytes() const
 // DockerIORelayHandle
 
 DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :
-    WriteStdout(std::move(Stdout)), WriteStderr(std::move(Stderr))
+    WriteStdout(std::move(Stdout), {}, false), WriteStderr(std::move(Stderr), {}, false)
 {
     if (ReadFormat == Format::HttpChunked)
     {
@@ -1082,7 +1076,7 @@ void DockerIORelayHandle::Schedule()
         {
             State = IOHandleStatus::Pending;
         }
-        else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        else if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
         {
             if (RemainingBytes == 0)
             {
@@ -1125,7 +1119,7 @@ void DockerIORelayHandle::Collect()
         // If the write is completed, switch back to reading.
         if (RemainingBytes == 0)
         {
-            if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+            if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
             {
                 ActiveHandle = nullptr;
             }
@@ -1328,8 +1322,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 continue;
             }
 
-            // A persistent handle with no pending work stays registered but isn't waited on; it will be
-            // rescheduled on a later iteration once more data is pushed into it.
+            // N.B. A Idle handle cannot be waiting for since it's not doing any IO.
             if (entry.Handle->GetState() == IOHandleStatus::Idle)
             {
                 ++it;
