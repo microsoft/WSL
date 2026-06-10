@@ -510,9 +510,6 @@ try
     m_initListenSocket = INVALID_SOCKET;
     DeleteFileW(m_initListenPath.c_str());
 
-    // Return the AF_UNIX socket directly. Callers that wrap it in a
-    // SocketChannel should use blocking I/O mode since AF_UNIX on Windows
-    // does not support overlapped I/O.
     *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
 }
@@ -691,9 +688,6 @@ try
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(response, "Response"));
 
-    // Return the AF_UNIX socket directly. Callers that wrap it in a
-    // SocketChannel should use blocking I/O mode since AF_UNIX on Windows
-    // does not support overlapped I/O.
     closeUnix.release();
     *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
@@ -719,9 +713,6 @@ try
     SOCKET unixSock = accept(m_crashDumpListenSocket, nullptr, nullptr);
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
 
-    // Return the AF_UNIX socket directly. Callers that wrap it in a
-    // SocketChannel should use blocking I/O mode since AF_UNIX on Windows
-    // does not support overlapped I/O.
     *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
 }

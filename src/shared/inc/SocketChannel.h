@@ -110,7 +110,6 @@ public:
 
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
-        m_blockingIO = other.m_blockingIO;
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -127,8 +126,7 @@ public:
 #ifdef WIN32
 
     SocketChannel(TSocket&& socket, std::string&& name, std::vector<HANDLE>&& exitEvents) :
-        m_socket(std::move(socket)), m_exitEvents(std::move(exitEvents)), m_name(std::move(name)),
-        m_blockingIO(IsNonOverlappedSocket(m_socket.get()))
+        m_socket(std::move(socket)), m_exitEvents(std::move(exitEvents)), m_name(std::move(name))
     {
     }
 
@@ -142,11 +140,6 @@ public:
     const std::vector<HANDLE>& GetExitEvents() const
     {
         return m_exitEvents;
-    }
-
-    bool IsBlockingIO() const
-    {
-        return m_blockingIO;
     }
 
 #endif
@@ -190,17 +183,10 @@ public:
 
 #ifdef WIN32
 
-        if (m_blockingIO)
-        {
-            BlockingSend(span, timeout);
-        }
-        else
-        {
-            auto io = CreateIO();
-            io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
+        auto io = CreateIO();
+        io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
 
-            io.Run(TimeoutToMilliseconds(timeout));
-        }
+        io.Run(TimeoutToMilliseconds(timeout));
 
         WSL_LOG(
             "SentMessage",
@@ -645,27 +631,8 @@ private:
         return std::chrono::milliseconds{timeout};
     }
 
-    // Returns true if the socket does not support overlapped I/O (e.g. AF_UNIX on Windows).
-    static bool IsNonOverlappedSocket(SOCKET s)
-    {
-        WSAPROTOCOL_INFOW protocolInfo{};
-        int infoLen = sizeof(protocolInfo);
-        if (getsockopt(s, SOL_SOCKET, SO_PROTOCOL_INFOW,
-                reinterpret_cast<char*>(&protocolInfo), &infoLen) == 0)
-        {
-            return protocolInfo.iAddressFamily == AF_UNIX;
-        }
-
-        return false;
-    }
-
     gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
     {
-        if (m_blockingIO)
-        {
-            return BlockingReceive(timeout);
-        }
-
         auto io = CreateIO();
 
         gsl::span<gsl::byte> message;
@@ -676,208 +643,6 @@ private:
         io.Run(TimeoutToMilliseconds(timeout));
 
         return message;
-    }
-
-    // Blocking send for sockets that do not support overlapped I/O (e.g. AF_UNIX on Windows).
-    // Handles WSAEWOULDBLOCK gracefully since the socket may be in non-blocking mode
-    // if a concurrent BlockingReceive is active (WSAEventSelect sets non-blocking).
-    void BlockingSend(gsl::span<gsl::byte> span, TTimeout timeout)
-    {
-        size_t offset = 0;
-        while (offset < span.size())
-        {
-            int sent = ::send(
-                m_socket.get(),
-                reinterpret_cast<const char*>(span.data() + offset),
-                static_cast<int>(span.size() - offset),
-                0);
-
-            if (sent == SOCKET_ERROR)
-            {
-                if (WSAGetLastError() == WSAEWOULDBLOCK)
-                {
-                    // Socket is temporarily in non-blocking mode. Wait for writability.
-                    fd_set writeSet;
-                    FD_ZERO(&writeSet);
-                    FD_SET(m_socket.get(), &writeSet);
-                    timeval tv{1, 0};
-                    if (select(0, nullptr, &writeSet, nullptr, &tv) > 0)
-                    {
-                        continue;
-                    }
-
-                    THROW_HR_MSG(E_FAIL, "BlockingSend timed out waiting for writability on channel: %hs", m_name.c_str());
-                }
-
-                THROW_LAST_ERROR_MSG("BlockingSend failed on channel: %hs", m_name.c_str());
-            }
-
-            THROW_HR_IF_MSG(E_UNEXPECTED, sent == 0, "Socket closed during BlockingSend on channel: %hs", m_name.c_str());
-
-            offset += sent;
-        }
-    }
-
-    // Blocking receive for sockets that do not support overlapped I/O (e.g. AF_UNIX on Windows).
-    // Uses WSAEventSelect + WaitForMultipleObjects to integrate exit event cancellation
-    // with non-blocking recv() on the data socket.
-    gsl::span<gsl::byte> BlockingReceive(TTimeout timeout)
-    {
-        // Set up a WSA event to detect when data is available or the socket closes.
-        wil::unique_event socketEvent(wil::EventOptions::ManualReset);
-        THROW_LAST_ERROR_IF(
-            WSAEventSelect(m_socket.get(), socketEvent.get(), FD_READ | FD_CLOSE) == SOCKET_ERROR);
-
-        // Restore the socket to blocking mode on exit (WSAEventSelect sets non-blocking).
-        auto restoreBlocking = wil::scope_exit([&] {
-            WSAEventSelect(m_socket.get(), nullptr, 0);
-            u_long nonBlocking = 0;
-            ioctlsocket(m_socket.get(), FIONBIO, &nonBlocking);
-        });
-
-        // Build wait handle array: exit events first, then socket event.
-        std::vector<HANDLE> waitHandles;
-        waitHandles.reserve(m_exitEvents.size() + 1);
-        for (const auto event : m_exitEvents)
-        {
-            waitHandles.push_back(event);
-        }
-        const DWORD socketEventIndex = static_cast<DWORD>(waitHandles.size());
-        waitHandles.push_back(socketEvent.get());
-
-        auto messageSize = sizeof(MESSAGE_HEADER);
-        if (m_buffer.size() < messageSize)
-        {
-            m_buffer.resize(messageSize);
-        }
-
-        size_t bytesNeeded = sizeof(MESSAGE_HEADER);
-        size_t currentOffset = 0;
-        bool readingHeader = true;
-
-        for (;;)
-        {
-            // Try to read data that may already be buffered before waiting.
-            // This is critical because WSAEventSelect only signals on state
-            // transitions; data that arrived before the call would be missed
-            // if we waited first.
-            while (bytesNeeded > 0)
-            {
-                int received = ::recv(
-                    m_socket.get(),
-                    reinterpret_cast<char*>(m_buffer.data() + currentOffset),
-                    static_cast<int>(bytesNeeded),
-                    0);
-
-                if (received == SOCKET_ERROR)
-                {
-                    auto error = WSAGetLastError();
-                    if (error == WSAEWOULDBLOCK)
-                    {
-                        break; // No more data available, need to wait.
-                    }
-
-                    if (error == WSAECONNABORTED || error == WSAECONNRESET)
-                    {
-                        return {}; // Clean close.
-                    }
-
-                    THROW_WIN32(error);
-                }
-
-                if (received == 0)
-                {
-                    // Socket closed.
-                    THROW_HR_IF_MSG(
-                        E_UNEXPECTED,
-                        currentOffset > 0,
-                        "Socket closed mid-message during BlockingReceive. Offset: %zu, Remaining: %zu, channel: %hs",
-                        currentOffset,
-                        bytesNeeded,
-                        m_name.c_str());
-
-                    return {};
-                }
-
-                currentOffset += received;
-                bytesNeeded -= received;
-            }
-
-            // When the header is fully read, parse the message size and set up for the body.
-            if (readingHeader && bytesNeeded == 0)
-            {
-                messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(
-                    gsl::make_span(m_buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
-
-                THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER),
-                    "Unexpected message size: %zu on channel: %hs", messageSize, m_name.c_str());
-                THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024,
-                    "Message size too large: %zu on channel: %hs", messageSize, m_name.c_str());
-
-                if (messageSize > sizeof(MESSAGE_HEADER))
-                {
-                    if (m_buffer.size() < messageSize)
-                    {
-                        m_buffer.resize(messageSize);
-                    }
-
-                    readingHeader = false;
-                    bytesNeeded = messageSize - sizeof(MESSAGE_HEADER);
-                    continue; // Try to read body data immediately.
-                }
-            }
-
-            // Message complete.
-            if (bytesNeeded == 0)
-            {
-                break;
-            }
-
-            // No data available (WSAEWOULDBLOCK). Wait for data or exit event.
-            // WSAEnumNetworkEvents atomically resets the event — never call
-            // ResetEvent manually, as that can clear a legitimate signal.
-            DWORD waitTimeout = (timeout == INFINITE) ? INFINITE : timeout;
-            auto waitResult = WaitForMultipleObjects(
-                static_cast<DWORD>(waitHandles.size()), waitHandles.data(), FALSE, waitTimeout);
-
-            if (waitResult == WAIT_TIMEOUT)
-            {
-                THROW_HR_MSG(
-                    HCS_E_CONNECTION_TIMEOUT,
-                    "BlockingReceive timeout on channel: %hs",
-                    m_name.c_str());
-            }
-
-            // An exit event was signaled.
-            if (waitResult >= WAIT_OBJECT_0 && waitResult < WAIT_OBJECT_0 + socketEventIndex)
-            {
-                THROW_HR_MSG(E_ABORT, "Exit event signaled during BlockingReceive on channel: %hs", m_name.c_str());
-            }
-
-            THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult > WAIT_OBJECT_0 + socketEventIndex);
-
-            // Reset the event and check what happened.
-            WSANETWORKEVENTS netEvents{};
-            THROW_LAST_ERROR_IF(
-                WSAEnumNetworkEvents(m_socket.get(), socketEvent.get(), &netEvents) != 0);
-
-            if (netEvents.lNetworkEvents & FD_CLOSE)
-            {
-                THROW_HR_IF_MSG(
-                    E_UNEXPECTED,
-                    currentOffset > 0,
-                    "Socket closed mid-message during BlockingReceive. Offset: %zu, Remaining: %zu, channel: %hs",
-                    currentOffset,
-                    bytesNeeded,
-                    m_name.c_str());
-
-                return {};
-            }
-
-            // FD_READ signaled — loop back to recv.
-        }
-
-        return gsl::make_span(m_buffer.data(), messageSize);
     }
 
 #else
@@ -958,7 +723,6 @@ private:
 #ifdef WIN32
 
     std::vector<HANDLE> m_exitEvents;
-    bool m_blockingIO = false;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;

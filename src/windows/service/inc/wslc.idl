@@ -484,9 +484,8 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
     // Connects to a vsock port in the VM. Returns a socket handle.
-    // For HCS VMs, this uses hvsocket (supports overlapped I/O).
-    // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge.
-    // AF_UNIX sockets do not support overlapped I/O
+    // For HCS VMs, this uses hvsocket.
+    // For OpenVMM VMs, this uses the hybrid_vsock Unix domain socket bridge;
     HRESULT ConnectToVsockPort([in] ULONG Port, [out, system_handle(sh_socket)] HANDLE* Socket);
 
     // Accepts a crash dump connection from the VM. Blocks until a crash dump
