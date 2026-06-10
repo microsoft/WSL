@@ -19,20 +19,15 @@ using wsl::windows::common::io::EventHandle;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::common::io::ReadNamedPipe;
+using wsl::windows::common::io::WriteHandle;
+using wsl::windows::common::io::WriteNamedPipe;
 
 DmesgCollector::DmesgCollector(
     GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
-    m_com1PipeName(Com1PipeName),
-    m_runtimeId(VmId),
-    m_debugConsole(EnableDebugConsole),
-    m_telemetry(EnableTelemetry),
-    m_outputHandle(std::move(OutputHandle))
+    m_com1PipeName(Com1PipeName), m_outputHandle(std::move(OutputHandle)), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
 {
     m_exitEvent.reset(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
-    m_overlappedEvent.create(wil::EventOptions::ManualReset);
-    m_overlapped.hEvent = m_overlappedEvent.get();
     m_threadExit.create(wil::EventOptions::ManualReset);
-    m_exitEvents = {m_threadExit.get(), m_exitEvent.get()};
 }
 
 DmesgCollector::~DmesgCollector()
@@ -82,31 +77,35 @@ try
 
     MultiHandleWait io;
 
-    // N.B. The reads use IgnoreErrors so a failure on one console doesn't tear down collection on the other.
     if (m_earlyConsolePipe)
     {
         io.AddHandle(
             std::make_unique<ReadNamedPipe>(
                 HandleWrapper{std::move(m_earlyConsolePipe)},
-                [this](const gsl::span<char>& Input) {
-                    if (!Input.empty())
-                    {
-                        ProcessInput(DmesgCollectorEarlyConsole, Input);
-                    }
-                }),
-            MultiHandleWait::IgnoreErrors | MultiHandleWait::NeedNotComplete);
+                [this](const gsl::span<char>& Input) { ProcessInput(DmesgCollectorEarlyConsole, Input); }),
+            MultiHandleWait::IgnoreErrors);
     }
 
     io.AddHandle(
         std::make_unique<ReadNamedPipe>(
             HandleWrapper{std::move(m_virtioConsolePipe)},
-            [this](const gsl::span<char>& Input) {
-                if (!Input.empty())
-                {
-                    ProcessInput(DmesgCollectorConsole, Input);
-                }
-            }),
-        MultiHandleWait::IgnoreErrors | MultiHandleWait::NeedNotComplete);
+            [this](const gsl::span<char>& Input) { ProcessInput(DmesgCollectorConsole, Input); }),
+        MultiHandleWait::IgnoreErrors);
+
+    if (m_outputHandle)
+    {
+        auto output = std::make_unique<WriteHandle>(HandleWrapper{std::move(m_outputHandle), [this]() { m_outputWrite = nullptr; }}, true);
+        m_outputWrite = output.get();
+        io.AddHandle(std::move(output), MultiHandleWait::IgnoreErrors);
+    }
+
+    if (m_com1Pipe)
+    {
+        const bool reconnect = m_pipeServer && !m_debugConsole;
+        auto com1 = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(m_com1Pipe), [this]() { m_com1Write = nullptr; }}, reconnect);
+        m_com1Write = com1.get();
+        io.AddHandle(std::move(com1), MultiHandleWait::IgnoreErrors);
+    }
 
     // The loop runs until either exit event is signaled.
     io.AddHandle(std::make_unique<EventHandle>(m_threadExit.get()), MultiHandleWait::CancelOnCompleted);
@@ -118,6 +117,11 @@ CATCH_LOG()
 
 void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Input)
 {
+    if (Input.empty())
+    {
+        return;
+    }
+
     RingBuffer* ringBuffer = nullptr;
     bool sendToComPipe = m_debugConsole;
     if (Source == DmesgCollectorEarlyConsole)
@@ -128,7 +132,7 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
         else
         {
-            sendToComPipe = !m_debugConsole && m_com1Pipe;
+            sendToComPipe = !m_debugConsole && (m_com1Write != nullptr);
         }
     }
     else
@@ -159,57 +163,15 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
     }
 
-    if (sendToComPipe)
+    if (m_com1Write)
     {
-        WriteToCom1(Input);
+        m_com1Write->Push(Input);
     }
 
-    if (m_outputHandle != nullptr)
+    if (m_outputWrite != nullptr)
     {
-        m_overlappedEvent.ResetEvent();
-        if (wsl::windows::common::relay::InterruptableWrite(
-                m_outputHandle.get(), gslhelpers::convert_span<gsl::byte>(Input), m_exitEvents, &m_overlapped) == 0)
-        {
-            m_outputHandle = nullptr;
-        }
-    }
-}
-
-void DmesgCollector::WriteToCom1(const gsl::span<char>& Input)
-{
-    if (!m_com1Pipe)
-    {
-        return;
-    }
-
-    // If this is not writing to the debug console, emulate the normal
-    // serial pipe behavior of waiting for a pipe connection.
-    if (m_waitForConnection)
-    {
-        if (FAILED(wil::ResultFromException(
-                [&]() { wsl::windows::common::helpers::ConnectPipe(m_com1Pipe.get(), INFINITE, m_exitEvents); })))
-        {
-            return;
-        }
-
-        m_waitForConnection = false;
-    }
-
-    m_overlappedEvent.ResetEvent();
-    const auto buffer = gslhelpers::convert_span<gsl::byte>(Input);
-    if (wsl::windows::common::relay::InterruptableWrite(m_com1Pipe.get(), buffer, m_exitEvents, &m_overlapped) == 0)
-    {
-        if (m_debugConsole || !m_pipeServer)
-        {
-            // A disconnect from the debug console, or from a pipe that was acting as the server, doesn't have any
-            // reconnect mechanism, so don't try to write anymore bytes.
-            m_com1Pipe.reset();
-        }
-        else
-        {
-            // Emulate the normal serial behavior of waiting for a pipe connection to write.
-            m_waitForConnection = true;
-        }
+        // Queue the bytes; the IO loop schedules the actual write.
+        m_outputWrite->Push(Input);
     }
 }
 
@@ -237,8 +199,6 @@ try
             if (m_com1Pipe)
             {
                 m_pipeServer = true;
-                // If the debug console is not active, may have to wait for a connection.
-                m_waitForConnection = !m_debugConsole;
             }
         }
 

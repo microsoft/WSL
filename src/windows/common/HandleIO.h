@@ -3,6 +3,7 @@
 #pragma once
 
 #include <concurrent_queue.h>
+#include <list>
 
 #define LX_RELAY_BUFFER_SIZE 0x1000
 
@@ -12,7 +13,10 @@ enum class IOHandleStatus
 {
     Standby,
     Pending,
-    Completed
+    Completed,
+    // A persistent handle with no work to do. It stays registered with the MultiHandleWait loop but is not
+    // waited on; it returns to Standby once more data is pushed into it.
+    Idle
 };
 
 struct HandleWrapper
@@ -233,6 +237,11 @@ public:
 
     WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
     WriteHandle(HandleWrapper&& Handle, gsl::span<gsl::byte> Span);
+
+    // Creates a persistent writer that stays registered with a MultiHandleWait loop. Data pushed via Push() is
+    // queued and written by the loop; when the queue drains the handle becomes Idle instead of Completed, so it
+    // is never removed from the loop. Push() is safe to call while a write is in flight.
+    WriteHandle(HandleWrapper&& Handle, bool Persistent);
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
@@ -240,11 +249,47 @@ public:
     void Push(const gsl::span<char>& Buffer);
 
 private:
+    // Returns the state to adopt once the active buffer drains: Completed for one-shot writers, or Idle/Standby
+    // for persistent writers depending on whether more data is queued.
+    IOHandleStatus DrainedState() const;
+
     HandleWrapper Handle;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     BufferWrapper Buffer;
     LARGE_INTEGER Offset{};
+    bool Persistent = false;
+    std::vector<char> Pending;
+};
+
+// A persistent writer for a named pipe that transparently handles the server-side connection lifecycle. Data
+// pushed via Push() is written to the pipe by the IO loop; if the pipe needs a client connection (server pipes)
+// it is established lazily on the first write. When Reconnect is set, a write failure (client disconnect) is
+// recovered by reconnecting and resuming writes rather than tearing the handle down.
+class WriteNamedPipe : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(WriteNamedPipe);
+    NON_MOVABLE(WriteNamedPipe);
+
+    WriteNamedPipe(HandleWrapper&& Pipe, bool Reconnect);
+    ~WriteNamedPipe();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+    void Push(const gsl::span<char>& Buffer);
+
+private:
+    // Drops the current client and arms a fresh connection so the next Schedule() reconnects before writing.
+    void Reconnect();
+
+    HandleWrapper Pipe;
+    std::optional<WriteHandle> Write;
+    wil::unique_event ConnectEvent{wil::EventOptions::ManualReset};
+    OVERLAPPED ConnectOverlapped{};
+    bool ReconnectOnFailure = false;
+    bool NeedConnect = false;
+    bool Connecting = false;
 };
 
 template <typename TRead = ReadHandle>
@@ -411,7 +456,9 @@ private:
     concurrency::concurrent_queue<Entry*> m_signaledHandles;
     wil::unique_event m_handleSignaledEvent{wil::EventOptions::ManualReset};
 
-    std::vector<std::unique_ptr<Entry>> m_handles;
+    // N.B. A std::list is used (rather than a vector) so handles can be added from a callback while Run() is
+    // iterating m_handles without invalidating the loop's iterator.
+    std::list<std::unique_ptr<Entry>> m_handles;
     bool m_cancel = false;
 };
 

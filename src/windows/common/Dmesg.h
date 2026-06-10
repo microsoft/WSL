@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "relay.hpp"
+#include "HandleIO.h"
 #include "RingBuffer.h"
 
 class DmesgCollector
@@ -73,20 +74,21 @@ private:
     std::wstring m_virtioConsoleName;
     wil::unique_event m_exitEvent;
     wil::unique_event m_threadExit;
-    std::vector<HANDLE> m_exitEvents;
     wil::unique_hfile m_com1Pipe;
+    wil::unique_handle m_outputHandle;
     wil::unique_hfile m_earlyConsolePipe;
     wil::unique_hfile m_virtioConsolePipe;
     GUID m_runtimeId{};
-    wil::unique_event m_overlappedEvent;
-    OVERLAPPED m_overlapped{};
     RingBuffer m_dmesgBuffer{LX_RELAY_BUFFER_SIZE};
     RingBuffer m_dmesgEarlyBuffer{LX_RELAY_BUFFER_SIZE};
     bool m_debugConsole;
     bool m_telemetry;
     bool m_earlyConsoleTransition = false;
     bool m_pipeServer = false;
-    bool m_waitForConnection = false;
     std::thread m_worker;
-    wil::unique_handle m_outputHandle = nullptr;
+
+    // Persistent write handles owned by the IO loop. The raw pointers are nulled via the handles' OnClose
+    // callbacks when they are removed from the loop, so they are only valid while Run() is executing.
+    wsl::windows::common::io::WriteHandle* m_outputWrite = nullptr;
+    wsl::windows::common::io::WriteNamedPipe* m_com1Write = nullptr;
 };
