@@ -1861,10 +1861,12 @@ Return Value:
 --*/
 
 {
-    if (ParentPath)
-    {
-        Path = ParentPath;
-    }
+    //
+    // Set the parent path explicitly so the result does not depend on any prior contents of the
+    // caller's buffer when ParentPath is null.
+    //
+
+    Path = ParentPath != nullptr ? ParentPath : "";
 
     //
     // Generate a random name for the directory.
@@ -2003,13 +2005,27 @@ try
     if (ScratchDevice.has_value())
     {
         const auto VolatileOptions = MountOptions + ",volatile";
-        if (UtilMount(nullptr, Target, "overlay", MountFlags, VolatileOptions.c_str(), TimeoutSeconds) >= 0)
+        const int VolatileResult = UtilMount(nullptr, Target, "overlay", MountFlags, VolatileOptions.c_str(), TimeoutSeconds);
+        if (VolatileResult >= 0)
         {
             cleanupRwLayer.release();
             return 0;
         }
 
-        LOG_ERROR("volatile overlay mount failed, retrying without volatile");
+        //
+        // A kernel that does not understand the "volatile" option fails the mount with EINVAL;
+        // only that warrants retrying without it. Any other failure (e.g. ENOSPC, EBUSY) would
+        // recur, so surface it to the caller, which falls back to a tmpfs read/write layer.
+        //
+        // N.B. UtilMount returns the negated errno on failure.
+        //
+
+        if (VolatileResult != -EINVAL)
+        {
+            return -1;
+        }
+
+        LOG_ERROR("volatile overlay mount unsupported (errno {}), retrying without volatile", -VolatileResult);
     }
 
     if (UtilMount(nullptr, Target, "overlay", MountFlags, MountOptions.c_str(), TimeoutSeconds) < 0)

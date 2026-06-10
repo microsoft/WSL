@@ -21,6 +21,7 @@ Abstract:
 #include <werapi.h>
 #include <Dbghelp.h>
 #include <winsafer.h>
+#include <thread>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -2552,6 +2553,12 @@ std::wstring GetBlockDeviceInWsl()
         }
 
         done = std::chrono::steady_clock::now() > timeout;
+        if (!done)
+        {
+            // Wait briefly before rescanning so the helper does not spin launching wsl.exe in a
+            // tight loop (burning CPU and spawning a burst of subprocesses) while the disk attaches.
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        }
     }
 
     VERIFY_FAIL(L"Failed to find the block device in WSL");
