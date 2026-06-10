@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
+#include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
 
@@ -308,6 +309,10 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
+    // Mirror the host's trusted root CAs into the UVM before the daemons start so that they trust
+    // private registries using certificates issued by a CA trusted by Windows.
+    InstallTrustedRootCertificates();
+
     // Launch containerd first
     StartContainerd();
 
@@ -553,6 +558,50 @@ void WSLCSession::StartDockerd()
 
     m_dockerdProcess = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
     WSL_LOG("DockerdStarted");
+}
+
+void WSLCSession::InstallTrustedRootCertificates()
+try
+{
+    const auto pem = CollectTrustedRootCertificatesPem();
+    if (pem.empty())
+    {
+        WSL_LOG("InstallTrustedRootCertificatesSkipped");
+        return;
+    }
+
+    // dockerd and containerd are Go binaries that read the certificates found in /etc/ssl/certs into
+    // their default system certificate pool, so dropping a bundle there is sufficient for both daemons.
+    constexpr auto c_certPath = "/etc/ssl/certs/wsl-windows-roots.pem";
+    const auto script = std::format("set -e; mkdir -p /etc/ssl/certs && cat > {}", c_certPath);
+
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", script}, {}, WSLCProcessFlagsStdin);
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    // Stream the PEM bundle to the process's stdin. The io context (and the WriteHandle it owns) are
+    // scoped so that stdin is closed once the write completes, signaling EOF so that `cat` exits.
+    {
+        auto io = CreateIOContext();
+        io.AddHandle(
+            std::make_unique<io::WriteHandle>(io::HandleWrapper{process.GetStdHandle(WSLCFDStdin)}, std::vector<char>{pem.begin(), pem.end()}),
+            MultiHandleWait::CancelOnCompleted);
+        io.Run(std::chrono::milliseconds(c_processTerminateTimeoutMs));
+    }
+
+    const auto result = process.WaitAndCaptureOutput(c_processTerminateTimeoutMs);
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    WSL_LOG(
+        "InstallTrustedRootCertificates",
+        TraceLoggingValue(c_certPath, "Path"),
+        TraceLoggingValue(static_cast<uint64_t>(pem.size()), "BundleBytes"));
+}
+catch (...)
+{
+    // Best-effort: failing to install the host's trusted roots must not prevent the session from
+    // starting. Registries using a certificate from a publicly trusted CA continue to work through
+    // the guest's built-in CA bundle.
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the UVM");
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
