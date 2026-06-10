@@ -2588,4 +2588,164 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(output.stdoutOutput, "/usr/lib/wsl/lib\n");
         }
     }
+
+    WSLC_TEST_METHOD(ContainerAutoRemove)
+    {
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "echo wslc-auto-remove"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsFlags(&containerSettings, WSLC_CONTAINER_FLAG_AUTO_REMOVE));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        UniqueProcess process;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+        auto output = WaitForProcessOutput(process.get());
+        VERIFY_ARE_EQUAL(output.stdoutOutput, "wslc-auto-remove\n");
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                WslcContainerState state{};
+                THROW_IF_FAILED(WslcGetContainerState(container.get(), &state));
+                THROW_WIN32_IF(ERROR_RETRY, state != WSLC_CONTAINER_STATE_DELETED);
+            },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{30}));
+    }
+
+    WSLC_TEST_METHOD(DeleteRunningContainerWithForce)
+    {
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sleep", "999"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        {
+            WslcContainerState state{};
+            VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
+            VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_RUNNING);
+        }
+
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_FORCE, nullptr));
+
+        {
+            WslcContainerState state{};
+            VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
+            VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_DELETED);
+        }
+    }
+
+    WSLC_TEST_METHOD(ImageProgressCallback)
+    {
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto registryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+
+        struct ProgressContext
+        {
+            bool invoked = false;
+            bool sawKnownStatus = false;
+        };
+
+        auto progressCb = [](const WslcImageProgressMessage* progress, PVOID context) -> HRESULT {
+            auto* ctx = static_cast<ProgressContext*>(context);
+            ctx->invoked = true;
+            if (progress != nullptr && progress->status != WSLC_IMAGE_PROGRESS_STATUS_UNKNOWN)
+            {
+                ctx->sawKnownStatus = true;
+            }
+            return S_OK;
+        };
+
+        const auto registryImage = std::format("{}/hello-world:latest", registryAddress);
+        const auto registryRepo = std::format("{}/hello-world", registryAddress);
+
+        WslcTagImageOptions tagOptions{};
+        tagOptions.image = "hello-world:latest";
+        tagOptions.repo = registryRepo.c_str();
+        tagOptions.tag = "latest";
+        VERIFY_SUCCEEDED(WslcTagSessionImage(m_defaultSession, &tagOptions, nullptr));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, registryImage.c_str(), nullptr));
+            LOG_IF_FAILED(WslcLoadSessionImageFromFile(m_defaultSession, GetTestImagePath("hello-world:latest").c_str(), nullptr, nullptr));
+        });
+
+        {
+            ProgressContext ctx;
+            WslcPushImageOptions opts{};
+            opts.image = registryImage.c_str();
+            opts.registryAuth = registryAuth.c_str();
+            opts.progressCallback = progressCb;
+            opts.progressCallbackContext = &ctx;
+
+            VERIFY_SUCCEEDED(WslcPushSessionImage(m_defaultSession, &opts, nullptr));
+            VERIFY_IS_TRUE(ctx.invoked);
+        }
+
+        VERIFY_SUCCEEDED(WslcDeleteSessionImage(m_defaultSession, registryImage.c_str(), nullptr));
+        VERIFY_SUCCEEDED(WslcDeleteSessionImage(m_defaultSession, "hello-world:latest", nullptr));
+
+        {
+            ProgressContext ctx;
+            WslcPullImageOptions opts{};
+            opts.uri = registryImage.c_str();
+            opts.registryAuth = registryAuth.c_str();
+            opts.progressCallback = progressCb;
+            opts.progressCallbackContext = &ctx;
+
+            VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
+            VERIFY_IS_TRUE(HasImage(registryImage));
+            VERIFY_IS_TRUE(ctx.sawKnownStatus);
+        }
+    }
+
+    WSLC_TEST_METHOD(StopContainerTimeout)
+    {
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "trap '' TERM; while :; do sleep 1; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        {
+            WslcContainerState state{};
+            VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
+            VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_RUNNING);
+        }
+
+        constexpr uint32_t c_timeoutSeconds = 1;
+        const auto start = std::chrono::steady_clock::now();
+        VERIFY_SUCCEEDED(WslcStopContainer(container.get(), WSLC_SIGNAL_SIGTERM, c_timeoutSeconds, nullptr));
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(elapsedMs, 900LL);
+
+        {
+            WslcContainerState state{};
+            VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
+            VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_EXITED);
+        }
+    }
 };
