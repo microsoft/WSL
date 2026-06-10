@@ -621,10 +621,7 @@ try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    // Intentionally destroy session before termination callback in the event that
-    // the termination callback ends up being invoked by session destruction.
     internalType->session.reset();
-    internalType->terminationCallback.reset();
 
     return S_OK;
 }
