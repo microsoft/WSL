@@ -2354,12 +2354,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{Locked="host"}{Locked="none"}{Locked="container:"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
-    <value>Network aliases require a user-defined network. Use '--network' to specify one.</value>
-    <comment>{Locked="--network"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Network aliases require a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Network aliases cannot be specified when multiple networks are requested. Specify a single '--network'.</value>
-    <comment>{Locked="--network"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >
     <value>Failed to create volume '{}': {}</value>
