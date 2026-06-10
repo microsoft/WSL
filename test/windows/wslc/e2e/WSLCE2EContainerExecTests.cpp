@@ -404,10 +404,13 @@ class WSLCE2EContainerExecTests
         result = RunWslc(std::format(L"container exec -d {} sh -c \"sleep 1 && echo wslc-detach-ok > {}\"", WslcContainerName, markerPath));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        Sleep(3000);
-
-        auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
-        readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
+                readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(10)));
     }
 
 private:

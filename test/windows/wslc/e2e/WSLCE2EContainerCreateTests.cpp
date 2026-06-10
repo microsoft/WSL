@@ -833,6 +833,13 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(static_cast<int64_t>(500'000'000), inspect.HostConfig.NanoCpus);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Cpus_Invalid)
+    {
+        auto result = RunWslc(std::format(L"container create --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Memory)
     {
         auto result =
@@ -842,6 +849,14 @@ class WSLCE2EContainerCreateTests
 
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL(static_cast<int64_t>(32) * 1024 * 1024, inspect.HostConfig.Memory);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Memory_Invalid)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit)
@@ -866,6 +881,14 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(byName.contains("nproc"));
         VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].first);
         VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit_Invalid)
+    {
+        auto result = RunWslc(std::format(L"container create --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Entrypoint)
@@ -894,26 +917,123 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_CREATE_ENV_FILE_B=create-env-file-b"));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_EnvFile_MissingFile)
     {
-        constexpr uint16_t hostPort = 48317;
-        constexpr uint16_t containerPort = 80;
+        auto result = RunWslc(std::format(
+            L"container create --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_EnvFile_InvalidContent)
+    {
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --env-file {} {} env", WslcContainerName, EscapePath(EnvTestFile1.wstring()), DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_TCP)
+    {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
         auto result = RunWslc(std::format(
-            L"container create --name {} -p {}:{} {} sleep 5", WslcContainerName, hostPort, containerPort, DebianImage.NameAndTag()));
+            L"container create --name {} -p {}:{} {} sleep 5", WslcContainerName, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        // Verify the port mapping is correct in the container inspect data
         const auto inspect = InspectContainer(WslcContainerName);
-        const auto portKey = std::to_string(containerPort) + "/tcp";
+        const auto portKey = std::to_string(ContainerTestPort) + "/tcp";
         VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
 
         const auto& bindings = inspect.Ports.at(portKey);
         VERIFY_ARE_EQUAL(1u, bindings.size());
-        VERIFY_ARE_EQUAL(std::to_string(hostPort), bindings[0].HostPort);
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), bindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", bindings[0].HostIp);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_MultipleMappings)
+    {
+        // Map two host ports to the same container port.
+        auto result = RunWslc(std::format(
+            L"container create --name {} -p {}:{} -p {}:{} {} sleep 5",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            HostTestPort2,
+            ContainerTestPort,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Both host ports should be bound to the same container port.
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
+
+        const auto& bindings = inspect.Ports.at(portKey);
+        VERIFY_ARE_EQUAL(2u, bindings.size());
+
+        bool foundHostPort1 = false;
+        bool foundHostPort2 = false;
+        for (const auto& binding : bindings)
+        {
+            if (binding.HostPort == std::to_string(HostTestPort1))
+            {
+                foundHostPort1 = true;
+            }
+            else if (binding.HostPort == std::to_string(HostTestPort2))
+            {
+                foundHostPort2 = true;
+            }
+        }
+        VERIFY_IS_TRUE(foundHostPort1);
+        VERIFY_IS_TRUE(foundHostPort2);
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_Ephemeral)
+    {
+        // -p <containerPort> (no host port) means the host picks a random port.
+        auto result = RunWslc(std::format(
+            L"container create --name {} -p {} {} sleep 5", WslcContainerName, ContainerTestPort, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Inspect the container to verify a host port was allocated.
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
+
+        const auto& bindings = inspect.Ports.at(portKey);
+        VERIFY_ARE_EQUAL(1u, bindings.size());
+        VERIFY_IS_TRUE(std::stoi(bindings[0].HostPort) > 0);
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_PortUdp_NotSupported)
+    {
+        auto result = RunWslc(std::format(L"container create --name {} -p 80:80/udp {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_PortHostIP_NotSupported)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --name {} -p 127.0.0.1:80:80 {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
 private:
@@ -938,6 +1058,11 @@ private:
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+
+    // Test ports
+    const uint16_t ContainerTestPort = 8080;
+    const uint16_t HostTestPort1 = 1234;
+    const uint16_t HostTestPort2 = 1235;
 
     // Test volume files
     std::filesystem::path VolumeTestFile1;
