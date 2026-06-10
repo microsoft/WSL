@@ -2119,6 +2119,10 @@ Usage:
     <value>A(z) {} tároló fut.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>A ContainerIpAddress még nem támogatott.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
   </data>
@@ -2329,6 +2333,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nem támogatott hálózati mód: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>További hálózatok nem engedélyezettek, ha az elsődleges hálózati mód 'host' vagy 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplikált hálózat: {}</value>
@@ -2708,6 +2716,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>A futtatandó parancs</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Number of CPUs (e.g. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Érvénytelen {} argumentumérték: "{}". A rendszer pozitív számú processzort várt (például 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Tárolók törlése akkor is, ha futnak</value>
   </data>
@@ -2777,11 +2793,25 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>A legutóbb létrehozott tároló megjelenítése (az összes állapotot tartalmazza)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Memory limit (e.g. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Tároló gazdagépének neve</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>A tároló neve</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Connect a container to a network</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a hálózatnév nem lehet üres vagy szóköz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>host mode networking is not supported</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Ne használjon gyorsítótárat a lemezkép létrehozásakor</value>
@@ -2866,6 +2896,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Munkakönyvtár a tárolón belül</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a munkakönyvtár nem lehet üres vagy szóköz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Írja a tárolóazonosítót a megadott elérési útba</value>
   </data>
@@ -2909,6 +2943,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>tmpfs-k csatlakoztatása a tárolóhoz a megadott elérési úton</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit beállítások (formátum: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], a korlátlan használathoz használja a -1)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Érvénytelen {} argumentumérték: "{}". Várt &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (korlátlan használatra használja a -1)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>A folyamat felhasználói azonosítója (name|uid|uid:gid)</value>
