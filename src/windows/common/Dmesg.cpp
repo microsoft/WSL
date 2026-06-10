@@ -87,7 +87,8 @@ try
 
     if (m_outputHandle)
     {
-        auto output = std::make_unique<WriteHandle>(HandleWrapper{std::move(m_outputHandle), [this]() { m_outputWrite = nullptr; }}, true);
+        auto output = std::make_unique<WriteHandle>(
+            HandleWrapper{std::move(m_outputHandle), [this]() { m_outputWrite = nullptr; }}, std::vector<char>{}, false);
         m_outputWrite = output.get();
         io.AddHandle(std::move(output), MultiHandleWait::IgnoreErrors);
     }
@@ -150,7 +151,7 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
         else
         {
-            sendToComPipe = !m_debugConsole && (m_com1Write != nullptr);
+            sendToComPipe = !m_debugConsole;
         }
     }
     else
@@ -181,7 +182,7 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
     }
 
-    if (sendToComPipe)
+    if (sendToComPipe && m_com1Write)
     {
         Push(*m_com1Write, Input, "com1");
     }

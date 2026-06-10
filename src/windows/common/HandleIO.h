@@ -235,25 +235,23 @@ public:
     NON_COPYABLE(WriteHandle);
     NON_MOVABLE(WriteHandle);
 
-    WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
-    WriteHandle(HandleWrapper&& Handle, gsl::span<gsl::byte> Span);
-
-    // Creates a persistent writer that stays registered with a MultiHandleWait loop. Data pushed via Push() is
-    // queued and written by the loop; when the queue drains the handle becomes Idle instead of Completed, so it
-    // is never removed from the loop. Push() is safe to call while a write is in flight.
-    WriteHandle(HandleWrapper&& Handle, bool Persistent);
+    WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Source = {}, bool CompleteOnDrained = true);
+    WriteHandle(HandleWrapper&& Handle, gsl::span<gsl::byte> Source);
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
 
+    // Controls whether the writer completes (and is removed from the loop) or becomes Idle once its buffer drains.
+    void SetCompleteOnDrained(bool CompleteOnDrained);
+
     // Returns the number of bytes that have been queued for writing but not yet written to the handle.
     size_t PendingBytes() const;
 
 private:
     // Returns the state to adopt once the active buffer drains: Completed for one-shot writers, or Idle/Standby
-    // for persistent writers depending on whether more data is queued.
+    // for reusable writers depending on whether more data is queued.
     IOHandleStatus DrainedState() const;
 
     HandleWrapper Handle;
@@ -261,7 +259,7 @@ private:
     OVERLAPPED Overlapped{};
     BufferWrapper Buffer;
     LARGE_INTEGER Offset{};
-    bool Persistent = false;
+    bool CompleteOnDrained = true;
     std::vector<char> Pending;
 };
 
@@ -306,7 +304,7 @@ public:
     NON_MOVABLE(RelayHandle);
 
     RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
-        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output))
+        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output), {}, false)
     {
     }
 
@@ -320,6 +318,8 @@ public:
             // If the output buffer is empty and the reading end is completed, then we're done.
             if (Read.GetState() == IOHandleStatus::Completed)
             {
+                Write.SetCompleteOnDrained(true);
+
                 State = IOHandleStatus::Completed;
                 return;
             }

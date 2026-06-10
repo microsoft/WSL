@@ -8164,6 +8164,189 @@ class WSLCTests
             VERIFY_ARE_EQUAL(static_cast<DWORD>(fileSize), bytesRead);
             VERIFY_IS_TRUE(readBuffer == writeBuffer);
         }
+
+        // Validate that WriteHandle behaves correctly when its buffer is fully written, and CompleteOnDrained is false.
+        {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            PartialHandleRead reader(readPipe.get());
+
+            wsl::windows::common::io::MultiHandleWait io;
+            auto writerHandle =
+                std::make_unique<WriteHandle>(wsl::windows::common::io::HandleWrapper{std::move(writePipe)}, std::vector<char>{}, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // A reusable writer with nothing queued is Idle, so Run() has no handle to wait on and returns.
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            // First write: a single Push() transitions the writer out of Idle and is delivered.
+            std::string first = "first-chunk";
+            writer->Push(gsl::make_span(first.data(), first.size()));
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), first.size());
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.ExpectConsume(first);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+
+            // Reuse: the writer returned to Idle (not Completed) so it is still registered, and several
+            // queued Push() calls accumulate and are written in order during the next Run().
+            std::string a = "aaa";
+            std::string b = "bbbb";
+            std::string c = "cc";
+            writer->Push(gsl::make_span(a.data(), a.size()));
+            writer->Push(gsl::make_span(b.data(), b.size()));
+            writer->Push(gsl::make_span(c.data(), c.size()));
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), a.size() + b.size() + c.size());
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.ExpectConsume(a + b + c);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+
+            // Close the writer.
+            writer->SetCompleteOnDrained(true);
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.ExpectClosed();
+        }
+    }
+
+    TEST_METHOD(WriteNamedPipeContent)
+    {
+        using wsl::windows::common::io::HandleWrapper;
+        using wsl::windows::common::io::MultiHandleWait;
+        using wsl::windows::common::io::WriteNamedPipe;
+
+        auto createServerPipe = [](const std::wstring& name) {
+            wil::unique_hfile pipe(CreateNamedPipeW(
+                name.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, nullptr));
+            THROW_LAST_ERROR_IF(!pipe);
+
+            return pipe;
+        };
+
+        auto connect = [](const std::wstring& name) {
+            for (;;)
+            {
+                wil::unique_hfile client(CreateFileW(name.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr));
+                if (client)
+                {
+                    return client;
+                }
+
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND);
+
+                THROW_IF_WIN32_BOOL_FALSE(WaitNamedPipeW(name.c_str(), 30 * 1000));
+            }
+        };
+
+        auto push = [](WriteNamedPipe& writer, std::string& data) { writer.Push(gsl::make_span(data.data(), data.size())); };
+
+        // Scenario 1: a payload queued before any client exists is delivered once a client connects,
+        // and PendingBytes() drops to zero after the write drains.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // Connect a client up-front; the writer completes the handshake during Run().
+            auto client = connect(name);
+            PartialHandleRead reader(client.get());
+
+            std::string expected = "hello-named-pipe";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 2: multiple Push() calls accumulate and are delivered, in order, as a single stream.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            auto client = connect(name);
+            PartialHandleRead reader(client.get());
+
+            std::string a = "aaaa";
+            std::string b = "bbbbbb";
+            std::string c = "cc";
+            push(*writer, a);
+            push(*writer, b);
+            push(*writer, c);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), a.size() + b.size() + c.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(a + b + c);
+        }
+
+        // Scenario 3: when the connected client disconnects, the next write fails and the writer
+        // reconnects, resuming delivery to a new client without losing the buffered payload.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // Phase 1: the first client connects, reads the first payload, then disconnects (the reader
+            // and client are scoped so the reader thread joins before the client handle closes).
+            std::string first = "first-payload";
+            {
+                auto client1 = connect(name);
+                PartialHandleRead reader1(client1.get());
+
+                push(*writer, first);
+                VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+                reader1.Expect(first);
+            }
+
+            // Phase 2: the next write fails against the now-closed client, triggering a reconnect. A
+            // second client connects while Run() performs the reconnect and receives the buffered payload.
+            std::string second = "second-payload";
+            push(*writer, second);
+
+            wil::unique_hfile client2;
+            std::thread connector([&]() { client2 = connect(name); });
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            connector.join();
+
+            PartialHandleRead reader2(client2.get());
+            reader2.Expect(second);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 4: a non-reconnecting writer skips the connection handshake and behaves like a
+        // persistent WriteHandle, writing queued data straight to the handle.
+        {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            PartialHandleRead reader(readPipe.get());
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(writePipe)}, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            std::string expected = "no-reconnect-path";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
     }
 
     TEST_METHOD(DockerIORelay)
@@ -8243,6 +8426,33 @@ class WSLCTests
 
             runTest(input, largeStdout + "regularStdout", largeStderr);
         }
+    }
+
+    TEST_METHOD(RelayHandleLargeBuffer)
+    {
+        using namespace wsl::windows::common::io;
+
+        auto [srcRead, srcWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, true);
+        auto [dstRead, dstWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, true);
+
+        // A payload larger than the relay read buffer forces several read -> write cycles through the
+        // RelayHandle's reused WriteHandle.
+        const std::string payload(LX_RELAY_BUFFER_SIZE * 4 + 123, 'x');
+
+        MultiHandleWait io;
+
+        io.AddHandle(std::make_unique<WriteHandle>(std::move(srcWrite), std::vector<char>(payload.begin(), payload.end())));
+        io.AddHandle(std::make_unique<RelayHandle<>>(std::move(srcRead), std::move(dstWrite)));
+
+        // Collect the relayed output.
+        std::string output;
+        io.AddHandle(std::make_unique<ReadHandle>(
+            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+
+        io.Run({});
+
+        VERIFY_ARE_EQUAL(payload.size(), output.size());
+        VERIFY_IS_TRUE(payload == output);
     }
 
     WSLC_TEST_METHOD(ContainerRecoveryFromStorage)

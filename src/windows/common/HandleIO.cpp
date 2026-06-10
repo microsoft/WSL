@@ -776,29 +776,26 @@ HANDLE ReadSocketMessageHandle::GetHandle() const
 
 // WriteHandle
 
-WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source) :
-    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source, bool CompleteOnDrained) :
+    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get())), CompleteOnDrained(CompleteOnDrained)
 {
-    std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    if (!Source.empty())
+    {
+        std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    }
+
     Overlapped.hEvent = Event.get();
+
+    if (!CompleteOnDrained && Buffer.Size() == 0)
+    {
+        State = IOHandleStatus::Idle;
+    }
 }
 
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, gsl::span<gsl::byte> Source) :
     Handle(std::move(MovedHandle)), Buffer(Source), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
-}
-
-WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, bool Persistent) :
-    Handle(std::move(MovedHandle)), Buffer(size_t{0}), Offset(InitializeFileOffset(Handle.Get())), Persistent(Persistent)
-{
-    Overlapped.hEvent = Event.get();
-
-    // A persistent writer starts with nothing to write.
-    if (Persistent)
-    {
-        State = IOHandleStatus::Idle;
-    }
 }
 
 WriteHandle::~WriteHandle()
@@ -809,9 +806,14 @@ WriteHandle::~WriteHandle()
     }
 }
 
+void WriteHandle::SetCompleteOnDrained(bool Value)
+{
+    CompleteOnDrained = Value;
+}
+
 IOHandleStatus WriteHandle::DrainedState() const
 {
-    if (!Persistent)
+    if (CompleteOnDrained)
     {
         return IOHandleStatus::Completed;
     }
@@ -890,6 +892,8 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     // Put any pending output to a different buffer, since the active buffer could be in the middle of a write.
     Pending.insert(Pending.end(), Content.begin(), Content.end());
 
+    // A reusable writer parks in Idle when drained; queueing data returns it to Standby so the loop schedules
+    // the write. A write that is still Pending stays Pending; the queued bytes are appended when it next drains.
     if (State == IOHandleStatus::Idle)
     {
         State = IOHandleStatus::Standby;
@@ -912,7 +916,7 @@ WriteNamedPipe::WriteNamedPipe(HandleWrapper&& MovedPipe, bool Reconnect) :
 {
     ConnectOverlapped.hEvent = ConnectEvent.get();
 
-    Write.emplace(HandleWrapper{Pipe.Get()}, true);
+    Write.emplace(HandleWrapper{Pipe.Get()}, std::vector<char>{}, false);
 
     State = IOHandleStatus::Idle;
 }
