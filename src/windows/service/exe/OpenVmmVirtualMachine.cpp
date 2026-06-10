@@ -31,7 +31,6 @@ Abstract:
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wslc::OpenVmmVirtualMachine;
-using wsl::windows::service::wslc::TtrpcClient;
 namespace wslutil = wsl::windows::common::wslutil;
 
 OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Settings)
@@ -177,10 +176,10 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     auto cleanupOnFailure = wil::scope_exit([this]() {
         m_vmExitEvent.SetEvent();
 
-        if (m_ttrpcClient)
+        if (m_vmService)
         {
-            m_ttrpcClient->Disconnect();
-            m_ttrpcClient.reset();
+            m_vmService->Disconnect();
+            m_vmService.reset();
         }
 
         if (m_processHandle)
@@ -272,35 +271,28 @@ std::wstring OpenVmmVirtualMachine::BuildCommandLine() const
     return cmd;
 }
 
-TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
+void OpenVmmVirtualMachine::ConfigureVmService() const
 {
-    TtrpcClient::VmConfig config;
-
-    config.KernelPath = wsl::shared::string::WideToMultiByte(m_kernelPath.wstring());
-    config.InitrdPath = wsl::shared::string::WideToMultiByte(m_initrdPath.wstring());
+    THROW_IF_FAILED(m_vmService->SetKernelPath(m_kernelPath.c_str()));
+    THROW_IF_FAILED(m_vmService->SetInitrdPath(m_initrdPath.c_str()));
 
     // Kernel command line — the server prepends "panic=-1 debug pci=off console=ttyS0 "
     // automatically via HyperVGen2LinuxDirect chipset type.
-    config.KernelCmdLine = wsl::shared::string::WideToMultiByte(m_kernelCmdLine);
+    THROW_IF_FAILED(m_vmService->SetKernelCmdLine(m_kernelCmdLine.c_str()));
 
     // Ensure 2MB granularity. Cap at 4GB because OpenVMM on WHP allocates guest RAM upfront.
     constexpr ULONG c_maxMemoryMb = 4096;
-    config.MemoryMb = std::min(m_memoryMb, c_maxMemoryMb) & ~0x1;
+    THROW_IF_FAILED(m_vmService->SetMemoryMb((std::min(m_memoryMb, c_maxMemoryMb) & ~0x1)));
 
-    config.ProcessorCount = m_cpuCount;
+    THROW_IF_FAILED(m_vmService->SetProcessorCount(m_cpuCount));
 
     // HvSocket bridge via vsock path (for the guest init connection).
-    config.HvSocketPath = wsl::shared::string::WideToMultiByte(m_vsockPath.wstring());
+    THROW_IF_FAILED(m_vmService->SetHvSocketPath(m_vsockPath.c_str()));
 
     // Boot disks: root VHD (LUN 0) and modules VHD (LUN 1), both read-only.
     for (const auto& [lun, disk] : m_attachedDisks)
     {
-        config.ScsiDisks.push_back({
-            .Controller = 0,
-            .Lun = lun,
-            .HostPath = wsl::shared::string::WideToMultiByte(disk.Path),
-            .ReadOnly = disk.ReadOnly,
-        });
+        THROW_IF_FAILED(m_vmService->AddBootDisk(0, lun, disk.Path.c_str(), disk.ReadOnly));
     }
 
     if (m_networkingMode == WSLCNetworkingModeConsomme)
@@ -310,25 +302,22 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
         GUID nicGuid = m_vmId;
         nicGuid.Data1 ^= c_nicGuidXorMask;
 
-        config.Nic = TtrpcClient::VmConfig::ConsommeNic{
-            .NicId = wsl::shared::string::GuidToString<char>(nicGuid),
-            .MacAddress = c_defaultConsommeMacAddress,
-        };
+        auto nicIdStr = wsl::shared::string::GuidToString<wchar_t>(nicGuid, wsl::shared::string::GuidToStringFlags::None);
+        auto macStr = wsl::shared::string::MultiByteToWide(c_defaultConsommeMacAddress);
+        THROW_IF_FAILED(m_vmService->SetConsommeNic(nicIdStr.c_str(), macStr.c_str()));
     }
 
-    // COM1 (port 0) — earlycon output before hvc0 loads.
-    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
+    // COM1 (port 0) — earlycon output before hvc0 loads. Only configure it when
+    // early-boot logging is enabled; otherwise EarlyConsoleName() is empty and the
+    // OpenVMM server would fail trying to connect to an empty serial socket path,
+    // aborting CreateVM.
+    if (const auto earlyConsoleName = m_dmesgCollector->EarlyConsoleName(); !earlyConsoleName.empty())
     {
-        config.SerialPorts.push_back({
-            .Port = 0,
-            .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
-        });
+        THROW_IF_FAILED(m_vmService->AddSerialPort(0, earlyConsoleName.c_str()));
     }
 
     // Virtio console (/dev/hvc0) — primary console after boot.
-    config.VirtioConsolePath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->VirtioConsoleName());
-
-    return config;
+    THROW_IF_FAILED(m_vmService->SetVirtioConsolePath(m_dmesgCollector->VirtioConsoleName().c_str()));
 }
 
 void OpenVmmVirtualMachine::LaunchOpenVmm()
@@ -396,18 +385,18 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
     m_processWatchThread = std::thread(&OpenVmmVirtualMachine::WatchProcessExit, this);
 
-    m_ttrpcClient = std::make_unique<TtrpcClient>();
+    m_vmService = wil::CoCreateInstance<IWslVmService>(CLSID_WslVmService, CLSCTX_INPROC_SERVER);
     THROW_IF_FAILED_MSG(
-        m_ttrpcClient->Connect(m_ttrpcSocketPath.wstring(), TtrpcClient::c_defaultTimeoutMs),
+        m_vmService->Connect(m_ttrpcSocketPath.c_str(), 30000),
         "Failed to connect to OpenVMM ttrpc server");
 
-    auto vmConfig = BuildVmConfig();
+    ConfigureVmService();
     THROW_IF_FAILED_MSG(
-        m_ttrpcClient->CreateVm(vmConfig),
+        m_vmService->CreateVm(),
         "Failed to create VM via ttrpc CreateVM");
 
     THROW_IF_FAILED_MSG(
-        m_ttrpcClient->ResumeVm(),
+        m_vmService->ResumeVm(),
         "Failed to resume VM via ttrpc ResumeVM");
 
 }
@@ -441,9 +430,12 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // Signal termination to any pending operations.
     m_vmExitEvent.SetEvent();
 
-    if (m_ttrpcClient)
+    // TeardownVM releases all VM resources and unblocks WaitVM.
+    if (m_vmService)
     {
-        LOG_IF_FAILED(m_ttrpcClient->QuitVm());
+        LOG_IF_FAILED(m_vmService->TeardownVm());
+        m_vmService->Disconnect();
+        m_vmService.reset();
     }
 
     // Wait for graceful exit, then force-terminate.
@@ -455,9 +447,6 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
             TerminateProcess(m_processHandle.get(), 1);
         }
     }
-
-    // Clean up the ttrpc client now that the process has exited.
-    m_ttrpcClient.reset();
 
     if (m_processWatchThread.joinable())
     {
@@ -550,8 +539,8 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for disk hot-add");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for disk hot-add");
 
     DiskInfo disk{Path, ReadOnly != FALSE};
     const ULONG allocatedLun = AllocateLun();
@@ -560,8 +549,7 @@ try
         FreeLun(allocatedLun);
     });
 
-    auto hostPath = wsl::shared::string::WideToMultiByte(Path);
-    THROW_IF_FAILED(m_ttrpcClient->AttachScsiDisk(0, allocatedLun, hostPath, ReadOnly != FALSE));
+    THROW_IF_FAILED(m_vmService->AttachScsiDisk(0, allocatedLun, Path, ReadOnly));
 
     m_attachedDisks.emplace(allocatedLun, std::move(disk));
     cleanup.release();
@@ -579,10 +567,10 @@ try
     auto it = m_attachedDisks.find(Lun);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for disk hot-remove");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for disk hot-remove");
 
-    THROW_IF_FAILED(m_ttrpcClient->DetachScsiDisk(0, Lun));
+    THROW_IF_FAILED(m_vmService->DetachScsiDisk(0, Lun));
 
     FreeLun(Lun);
     m_attachedDisks.erase(it);
@@ -600,13 +588,12 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for share add");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for share add");
 
     GUID shareIdLocal;
     THROW_IF_FAILED(CoCreateGuid(&shareIdLocal));
-    auto shareTag = wsl::shared::string::GuidToString<char>(shareIdLocal, wsl::shared::string::None);
-    auto hostPath = wsl::shared::string::WideToMultiByte(WindowsPath);
+    auto shareTag = wsl::shared::string::GuidToString<wchar_t>(shareIdLocal, wsl::shared::string::None);
 
     WSL_LOG(
         "OpenVmmAddShare",
@@ -615,7 +602,7 @@ try
         TraceLoggingValue(ReadOnly, "ReadOnly"),
         TraceLoggingValue(shareTag.c_str(), "Tag"));
 
-    THROW_IF_FAILED(m_ttrpcClient->AddShare(shareTag, hostPath, ReadOnly));
+    THROW_IF_FAILED(m_vmService->AddShare(shareTag.c_str(), WindowsPath, ReadOnly));
 
     m_shares.emplace(shareIdLocal, WindowsPath);
     *ShareId = shareIdLocal;
@@ -631,17 +618,17 @@ try
     auto it = m_shares.find(ShareId);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_shares.end());
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for share remove");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for share remove");
 
-    auto shareTag = wsl::shared::string::GuidToString<char>(it->first, wsl::shared::string::None);
+    auto shareTag = wsl::shared::string::GuidToString<wchar_t>(it->first, wsl::shared::string::None);
 
     WSL_LOG(
         "OpenVmmRemoveShare",
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
         TraceLoggingValue(shareTag.c_str(), "Tag"));
 
-    THROW_IF_FAILED(m_ttrpcClient->RemoveShare(shareTag));
+    THROW_IF_FAILED(m_vmService->RemoveShare(shareTag.c_str()));
 
     m_shares.erase(it);
     return S_OK;
@@ -761,8 +748,8 @@ try
         return HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES);
     }
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for port bind");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for port bind");
 
     WSL_LOG(
         "OpenVmmMapPort",
@@ -771,7 +758,7 @@ try
         TraceLoggingValue(GuestPort, "GuestPort"),
         TraceLoggingValue(Family, "Family"));
 
-    THROW_IF_FAILED(m_ttrpcClient->BindPort(HostPort, GuestPort, true, Family));
+    THROW_IF_FAILED(m_vmService->BindPort(HostPort, GuestPort, TRUE, Family));
 
     m_boundPorts.insert(key);
     return S_OK;
@@ -789,8 +776,8 @@ try
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
 
-    THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
-        "ttrpc client not connected for port unbind");
+    THROW_HR_IF_MSG(E_FAIL, !m_vmService,
+        "VM service not available for port unbind");
 
     WSL_LOG(
         "OpenVmmUnmapPort",
@@ -799,7 +786,7 @@ try
         TraceLoggingValue(GuestPort, "GuestPort"),
         TraceLoggingValue(Family, "Family"));
 
-    THROW_IF_FAILED(m_ttrpcClient->UnbindPort(HostPort, GuestPort, true, Family));
+    THROW_IF_FAILED(m_vmService->UnbindPort(HostPort, GuestPort, TRUE, Family));
 
     m_boundPorts.erase(key);
     return S_OK;

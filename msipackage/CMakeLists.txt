@@ -32,6 +32,8 @@ if (INCLUDE_OPENVMM)
     foreach(binary ${WSL_DEVICE_HOST_BINARIES})
         list(APPEND BINARIES_DEPENDENCIES "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}")
     endforeach()
+
+    list(APPEND BINARIES_DEPENDENCIES "${WSL_VM_SERVICE_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wslvmservice.dll")
 endif()
 
 set(LINUX_BINARIES init;initrd.img)

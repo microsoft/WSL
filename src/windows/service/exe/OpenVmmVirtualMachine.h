@@ -20,8 +20,8 @@ Abstract:
 
 #include "wslc.h"
 #include "INetworkingEngine.h"
-#include "TtrpcClient.h"
 #include "Dmesg.h"
+#include <windowsdefs.h>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -65,8 +65,8 @@ private:
     // Build the openvmm.exe command line (ttrpc-only in orchestration mode).
     std::wstring BuildCommandLine() const;
 
-    // Build a ttrpc CreateVM configuration from stored VM settings.
-    TtrpcClient::VmConfig BuildVmConfig() const;
+    // Configure the VM via IWslVmService COM calls (kernel, disks, NIC, etc.).
+    void ConfigureVmService() const;
 
     // Create a Unix domain socket listener for the hybrid_vsock bridge at the given port.
     // Returns the listening socket and the filesystem path for cleanup.
@@ -155,9 +155,9 @@ private:
     // Networking engine (ConsommeNetworking for the OpenVMM backend).
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
-    // ttrpc client for runtime VM management (disk hot-add/remove etc.).
+    // ttrpc client COM object for runtime VM management (disk hot-add/remove etc.).
     std::filesystem::path m_ttrpcSocketPath;
-    std::unique_ptr<TtrpcClient> m_ttrpcClient;
+    wil::com_ptr<IWslVmService> m_vmService;
 
     // Termination callback to invoke when the VM exits.
     wil::com_ptr<ITerminationCallback> m_terminationCallback;

@@ -55,6 +55,19 @@ set(OPENVMM_/BUILD_DIR "d:/src/openvmm/target/release")
 # # Uncomment to reduce the verbosity of the appx package build
 # set(WSL_SILENT_APPX_BUILD true)
 
+# # --- Local hvlite / OpenVMM development ---
+# # Set HVLITE_BUILD_DIR to consume locally built DLLs from your hvlite checkout
+# # (wsldevicehost.dll, wslvmservice.dll). Set OPENVMM_BUILD_DIR for openvmm.exe,
+# # which builds from the separate oss/ submodule workspace.
+# #
+# # Build in hvlite first:
+# #   cargo build -p wsldevicehost -p wslvmservice
+# #   cd oss && cargo build -p openvmm
+# #
+# # Then uncomment and adjust the paths:
+# set(HVLITE_BUILD_DIR "d:/src/hvlite/target/debug")
+# set(OPENVMM_BUILD_DIR "d:/src/hvlite/oss/target/debug")
+
 # # Uncomment to change the pre-commit hook behavior (default: warn)
 # #   warn  - report formatting issues without blocking the commit
 # #   error - block the commit when formatting issues are found

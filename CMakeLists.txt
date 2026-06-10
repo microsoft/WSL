@@ -106,49 +106,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(boost_headers)
 
-set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
-
-if (INCLUDE_OPENVMM)
-    FetchContent_Declare(protobuf
-                         URL https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
-                         URL_HASH SHA256=e4e6ff10760cf747a2decd1867741f561b216bd60cc4038c87564713a6da1848)
-
-    FetchContent_MakeAvailable(protobuf)
-    include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
-endif()
-
-# Adds protobuf-generated C++ sources from VMService.proto to the given TARGET.
-# The target must already exist. This function handles code generation, include
-# directories, library linking, and MSVC warning suppression for generated code.
-function(wsl_add_openvmm_proto TARGET)
-    set(_proto_file ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
-    set(_proto_out_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
-
-    if (NOT EXISTS ${_proto_file})
-        message(FATAL_ERROR "Expected DeviceHost proto file was not found: ${_proto_file}")
-    endif()
-
-    protobuf_generate(
-        TARGET ${TARGET}
-        PROTOS ${_proto_file}
-        IMPORT_DIRS ${WSL_DEVICE_HOST_SOURCE_DIR}/proto ${protobuf_SOURCE_DIR}/src
-        PROTOC_OUT_DIR ${_proto_out_dir}
-    )
-
-    target_include_directories(${TARGET} PRIVATE ${_proto_out_dir})
-    target_link_libraries(${TARGET} protobuf::libprotobuf)
-
-    if (MSVC)
-        set_source_files_properties(
-            ${_proto_out_dir}/VMService.pb.cc
-            TARGET_DIRECTORY ${TARGET}
-            PROPERTIES COMPILE_OPTIONS "/wd4267;/wd4244;/wd4018")
-    endif()
-endfunction()
-
-
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(IDL REQUIRED)
@@ -212,6 +169,14 @@ set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
+endif()
+
+# Resolve OpenVMM packages. UserConfig.cmake can set WSL_DEVICE_HOST_SOURCE_DIR
+# and/or WSL_VM_SERVICE_SOURCE_DIR to local paths to skip the NuGet lookup.
+# When INCLUDE_OPENVMM is set and WSL_VM_SERVICE_SOURCE_DIR is not already
+# overridden, resolve from the NuGet feed.
+if (INCLUDE_OPENVMM AND NOT WSL_VM_SERVICE_SOURCE_DIR)
+    find_nuget_package(Microsoft.WSL.VmService WSL_VM_SERVICE /build/native)
 endif()
 
 # --- Local OpenVMM binary override ---

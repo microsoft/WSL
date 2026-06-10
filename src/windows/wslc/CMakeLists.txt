@@ -11,10 +11,6 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
 target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
 
-if (INCLUDE_OPENVMM)
-    wsl_add_openvmm_proto(wslclib)
-endif()
-
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
                       yaml-cpp
