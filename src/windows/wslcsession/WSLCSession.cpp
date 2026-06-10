@@ -2760,9 +2760,9 @@ try
 {
     RETURN_HR_IF(E_POINTER, Event == nullptr);
 
-    // Duplicate the "terminated" event (signaled once the session is fully done, via either an
-    // explicit Terminate() or an unexpected VM exit). The caller owns the returned handle, which
-    // stays valid (and observes the signaled state) even after the session is released.
+    *Event = nullptr;
+
+    // Duplicate the "terminated" event. The caller owns the returned handle, which stays valid even after the session is released.
     *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get());
 
     return S_OK;
@@ -2774,11 +2774,11 @@ try
 {
     RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
 
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
     auto lock = m_lock.lock_shared();
 
-    // The termination reason is only populated once the session has finished terminating. Fail
-    // rather than returning a placeholder so callers can distinguish "still running" from
-    // "terminated for an unknown reason".
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
 
     *Reason = m_terminationReason;
