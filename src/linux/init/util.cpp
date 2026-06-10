@@ -1985,6 +1985,33 @@ try
     }
 
     MountOptions += std::format("workdir={}", Path);
+
+    //
+    // The scratch-backed read/write layer is reformatted on every launch and discarded on
+    // teardown, so the overlay upper dir is disposable. Mount it "volatile" to skip syncs to the
+    // upper filesystem (supported since overlayfs 5.10), avoiding writeback stalls on a layer
+    // whose contents never need to survive a crash. overlayfs refuses to reuse a volatile upper
+    // dir after an unclean shutdown, but that is moot here because the upper dir is always freshly
+    // created above. A tmpfs read/write layer gains nothing from volatile, so it is only used for
+    // the scratch-backed layer.
+    //
+    // N.B. If the running kernel does not support the volatile option the mount fails with EINVAL;
+    //      retry without it so a disk-backed overlay is still used rather than falling all the way
+    //      back to a tmpfs layer.
+    //
+
+    if (ScratchDevice.has_value())
+    {
+        const auto VolatileOptions = MountOptions + ",volatile";
+        if (UtilMount(nullptr, Target, "overlay", MountFlags, VolatileOptions.c_str(), TimeoutSeconds) >= 0)
+        {
+            cleanupRwLayer.release();
+            return 0;
+        }
+
+        LOG_ERROR("volatile overlay mount failed, retrying without volatile");
+    }
+
     if (UtilMount(nullptr, Target, "overlay", MountFlags, MountOptions.c_str(), TimeoutSeconds) < 0)
     {
         return -1;
