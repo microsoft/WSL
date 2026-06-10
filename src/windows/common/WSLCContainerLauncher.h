@@ -86,6 +86,7 @@ public:
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
+    using WSLCProcessLauncher::SetTtySize;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 

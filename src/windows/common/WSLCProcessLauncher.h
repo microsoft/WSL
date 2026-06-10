@@ -109,8 +109,8 @@ protected:
     std::optional<std::string> m_detachKeys;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
-    DWORD m_rows = 0;
-    DWORD m_columns = 0;
+    DWORD m_rows = 24;
+    DWORD m_columns = 80;
 };
 
 } // namespace wsl::windows::common

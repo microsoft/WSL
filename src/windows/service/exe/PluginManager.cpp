@@ -197,7 +197,7 @@ try
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
 
     if (Errno != nullptr)
     {
@@ -421,6 +421,7 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
             WSL_LOG(
                 "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
+            SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
             ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), e.name.c_str());
         }
     }
@@ -457,6 +458,7 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
+            SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
             ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), e.name.c_str());
         }
     }

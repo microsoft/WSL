@@ -1699,11 +1699,12 @@ try
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateContainer",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
@@ -2009,7 +2010,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLCProcessOptions* Options, IWSLCProcess** Process, int* Errno)
+HRESULT WSLCSession::CreateRootNamespaceProcess(
+    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, IWSLCProcess** Process, int* Errno)
 try
 {
     WSLCExecutionContext context(this);
@@ -2027,7 +2029,7 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
+    auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
     THROW_IF_FAILED(process.CopyTo(Process));
 
     return S_OK;
