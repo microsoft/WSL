@@ -285,12 +285,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
 
-    // Configure termination callback
-    if (Settings->TerminationCallback)
-    {
-        m_terminationCallback = Settings->TerminationCallback;
-    }
-
     hcs::RegisterCallback(m_computeSystem.get(), &HcsVirtualMachine::OnVmExitCallback, this);
 
     // Create a listening socket for mini_init to connect to once the VM is running.
@@ -686,8 +680,6 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    m_vmExitEvent.SetEvent();
-
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
     auto reason = WSLCVirtualMachineTerminationReasonUnknown;
@@ -709,11 +701,28 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
         }
     }
 
-    if (m_terminationCallback)
+    // Cache the termination reason and details before signaling the exit event.
     {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
+        std::lock_guard lock(m_lock);
+        m_terminationReason = reason;
+        m_terminationDetails = Event->EventData;
     }
+
+    m_vmExitEvent.SetEvent();
 }
+
+HRESULT HcsVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    std::lock_guard lock(m_lock);
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 {

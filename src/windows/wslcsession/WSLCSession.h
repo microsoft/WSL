@@ -89,6 +89,8 @@ public:
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
+    IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
@@ -229,7 +231,11 @@ private:
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmExitedEvent;
+
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
     wil::srwlock m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_containerdProcess;
@@ -237,7 +243,6 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
-    std::atomic<bool> m_terminated{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 

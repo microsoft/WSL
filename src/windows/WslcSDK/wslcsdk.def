@@ -16,7 +16,8 @@ WslcReleaseContainer
 WslcReleaseProcess
 
 WslcSetSessionSettingsFeatureFlags
-WslcSetSessionSettingsTerminationCallback
+WslcGetSessionTerminationEvent
+WslcGetSessionTerminationReason
 WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout

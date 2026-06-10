@@ -46,6 +46,7 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:
     struct DiskInfo
@@ -102,7 +103,9 @@ private:
     std::atomic<bool> m_vmSavedStateCaptured = false;
     std::atomic<bool> m_crashLogCaptured = false;
 
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
+    // Termination reason and details, cached when the VM exits (see OnExit). Guarded by m_lock.
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
 };
 
 } // namespace wsl::windows::service::wslc

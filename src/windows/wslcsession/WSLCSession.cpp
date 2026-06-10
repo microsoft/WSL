@@ -2479,9 +2479,20 @@ try
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
+
+        // The VM exited on its own, so it recorded the cause.
+        if (m_virtualMachine)
+        {
+            wil::unique_cotaskmem_string details;
+            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
+            m_terminationDetails = details ? details.get() : L"";
+        }
     }
     else
     {
+        // The VM is still alive, so this is a graceful shutdown initiated by us.
+        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+
         if (m_virtualMachine)
         {
             m_virtualMachine->OnSessionTerminated();
@@ -2520,7 +2531,8 @@ try
         m_swapVhdPath.clear();
     }
 
-    m_terminated = true;
+    m_sessionTerminatedEvent.SetEvent();
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -2739,9 +2751,42 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
-    *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
+    *State = m_sessionTerminatedEvent.is_signaled() ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }
+
+HRESULT WSLCSession::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    RETURN_HR_IF(E_POINTER, Event == nullptr);
+
+    // Duplicate the "terminated" event (signaled once the session is fully done, via either an
+    // explicit Terminate() or an unexpected VM exit). The caller owns the returned handle, which
+    // stays valid (and observes the signaled state) even after the session is released.
+    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get());
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    auto lock = m_lock.lock_shared();
+
+    // The termination reason is only populated once the session has finished terminating. Fail
+    // rather than returning a placeholder so callers can distinguish "still running" from
+    // "terminated for an unknown reason".
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 void WSLCSession::RecoverExistingContainers()
 {

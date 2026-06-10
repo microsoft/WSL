@@ -98,16 +98,6 @@ typedef enum _WSLCSignal
 } WSLCSignal;
 
 [
-    uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
-    pointer_default(unique),
-    object
-]
-interface ITerminationCallback : IUnknown
-{
-    HRESULT OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details);
-};
-
-[
     uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
     pointer_default(unique),
     object
@@ -498,6 +488,11 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    // Returns the cached termination reason and details. The values are only meaningful
+    // after the termination event has been signaled; before that the reason is
+    // WSLCVirtualMachineTerminationReasonUnknown and Details is an empty string.
+    HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 }
 
 typedef enum _WSLCSessionStorageFlags
@@ -518,7 +513,6 @@ typedef struct _WSLCSessionSettings {
     ULONG MemoryMb;
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
-    [unique] ITerminationCallback* TerminationCallback;
     WSLCFeatureFlags FeatureFlags;
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
@@ -727,6 +721,16 @@ interface IWSLCSession : IUnknown
 {
     HRESULT GetId([out] ULONG* Id);
     HRESULT GetState([out] WSLCSessionState* State);
+
+    // Returns a one-off event that is signaled when the session terminates, whether due to an
+    // explicit Terminate() call or an unexpected VM exit. The returned handle is owned by the
+    // caller and remains valid (and observes the signaled state) even after the session is released.
+    HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    // Returns the cached termination reason and details. The values are only meaningful after the
+    // termination event has been signaled; before that the reason is
+    // WSLCVirtualMachineTerminationReasonUnknown and Details is an empty string.
+    HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
