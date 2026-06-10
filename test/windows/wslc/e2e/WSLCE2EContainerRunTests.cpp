@@ -713,6 +713,37 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_Success)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --name {} --network {} --network-alias db {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoNetwork_Rejected)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Network aliases require a user-defined network. Use '--network' to specify one.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_EmptyValue_Rejected)
+    {
+        auto result = RunWslc(
+            std::format(L"container run --rm --network-alias \"\" --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid network-alias value: network alias cannot be empty or whitespace\r\n", .ExitCode = 1});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
@@ -973,6 +1004,7 @@ private:
                 << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  --network         Connect a container to a network\r\n"
+                << L"  --network-alias   Add a network-scoped alias for the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"

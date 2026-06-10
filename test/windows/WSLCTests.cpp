@@ -6762,6 +6762,131 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkAliasCreateTest)
+    {
+        auto createNetwork = [&](const std::string& name, const char* subnet) {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(name.c_str()));
+            WSLCDriverOption opts[] = {{"Subnet", subnet}};
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = name.c_str();
+            netOpts.Driver = "bridge";
+            netOpts.DriverOpts = opts;
+            netOpts.DriverOptsCount = ARRAYSIZE(opts);
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+        };
+
+        auto launchWithAliases = [&](const std::string& containerName, const std::string& networkMode, const std::vector<std::string>& aliases) {
+            WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, networkMode);
+            for (const auto& a : aliases)
+            {
+                launcher.AddPrimaryNetworkAlias(a);
+            }
+            return launcher.Launch(*m_defaultSession);
+        };
+
+        auto launchWithAliasesNoThrow =
+            [&](const std::string& containerName, const std::string& networkMode, const std::vector<std::string>& aliases) {
+                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, networkMode);
+                for (const auto& a : aliases)
+                {
+                    launcher.AddPrimaryNetworkAlias(a);
+                }
+                return launcher.LaunchNoThrow(*m_defaultSession);
+            };
+
+        // Single user-defined network + single alias — success, round-trips via inspect.
+        {
+            const std::string networkName = "alias-net-single";
+            createNetwork(networkName, "172.60.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchWithAliases("alias-ctr-single", networkName, {"db"});
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+        }
+
+        // Multiple aliases on a single network — all present.
+        {
+            const std::string networkName = "alias-net-multi";
+            createNetwork(networkName, "172.61.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchWithAliases("alias-ctr-multi", networkName, {"db", "primary", "backup"});
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "backup") != endpoint.Aliases.end());
+        }
+
+        // Alias on 'host' mode — rejected at the IDL layer.
+        {
+            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-host", "host", {"db"});
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            ValidateCOMErrorMessage(
+                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+        }
+
+        // Alias on 'none' mode — rejected.
+        {
+            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-none", "none", {"db"});
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            ValidateCOMErrorMessage(
+                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+        }
+
+        // Alias on 'container:' mode — rejected.
+        {
+            WSLCContainerLauncher targetLauncher("debian:latest", "alias-ctr-target", {"sleep", "99999"}, {});
+            auto target = targetLauncher.Launch(*m_defaultSession);
+
+            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-container", "container:alias-ctr-target", {"db"});
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            ValidateCOMErrorMessage(
+                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+        }
+
+        // Empty alias string — rejected.
+        {
+            const std::string networkName = "alias-net-empty";
+            createNetwork(networkName, "172.62.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-empty", networkName, {""});
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Network alias cannot be empty.");
+        }
+
+        // Unknown KVP key on primary settings — rejected with E_NOTIMPL.
+        {
+            const std::string networkName = "alias-net-unknown";
+            createNetwork(networkName, "172.63.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {{"IPAddress", "10.0.0.5"}};
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-unknown";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
+            ValidateCOMErrorMessage(std::format(
+                                        L"Endpoint settings are not yet supported (network '{}').",
+                                        std::wstring(networkName.begin(), networkName.end()))
+                                        .c_str());
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerNetworkModeHappyPathTest)
     {
         // Start container A on the default (bridged) network, then start container B sharing A's

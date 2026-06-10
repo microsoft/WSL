@@ -124,6 +124,19 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
     }
 
+    case ArgType::NetworkAlias:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::NetworkAlias>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
+            }
+        }
+        break;
+    }
+
     default:
         break;
     }
