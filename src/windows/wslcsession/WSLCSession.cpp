@@ -249,12 +249,9 @@ UserCOMCallback::~UserCOMCallback() noexcept
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
 {
-    RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
 
-    wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
-    THROW_LAST_ERROR_IF(!process);
-
-    *ProcessHandle = process.release();
+    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE);
     return S_OK;
 }
 CATCH_RETURN();
