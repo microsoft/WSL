@@ -2125,6 +2125,10 @@ Verwendung:
     <value>Container „{}“ wird ausgeführt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress wird noch nicht unterstützt.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Portzuordnungen werden im Containernetzwerkmodus nicht unterstützt. Ports befinden sich im Besitz des Zielcontainers.</value>
   </data>
@@ -2335,6 +2339,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nicht unterstützter Netzwerkmodus: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Zusätzliche Netzwerke sind nicht zulässig, wenn der primäre Netzwerkmodus „host“ oder „none“ ist.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Doppelt vorhandenes Netzwerk: „{}“</value>
@@ -2714,6 +2722,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Der auszuführende Befehl</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Anzahl der CPUs (z. B. 0.5, 1 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Ungültiger {}-Argumentwert: "{}". Es wurde eine positive Anzahl von CPUs erwartet (z. B. 0.5, 1 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Container löschen, auch wenn sie ausgeführt werden</value>
   </data>
@@ -2783,11 +2799,25 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Den zuletzt erstellten Container anzeigen (einschließlich aller Zustände)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Speicherlimit (z. B. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Hostname des Containers</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name des Containers</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Verbinden eines Containers mit einem Netzwerk</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: Der Netzwerkname darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>Das Hostmodusnetzwerk wird nicht unterstützt</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Zwischenspeichern beim Erstellen des Bildes nicht verwenden</value>
@@ -2872,6 +2902,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeitsverzeichnis im Container</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: Das Arbeitsverzeichnis darf nicht leer sein oder aus Leerzeichen bestehen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Schreibt die Container-ID in den angegebenen Pfad</value>
   </data>
@@ -2915,6 +2949,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>tmpfs im Container an dem angegebenen Pfad mounten</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit-Optionen (Format: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], verwenden Sie -1 für unbegrenzt)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Ungültiger {}-Argumentwert: "{}". Erwartete &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (verwenden Sie -1 für unbegrenzt)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>Benutzer-ID für den Prozess (name|uid|uid:gid)</value>

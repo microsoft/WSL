@@ -2125,6 +2125,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器“{}”正在运行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>尚不支持 ContainerIpAddress。</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器网络模式不支持端口映射；端口由目标容器拥有。</value>
   </data>
@@ -2335,6 +2339,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>不受支持的网络模式: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>当主网络模式为 'host' 或 'none' 时，不允许添加其他网络。</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>重复的网络:“{}”</value>
@@ -2714,6 +2722,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>要运行的命令</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>CPU 数(例如 0.5、1、2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>{} 参数值无效：“{}”。应为正数的 CPU (，例如 0.5、1、2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>删除容器，即使它们正在运行</value>
   </data>
@@ -2783,11 +2799,25 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>显示最新创建的容器 (包括所有状态)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>内存限制(例如 512M、1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>容器主机名</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>容器的名称</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>将容器连接到网络</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>{} 值无效： 网络名称不能为空或空白</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>不支持主机模式网络</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>生成映像时不要使用缓存</value>
@@ -2872,6 +2902,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器内的工作目录</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>{} 值无效： 工作目录不能为空或空白</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>将容器 ID 写入提供的路径</value>
   </data>
@@ -2915,6 +2949,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>将 tmpfs 装载到给定路径处的容器</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit 选项 (格式： &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]，使用 -1 无限制)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>{} 参数值无效：“{}”。预期 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (使用 -1 获取无限)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>进程的用户 ID (name|uid|uid:gid)</value>
