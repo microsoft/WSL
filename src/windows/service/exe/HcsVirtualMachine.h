@@ -84,12 +84,12 @@ private:
     std::wstring m_swiotlbOption;
 
     wil::unique_socket m_listenSocket;
+    wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     std::optional<wsl::core::Config> m_natConfig;
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
-    wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;

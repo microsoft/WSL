@@ -23,25 +23,23 @@ using wsl::windows::common::io::WriteHandle;
 using wsl::windows::common::io::WriteNamedPipe;
 
 DmesgCollector::DmesgCollector(
-    GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
-    m_com1PipeName(Com1PipeName), m_outputHandle(std::move(OutputHandle)), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
+    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
+    m_com1PipeName(Com1PipeName), m_vmExitEvent(ExitEvent), m_outputHandle(std::move(OutputHandle)), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
 {
-    m_exitEvent.reset(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
-    m_threadExit.create(wil::EventOptions::ManualReset);
 }
 
 DmesgCollector::~DmesgCollector()
 {
-    m_threadExit.SetEvent();
-    if (m_worker.joinable())
+    m_threadExitEvent.SetEvent();
+    if (m_thread.joinable())
     {
-        m_worker.join();
+        m_thread.join();
     }
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
     GUID VmId,
-    const wil::unique_event& ExitEvent,
+    HANDLE ExitEvent,
     bool EnableTelemetry,
     bool EnableDebugConsole,
     const std::wstring& Com1PipeName,
@@ -51,11 +49,7 @@ std::shared_ptr<DmesgCollector> DmesgCollector::Create(
     auto dmesgCollector = std::shared_ptr<DmesgCollector>(
         new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));
 
-    if (FAILED(dmesgCollector->Start(EnableEarlyBootConsole)))
-    {
-        return {};
-    }
-
+    dmesgCollector->Start(EnableEarlyBootConsole);
     return dmesgCollector;
 }
 
@@ -108,12 +102,37 @@ try
     }
 
     // The loop runs until either exit event is signaled.
-    io.AddHandle(std::make_unique<EventHandle>(m_threadExit.get()), MultiHandleWait::CancelOnCompleted);
-    io.AddHandle(std::make_unique<EventHandle>(m_exitEvent.get()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<EventHandle>(m_threadExitEvent.get()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<EventHandle>(m_vmExitEvent), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
 }
 CATCH_LOG()
+
+namespace {
+
+template <typename TWriter>
+void Push(TWriter& Writer, const gsl::span<char>& Input, const char* Target)
+{
+    constexpr size_t c_maxDmesgPendingBytes = 1024 * 1024;
+
+    const auto pending = Writer.PendingBytes();
+
+    // Don't fill the buffer past c_maxDmesgPendingBytes. If full, just drop the bytes with a warning.
+    if (pending > c_maxDmesgPendingBytes)
+    {
+        WSL_LOG(
+            "DmesgOutputDropped",
+            TraceLoggingValue(Target, "target"),
+            TraceLoggingValue(static_cast<uint64_t>(pending), "pendingBytes"));
+
+        return;
+    }
+
+    Writer.Push(Input);
+}
+
+} // namespace
 
 void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Input)
 {
@@ -163,20 +182,18 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
     }
 
-    if (m_com1Write)
+    if (sendToComPipe)
     {
-        m_com1Write->Push(Input);
+        Push(*m_com1Write, Input, "com1");
     }
 
     if (m_outputWrite != nullptr)
     {
-        // Queue the bytes; the IO loop schedules the actual write.
-        m_outputWrite->Push(Input);
+        Push(*m_outputWrite, Input, "output");
     }
 }
 
-HRESULT DmesgCollector::Start(bool EnableEarlyBootConsole)
-try
+void DmesgCollector::Start(bool EnableEarlyBootConsole)
 {
     if (!m_com1PipeName.empty())
     {
@@ -212,7 +229,5 @@ try
 
     std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe();
 
-    m_worker = std::thread([this]() { Run(); });
-    return S_OK;
+    m_thread = std::thread([this]() { Run(); });
 }
-CATCH_RETURN()

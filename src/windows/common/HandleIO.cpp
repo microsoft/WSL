@@ -889,7 +889,17 @@ void WriteHandle::Push(const gsl::span<char>& Content)
 
     // Put any pending output to a different buffer, since the active buffer could be in the middle of a write.
     Pending.insert(Pending.end(), Content.begin(), Content.end());
-    State = IOHandleStatus::Standby;
+
+    if (State == IOHandleStatus::Idle)
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+size_t WriteHandle::PendingBytes() const
+{
+    // Bytes still queued (Pending) plus bytes in the active buffer that have not yet been written (Buffer).
+    return Pending.size() + Buffer.Size();
 }
 
 HANDLE WriteHandle::GetHandle() const
@@ -1019,6 +1029,11 @@ void WriteNamedPipe::Push(const gsl::span<char>& Content)
     {
         State = IOHandleStatus::Standby;
     }
+}
+
+size_t WriteNamedPipe::PendingBytes() const
+{
+    return Write ? Write->PendingBytes() : 0;
 }
 
 // DockerIORelayHandle

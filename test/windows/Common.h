@@ -520,6 +520,8 @@ struct TestConfigDefaults
     std::optional<size_t> vmIdleTimeout;
     std::optional<bool> safeMode;
     std::optional<bool> guiApplications;
+    std::optional<bool> earlyBootLogging;
+    std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;

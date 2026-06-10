@@ -248,6 +248,9 @@ public:
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
 
+    // Returns the number of bytes that have been queued for writing but not yet written to the handle.
+    size_t PendingBytes() const;
+
 private:
     // Returns the state to adopt once the active buffer drains: Completed for one-shot writers, or Idle/Standby
     // for persistent writers depending on whether more data is queued.
@@ -278,6 +281,9 @@ public:
     void Collect() override;
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
+
+    // Returns the number of bytes that have been queued for writing but not yet written to the pipe.
+    size_t PendingBytes() const;
 
 private:
     // Drops the current client and arms a fresh connection so the next Schedule() reconnects before writing.
