@@ -24,7 +24,12 @@ using wsl::windows::common::io::WriteNamedPipe;
 
 DmesgCollector::DmesgCollector(
     GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
-    m_com1PipeName(Com1PipeName), m_vmExitEvent(ExitEvent), m_outputHandle(std::move(OutputHandle)), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
+    m_com1PipeName(Com1PipeName),
+    m_vmExitEvent(ExitEvent),
+    m_outputHandle(std::move(OutputHandle)),
+    m_runtimeId(VmId),
+    m_debugConsole(EnableDebugConsole),
+    m_telemetry(EnableTelemetry)
 {
 }
 
@@ -38,13 +43,7 @@ DmesgCollector::~DmesgCollector()
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
-    GUID VmId,
-    HANDLE ExitEvent,
-    bool EnableTelemetry,
-    bool EnableDebugConsole,
-    const std::wstring& Com1PipeName,
-    bool EnableEarlyBootConsole,
-    wil::unique_handle&& OutputHandle)
+    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole, wil::unique_handle&& OutputHandle)
 {
     auto dmesgCollector = std::shared_ptr<DmesgCollector>(
         new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));

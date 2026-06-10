@@ -2297,7 +2297,6 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
         WslConfigChange config(LxssGenerateTestConfig({}));
 
-
         auto readDmesgLog = [&](uint64_t Offset) -> std::string {
             wil::unique_hfile file(CreateFileW(
                 dmesgLogFile.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));

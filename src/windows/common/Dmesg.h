@@ -50,13 +50,7 @@ private:
         DmesgCollectorConsole
     };
 
-    DmesgCollector(
-        GUID VmId,
-        HANDLE ExitEvent,
-        bool EnableTelemetry,
-        bool EnableDebugConsole,
-        const std::wstring& Com1PipeName,
-        wil::unique_handle&& OutputHandle = {});
+    DmesgCollector(GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle = {});
 
     void Start(bool EnableEarlyBootConsole);
 

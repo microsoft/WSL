@@ -90,7 +90,6 @@ private:
     std::optional<wsl::core::Config> m_natConfig;
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
-
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 
