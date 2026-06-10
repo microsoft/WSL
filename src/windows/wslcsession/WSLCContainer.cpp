@@ -242,7 +242,10 @@ EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG 
     {
         for (const auto& alias : it->second)
         {
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasEmpty(), alias.empty());
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcAliasEmpty(),
+                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
         }
         config.Aliases = std::move(it->second);
     }
