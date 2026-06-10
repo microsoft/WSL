@@ -140,7 +140,12 @@ public:
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
-        _In_ LPCSTR Executable, _In_ const WSLCProcessOptions* Options, _Out_ IWSLCProcess** VirtualMachine, _Out_ int* Errno) override;
+        _In_ LPCSTR Executable,
+        _In_ const WSLCProcessOptions* Options,
+        _In_ ULONG TtyRows,
+        _In_ ULONG TtyColumns,
+        _Out_ IWSLCProcess** VirtualMachine,
+        _Out_ int* Errno) override;
 
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
