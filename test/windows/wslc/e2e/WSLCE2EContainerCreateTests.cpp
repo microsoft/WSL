@@ -848,11 +848,14 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr =
+                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Create_NetworkAlias_HostMode_Rejected)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_NetworkAlias_NoneMode_Rejected)
     {
         auto result = RunWslc(std::format(
             L"container create --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));

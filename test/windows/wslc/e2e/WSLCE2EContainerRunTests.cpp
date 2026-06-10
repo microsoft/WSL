@@ -734,10 +734,13 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr =
+                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_HostMode_Rejected)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoneMode_Rejected)
     {
         auto result = RunWslc(std::format(
             L"container run --rm --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));

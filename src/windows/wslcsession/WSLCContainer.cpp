@@ -1623,7 +1623,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto primaryConfig =
         ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
 
-    // Aliases require an endpoint we actually attach. host/none/container: modes have none.
+    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+        primaryConfig.Aliases.has_value() && networkMode == "bridge");
+
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcAliasRequiresPrimaryNetwork(),

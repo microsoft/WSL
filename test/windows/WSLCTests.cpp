@@ -6832,6 +6832,13 @@ class WSLCTests
                 L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
         }
 
+        // Alias on default 'bridge' mode — rejected (aliases require a user-defined network).
+        {
+            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-bridge", "bridge", {"db"});
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Network aliases require a user-defined network. Use '--network' to specify one.");
+        }
+
         // Alias on 'none' mode — rejected.
         {
             auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-none", "none", {"db"});
