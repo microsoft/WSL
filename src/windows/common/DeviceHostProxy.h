@@ -114,7 +114,13 @@ private:
     std::map<GUID, DeviceHostProxyEntry, wsl::windows::common::helpers::GuidLess> m_devices;
     bool m_devicesShutdown;
 
-    wil::unique_handle m_jobObject;
+    // Per-device-host-process kill-on-close jobs, keyed by process id. A separate job is
+    // created for each distinct device host process rather than sharing one: a process the
+    // system already placed in another job cannot be assigned to a job that has already been
+    // assigned to a different process, which fails intermittently with ERROR_ACCESS_DENIED.
+    // The jobs are held for the proxy's lifetime so the processes are terminated when the VM
+    // shuts down. Guarded by m_devicesLock.
+    std::map<DWORD, wil::unique_handle> m_processJobs;
 
     static constexpr LPCWSTR c_hdvModuleName = L"vmdevicehost.dll";
     static constexpr LPCWSTR c_vmwpctrlModuleName = L"vmwpctrl.dll";

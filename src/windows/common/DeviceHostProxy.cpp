@@ -27,10 +27,6 @@ DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId
 {
     m_devicesShutdown = false;
     m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
-
-    // Create a job object that will terminate device host processes when this proxy is destroyed
-    // (i.e., when the VM shuts down).
-    m_jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
 GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag)
@@ -157,12 +153,29 @@ try
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
 
-    // Add the device host process to the job object so it is terminated when the VM shuts down.
-    wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
-    LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
-    if (process)
+    // Add the device host process to a kill-on-close job so it is terminated when the VM shuts down.
+    // A fresh job is created for each distinct process (see m_processJobs); assigning a process the
+    // system already placed in another job to a job that has already been assigned to a different
+    // process fails with ERROR_ACCESS_DENIED.
     {
-        LOG_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_jobObject.get(), process.get()));
+        auto lock = m_devicesLock.lock_exclusive();
+        if (!m_devicesShutdown && !m_processJobs.contains(ProcessId))
+        {
+            wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
+            LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
+            if (process)
+            {
+                wil::unique_handle job = wsl::windows::common::helpers::CreateKillOnCloseJob();
+                if (AssignProcessToJobObject(job.get(), process.get()))
+                {
+                    m_processJobs.emplace(ProcessId, std::move(job));
+                }
+                else
+                {
+                    LOG_LAST_ERROR_MSG("Failed to assign device host process %u to job object", ProcessId);
+                }
+            }
+        }
     }
 
     return S_OK;
