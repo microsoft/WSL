@@ -4030,7 +4030,7 @@ int main(int Argc, char* Argv[])
     if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr))
     {
         Result = -1;
-        LOG_ERROR("Failed to mount cgroup2: {}", CGROUP_MOUNTPOINT, errno);
+        LOG_ERROR("Failed to mount cgroup2: {}", errno);
         goto ErrorExit;
     }
 
