@@ -35,6 +35,13 @@ constexpr auto c_dockerdReadyLogLine = "API service listening on";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
+// podman/netavark stores network definitions in c_containerNetworkConfig, which is on the ephemeral
+// system rootfs; c_persistentContainerNetworks lives under the storage.vhdx mount (c_containerdStorage)
+// and persists across session restarts. See PersistNetworkConfig.
+constexpr auto c_containerNetworkConfig = "/etc/containers/networks";
+constexpr auto c_persistentContainerNetworks = "/var/lib/containers/networks";
+constexpr DWORD c_networkConfigSetupTimeoutMs = 30 * 1000;
+
 namespace {
 
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
@@ -443,6 +450,10 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     // Mount the device to /root.
     m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
 
+    // Back podman's network config dir with the persistent storage we just mounted, so that
+    // user-created networks survive a session restart (only meaningful for persistent storage).
+    PersistNetworkConfig();
+
     // Configure swap on a separate ephemeral VHD.
     if (Settings.SwapSizeMb > 0)
     {
@@ -463,6 +474,44 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     deleteVhdOnFailure.release();
+}
+
+void WSLCSession::PersistNetworkConfig()
+{
+    // podman/netavark stores network definitions in c_containerNetworkConfig (/etc/containers/
+    // networks), which lives on the ephemeral system rootfs and comes up empty on every session
+    // restart (fresh VM) - so user-created networks would be lost. The storage.vhdx mount
+    // (c_containerdStorage) is the only persistent location, so back the network dir with it via a
+    // bind mount: seed the baked default network (keeping its fixed id) into the persistent dir on
+    // first use, then bind that dir over /etc/containers/networks. podman keeps using its default
+    // network dir, now durable, so custom networks survive a restart and RecoverExistingNetworks can
+    // find them. (dockerd kept networks under its data-root, so this came for free before podman.)
+    //
+    // Best-effort: `set -e` aborts before the bind if seeding fails, leaving the baked
+    // /etc/containers/networks intact, so the session still works - just without cross-restart
+    // network persistence.
+    const auto script = std::format(
+        "set -e; "
+        "mkdir -p {1}; "
+        "[ -f {1}/podman.json ] || cp {0}/podman.json {1}/podman.json; "
+        "mount --bind {1} {0}",
+        c_containerNetworkConfig,
+        c_persistentContainerNetworks);
+
+    try
+    {
+        ServiceProcessLauncher launcher(
+            "/bin/sh", {"/bin/sh", "-c", script}, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}});
+        auto process = launcher.Launch(*m_virtualMachine);
+        const auto code = process.Wait(c_networkConfigSetupTimeoutMs);
+        THROW_HR_IF_MSG(E_FAIL, code != 0, "Network config persistence setup exited with code %d", code);
+
+        // Logged so the symptom of a failure here ("custom networks vanish after a session restart")
+        // is traceable: its absence in the logs points back to this step. The failure path is
+        // captured by CATCH_LOG below.
+        WSL_LOG("NetworkConfigPersisted", TraceLoggingValue(m_displayName.c_str(), "SessionName"));
+    }
+    CATCH_LOG();
 }
 
 HRESULT WSLCSession::GetId(ULONG* Id)
@@ -2593,6 +2642,14 @@ try
             // argument" 500, containers/podman#19090).
             if (m_storageDiskLun.has_value())
             {
+                // Release the network-config bind mount (PersistNetworkConfig) first so it doesn't
+                // hold the storage filesystem busy when the disk is detached/unmounted below.
+                try
+                {
+                    m_virtualMachine->Unmount(c_containerNetworkConfig);
+                }
+                CATCH_LOG();
+
                 try
                 {
                     m_virtualMachine->DetachDisk(m_storageDiskLun.value());

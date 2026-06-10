@@ -184,6 +184,7 @@ private:
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
+    void PersistNetworkConfig();
     void Ext4Format(const std::string& Device);
     _Requires_shared_lock_held_(m_lock)
     std::string InspectImageLockHeld(const std::string& Id);

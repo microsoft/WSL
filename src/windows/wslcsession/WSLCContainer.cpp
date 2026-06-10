@@ -1750,6 +1750,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
+    metadata.NetworkMode = networkMode;
 
     for (const auto& e : mappedPorts)
     {
@@ -1913,6 +1914,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         static_cast<std::uint64_t>(dockerContainer.Created),
         metadata.InitProcessFlags,
         metadata.Flags);
+
+    // Restore the Docker-semantic network mode persisted at create time, so the recovered container
+    // reports the same NetworkMode (e.g. a custom network name) instead of podman's collapsed "bridge".
+    if (!metadata.NetworkMode.empty())
+    {
+        container->m_requestedNetworkMode = metadata.NetworkMode;
+    }
 
     // Restore the state change timestamp from Docker inspect data.
     try

@@ -8084,14 +8084,16 @@ class WSLCTests
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "container", "rm", "-f", "test-invalid-metadata"});
+            RunCommand(m_defaultSession.get(), {"/usr/bin/podman", "container", "rm", "-f", "test-invalid-metadata"});
         });
 
         {
-            // Create a docker container that has no metadata.
+            // Create a container directly via the engine CLI (bypassing WSLC) so it has no WSLC
+            // metadata label. The distro runs podman (daemonless); the docker CLI would fail with
+            // "Cannot connect to the Docker daemon" since no dockerd runs.
             auto result = RunCommand(
                 m_defaultSession.get(),
-                {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                {"/usr/bin/podman", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 

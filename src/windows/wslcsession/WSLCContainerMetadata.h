@@ -58,7 +58,13 @@ struct WSLCContainerMetadataV1
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    // The Docker-semantic network mode requested at create time (network name for a custom network,
+    // otherwise "bridge"/"host"/"none"/"container:<id>"). Persisted so a recovered container reports
+    // the same NetworkMode that podman's inspect would otherwise collapse to "bridge". Empty for
+    // containers created before this field existed (falls back to podman's reported value).
+    std::string NetworkMode;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, NetworkMode);
 };
 
 struct WSLCContainerMetadata
