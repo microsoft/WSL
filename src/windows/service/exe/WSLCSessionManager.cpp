@@ -273,7 +273,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        wil::unique_handle sessionJob = AddSessionProcessToJobObject(factory.get());
+        wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
@@ -445,7 +445,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     return sessionSettings;
 }
 
-wil::unique_handle WSLCSessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory)
+wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory)
 {
     // Use a fresh job per session; reusing one fails intermittently with
     // ERROR_ACCESS_DENIED once it's assigned to a process the system put in another job.

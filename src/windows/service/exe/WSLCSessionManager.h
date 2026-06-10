@@ -165,7 +165,7 @@ private:
         }
     }
 
-    [[nodiscard]] wil::unique_handle AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory);
+    [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory);
     WSLCSessionInitSettings CreateSessionSettings(
         _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
