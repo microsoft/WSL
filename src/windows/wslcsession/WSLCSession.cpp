@@ -2777,8 +2777,8 @@ try
     *Reason = WSLCVirtualMachineTerminationReasonUnknown;
     *Details = nullptr;
 
-    auto lock = m_lock.lock_shared();
-
+    // m_terminationReason/m_terminationDetails are written once before m_sessionTerminatedEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
 
     *Reason = m_terminationReason;
