@@ -119,7 +119,7 @@ void Push(TWriter& Writer, const gsl::span<char>& Input, const char* Target)
     const auto pending = Writer.PendingBytes();
 
     // Don't fill the buffer past c_maxDmesgPendingBytes. If full, just drop the bytes with a warning.
-    if (pending > c_maxDmesgPendingBytes)
+    if (pending + Input.size() > c_maxDmesgPendingBytes)
     {
         WSL_LOG(
             "DmesgOutputDropped",
