@@ -21,6 +21,7 @@ Abstract:
 #include "wslc.h"
 #include "INetworkingEngine.h"
 #include "Dmesg.h"
+#include "WslVmServiceClient.h"
 #include <windowsdefs.h>
 #include <filesystem>
 #include <map>
@@ -155,9 +156,9 @@ private:
     // Networking engine (ConsommeNetworking for the OpenVMM backend).
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
-    // ttrpc client COM object for runtime VM management (disk hot-add/remove etc.).
+    // ttrpc client (wslvmservice.dll) for runtime VM management (disk hot-add/remove etc.).
     std::filesystem::path m_ttrpcSocketPath;
-    wil::com_ptr<IWslVmService> m_vmService;
+    std::unique_ptr<WslVmServiceClient> m_vmService;
 
     // Termination callback to invoke when the VM exits.
     wil::com_ptr<ITerminationCallback> m_terminationCallback;

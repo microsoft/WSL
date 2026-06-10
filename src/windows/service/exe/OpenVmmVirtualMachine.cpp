@@ -385,7 +385,7 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
     m_processWatchThread = std::thread(&OpenVmmVirtualMachine::WatchProcessExit, this);
 
-    m_vmService = wil::CoCreateInstance<IWslVmService>(CLSID_WslVmService, CLSCTX_INPROC_SERVER);
+    m_vmService = std::make_unique<WslVmServiceClient>();
     THROW_IF_FAILED_MSG(
         m_vmService->Connect(m_ttrpcSocketPath.c_str(), 30000),
         "Failed to connect to OpenVMM ttrpc server");
