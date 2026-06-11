@@ -2297,7 +2297,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
         WslConfigChange config(LxssGenerateTestConfig({}));
 
-        auto readDmesgLog = [&](uint64_t Offset) -> std::string {
+        auto readDmesgLog = [&](uint64_t offset) -> std::string {
             wil::unique_hfile file(CreateFileW(
                 dmesgLogFile.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
             if (!file)
@@ -2305,9 +2305,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 return {};
             }
 
-            LARGE_INTEGER offset{};
-            offset.QuadPart = static_cast<LONGLONG>(Offset);
-            THROW_LAST_ERROR_IF(!SetFilePointerEx(file.get(), offset, nullptr, FILE_BEGIN));
+            LARGE_INTEGER fileOffset{};
+            fileOffset.QuadPart = static_cast<LONGLONG>(offset);
+            THROW_LAST_ERROR_IF(!SetFilePointerEx(file.get(), fileOffset, nullptr, FILE_BEGIN));
 
             return ReadToString(file.get());
         };
