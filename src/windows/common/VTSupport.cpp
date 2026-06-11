@@ -101,14 +101,17 @@ EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool dis
     if (mode == Mode::Input)
     {
         const DWORD newMode = (current & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT;
-        if (SetConsoleMode(console, newMode))
+        if (newMode != current)
         {
-            m_console = console;
-            m_originalMode = current;
-        }
-        else
-        {
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
+            if (SetConsoleMode(console, newMode))
+            {
+                m_console = console;
+                m_originalMode = current;
+            }
+            else
+            {
+                LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
+            }
         }
     }
     else
@@ -117,8 +120,7 @@ EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool dis
             const DWORD newMode = current | flags;
             if (newMode == current)
             {
-                m_console = console;
-                m_originalMode = current;
+                // Flags already set; no mode change needed and nothing to restore.
                 return true;
             }
 

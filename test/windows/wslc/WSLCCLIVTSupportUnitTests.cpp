@@ -338,10 +338,24 @@ class WSLCCLIVTSupportUnitTests
             VERIFY_IS_TRUE(!!(mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING));
         }
 
-        // Input mode.
+        // Non-console handles are silently ignored for both modes.
+        wil::unique_handle readPipe, writePipe;
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&readPipe, &writePipe, nullptr, 0));
+        VERIFY_IS_FALSE(EnableVirtualTerminal(readPipe.get(), EnableVirtualTerminal::Mode::Output).IsVTEnabled());
+        VERIFY_IS_FALSE(EnableVirtualTerminal(readPipe.get(), EnableVirtualTerminal::Mode::Input).IsVTEnabled());
+    }
+
+    TEST_METHOD(VT_EnableVirtualTerminal_InputMode)
+    {
+        // CONIN$ requires an attached console. CI environments that run without one
+        // (e.g. headless agents) cannot exercise this path; skip rather than fail.
         wil::unique_hfile conin{CreateFileW(
             L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-        VERIFY_IS_TRUE(!!conin);
+        if (!conin)
+        {
+            LogSkipped("Skipping input-mode VT test: CONIN$ is not available (no attached console)");
+            return;
+        }
 
         DWORD inputBaseline{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &inputBaseline));
@@ -359,12 +373,6 @@ class WSLCCLIVTSupportUnitTests
         DWORD inputRestored{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &inputRestored));
         VERIFY_ARE_EQUAL(inputBaseline, inputRestored);
-
-        // Non-console handles are silently ignored for both modes.
-        wil::unique_handle readPipe, writePipe;
-        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&readPipe, &writePipe, nullptr, 0));
-        VERIFY_IS_FALSE(EnableVirtualTerminal(readPipe.get(), EnableVirtualTerminal::Mode::Output).IsVTEnabled());
-        VERIFY_IS_FALSE(EnableVirtualTerminal(readPipe.get(), EnableVirtualTerminal::Mode::Input).IsVTEnabled());
     }
 
     TEST_METHOD(VT_EnableVirtualTerminal_RedirectedHandles)

@@ -91,8 +91,8 @@ private:
 
 // VT escape sequences are pure ASCII byte sequences (0x00-0x7F), so all sequences
 // are stored and manipulated as narrow strings (std::string / std::string_view).
-// Widening to std::wstring happens only at the stream output boundary; see
-// operator<<(std::wostream&, const Sequence&) below.
+// Widening to std::wstring happens via ToWide() or operator+=(std::wstring&, const Sequence&);
+// use the std::formatter specializations below for std::format/std::wformat output.
 
 // The base for all VT sequences.
 struct Sequence
