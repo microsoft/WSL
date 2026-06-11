@@ -2349,10 +2349,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Network alias cannot be empty.</value>
   </data>
-  <data name="MessageWslcAliasRequiresPrimaryNetwork" xml:space="preserve">
-    <value>Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.</value>
-    <comment>{Locked="host"}{Locked="none"}{Locked="container:"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>

@@ -1633,7 +1633,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
-        Localization::MessageWslcAliasRequiresPrimaryNetwork(),
+        Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
         primaryConfig.Aliases.has_value() && !NetworkModeAllocatesVmPorts(networkMode));
 
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);

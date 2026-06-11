@@ -6852,15 +6852,15 @@ class WSLCTests
             return launcher.Launch(*m_defaultSession);
         };
 
-        auto launchWithAliasesNoThrow =
-            [&](const std::string& containerName, const std::string& networkMode, const std::vector<std::string>& aliases) {
-                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, networkMode);
-                for (const auto& a : aliases)
-                {
-                    launcher.AddPrimaryNetworkAlias(a);
-                }
-                return launcher.LaunchNoThrow(*m_defaultSession);
-            };
+        auto expectError = [&](const std::string& containerName,
+                               const std::string& networkMode,
+                               const std::vector<std::string>& aliases,
+                               HRESULT expectedResult,
+                               const std::wstring& expectedErrorMessage) {
+            auto result = wil::ResultFromException([&] { launchWithAliases(containerName, networkMode, aliases); });
+            VERIFY_ARE_EQUAL(result, expectedResult);
+            ValidateCOMErrorMessage(expectedErrorMessage);
+        };
 
         // Single user-defined network + single alias — success, round-trips via inspect.
         {
@@ -6894,25 +6894,32 @@ class WSLCTests
 
         // Alias on 'host' mode — rejected at the IDL layer.
         {
-            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-host", "host", {"db"});
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(
-                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+            expectError(
+                "alias-ctr-host",
+                "host",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
         }
 
         // Alias on default 'bridge' mode — rejected (aliases require a user-defined network).
         {
-            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-bridge", "bridge", {"db"});
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Network aliases require a user-defined network. Use --network to specify one.");
+            expectError(
+                "alias-ctr-bridge",
+                "bridge",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
         }
 
         // Alias on 'none' mode — rejected.
         {
-            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-none", "none", {"db"});
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(
-                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+            expectError(
+                "alias-ctr-none",
+                "none",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
         }
 
         // Alias on 'container:' mode — rejected.
@@ -6920,10 +6927,12 @@ class WSLCTests
             WSLCContainerLauncher targetLauncher("debian:latest", "alias-ctr-target", {"sleep", "99999"}, {});
             auto target = targetLauncher.Launch(*m_defaultSession);
 
-            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-container", "container:alias-ctr-target", {"db"});
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(
-                L"Network aliases are not allowed when the primary network mode is 'host', 'none' or 'container:'.");
+            expectError(
+                "alias-ctr-container",
+                "container:alias-ctr-target",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
         }
 
         // Empty alias string — rejected.
@@ -6932,9 +6941,7 @@ class WSLCTests
             createNetwork(networkName, "172.62.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-empty", networkName, {""});
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Network alias cannot be empty.");
+            expectError("alias-ctr-empty", networkName, {""}, E_INVALIDARG, L"Network alias cannot be empty.");
         }
 
         // Unknown KVP key on primary settings — rejected with E_NOTIMPL.
