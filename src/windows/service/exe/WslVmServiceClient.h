@@ -62,6 +62,7 @@ public:
         m_createVm = GetProc<HandleOnlyFn>("WslVmServiceCreateVm");
         m_resumeVm = GetProc<HandleOnlyFn>("WslVmServiceResumeVm");
         m_teardownVm = GetProc<HandleOnlyFn>("WslVmServiceTeardownVm");
+        m_quit = GetProc<HandleOnlyFn>("WslVmServiceQuit");
         m_attachScsiDisk = GetProc<DiskFn>("WslVmServiceAttachScsiDisk");
         m_detachScsiDisk = GetProc<DetachScsiDiskFn>("WslVmServiceDetachScsiDisk");
         m_addShare = GetProc<AddShareFn>("WslVmServiceAddShare");
@@ -161,6 +162,11 @@ public:
         return m_teardownVm(m_handle);
     }
 
+    HRESULT Quit() const
+    {
+        return m_quit(m_handle);
+    }
+
     HRESULT AttachScsiDisk(UINT32 controller, UINT32 lun, LPCWSTR hostPath, BOOL readOnly) const
     {
         return m_attachScsiDisk(m_handle, controller, lun, hostPath, readOnly);
@@ -234,6 +240,7 @@ private:
     HandleOnlyFn m_createVm = nullptr;
     HandleOnlyFn m_resumeVm = nullptr;
     HandleOnlyFn m_teardownVm = nullptr;
+    HandleOnlyFn m_quit = nullptr;
     DiskFn m_attachScsiDisk = nullptr;
     DetachScsiDiskFn m_detachScsiDisk = nullptr;
     AddShareFn m_addShare = nullptr;

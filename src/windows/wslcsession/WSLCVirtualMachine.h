@@ -180,6 +180,10 @@ private:
     // Initial setup during Connect()
     void ConfigureNetworking();
 
+    // Statically configures the guest network interface for consomme mode by driving
+    // the GNS engine over the gns channel.
+    void ConfigureConsommeGuestNetworking(wil::unique_handle&& GnsHandle);
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 

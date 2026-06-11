@@ -22,6 +22,7 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "ConsommeNetworking.h"
+#include "GnsChannel.h"
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wslc::TypedHandle;
@@ -374,45 +375,14 @@ void WSLCVirtualMachine::ConfigureNetworking()
         return;
     }
 
-    if (m_networkingMode == WSLCNetworkingModeConsomme)
-    {
-        // Consomme networking: no GNS daemon needed. The VMM provides NAT,
-        // DHCP, and DNS directly via the virtio-net device.
-        //
-        // Send a message to mini_init to configure the guest's network
-        // interface statically. This must happen before containerd/dockerd
-        // start, as they cache DNS from /etc/resolv.conf at launch.
-        auto address = std::format("{}/{}", wsl::core::c_consommeGuestIp, wsl::core::c_consommeSubnetMask);
-
-        wsl::shared::MessageWriter<WSLC_CONFIGURE_NETWORKING> netMessage;
-        netMessage.WriteString(netMessage->InterfaceOffset, wsl::core::c_consommeInterface);
-        netMessage.WriteString(netMessage->AddressOffset, address);
-        netMessage.WriteString(netMessage->GatewayOffset, wsl::core::c_consommeGatewayIp);
-        netMessage.WriteString(netMessage->DnsServerOffset, wsl::core::c_consommeGatewayIp);
-
-        const auto& response = m_initChannel.Transaction<WSLC_CONFIGURE_NETWORKING>(netMessage.Span());
-        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Consomme guest network setup failed: %d", response.Result);
-
-        WSL_LOG("ConsommeConfigureGuestNetwork", TraceLoggingValue(response.Result, "Result"));
-
-        // No ConfigureNetworking COM call needed — ConsommeNetworking is
-        // initialized eagerly in the OpenVmmVirtualMachine constructor
-        // (the system_handle IDL attribute can't marshal INVALID_HANDLE_VALUE).
-
-        // Skip LaunchPortRelay — the relay uses wslrelay.exe which connects
-        // via hvsocket (m_vmId), and OpenVMM/WHP VMs are not registered with
-        // the HvSocket driver. Port forwarding for OpenVMM will need a
-        // different mechanism (e.g. consomme's own NAT port forwarding).
-        // TODO: Implement port forwarding for OpenVMM consomme backend.
-        return;
-    }
-
     // Launch /gns with auto-allocated file descriptors for the GNS channel (and DNS channel if enabled).
     std::vector<WSLCProcessFd> fds;
     fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
 
-    // Virtio proxy forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
-    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeVirtioProxy;
+    // Virtio proxy forwards DNS via the host proxy, and consomme provides DNS via its
+    // built-in resolver on the gateway, so the DNS channel and /gns args are only needed for NAT mode.
+    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) &&
+                                    m_networkingMode != WSLCNetworkingModeVirtioProxy && m_networkingMode != WSLCNetworkingModeConsomme;
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
@@ -447,9 +417,26 @@ void WSLCVirtualMachine::ConfigureNetworking()
 
     auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
 
-    // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
 
+    if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        // Consomme provides NAT, DHCP, and DNS within the VMM, but the guest interface
+        // still needs static L3 configuration. Drive the GNS engine directly from here
+        // instead of going through the service's networking engine (ConsommeNetworking
+        // is initialized eagerly in the OpenVmmVirtualMachine constructor and exposes no
+        // GNS channel to marshal back through COM).
+        ConfigureConsommeGuestNetworking(std::move(gnsHandle));
+
+        // Skip LaunchPortRelay — the relay uses wslrelay.exe which connects via hvsocket
+        // (m_vmId), and OpenVMM/WHP VMs are not registered with the HvSocket driver. Port
+        // forwarding for OpenVMM will need a different mechanism (e.g. consomme's own NAT
+        // port forwarding).
+        // TODO: Implement port forwarding for OpenVMM consomme backend.
+        return;
+    }
+
+    // Call back to the service to configure the networking engine.
     wil::unique_handle dnsHandle;
     HANDLE dnsSocketHandle = nullptr;
     if (enableDnsTunneling)
@@ -462,6 +449,82 @@ void WSLCVirtualMachine::ConfigureNetworking()
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
+}
+
+void WSLCVirtualMachine::ConfigureConsommeGuestNetworking(wil::unique_handle&& GnsHandle)
+{
+    namespace hns = wsl::shared::hns;
+
+    // The GNS channel handle is a vsock socket; transfer ownership to GnsChannel.
+    wil::unique_socket gnsSocket{reinterpret_cast<SOCKET>(GnsHandle.release())};
+    wsl::core::GnsChannel gnsChannel{std::move(gnsSocket)};
+
+    const std::wstring deviceName = wsl::shared::string::MultiByteToWide(wsl::core::c_consommeInterface);
+    const auto sendDeviceMessage = [&](const auto& Request) {
+        gnsChannel.SendNetworkDeviceMessage(LxGnsMessageDeviceSettingRequest, wsl::shared::ToJsonW(Request).c_str());
+    };
+
+    // 1. Bring the interface up.
+    {
+        hns::ModifyGuestEndpointSettingRequest<hns::NetworkInterface> request;
+        request.RequestType = hns::ModifyRequestType::Update;
+        request.ResourceType = hns::GuestEndpointResourceType::Interface;
+        request.targetDeviceName = deviceName;
+        request.Settings.Connected = true;
+        sendDeviceMessage(request);
+    }
+
+    // 2. Assign the static IPv4 address. The GNS engine disables prefix-route
+    //    autogeneration for addresses plumbed this way, so the on-link route is added
+    //    explicitly below.
+    {
+        hns::ModifyGuestEndpointSettingRequest<hns::IPAddress> request;
+        request.RequestType = hns::ModifyRequestType::Add;
+        request.ResourceType = hns::GuestEndpointResourceType::IPAddress;
+        request.targetDeviceName = deviceName;
+        request.Settings.Address = wsl::shared::string::MultiByteToWide(wsl::core::c_consommeGuestIp);
+        request.Settings.Family = AF_INET;
+        request.Settings.OnLinkPrefixLength = wsl::core::c_consommeSubnetPrefixLength;
+        sendDeviceMessage(request);
+    }
+
+    // 3. Add the on-link prefix route for the local subnet. An unspecified next hop is
+    //    treated as on-link by the GNS engine.
+    {
+        hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
+        request.RequestType = hns::ModifyRequestType::Add;
+        request.ResourceType = hns::GuestEndpointResourceType::Route;
+        request.targetDeviceName = deviceName;
+        request.Settings.DestinationPrefix = wsl::shared::string::MultiByteToWide(wsl::core::c_consommeSubnet);
+        request.Settings.NextHop = LX_INIT_UNSPECIFIED_ADDRESS;
+        request.Settings.Family = AF_INET;
+        sendDeviceMessage(request);
+    }
+
+    // 4. Add the default route via the gateway.
+    {
+        hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
+        request.RequestType = hns::ModifyRequestType::Add;
+        request.ResourceType = hns::GuestEndpointResourceType::Route;
+        request.targetDeviceName = deviceName;
+        request.Settings.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        request.Settings.NextHop = wsl::shared::string::MultiByteToWide(wsl::core::c_consommeGatewayIp);
+        request.Settings.Family = AF_INET;
+        sendDeviceMessage(request);
+    }
+
+    // 5. Configure DNS (writes /etc/resolv.conf). This must happen before containerd /
+    //    dockerd start, as they cache DNS from /etc/resolv.conf at launch.
+    {
+        hns::ModifyGuestEndpointSettingRequest<hns::DNS> request;
+        request.RequestType = hns::ModifyRequestType::Update;
+        request.ResourceType = hns::GuestEndpointResourceType::DNS;
+        request.targetDeviceName = deviceName;
+        request.Settings.ServerList = wsl::shared::string::MultiByteToWide(wsl::core::c_consommeGatewayIp);
+        sendDeviceMessage(request);
+    }
+
+    WSL_LOG("ConsommeConfigureGuestNetwork", TraceLoggingValue(deviceName.c_str(), "interface"));
 }
 
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const

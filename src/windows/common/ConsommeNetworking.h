@@ -10,7 +10,8 @@ namespace wsl::core {
 // These match the consomme backend defaults in OpenVMM.
 constexpr auto c_consommeGuestIp = "10.0.0.2";
 constexpr auto c_consommeGatewayIp = "10.0.0.1";
-constexpr auto c_consommeSubnetMask = "24";
+constexpr auto c_consommeSubnet = "10.0.0.0/24";
+constexpr uint8_t c_consommeSubnetPrefixLength = 24;
 constexpr auto c_consommeInterface = "eth0";
 
 // Networking engine for OpenVMM's built-in consomme NAT backend.

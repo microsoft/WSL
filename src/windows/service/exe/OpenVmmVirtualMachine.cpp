@@ -430,10 +430,9 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // Signal termination to any pending operations.
     m_vmExitEvent.SetEvent();
 
-    // TeardownVM releases all VM resources and unblocks WaitVM.
     if (m_vmService)
     {
-        LOG_IF_FAILED(m_vmService->TeardownVm());
+        LOG_IF_FAILED(m_vmService->Quit());
         m_vmService->Disconnect();
         m_vmService.reset();
     }
