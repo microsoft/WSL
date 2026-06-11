@@ -289,10 +289,13 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::Initialize(
-    _In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier, _In_opt_ IWarningCallback* WarningCallback)
+    _In_ const WSLCSessionInitSettings* Settings,
+    _In_ IWSLCVirtualMachineFactory* VmFactory,
+    _In_ IWSLCPluginNotifier* PluginNotifier,
+    _In_opt_ IWarningCallback* WarningCallback)
 try
 {
-    RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
+    RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
     THROW_HR_IF_MSG(
@@ -323,10 +326,13 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Create the VM. The VM produces crash events; the session multiplexes them out to any
-    // registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
+    // Create the VM through the factory. The VM produces crash events; the session multiplexes
+    // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
+    wil::com_ptr<IWSLCVirtualMachine> vm;
+    THROW_IF_FAILED(VmFactory->CreateVirtualMachine(&vm));
+
     m_virtualMachine.emplace(
-        Vm,
+        vm.get(),
         Settings,
         m_sessionTerminatingEvent.get(),
         std::bind(&WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
@@ -337,7 +343,7 @@ try
     m_virtualMachine->Initialize();
 
     // Get an event from the service that is signaled when the VM exits.
-    THROW_IF_FAILED(Vm->GetTerminationEvent(&m_vmExitedEvent));
+    THROW_IF_FAILED(vm->GetTerminationEvent(&m_vmExitedEvent));
 
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);

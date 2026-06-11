@@ -45,7 +45,7 @@ public:
     // IWSLCSessionFactory
     IFACEMETHOD(CreateSession)
     (_In_ const WSLCSessionInitSettings* Settings,
-     _In_ IWSLCVirtualMachine* Vm,
+     _In_ IWSLCVirtualMachineFactory* VmFactory,
      _In_ IWSLCPluginNotifier* PluginNotifier,
      _In_opt_ IWarningCallback* WarningCallback,
      _Out_ IWSLCSession** Session,
