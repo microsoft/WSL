@@ -18,6 +18,7 @@ Abstract:
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
+#include "CrashDumpCallback.h"
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
@@ -444,7 +445,8 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -599,13 +601,56 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, subscription);
+    *subscription = nullptr;
+    RETURN_HR_IF_NULL(E_INVALIDARG, crashDumpCallback);
+
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalSession = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+
+    auto result = std::make_unique<WslcCrashDumpSubscriptionImpl>();
+    auto callback = winrt::make_self<CrashDumpCallback>(crashDumpCallback, crashDumpContext);
+    result->callback = callback.get();
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            internalSession->session->RegisterCrashDumpCallback(result->callback.get(), &result->subscription))))
+    {
+        *subscription = reinterpret_cast<WslcCrashDumpSubscription>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription)
+try
+{
+    auto internalType = CheckAndGetInternalTypeUniquePointer(subscription);
+
+    // Release the service-side subscription first so it unregisters cleanly, then drop the shim.
+    internalType->subscription.reset();
+    internalType->callback.reset();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcReleaseSession(_In_ WslcSession session)
 try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    // Intentionally destroy session before termination callback in the event that
-    // the termination callback ends up being invoked by session destruction.
+    // Drop the session before the termination callback, in case session destruction triggers
+    // the termination callback.
     internalType->session.reset();
     internalType->terminationCallback.reset();
 
@@ -831,7 +876,7 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -859,7 +904,7 @@ try
     // TODO: Consider if we should just override flags when callbacks were provided instead.
     RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr, nullptr))))
     {
         if (hasIOCallback)
         {
@@ -1331,7 +1376,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1341,7 +1386,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1379,7 +1424,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1458,7 +1503,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 

@@ -64,11 +64,12 @@ public:
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
 
-    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session);
-    RunningWSLCContainer Create(IWSLCSession& Session);
+    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
+    RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
 
-    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach);
-    std::pair<HRESULT, std::optional<RunningWSLCContainer>> LaunchNoThrow(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach);
+    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
+    std::pair<HRESULT, std::optional<RunningWSLCContainer>> LaunchNoThrow(
+        IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
 
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
@@ -85,6 +86,7 @@ public:
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
+    using WSLCProcessLauncher::SetTtySize;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 

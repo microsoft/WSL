@@ -83,6 +83,9 @@ void PortRelayAcceptHandle::Collect()
         THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult(ListenSocket.get(), &Overlapped, &bytesReceived, false, &flagsReturned));
     }
 
+    // Set the accept context to mark the socket as connected.
+    socket::SetAcceptContext(AcceptedSocket.get(), ListenSocket.get());
+
     // Launch a relay for this accepted connection
     LaunchRelay(std::move(AcceptedSocket));
 

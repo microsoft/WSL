@@ -19,7 +19,8 @@ typedef enum _InspectType
     Container = 1,
     Image = 2,
     Volume = 4,
+    Network = 8,
 
-    All = Container | Image | Volume,
+    All = Container | Image | Network | Volume,
 } InspectType;
 } // namespace wsl::windows::wslc::models
