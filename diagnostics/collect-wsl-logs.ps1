@@ -442,6 +442,122 @@ if ($Dump)
     }
 }
 
+# ---------------------------------------------------------------------------
+# Write a machine-readable summary and a human/agent-readable index so that
+# whoever (or whatever) analyzes the archive has an immediate overview without
+# having to run tools or infer state from the individual artifacts.
+# ---------------------------------------------------------------------------
+function Get-Prop
+{
+    param ($Object, $Name)
+    if ($Object -ne $null -And ($Object.PSObject.Properties.Name -contains $Name))
+    {
+        return $Object.$Name
+    }
+    return $null
+}
+
+# Enumerate installed distributions from the registry.
+$distributions = @()
+$lxssKey = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss"
+if (Test-Path $lxssKey)
+{
+    foreach ($subKey in (Get-ChildItem $lxssKey -ErrorAction Ignore))
+    {
+        $props = Get-ItemProperty $subKey.PSPath -ErrorAction Ignore
+        $name = Get-Prop $props "DistributionName"
+        if ($name -ne $null)
+        {
+            $distributions += [ordered]@{
+                name    = $name
+                state   = Get-Prop $props "State"
+                version = Get-Prop $props "Version"
+                flavor  = Get-Prop $props "Flavor"
+                modern  = Get-Prop $props "Modern"
+            }
+        }
+    }
+}
+
+# Inventory the dumps that were actually written (empty ones were removed above).
+$dumps = @()
+$dumpFolder = Join-Path $folder "dumps"
+if (Test-Path $dumpFolder)
+{
+    foreach ($dump in (Get-ChildItem $dumpFolder -Filter *.dmp -ErrorAction Ignore))
+    {
+        $dumps += [ordered]@{ name = $dump.Name; sizeBytes = $dump.Length }
+    }
+}
+
+# Determine the networking mode (defaults to NAT unless overridden in .wslconfig).
+$networkingMode = "default (NAT)"
+if (Test-Path $wslconfig)
+{
+    $match = Select-String -Path $wslconfig -Pattern '^\s*networkingMode\s*=\s*(\S+)' -ErrorAction Ignore | Select-Object -First 1
+    if ($match -ne $null)
+    {
+        $networkingMode = $match.Matches[0].Groups[1].Value
+    }
+}
+
+$appx = Get-AppxPackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore | Select-Object -First 1
+$winCV = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction Ignore
+
+$summary = [ordered]@{
+    collectedAt         = (Get-Date -Format "o")
+    logProfile          = $logProfileDisplay
+    wprpProfile         = $wprpProfileDisplay
+    dump                = [bool]$Dump
+    restartWslReproMode = [bool]$RestartWslReproMode
+    wslVersion          = (Get-Prop $appx "Version")
+    windows             = [ordered]@{
+        build          = "$(Get-Prop $winCV 'CurrentBuild').$(Get-Prop $winCV 'UBR')"
+        displayVersion = Get-Prop $winCV "DisplayVersion"
+        edition        = Get-Prop $winCV "EditionID"
+    }
+    networkingMode      = $networkingMode
+    wslConfigPresent    = [bool](Test-Path $wslconfig)
+    distributions       = $distributions
+    dumps               = $dumps
+}
+$summary | ConvertTo-Json -Depth 5 | Out-File -FilePath "$folder/summary.json" -Encoding utf8
+
+# Human/agent-readable index of the archive contents.
+@"
+# WSL log collection
+
+Start with ``summary.json`` (machine-readable overview) and
+``collection-info.txt`` (how these logs were captured).
+
+> NOTE: ``logs.etl`` is a binary ETW trace. The WSL trace providers are
+> TraceLogging (self-describing); decode it with WPA or PerfView for full
+> payloads (``tracerpt logs.etl -o logs.csv -of CSV`` works for a quick text
+> dump but renders some TraceLogging payloads as raw bytes). If the relevant
+> WSL providers are missing, the capture likely used a non-default
+> ``-LogProfile`` (see ``collection-info.txt``).
+
+## Key files
+
+| File | What it is |
+|------|------------|
+| summary.json | Machine-readable overview: profile, versions, distros, networking mode, dumps. |
+| collection-info.txt | Which WPR profile / switches were used for this capture. |
+| logs.etl | ETW trace captured during the repro (binary; see note above). |
+| wsl-info.txt | Output of ``wsl --version`` / ``--status`` / ``--list --verbose``. |
+| linux_diagnostics.log | Guest-side state (dmesg, free, ulimit, pid_max, thread/process counts). Useful for in-distro errors such as "Resource temporarily unavailable" (EAGAIN). |
+| dumps/ | Process minidumps (only present with ``-Dump``; empty dumps are removed). |
+| HKCU.txt / HKLM.txt | Lxss registry state (distributions, NAT config). |
+| windows-version.txt | Windows build / edition. |
+| .wslconfig | User's WSL configuration (only if present). |
+| wsl-install-log*.txt / wsl-install-logs.txt | Install logs (only if present). |
+| wpr.txt | Output from the WPR start/stop commands. |
+
+Networking-profile captures additionally contain ``tcpdump.log``,
+``pktmon.etl``, ``wfpdiag.cab``, ``hns_events.log`` and various
+``*_before_repro`` / ``*_after_repro`` network state logs.
+"@ | Out-File -FilePath "$folder/README.md" -Encoding utf8
+
 $logArchive = "$(Resolve-Path $folder).tar.gz"
 tar.exe -czf $logArchive $folder
 if ($LASTEXITCODE -eq 0)
