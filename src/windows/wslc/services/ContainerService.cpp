@@ -66,8 +66,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     {
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), options.Networks.empty());
 
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
-
         const auto& primary = options.Networks.front();
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), primary == "bridge");
         THROW_HR_WITH_USER_ERROR_IF(

@@ -80,6 +80,14 @@ std::wstring ContainerCreateCommand::LongDescription() const
     return Localization::WSLCCLI_ContainerCreateLongDesc();
 }
 
+void ContainerCreateCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+{
+    if (execArgs.Contains(ArgType::NetworkAlias) && execArgs.GetAll<ArgType::Network>().size() > 1)
+    {
+        throw CommandException(Localization::MessageWslcAliasAmbiguousWithMultipleNetworks());
+    }
+}
+
 // clang-format off
 void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
