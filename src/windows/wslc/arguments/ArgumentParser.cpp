@@ -17,8 +17,8 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments) :
-    m_invocation(inv), m_executionArgs(execArgs), m_arguments(std::move(arguments)), m_invocationItr(m_invocation.begin())
+ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly) :
+    m_invocation(inv), m_executionArgs(execArgs), m_arguments(std::move(arguments)), m_invocationItr(m_invocation.begin()), m_optionsOnly(optionsOnly)
 {
     // Create sublists by Kind for easier processing in the state machine.
     for (const auto& arg : m_arguments)
@@ -45,7 +45,7 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& 
 
 bool ParseArgumentsStateMachine::Step()
 {
-    if (m_invocationItr == m_invocation.end())
+    if (m_stopped || m_invocationItr == m_invocation.end())
     {
         return false;
     }
@@ -125,6 +125,15 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
     if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
     {
+        if (m_optionsOnly)
+        {
+            // Options-only mode: stop cleanly at the first positional token without
+            // consuming it so the caller can resume parsing (e.g. subcommand resolution).
+            --m_invocationItr;
+            m_stopped = true;
+            return {};
+        }
+
         return ProcessPositionalArgument(currArg);
     }
 

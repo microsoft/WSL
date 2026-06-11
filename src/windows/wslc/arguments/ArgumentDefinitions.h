@@ -43,6 +43,7 @@ _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,           "cpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ForceArgDescription()) \
+_(Debug,          "debug",               L"D",              Kind::Flag,        Localization::WSLCCLI_DebugArgDescription()) \
 _(Detach,         "detach",              L"d",              Kind::Flag,        Localization::WSLCCLI_DetachArgDescription()) \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSDomainArgDescription())*/ \
@@ -79,6 +80,7 @@ _(Network,        "network",             NO_ALIAS,          Kind::Value,       L
 _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
+_(NoColor,        "no-color",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoColorArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ObjectIdArgDescription()) \

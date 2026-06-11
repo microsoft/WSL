@@ -311,15 +311,24 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
-void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
+void Command::ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly) const
 {
-    auto definedArgs = GetAllArguments();
+    if (definedArgs.empty())
+    {
+        return;
+    }
 
-    ParseArgumentsStateMachine stateMachine{inv, execArgs, std::move(definedArgs)};
+    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly};
 
     while (stateMachine.Step())
     {
         stateMachine.ThrowIfError();
+    }
+    stateMachine.ThrowIfError();
+
+    if (optionsOnly)
+    {
+        inv.consumeUntil(stateMachine.Position());
     }
 }
 
@@ -328,34 +337,35 @@ void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
 // that the arguments provided meet the requirements of the command. This includes checking
 // that all required arguments are present and no arguments exceed their count limits.
 // Any defined validation for specific ArgTypes are also run.
-void Command::ValidateArguments(ArgMap& execArgs) const
+void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
-    // If help is asked for, don't bother validating anything else.
-    if (execArgs.Contains(ArgType::Help))
+    if (source.Contains(ArgType::Help))
     {
         return;
     }
 
-    auto allArgs = GetAllArguments();
-    for (const auto& arg : allArgs)
+    for (const auto& arg : definedArgs)
     {
-        if (arg.Required() && !execArgs.Contains(arg.Type()))
+        if (arg.Required() && !source.Contains(arg.Type()))
         {
             throw CommandException(Localization::WSLCCLI_RequiredArgumentError(arg.Name()));
         }
 
-        if ((arg.Limit() > 0) && (arg.Limit() < execArgs.Count(arg.Type())))
+        if ((arg.Limit() > 0) && (arg.Limit() < source.Count(arg.Type())))
         {
             throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
         }
 
-        if (execArgs.Contains(arg.Type()))
+        if (source.Contains(arg.Type()))
         {
-            arg.Validate(execArgs);
+            arg.Validate(source);
         }
     }
 
-    ValidateArgumentsInternal(execArgs);
+    if (runInternalHook)
+    {
+        ValidateArgumentsInternal(source);
+    }
 }
 
 void Command::Execute(CLIExecutionContext& context) const

@@ -18,6 +18,7 @@ Abstract:
 #include "wslutil.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"
+#include "EnvironmentOptions.h"
 #include "Invocation.h"
 #include "RootCommand.h"
 
@@ -72,6 +73,10 @@ try
 
     std::unique_ptr<Command> command = std::make_unique<RootCommand>();
 
+    // Non-owning pointer to the root command so we can reach GetGlobalArguments()
+    // for parse/validate even after `command` is moved to the deepest subcommand.
+    const Command* const rootCommand = command.get();
+
     try
     {
         std::vector<std::wstring> args;
@@ -81,6 +86,22 @@ try
         }
 
         Invocation invocation{std::move(args)};
+
+        // Parse and apply global options supplied in the command line or by environment variables.
+        auto cliGlobals = rootCommand->GetGlobalArguments();
+        auto envOnly = rootCommand->GetEnvArguments();
+
+        auto envDefs = cliGlobals;
+        envDefs.insert(envDefs.end(), envOnly.begin(), envOnly.end());
+
+        rootCommand->ParseArguments(invocation, context.GlobalArgs, cliGlobals, /*optionsOnly*/ true);
+        ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
+        rootCommand->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
+        context.ApplyGlobalOptions();
+
+        // Anything above this point is not affected by global options, including output (debug).
+
+        // Find the subcommand being executed and then parse its options.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
         while (subCommand)
         {

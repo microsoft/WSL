@@ -2188,6 +2188,15 @@ Usage:
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>The following arguments are available:</value>
   </data>
+  <data name="WSLCCLI_OperationCancelled" xml:space="preserve">
+    <value>Operation cancelled.</value>
+  </data>
+  <data name="WSLCCLI_DebugArgDescription" xml:space="preserve">
+    <value>Enable debug output.</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
+  </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>For more details on a specific command, pass it the help argument.</value>
   </data>

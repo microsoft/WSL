@@ -29,7 +29,12 @@ namespace wsl::windows::wslc {
 // and determine the likely state of the word to be completed.
 struct ParseArgumentsStateMachine
 {
-    ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments);
+    // If optionsOnly is true, the state machine stops cleanly (without consuming
+    // the token) at the first argument that would be treated as positional. The
+    // unconsumed iterator position is available via Position(). This is used to
+    // parse "global options" that appear before a subcommand token without
+    // duplicating the option parsing rules.
+    ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly = false);
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -97,6 +102,13 @@ struct ParseArgumentsStateMachine
         return m_arguments;
     }
 
+    // The current position into the Invocation. In options-only mode this points
+    // at the first token that was not consumed (i.e. the first positional token).
+    Invocation::iterator Position() const
+    {
+        return m_invocationItr;
+    }
+
 private:
     State StepInternal();
     State ProcessPositionalArgument(const std::wstring_view& currArg);
@@ -124,5 +136,11 @@ private:
     std::vector<Argument> m_forwardArgs = {};
 
     State m_state;
+
+    // When true, stop cleanly at the first positional token (do not consume it).
+    bool m_optionsOnly = false;
+
+    // Set when m_optionsOnly stopped processing; Step() will then return false.
+    bool m_stopped = false;
 };
 } // namespace wsl::windows::wslc

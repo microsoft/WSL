@@ -79,6 +79,18 @@ struct Command
         return args;
     }
 
+    // Recognized as options before any subcommand on the command line.
+    virtual std::vector<Argument> GetGlobalArguments() const
+    {
+        return {};
+    }
+
+    // Settable from environment only; never parsed from the command line.
+    virtual std::vector<Argument> GetEnvArguments() const
+    {
+        return {};
+    }
+
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
@@ -86,13 +98,27 @@ struct Command
     void OutputHelp(const CommandException* exception = nullptr) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
-    void ParseArguments(Invocation& inv, ArgMap& execArgs) const;
-    void ValidateArguments(ArgMap& execArgs) const;
+
+    // When optionsOnly is true, stops at the first positional without consuming it
+    // and advances inv past the consumed range.
+    void ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false) const;
+
+    void ParseArguments(Invocation& inv, ArgMap& target) const
+    {
+        ParseArguments(inv, target, GetAllArguments(), false);
+    }
+
+    void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+
+    void ValidateArguments(const ArgMap& source) const
+    {
+        ValidateArguments(source, GetAllArguments(), true);
+    }
 
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ValidateArgumentsInternal(const ArgMap& execArgs) const;
+    virtual void ValidateArgumentsInternal(const ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:
