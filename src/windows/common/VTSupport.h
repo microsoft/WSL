@@ -49,32 +49,10 @@ public:
     NON_COPYABLE(ChangeTerminalMode);
     NON_MOVABLE(ChangeTerminalMode);
 
-    ChangeTerminalMode(HANDLE console, bool cursorVisible) : m_console(console)
-    {
-        if (!wsl::windows::common::wslutil::IsConsoleHandle(console))
-        {
-            m_console = nullptr;
-            return;
-        }
+    ChangeTerminalMode(HANDLE console, bool cursorVisible);
+    ~ChangeTerminalMode();
 
-        THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
-        CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
-        newCursorInfo.bVisible = cursorVisible;
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(console, &newCursorInfo));
-    }
-
-    ~ChangeTerminalMode()
-    {
-        if (m_console)
-        {
-            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
-        }
-    }
-
-    bool IsConsole() const
-    {
-        return m_console != nullptr;
-    }
+    bool IsConsole() const;
 
 private:
     HANDLE m_console{};
@@ -101,75 +79,8 @@ public:
         Input,
     };
 
-    explicit EnableVirtualTerminal(HANDLE console, Mode mode = Mode::Output, bool disableNewlineAutoReturn = false)
-    {
-        DWORD current;
-        if (!GetConsoleMode(console, &current))
-        {
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_HANDLE);
-            return;
-        }
-
-        if (mode == Mode::Input)
-        {
-            const DWORD newMode = (current & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT;
-            if (SetConsoleMode(console, newMode))
-            {
-                m_console = console;
-                m_originalMode = current;
-            }
-            else
-            {
-                LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
-            }
-        }
-        else
-        {
-            // Attempts to apply the given extra flags on top of the current mode.
-            // Returns true on success (including when the flags are already set),
-            // false if SetConsoleMode rejected them.
-            auto tryEnable = [&](DWORD flags) -> bool {
-                const DWORD newMode = current | flags;
-                if (newMode == current)
-                {
-                    // The requested flags are already active; report success without
-                    // calling SetConsoleMode.  The destructor will restore current to
-                    // itself (a no-op) which is correct and harmless.
-                    m_console = console;
-                    m_originalMode = current;
-                    return true;
-                }
-
-                if (SetConsoleMode(console, newMode))
-                {
-                    m_console = console;
-                    m_originalMode = current;
-                    return true;
-                }
-
-                LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
-                return false;
-            };
-
-            // When DISABLE_NEWLINE_AUTO_RETURN is requested, try it first and fall
-            // back to plain ENABLE_VIRTUAL_TERMINAL_PROCESSING if the flag is
-            // unsupported.  When it is not requested, only one attempt is needed.
-            if (disableNewlineAutoReturn && tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
-            {
-                return;
-            }
-
-            tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-        }
-    }
-
-    ~EnableVirtualTerminal()
-    {
-        if (m_console)
-        {
-            LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(m_console, m_originalMode));
-        }
-    }
+    explicit EnableVirtualTerminal(HANDLE console, Mode mode = Mode::Output, bool disableNewlineAutoReturn = false);
+    ~EnableVirtualTerminal();
 
     bool IsVTEnabled() const
     {
@@ -226,44 +137,16 @@ private:
 // A VT sequence that is constructed at runtime.
 struct ConstructedSequence : public Sequence
 {
-    ConstructedSequence()
-    {
-        Set(m_str);
-    }
+    ConstructedSequence();
+    explicit ConstructedSequence(std::string s);
 
-    explicit ConstructedSequence(std::string s) : m_str(std::move(s))
-    {
-        Set(m_str);
-    }
+    ConstructedSequence(const ConstructedSequence& other);
+    ConstructedSequence& operator=(const ConstructedSequence& other);
 
-    ConstructedSequence(const ConstructedSequence& other) : m_str(other.m_str)
-    {
-        Set(m_str);
-    }
-
-    ConstructedSequence& operator=(const ConstructedSequence& other)
-    {
-        m_str = other.m_str;
-        Set(m_str);
-        return *this;
-    }
-
-    ConstructedSequence(ConstructedSequence&& other) noexcept : m_str(std::move(other.m_str))
-    {
-        Set(m_str);
-        other.Set(other.m_str);
-    }
-
-    ConstructedSequence& operator=(ConstructedSequence&& other) noexcept
-    {
-        m_str = std::move(other.m_str);
-        Set(m_str);
-        other.Set(other.m_str);
-        return *this;
-    }
+    ConstructedSequence(ConstructedSequence&& other) noexcept;
+    ConstructedSequence& operator=(ConstructedSequence&& other) noexcept;
 
     void Append(const Sequence& sequence);
-
     void Clear();
 
 private:
@@ -449,19 +332,6 @@ namespace Progress {
     ConstructedSequence Construct(State state, std::optional<uint32_t> percentage = std::nullopt);
 } // namespace Progress
 
-// operator<< for stream output.
-// Widens the narrow sequence bytes (all ASCII) into a wide string for wostream output.
-inline std::wostream& operator<<(std::wostream& o, const Sequence& s)
-{
-    const auto sv = s.Get();
-    return (o << std::wstring(sv.begin(), sv.end()));
-}
-
-inline std::ostream& operator<<(std::ostream& o, const Sequence& s)
-{
-    return (o << s.Get());
-}
-
 // operator+ overloads for direct std::string / std::wstring concatenation with sequences.
 // These allow sequences to be combined with string literals and std::string without
 // manually calling .Get() or wrapping in std::string{...}.
@@ -506,8 +376,6 @@ inline std::wstring operator+(const std::wstring& lhs, const Sequence& rhs)
 
 // operator== overloads so any Sequence-derived type can be compared directly against
 // string literals and std::string_view without calling .Get() at every call site.
-// Templated to cover both Sequence and ConstructedSequence without separate overloads.
-
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
 inline bool operator==(const T& lhs, std::string_view rhs)
 {
@@ -532,9 +400,7 @@ inline bool operator==(const char* lhs, const T& rhs)
     return lhs == rhs.Get();
 }
 
-// operator+= overloads for in-place wide string appending.
-// Appends the ASCII sequence bytes directly into lhs without creating a temporary
-// std::wstring, making them more efficient than ToWide() when building a frame buffer.
+// operator+= for in-place wide string appending without a temporary wstring.
 inline std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
 {
     const auto sv = rhs.Get();
@@ -543,7 +409,6 @@ inline std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
 }
 
 // Widens a Sequence's ASCII bytes into a std::wstring.
-// Use when building a wide string buffer that mixes VT sequences with wide content.
 inline std::wstring ToWide(const Sequence& s)
 {
     const auto sv = s.Get();

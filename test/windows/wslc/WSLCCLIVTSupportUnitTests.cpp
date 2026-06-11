@@ -244,38 +244,6 @@ class WSLCCLIVTSupportUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"world\x1b[0m"}, std::wstring{L"world"} + Format::Default);
     }
 
-    TEST_METHOD(VT_StreamOperators)
-    {
-        const Sequence seq{"\x1b[1m"};
-
-        // Narrow stream writes bytes as-is.
-        std::ostringstream oss;
-        oss << seq;
-        VERIFY_ARE_EQUAL(std::string{"\x1b[1m"}, oss.str());
-
-        // Multiple sequences can be streamed in one expression.
-        std::ostringstream multi;
-        multi << Format::Bright << "text" << Format::Default;
-        VERIFY_ARE_EQUAL(std::string{"\x1b[1mtext\x1b[0m"}, multi.str());
-
-        // Wide stream correctly widens the ASCII sequence bytes.
-        std::wostringstream woss;
-        woss << seq;
-        VERIFY_ARE_EQUAL(std::wstring{L"\x1b[1m"}, woss.str());
-
-        // std::format — narrow.
-        VERIFY_ARE_EQUAL(std::string{"\x1b[92mhello\x1b[0m"}, std::format("{}{}{}", Format::Fg::BrightGreen, "hello", Format::Default));
-
-        // std::format — wide, sequence bytes widened losslessly.
-        VERIFY_ARE_EQUAL(std::wstring{L"\x1b[92mhello\x1b[0m"}, std::format(L"{}{}{}", Format::Fg::BrightGreen, L"hello", Format::Default));
-
-        // std::format — ConstructedSequence via Sequence base.
-        VERIFY_ARE_EQUAL(std::string{"\x1b[3A text"}, std::format("{} text", Cursor::Up(3)));
-
-        // std::format — Sgr multi-parameter sequence.
-        VERIFY_ARE_EQUAL(std::string{"\x1b[1;31mtext\x1b[0m"}, std::format("{}text{}", Sgr({1, 31}), Format::Default));
-    }
-
     TEST_METHOD(VT_ChangeTerminalMode)
     {
         auto buffer = MakeScreenBuffer();

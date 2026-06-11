@@ -27,42 +27,17 @@ Abstract:
 
 namespace wsl::windows::common::vt {
 namespace {
-    // Extracts a VT sequence of the form ESC + prefix + result + suffix from a
-    // wide input stream, returning the result part as a std::wstring.
-    //
-    // Reads up to s_bufferSize wide characters from inStream; calls peek() first
-    // to prompt the stream buffer to fill from the underlying device, then uses
-    // readsome() to drain only what is immediately available.  If the buffer fills
-    // completely the suffix may not be present, in which case an empty wstring is
-    // returned — the same outcome as any other parse failure.  Any characters after
-    // the suffix (e.g. queued user input) are ignored.
-    //
-    // The DA1 response bytes are pure ASCII (0x00–0x7F); under _O_U8TEXT mode the
-    // CRT decodes each byte to the identical wchar_t value, so wide reads are
-    // lossless for all VT escape sequence content.
-    //
-    // Note: peek() may block briefly on a real console stdin until the terminal
-    // delivers its response (typically a few milliseconds for DA1).  It will not
-    // block indefinitely because all supported Windows console hosts (Windows Terminal,
-    // conhost.exe) respond to ESC[0c, and non-console streams (pipes, wstringstreams)
-    // have data already buffered by the caller.
     std::wstring ExtractSequence(std::wistream& inStream, std::wstring_view prefix, std::wstring_view suffix)
     {
-        // Force discovery of available input.
         std::ignore = inStream.peek();
 
         static constexpr std::streamsize s_bufferSize = 1024;
         wchar_t buffer[s_bufferSize];
 
-        // readsome() returns at most s_bufferSize wide characters, so == s_bufferSize
-        // is the full-buffer case, not overflow.  If the suffix is still within those
-        // characters the parse succeeds normally; if not, the suffix-not-found path
-        // below returns {}.
         std::streamsize charsRead = inStream.readsome(buffer, s_bufferSize);
 
         std::wstring_view resultView{buffer, static_cast<size_t>(charsRead)};
 
-        // Locate the escape character that begins the sequence.
         const size_t escapeIndex = resultView.find(L'\x1b');
         if (escapeIndex == std::wstring_view::npos)
         {
@@ -71,13 +46,11 @@ namespace {
 
         resultView = resultView.substr(escapeIndex);
 
-        // Verify the prefix immediately follows the escape character.
         if (resultView.length() < 1 + prefix.length() || resultView.substr(1, prefix.length()) != prefix)
         {
             return {};
         }
 
-        // Find the suffix anywhere after the prefix.
         const std::wstring_view body = resultView.substr(1 + prefix.length());
         const size_t suffixIndex = body.find(suffix);
         if (suffixIndex == std::wstring_view::npos)
@@ -88,6 +61,130 @@ namespace {
         return std::wstring{body.substr(0, suffixIndex)};
     }
 } // namespace
+
+ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible) : m_console(console)
+{
+    if (!wsl::windows::common::wslutil::IsConsoleHandle(console))
+    {
+        m_console = nullptr;
+        return;
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
+    CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
+    newCursorInfo.bVisible = cursorVisible;
+    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(console, &newCursorInfo));
+}
+
+ChangeTerminalMode::~ChangeTerminalMode()
+{
+    if (m_console)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
+}
+
+bool ChangeTerminalMode::IsConsole() const
+{
+    return m_console != nullptr;
+}
+
+EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool disableNewlineAutoReturn)
+{
+    DWORD current;
+    if (!GetConsoleMode(console, &current))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_HANDLE);
+        return;
+    }
+
+    if (mode == Mode::Input)
+    {
+        const DWORD newMode = (current & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT;
+        if (SetConsoleMode(console, newMode))
+        {
+            m_console = console;
+            m_originalMode = current;
+        }
+        else
+        {
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
+        }
+    }
+    else
+    {
+        auto tryEnable = [&](DWORD flags) -> bool {
+            const DWORD newMode = current | flags;
+            if (newMode == current)
+            {
+                m_console = console;
+                m_originalMode = current;
+                return true;
+            }
+
+            if (SetConsoleMode(console, newMode))
+            {
+                m_console = console;
+                m_originalMode = current;
+                return true;
+            }
+
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
+            return false;
+        };
+
+        if (disableNewlineAutoReturn && tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
+        {
+            return;
+        }
+
+        tryEnable(ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+}
+
+EnableVirtualTerminal::~EnableVirtualTerminal()
+{
+    if (m_console)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(m_console, m_originalMode));
+    }
+}
+
+ConstructedSequence::ConstructedSequence()
+{
+    Set(m_str);
+}
+
+ConstructedSequence::ConstructedSequence(std::string s) : m_str(std::move(s))
+{
+    Set(m_str);
+}
+
+ConstructedSequence::ConstructedSequence(const ConstructedSequence& other) : m_str(other.m_str)
+{
+    Set(m_str);
+}
+
+ConstructedSequence& ConstructedSequence::operator=(const ConstructedSequence& other)
+{
+    m_str = other.m_str;
+    Set(m_str);
+    return *this;
+}
+
+ConstructedSequence::ConstructedSequence(ConstructedSequence&& other) noexcept : m_str(std::move(other.m_str))
+{
+    Set(m_str);
+    other.Set(other.m_str);
+}
+
+ConstructedSequence& ConstructedSequence::operator=(ConstructedSequence&& other) noexcept
+{
+    m_str = std::move(other.m_str);
+    Set(m_str);
+    other.Set(other.m_str);
+    return *this;
+}
 
 bool Sequence::IsColor() const
 {
