@@ -2800,7 +2800,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Mostra l'ultimo contenitore creato (include tutti gli stati)</value>
   </data>
   <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
-    <value>Memory limit (e.g. 512M, 1G)</value>
+    <value>Limite di memoria (ad es. 512M, 1G)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
