@@ -2825,11 +2825,12 @@ void PartialHandleRead::ExpectConsume(const std::string& Expected)
 
     if (content != Expected)
     {
-        VERIFY_FAIL(std::format(
-                        L"Expected: '{}' but got: '{}'",
-                        wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
-                        wsl::shared::string::MultiByteToWide(EscapeString(content)))
-                        .c_str());
+        VERIFY_FAIL(
+            std::format(
+                L"Expected: '{}' but got: '{}'",
+                wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                wsl::shared::string::MultiByteToWide(EscapeString(content)))
+                .c_str());
     }
 }
 

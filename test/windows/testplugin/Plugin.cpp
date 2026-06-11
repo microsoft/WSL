@@ -698,11 +698,13 @@ try
             std::string err;
 
             MultiHandleWait io;
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutHandle), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutHandle), [&out](const auto& span) {
+                out.append(span.begin(), span.end());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrHandle), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrHandle), [&err](const auto& span) {
+                err.append(span.begin(), span.end());
+            }));
 
             io.AddHandle(std::make_unique<EventHandle>(std::move(exitEvent)));
 

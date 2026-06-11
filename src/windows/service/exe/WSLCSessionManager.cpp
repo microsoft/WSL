@@ -421,17 +421,18 @@ void WSLCSessionManagerImpl::CreateSession(
                     m_persistentSessions.reserve(m_persistentSessions.size() + 1);
                 }
 
-                m_sessions.push_back(SessionEntry{
-                    std::move(createdRef),
-                    createdSessionId,
-                    createdPid,
-                    resolvedDisplayName,
-                    std::move(tokenInfo),
-                    createdNotifier,
-                    false,
-                    createdToken,
-                    std::move(createdSid),
-                    std::move(createdJob)});
+                m_sessions.push_back(
+                    SessionEntry{
+                        std::move(createdRef),
+                        createdSessionId,
+                        createdPid,
+                        resolvedDisplayName,
+                        std::move(tokenInfo),
+                        createdNotifier,
+                        false,
+                        createdToken,
+                        std::move(createdSid),
+                        std::move(createdJob)});
 
                 if (persistent)
                 {
