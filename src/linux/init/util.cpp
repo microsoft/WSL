@@ -3732,6 +3732,37 @@ Return Value:
     return static_cast<long long>(Info.freeram) * Info.mem_unit;
 }
 
+static long long GetTotalMemoryBytes()
+
+/*++
+
+Routine Description:
+
+    This routine returns the guest's total RAM (in bytes), used to scale the
+    adaptive reclaim floor cap relative to the configured VM size rather than a
+    fixed absolute value.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    Total memory in bytes, or -1 on failure.
+
+--*/
+
+{
+    struct sysinfo Info = {};
+    if (sysinfo(&Info) < 0)
+    {
+        LOG_ERROR("sysinfo failed {}", errno);
+        return -1;
+    }
+
+    return static_cast<long long>(Info.totalram) * Info.mem_unit;
+}
+
 static double GetMemoryPressureAvg10()
 
 /*++
@@ -3778,6 +3809,48 @@ Return Value:
     return strtod(Marker + (sizeof("avg10=") - 1), nullptr);
 }
 
+static long long GetFileRefaults()
+
+/*++
+
+Routine Description:
+
+    This routine returns the cumulative workingset_refault_file counter from
+    /proc/vmstat. A rising counter means file pages that were previously evicted
+    are being faulted back in -- i.e. reclaim (or workload pressure) is cutting
+    into the live working set, which is used as a brake on further reclaim.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    The cumulative file refault count (in pages), or -1 if unavailable.
+
+--*/
+
+{
+    //
+    // /proc/vmstat is several KB and the counter appears well into the file, so a
+    // generous buffer (filled across reads by ReadProcFile) avoids truncating it.
+    //
+
+    char Buffer[16384];
+    if (!ReadProcFile("/proc/vmstat", Buffer, sizeof(Buffer)))
+    {
+        return -1;
+    }
+
+    const char* Marker = strstr(Buffer, "workingset_refault_file ");
+    if (Marker == nullptr)
+    {
+        return -1;
+    }
+
+    return strtoll(Marker + (sizeof("workingset_refault_file ") - 1), nullptr, 10);
+}
+
 namespace {
 
 //
@@ -3795,17 +3868,31 @@ constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
 constexpr int c_dropCacheIdleIntervals = 30; // 5 minutes
 constexpr long long c_cacheGrowthRearmBytes = 256ll * 1024 * 1024;
 
-// Gradual: reclaimable cache below this floor is always retained; only the excess above it (beyond a
-// hysteresis margin) is reclaimed.
+// Gradual: PSI "some avg10" thresholds. Reclaim only when pressure is below the reclaim ceiling; raise
+// the floor and back off when pressure exceeds the backoff floor. The band in between is a dead zone
+// that prevents oscillation.
+constexpr double c_pressureReclaimMax = 1.0;
+constexpr double c_pressureBackoffMin = 5.0;
+
+// Gradual: back off if more than this many file pages were refaulted in one interval (~40 MB at 4 KB
+// pages), indicating reclaim is cutting into the live working set.
+constexpr long long c_refaultBackoffPages = 10000;
+
+// Gradual: adaptive floor of reclaimable cache to retain. It starts small, doubles (up to the cap)
+// whenever reclaim hurts, and decays back toward the base only after sustained calm so a learned working
+// set is held steady instead of being re-probed (and re-evicted) every tick. The cap is scaled to a
+// fraction of guest RAM at startup (see c_floorMaxRam*), so large working sets on large VMs can be fully
+// protected; the fallback applies only if total RAM cannot be determined.
 constexpr long long c_floorBaseBytes = 128ll * 1024 * 1024;
+constexpr long long c_floorMaxFallbackBytes = 4096ll * 1024 * 1024;
+constexpr long long c_floorMaxRamNumerator = 3;
+constexpr long long c_floorMaxRamDenominator = 4;
+constexpr long long c_floorDecayBytes = 64ll * 1024 * 1024;
+constexpr int c_floorDecayAfterCalmTicks = 6; // 60s
 constexpr long long c_gradualHysteresisBytes = 128ll * 1024 * 1024;
 
-// Gradual is driven by PSI: reclaim cold cache while the "some avg10" memory pressure is below this
-// value (in percent), and back off above it.
-constexpr double c_pressureReclaimMax = 1.0;
-
-// While the VM is busy, reclaim at most this much per interval so a large backlog is drained gently;
-// an idle interval drains the full excess at once.
+// Gradual: when the VM is busy, reclaim at most this much per interval (cautious, so a burst of refaults
+// can brake it before too much is evicted); when idle, drain the full excess.
 constexpr long long c_gradualStepBusyBytes = 256ll * 1024 * 1024;
 
 // Compaction runs once free memory grows by at least this much since the last compaction.
@@ -3827,9 +3914,54 @@ struct MemoryReclaimState
     bool ReclaimedThisIdlePeriod = false;
     long long CacheAtLastDrop = 0;
 
+    // Gradual.
+    long long FloorBytes = c_floorBaseBytes;
+    long long FloorMaxBytes = c_floorMaxFallbackBytes;
+    long long PreviousRefaults = -1;
+    int CalmStreak = 0;
+
     // Compaction.
     long long FreeAtLastCompaction = 0;
 };
+
+void RaiseFloorToProtect(MemoryReclaimState& State, long long Cache)
+
+/*++
+
+Routine Description:
+
+    Reclaim is hurting (real pressure, or the workload is refaulting evicted file pages). Rather than
+    ramping the floor up over many thrashing ticks, this immediately raises it to protect the cache that
+    is actually in use: it jumps to at least the current reclaimable cache (plus a margin) so reclaim
+    stops cutting into the working set on this very tick. The slow calm-time decay then re-probes downward
+    gently, so an over-estimate self-corrects without re-thrashing.
+
+--*/
+
+{
+    const long long Protect = (Cache < 0) ? (State.FloorBytes * 2) : (Cache + c_gradualHysteresisBytes);
+    State.FloorBytes = (std::min)(State.FloorMaxBytes, (std::max)(State.FloorBytes * 2, Protect));
+    State.CalmStreak = 0;
+}
+
+void DecayFloorAfterCalm(MemoryReclaimState& State)
+
+/*++
+
+Routine Description:
+
+    Relaxes the floor toward the base, but only after sustained calm, so a learned working set is not
+    immediately re-probed (and re-evicted) the moment pressure subsides.
+
+--*/
+
+{
+    State.CalmStreak += 1;
+    if (State.CalmStreak >= c_floorDecayAfterCalmTicks && State.FloorBytes > c_floorBaseBytes)
+    {
+        State.FloorBytes = (std::max)(c_floorBaseBytes, State.FloorBytes - c_floorDecayBytes);
+    }
+}
 
 bool RunGradualTick(MemoryReclaimState& State, bool IntervalIdle)
 
@@ -3837,11 +3969,9 @@ bool RunGradualTick(MemoryReclaimState& State, bool IntervalIdle)
 
 Routine Description:
 
-    Runs one interval of pressure-driven gentle reclaim (cold-first via cgroup memory.reclaim) toward a
-    fixed floor. While the kernel reports little/no memory pressure (PSI) there is cold cache the guest is
-    not really using, so it is reclaimed -- even while the VM is busy. A busy interval reclaims at most a
-    bounded step so a large backlog is drained gently; an idle interval drains the full excess. When PSI
-    is unavailable, reclaim falls back to gating on CPU idle.
+    Runs one interval of pressure-driven gentle reclaim (cold-first via cgroup memory.reclaim) toward the
+    adaptive floor. The refault rate is refreshed every interval so it reflects current activity
+    regardless of whether reclaim runs.
 
 Return Value:
 
@@ -3850,53 +3980,96 @@ Return Value:
 --*/
 
 {
-    (void)State;
-
     const double Pressure = GetMemoryPressureAvg10();
+    const long long Refaults = GetFileRefaults();
+    const long long RefaultDelta = (Refaults >= 0 && State.PreviousRefaults >= 0) ? (Refaults - State.PreviousRefaults) : 0;
+    if (Refaults >= 0)
+    {
+        State.PreviousRefaults = Refaults;
+    }
+
+    const bool RefaultBrake = RefaultDelta >= c_refaultBackoffPages;
+    const long long Cache = GetReclaimableCacheBytes();
 
     bool MayReclaim;
     if (Pressure < 0.0)
     {
         //
-        // No PSI brake available: gate reclaim on CPU idle.
+        // No PSI brake available: gate reclaim on CPU idle, but still honor the refault brake so reclaim
+        // backs off (and the floor is raised to protect the working set) if it starts faulting evicted
+        // file pages back in. On calm idle intervals decay the floor as in the PSI path so a learned
+        // working set is eventually re-probed downward.
         //
 
-        MayReclaim = IntervalIdle;
+        if (RefaultBrake)
+        {
+            RaiseFloorToProtect(State, Cache);
+            MayReclaim = false;
+        }
+        else if (IntervalIdle)
+        {
+            DecayFloorAfterCalm(State);
+            MayReclaim = true;
+        }
+        else
+        {
+            State.CalmStreak = 0;
+            MayReclaim = false;
+        }
+    }
+    else if (Pressure >= c_pressureBackoffMin || RefaultBrake)
+    {
+        RaiseFloorToProtect(State, Cache);
+        MayReclaim = false;
+    }
+    else if (Pressure >= c_pressureReclaimMax)
+    {
+        //
+        // Dead zone: some pressure but not enough to back off. Hold steady.
+        //
+
+        State.CalmStreak = 0;
+        MayReclaim = false;
     }
     else
     {
         //
-        // Reclaim only while pressure is low; back off once the workload starts stalling on memory.
+        // Calm: relax the floor toward the base after sustained calm, then reclaim cold excess.
         //
 
-        MayReclaim = Pressure < c_pressureReclaimMax;
+        DecayFloorAfterCalm(State);
+        MayReclaim = true;
     }
 
-    if (!MayReclaim)
+    bool Reclaimed = false;
+    if (MayReclaim && Cache >= 0)
     {
-        return false;
+        const long long Excess = Cache - State.FloorBytes;
+        if (Excess > c_gradualHysteresisBytes)
+        {
+            const long long ToFree = IntervalIdle ? Excess : (std::min)(Excess, c_gradualStepBusyBytes);
+            const std::string Bytes = std::to_string(ToFree);
+
+            // Best-effort: WriteToFile logs internally on failure. EAGAIN merely means the kernel could
+            // not evict the full amount this pass (pages were still freed), so it counts as reclaim.
+            // Never throw on a transient write error and tear down the long-lived reduction thread.
+            const int Status = WriteToFile(RECLAIM_PATH, Bytes.c_str());
+            Reclaimed = (Status == 0) || (errno == EAGAIN);
+
+            //
+            // Reset the refault baseline to post-reclaim so the next interval's delta attributes refaults
+            // to this reclaim.
+            //
+
+            const long long After = GetFileRefaults();
+            if (After >= 0)
+            {
+                State.PreviousRefaults = After;
+            }
+        }
     }
 
-    const long long Cache = GetReclaimableCacheBytes();
-    if (Cache < 0)
-    {
-        return false;
-    }
-
-    const long long Excess = Cache - c_floorBaseBytes;
-    if (Excess <= c_gradualHysteresisBytes)
-    {
-        return false;
-    }
-
-    const long long ToFree = IntervalIdle ? Excess : (std::min)(Excess, c_gradualStepBusyBytes);
-    const std::string Bytes = std::to_string(ToFree);
-
-    // Best-effort: WriteToFile logs internally on failure. EAGAIN merely means the kernel could not evict
-    // the full amount this pass (pages were still freed), so it counts as reclaim. Never throw on a
-    // transient write error and tear down the long-lived reduction thread.
-    const int Status = WriteToFile(RECLAIM_PATH, Bytes.c_str());
-    return (Status == 0) || (errno == EAGAIN);
+    return Reclaimed;
 }
 
 bool RunDropCacheTick(MemoryReclaimState& State, bool IntervalIdle)
@@ -3999,11 +4172,12 @@ Routine Description:
 
         1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is driven by *memory pressure*,
            not CPU idleness. While the kernel reports little/no memory pressure (PSI), there is cold
-           memory the guest is not really using, so it is reclaimed toward a fixed floor -- even while
-           the VM is busy. This is important because a CPU-bound workload can sit on gigabytes of cold
-           cache that a CPU-idle check would never reclaim. A busy interval reclaims at most a bounded
-           step so a large backlog is drained gently; an idle interval drains the full excess. When PSI
-           is unavailable, Gradual falls back to reclaiming only while CPU-idle.
+           memory the guest is not really using, so it is reclaimed toward an adaptive floor -- even
+           while the VM is busy. This is important because a CPU-bound workload can sit on gigabytes of
+           cold cache that a CPU-idle check would never reclaim. The amount of file refaults is used as a
+           brake: if reclaim starts faulting evicted file pages back in (or pressure rises), the floor is
+           raised and reclaim backs off, so the loop self-regulates to the true working-set size. When
+           PSI is unavailable, Gradual falls back to reclaiming only while CPU-idle.
 
         2. DropCache mode (the indiscriminate sledgehammer: drop_caches evicts the entire page cache,
            hot and cold alike) cannot run safely under load, so it stays gated on sustained CPU idle. It
@@ -4059,6 +4233,17 @@ try
 
             MemoryReclaimState State;
 
+            //
+            // Scale the adaptive floor cap to a fraction of guest RAM so large working sets on large VMs
+            // can be fully protected, falling back to a fixed cap only if total RAM is unavailable.
+            //
+
+            const long long TotalRam = GetTotalMemoryBytes();
+            if (TotalRam > 0)
+            {
+                State.FloorMaxBytes = (std::max)(c_floorBaseBytes, (TotalRam * c_floorMaxRamNumerator) / c_floorMaxRamDenominator);
+            }
+
             for (;;)
             {
                 std::this_thread::sleep_for(c_pollInterval);
@@ -4079,6 +4264,7 @@ try
                     State.PreviousBusy = Busy;
                     State.PreviousIdle = Idle;
                     State.HavePreviousSample = true;
+                    State.PreviousRefaults = GetFileRefaults();
                     continue;
                 }
 
