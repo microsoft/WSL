@@ -446,7 +446,7 @@ namespace Progress {
     {
         // See https://conemu.github.io/en/AnsiEscapeCodes.html#ConEmu_specific_OSC
 
-        THROW_HR_IF(E_BOUNDS, percentage.has_value() && percentage > 100u);
+        THROW_HR_IF(E_BOUNDS, percentage.has_value() && percentage.value() > 100u);
 
         // Workaround some quirks in the Windows Terminal implementation of the progress OSC sequence
         switch (state)
