@@ -14,20 +14,29 @@ Abstract:
 
 #include "precomp.h"
 #include "WindowsCertStore.h"
+#include <optional>
 #include <set>
 #include <wincrypt.h>
 
 namespace {
 
-// Converts a single DER-encoded certificate into a PEM block delimited by
-// "-----BEGIN CERTIFICATE-----" / "-----END CERTIFICATE-----".
-std::string EncodeCertificateAsPem(const CERT_CONTEXT& Cert)
+// Converts a single DER-encoded certificate into a PEM block.
+// Returns nullopt if the certificate cannot be encoded.
+std::optional<std::string> TryEncodeCertificateAsPem(const CERT_CONTEXT& Cert)
 {
     DWORD pemSize = 0;
-    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(Cert.pbCertEncoded, Cert.cbCertEncoded, CRYPT_STRING_BASE64HEADER, nullptr, &pemSize));
+    if (!CryptBinaryToStringA(Cert.pbCertEncoded, Cert.cbCertEncoded, CRYPT_STRING_BASE64HEADER, nullptr, &pemSize))
+    {
+        LOG_LAST_ERROR_MSG("CryptBinaryToStringA (size query) failed for a root certificate; skipping it");
+        return std::nullopt;
+    }
 
     std::string pem(pemSize, '\0');
-    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(Cert.pbCertEncoded, Cert.cbCertEncoded, CRYPT_STRING_BASE64HEADER, pem.data(), &pemSize));
+    if (!CryptBinaryToStringA(Cert.pbCertEncoded, Cert.cbCertEncoded, CRYPT_STRING_BASE64HEADER, pem.data(), &pemSize))
+    {
+        LOG_LAST_ERROR_MSG("CryptBinaryToStringA (encode) failed for a root certificate; skipping it");
+        return std::nullopt;
+    }
 
     // CryptBinaryToStringA reports the size including the terminating null; drop it.
     pem.resize(pemSize);
@@ -58,7 +67,11 @@ void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string&
             continue;
         }
 
-        Pem += EncodeCertificateAsPem(*cert);
+        // Skip any certificate that fails to encode rather than aborting the whole bundle.
+        if (auto pem = TryEncodeCertificateAsPem(*cert))
+        {
+            Pem += *pem;
+        }
     }
 }
 
