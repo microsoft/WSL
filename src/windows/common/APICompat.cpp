@@ -14,8 +14,15 @@ namespace {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(Destination, Source) != 0);
     }
 
-    // Converts an input array of WSLCCompat elements into a vector of the matching
-    // wslc.idl elements by converting each element individually.
+    // Throws E_INVALIDARG if Value contains any bit outside of KnownMask.
+    template <typename TValue, typename TMask>
+    void ThrowIfUnknownFlags(TValue Value, TMask KnownMask, PCSTR Name)
+    {
+        const auto value = static_cast<unsigned long long>(Value);
+        const auto mask = static_cast<unsigned long long>(KnownMask);
+        THROW_HR_IF_MSG(E_INVALIDARG, (value & ~mask) != 0, "Invalid %hs value: 0x%llx", Name, value);
+    }
+
     template <typename TOut, typename TIn>
     std::vector<TOut> ConvertArray(const TIn* Items, ULONG Count)
     {
@@ -33,13 +40,6 @@ namespace {
 
         return result;
     }
-
-    //
-    // In-process adapters that bridge the SDK-facing WSLCCompat callback interfaces to
-    // the internal wslc.idl callback interfaces. They wrap the SDK's marshaled proxy
-    // and are only ever invoked in-process, so they do not need to be registered for
-    // marshaling.
-    //
 
     class TerminationCallbackAdapter
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback>
@@ -129,7 +129,7 @@ WSLCFD Convert(WSLCCompatFD Fd)
         return WSLCFDTty;
     }
 
-    return WSLCFDStdin;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatFD value: %i", static_cast<int>(Fd));
 }
 
 WSLCSignal Convert(WSLCCompatSignal Signal)
@@ -148,7 +148,7 @@ WSLCSignal Convert(WSLCCompatSignal Signal)
         return WSLCSignalSIGILL;
     case WSLCCompatSignalSIGTRAP:
         return WSLCSignalSIGTRAP;
-    case WSLCCompatSignalSIGABRT: // Equivalent to WSLCCompatSignalSIGIOT.
+    case WSLCCompatSignalSIGABRT:
         return WSLCSignalSIGABRT;
     case WSLCCompatSignalSIGBUS:
         return WSLCSignalSIGBUS;
@@ -194,7 +194,7 @@ WSLCSignal Convert(WSLCCompatSignal Signal)
         return WSLCSignalSIGPROF;
     case WSLCCompatSignalSIGWINCH:
         return WSLCSignalSIGWINCH;
-    case WSLCCompatSignalSIGIO: // Equivalent to WSLCCompatSignalSIGPOLL.
+    case WSLCCompatSignalSIGIO:
         return WSLCSignalSIGIO;
     case WSLCCompatSignalSIGPWR:
         return WSLCSignalSIGPWR;
@@ -202,11 +202,13 @@ WSLCSignal Convert(WSLCCompatSignal Signal)
         return WSLCSignalSIGSYS;
     }
 
-    return WSLCSignalNone;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid Signal value: %i", static_cast<int>(Signal));
 }
 
 WSLCProcessFlags Convert(WSLCCompatProcessFlags Flags)
 {
+    ThrowIfUnknownFlags(Flags, WSLCCompatProcessFlagsStdin | WSLCCompatProcessFlagsTty, "WSLCCompatProcessFlags");
+
     WSLCProcessFlags result = WSLCProcessFlagsNone;
     WI_SetFlagIf(result, WSLCProcessFlagsStdin, WI_IsFlagSet(Flags, WSLCCompatProcessFlagsStdin));
     WI_SetFlagIf(result, WSLCProcessFlagsTty, WI_IsFlagSet(Flags, WSLCCompatProcessFlagsTty));
@@ -215,6 +217,11 @@ WSLCProcessFlags Convert(WSLCCompatProcessFlags Flags)
 
 WSLCContainerFlags Convert(WSLCCompatContainerFlags Flags)
 {
+    ThrowIfUnknownFlags(
+        Flags,
+        WSLCCompatContainerFlagsRm | WSLCCompatContainerFlagsGpu | WSLCCompatContainerFlagsInit | WSLCCompatContainerFlagsPublishAll,
+        "WSLCCompatContainerFlags");
+
     WSLCContainerFlags result = WSLCContainerFlagsNone;
     WI_SetFlagIf(result, WSLCContainerFlagsRm, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsRm));
     WI_SetFlagIf(result, WSLCContainerFlagsGpu, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsGpu));
@@ -225,6 +232,8 @@ WSLCContainerFlags Convert(WSLCCompatContainerFlags Flags)
 
 WSLCContainerStartFlags Convert(WSLCCompatContainerStartFlags Flags)
 {
+    ThrowIfUnknownFlags(Flags, WSLCCompatContainerStartFlagsAttach, "WSLCCompatContainerStartFlags");
+
     WSLCContainerStartFlags result = WSLCContainerStartFlagsNone;
     WI_SetFlagIf(result, WSLCContainerStartFlagsAttach, WI_IsFlagSet(Flags, WSLCCompatContainerStartFlagsAttach));
     return result;
@@ -232,6 +241,8 @@ WSLCContainerStartFlags Convert(WSLCCompatContainerStartFlags Flags)
 
 WSLCDeleteFlags Convert(WSLCCompatDeleteFlags Flags)
 {
+    ThrowIfUnknownFlags(Flags, WSLCCompatDeleteFlagsForce | WSLCCompatDeleteFlagsDeleteVolumes, "WSLCCompatDeleteFlags");
+
     WSLCDeleteFlags result = WSLCDeleteFlagsNone;
     WI_SetFlagIf(result, WSLCDeleteFlagsForce, WI_IsFlagSet(Flags, WSLCCompatDeleteFlagsForce));
     WI_SetFlagIf(result, WSLCDeleteFlagsDeleteVolumes, WI_IsFlagSet(Flags, WSLCCompatDeleteFlagsDeleteVolumes));
@@ -250,11 +261,17 @@ WSLCNetworkingMode Convert(WSLCCompatNetworkingMode Mode)
         return WSLCNetworkingModeVirtioProxy;
     }
 
-    return WSLCNetworkingModeNone;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatNetworkingMode value: %i", static_cast<int>(Mode));
 }
 
 WSLCFeatureFlags Convert(WSLCCompatFeatureFlags Flags)
 {
+    ThrowIfUnknownFlags(
+        Flags,
+        WSLCCompatFeatureFlagsDnsTunneling | WSLCCompatFeatureFlagsEarlyBootDmesg | WSLCCompatFeatureFlagsGPU |
+            WSLCCompatFeatureFlagsVirtioFs | WSLCCompatFeatureFlagsDebug,
+        "WSLCCompatFeatureFlags");
+
     WSLCFeatureFlags result = WslcFeatureFlagsNone;
     WI_SetFlagIf(result, WslcFeatureFlagsDnsTunneling, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsDnsTunneling));
     WI_SetFlagIf(result, WslcFeatureFlagsEarlyBootDmesg, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsEarlyBootDmesg));
@@ -266,6 +283,8 @@ WSLCFeatureFlags Convert(WSLCCompatFeatureFlags Flags)
 
 WSLCSessionStorageFlags Convert(WSLCCompatSessionStorageFlags Flags)
 {
+    ThrowIfUnknownFlags(Flags, WSLCCompatSessionStorageFlagsNoCreate, "WSLCCompatSessionStorageFlags");
+
     WSLCSessionStorageFlags result = WSLCSessionStorageFlagsNone;
     WI_SetFlagIf(result, WSLCSessionStorageFlagsNoCreate, WI_IsFlagSet(Flags, WSLCCompatSessionStorageFlagsNoCreate));
     return result;
@@ -273,6 +292,8 @@ WSLCSessionStorageFlags Convert(WSLCCompatSessionStorageFlags Flags)
 
 WSLCSessionFlags Convert(WSLCCompatSessionFlags Flags)
 {
+    ThrowIfUnknownFlags(Flags, WSLCCompatSessionFlagsPersistent | WSLCCompatSessionFlagsOpenExisting, "WSLCCompatSessionFlags");
+
     WSLCSessionFlags result = WSLCSessionFlagsNone;
     WI_SetFlagIf(result, WSLCSessionFlagsPersistent, WI_IsFlagSet(Flags, WSLCCompatSessionFlagsPersistent));
     WI_SetFlagIf(result, WSLCSessionFlagsOpenExisting, WI_IsFlagSet(Flags, WSLCCompatSessionFlagsOpenExisting));
@@ -293,7 +314,7 @@ WSLCHandleType Convert(WSLCCompatHandleType Type)
         return WSLCHandleTypeSocket;
     }
 
-    return WSLCHandleTypeUnknown;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatHandleType value: %i", static_cast<int>(Type));
 }
 
 WSLCCompatProcessState Convert(WSLCProcessState State)
@@ -310,7 +331,7 @@ WSLCCompatProcessState Convert(WSLCProcessState State)
         return WSLCCompatProcessStateSignalled;
     }
 
-    return WSLCCompatProcessStateUnknown;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCProcessState value: %i", static_cast<int>(State));
 }
 
 WSLCCompatContainerState Convert(WSLCContainerState State)
@@ -329,7 +350,7 @@ WSLCCompatContainerState Convert(WSLCContainerState State)
         return WSLCCompatContainerStateDeleted;
     }
 
-    return WSLCCompatContainerStateInvalid;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCContainerState value: %i", static_cast<int>(State));
 }
 
 WSLCCompatVirtualMachineTerminationReason Convert(WSLCVirtualMachineTerminationReason Reason)
@@ -344,7 +365,7 @@ WSLCCompatVirtualMachineTerminationReason Convert(WSLCVirtualMachineTerminationR
         return WSLCCompatVirtualMachineTerminationReasonCrashed;
     }
 
-    return WSLCCompatVirtualMachineTerminationReasonUnknown;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCVirtualMachineTerminationReason value: %i", static_cast<int>(Reason));
 }
 
 WSLCCompatHandleType Convert(WSLCHandleType Type)
@@ -361,7 +382,7 @@ WSLCCompatHandleType Convert(WSLCHandleType Type)
         return WSLCCompatHandleTypeSocket;
     }
 
-    return WSLCCompatHandleTypeUnknown;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCHandleType value: %i", static_cast<int>(Type));
 }
 
 WSLCCompatDeletedImageType Convert(WSLCDeletedImageType Type)
@@ -374,7 +395,7 @@ WSLCCompatDeletedImageType Convert(WSLCDeletedImageType Type)
         return WSLCCompatDeletedImageTypeUntagged;
     }
 
-    return WSLCCompatDeletedImageTypeDeleted;
+    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCDeletedImageType value: %i", static_cast<int>(Type));
 }
 
 //
@@ -518,6 +539,9 @@ WSLCUlimit Convert(const WSLCCompatUlimit& Ulimit)
 
 WSLCDeleteImageOptions Convert(const WSLCCompatDeleteImageOptions& Options)
 {
+    ThrowIfUnknownFlags(
+        Options.Flags, WSLCCompatDeleteImageFlagsForce | WSLCCompatDeleteImageFlagsNoPrune, "WSLCCompatDeleteImageFlags");
+
     WSLCDeleteImageOptions result{};
     result.Image = Options.Image;
     result.Flags = Options.Flags;
@@ -633,6 +657,9 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)
 {
+    ThrowIfUnknownFlags(
+        Options.Flags, WSLCCompatListImagesFlagsAll | WSLCCompatListImagesFlagsDigests, "WSLCCompatListImagesFlags");
+
     // Flags is a DWORD bitmask with identical bit meanings in both contracts.
     m_value.Flags = Options.Flags;
 
@@ -665,8 +692,6 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.BootTimeoutMs = Settings.BootTimeoutMs;
     m_value.NetworkingMode = Convert(Settings.NetworkingMode);
 
-    // The factory deep-copies (AddRefs) the termination callback synchronously
-    // during CreateSession, so the adapter held here outlives the call.
     m_terminationCallback = Convert(Settings.TerminationCallback);
     m_value.TerminationCallback = m_terminationCallback.Get();
 

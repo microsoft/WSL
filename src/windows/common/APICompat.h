@@ -1,20 +1,16 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
 
-//
-// Conversion helpers that bridge the SDK-facing WSLCCompat COM contract (declared
-// in WSLCCompat.idl) and the internal wslc.idl contract.
-//
-// The two contracts are intentionally decoupled: WSLCCompat.idl must stay
-// backwards compatible, while wslc.idl can change freely. Because of that, the
-// two sets of types are never assumed to share the same layout. Every
-// conversion below copies field by field instead of casting between the two
-// representations.
-//
-// The service classes (WSLCSessionManager, WSLCSession, WSLCContainer,
-// WSLCProcess) implement the IWSLCCompat* interfaces by converting the WSLCCompat
-// types into the wslc.idl types with the overloaded Convert() functions here
-// and then forwarding to the existing wslc.idl based implementations.
-//
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    APICompat.h
+
+Abstract:
+
+    API compatibility layer between the wslc.idl and wslccompat.idl.
+
+--*/
 
 #pragma once
 
@@ -48,13 +44,6 @@ WSLCCompatContainerState Convert(WSLCContainerState State);
 WSLCCompatVirtualMachineTerminationReason Convert(WSLCVirtualMachineTerminationReason Reason);
 WSLCCompatHandleType Convert(WSLCHandleType Type);
 WSLCCompatDeletedImageType Convert(WSLCDeletedImageType Type);
-
-//
-// Scalar / non-owning struct conversions. The returned struct copies any
-// pointer fields straight from the input, so it stays valid only as long as the
-// input (and the buffers it points at) remain alive. They are meant to be used
-// for the duration of a single forwarded call.
-//
 
 // Forward (WSLCCompat -> wslc.idl).
 WSLCVersion Convert(const WSLCCompatVersion& Version);
@@ -185,10 +174,7 @@ inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settin
 }
 
 //
-// Callback conversions. Wrap the SDK callback object in an in-process adapter
-// that implements the matching wslc.idl callback interface, or return a null
-// ComPtr when the SDK callback is null.
-//
+// Callback conversions.
 
 Microsoft::WRL::ComPtr<ITerminationCallback> Convert(IWSLCCompatTerminationCallback* Callback);
 Microsoft::WRL::ComPtr<ICrashDumpCallback> Convert(IWSLCCompatCrashDumpCallback* Callback);
