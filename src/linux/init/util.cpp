@@ -24,6 +24,7 @@ Abstract:
 #include <ctype.h>
 #include <optional>
 #include <fstream>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <regex>
@@ -3505,71 +3506,157 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
 #define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
 
-static long long int GetUserCpuTime()
+static bool ReadProcFile(const char* Path, char* Buffer, size_t Size, bool LogErrors = true)
 
 /*++
 
 Routine Description:
 
-    This routine parses /proc/stat to query a summary of all user CPU time.
+    This routine reads the full contents of a procfs file into a caller-supplied
+    NUL-terminated buffer. Because procfs content is generated on read and a
+    single read() may return only a partial snapshot, this loops until EOF (or
+    the buffer fills), which keeps later-appearing fields (for example the
+    workingset counters deep in /proc/vmstat) from being truncated away.
 
 Arguments:
 
-    None.
+    Path - Supplies the procfs path to read.
+
+    Buffer - Supplies the buffer to fill; always NUL-terminated on success.
+
+    Size - Supplies the size of Buffer in bytes (must be at least 1).
+
+    LogErrors - Supplies whether open/read failures are logged. Callers for
+        which absence is normal (for example PSI) pass false.
 
 Return Value:
 
-    The current user CPU counter for all cores.
+    true on success (Buffer holds the content), false on failure.
 
 --*/
 
 {
-    wil::unique_fd Fd{open("/proc/stat", O_RDONLY)};
+    if (Size == 0)
+    {
+        return false;
+    }
+
+    wil::unique_fd Fd{open(Path, O_RDONLY | O_CLOEXEC)};
     if (!Fd)
     {
-        LOG_ERROR("open failed {}", errno);
-        return -1;
+        if (LogErrors)
+        {
+            LOG_ERROR("open({}) failed {}", Path, errno);
+        }
+
+        return false;
     }
 
-    char Buffer[32];
-    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result <= 0)
+    size_t Total = 0;
+    while (Total < (Size - 1))
     {
-        LOG_ERROR("read failed {}", errno);
-        return -1;
+        const ssize_t Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer + Total, (Size - 1) - Total));
+        if (Result < 0)
+        {
+            if (LogErrors)
+            {
+                LOG_ERROR("read({}) failed {}", Path, errno);
+            }
+
+            return false;
+        }
+
+        if (Result == 0)
+        {
+            break;
+        }
+
+        Total += static_cast<size_t>(Result);
     }
 
-    //
-    // Parse the first line of /proc/stat which is in the format
-    // "cpu  <counter>".
-    //
-
-    Buffer[Result] = '\0';
-    char* Sp1;
-    char* Info = strtok_r(Buffer, " \n", &Sp1);
-    if (Info == nullptr)
-    {
-        LOG_ERROR("/proc/stat first line missing cpu label");
-        return -1;
-    }
-
-    Info = strtok_r(nullptr, " \n", &Sp1);
-    if (Info == nullptr)
-    {
-        LOG_ERROR("/proc/stat first line missing cpu counter");
-        return -1;
-    }
-
-    return strtoll(Info, nullptr, 10);
+    Buffer[Total] = '\0';
+    return Total > 0;
 }
 
-static ssize_t GetMemoryInUse()
+static bool ReadAggregateCpuTimes(unsigned long long& Busy, unsigned long long& Idle)
 
 /*++
 
 Routine Description:
 
-    This routine returns the amount memory in use in bytes.
+    This routine parses the aggregate "cpu" line of /proc/stat and splits the
+    cumulative jiffies into busy and idle buckets.
+
+    Unlike a naive "user time only" measurement, idle time is taken as idle +
+    iowait and everything else (user, nice, system, irq, softirq, steal) counts
+    as busy. This ensures kernel-bound work -- background daemons, I/O, niced
+    builds -- correctly keeps the VM out of the idle state.
+
+Arguments:
+
+    Busy - Receives the cumulative busy jiffies across all cores.
+
+    Idle - Receives the cumulative idle jiffies (idle + iowait) across all cores.
+
+Return Value:
+
+    true on success, false on failure.
+
+--*/
+
+{
+    //
+    // The aggregate cpu line easily fits in this buffer.
+    //
+
+    char Buffer[256];
+    if (!ReadProcFile("/proc/stat", Buffer, sizeof(Buffer)))
+    {
+        return false;
+    }
+
+    //
+    // Format: "cpu  user nice system idle iowait irq softirq steal guest guest_nice".
+    // The guest fields are already accounted for in user/nice and are ignored here.
+    //
+
+    unsigned long long Fields[8] = {};
+    const int Parsed = sscanf(
+        Buffer, "cpu %llu %llu %llu %llu %llu %llu %llu %llu", &Fields[0], &Fields[1], &Fields[2], &Fields[3], &Fields[4], &Fields[5], &Fields[6], &Fields[7]);
+
+    if (Parsed < 5)
+    {
+        LOG_ERROR("failed to parse /proc/stat cpu line (parsed {})", Parsed);
+        return false;
+    }
+
+    Idle = Fields[3] + Fields[4];
+    Busy = 0;
+    for (int Index = 0; Index < Parsed; Index += 1)
+    {
+        if (Index != 3 && Index != 4)
+        {
+            Busy += Fields[Index];
+        }
+    }
+
+    return true;
+}
+
+static long long GetReclaimableCacheBytes()
+
+/*++
+
+Routine Description:
+
+    This routine returns the amount of reclaimable file-backed page cache (in
+    bytes) by parsing /proc/meminfo.
+
+    It deliberately counts only memory that cache reclaim can actually return to
+    the host: file-backed page cache (Active(file) + Inactive(file)) plus
+    reclaimable slab (SReclaimable). Anonymous memory is excluded because neither
+    drop_caches nor cgroup reclaim of clean cache can free it, so it must not
+    drive the reclaim trigger.
 
 Arguments:
 
@@ -3577,17 +3664,302 @@ Arguments:
 
 Return Value:
 
-    Total memory - Free memory. Includes that used by cache and buffers.
+    Reclaimable cache in bytes, or -1 on failure.
 
 --*/
 
-try
+{
+    char Buffer[4096];
+    if (!ReadProcFile("/proc/meminfo", Buffer, sizeof(Buffer)))
+    {
+        return -1;
+    }
+
+    //
+    // All values in /proc/meminfo are reported in kB.
+    //
+
+    long long TotalKb = 0;
+    char* Save = nullptr;
+    for (char* Line = strtok_r(Buffer, "\n", &Save); Line != nullptr; Line = strtok_r(nullptr, "\n", &Save))
+    {
+        const char* Value = nullptr;
+        if (strncmp(Line, "Active(file):", 13) == 0)
+        {
+            Value = Line + 13;
+        }
+        else if (strncmp(Line, "Inactive(file):", 15) == 0)
+        {
+            Value = Line + 15;
+        }
+        else if (strncmp(Line, "SReclaimable:", 13) == 0)
+        {
+            Value = Line + 13;
+        }
+
+        if (Value != nullptr)
+        {
+            TotalKb += strtoll(Value, nullptr, 10);
+        }
+    }
+
+    return TotalKb * 1024;
+}
+
+static long long GetFreeMemoryBytes()
+
+/*++
+
+Routine Description:
+
+    This routine returns the amount of free memory (in bytes) currently held in
+    the buddy allocator, used to decide when there are newly-freed pages worth
+    compacting -- whether they were freed by reclaim or by a process exiting.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    Free memory in bytes, or -1 on failure.
+
+--*/
+
 {
     struct sysinfo Info = {};
-    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
-    return (Info.totalram - Info.freeram) * Info.mem_unit;
+    if (sysinfo(&Info) < 0)
+    {
+        LOG_ERROR("sysinfo failed {}", errno);
+        return -1;
+    }
+
+    return static_cast<long long>(Info.freeram) * Info.mem_unit;
 }
-CATCH_RETURN_ERRNO()
+
+namespace {
+
+//
+// Tunables for the memory reduction thread.
+//
+
+constexpr auto c_pollInterval = std::chrono::seconds(10);
+
+// An interval is CPU-idle when less than this fraction (per-mille) of aggregate CPU time was spent on
+// non-idle work.
+constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
+
+// DropCache: drop only after this many consecutive idle intervals, then re-drop once the reclaimable
+// cache grows by at least the re-arm threshold.
+constexpr int c_dropCacheIdleIntervals = 30; // 5 minutes
+constexpr long long c_cacheGrowthRearmBytes = 256ll * 1024 * 1024;
+
+// Gradual: reclaimable cache below this floor is always retained; only the excess above it (beyond a
+// hysteresis margin) is reclaimed.
+constexpr long long c_floorBaseBytes = 128ll * 1024 * 1024;
+constexpr long long c_gradualHysteresisBytes = 128ll * 1024 * 1024;
+
+// Compaction runs once free memory grows by at least this much since the last compaction.
+constexpr long long c_compactFreeGrowthBytes = 256ll * 1024 * 1024;
+
+//
+// Mutable state carried across polling intervals by the reduction thread.
+//
+
+struct MemoryReclaimState
+{
+    // CPU sampling.
+    unsigned long long PreviousBusy = 0;
+    unsigned long long PreviousIdle = 0;
+    bool HavePreviousSample = false;
+
+    // DropCache.
+    int IdleStreak = 0;
+    bool ReclaimedThisIdlePeriod = false;
+    long long CacheAtLastDrop = 0;
+
+    // Compaction.
+    long long FreeAtLastCompaction = 0;
+};
+
+bool RequestCgroupReclaim(long long Bytes)
+
+/*++
+
+Routine Description:
+
+    Best-effort write of a byte count to the cgroup memory.reclaim knob. EAGAIN is an expected outcome
+    (the kernel freed some, but not all, of the requested pages this pass) and is treated as a successful
+    reclaim *without* logging, so the long-lived reduction thread does not emit an error every interval.
+    A transient write failure never throws and tears down the thread.
+
+Arguments:
+
+    Bytes - Supplies the number of bytes to request the kernel reclaim.
+
+Return Value:
+
+    true if pages were reclaimed (full success or EAGAIN), false on an unexpected error.
+
+--*/
+
+{
+    const std::string Request = std::to_string(Bytes);
+
+    wil::unique_fd Fd{open(RECLAIM_PATH, O_WRONLY | O_CLOEXEC)};
+    if (!Fd)
+    {
+        LOG_ERROR("open({}) failed {}", RECLAIM_PATH, errno);
+        return false;
+    }
+
+    const std::string_view Buffer{Request};
+    if (UtilWriteStringView(Fd.get(), Buffer) == static_cast<ssize_t>(Buffer.size()))
+    {
+        return true;
+    }
+
+    //
+    // EAGAIN means the kernel could not evict the full amount this pass (pages were still freed), which
+    // is normal under reclaim, so it is not logged.
+    //
+
+    if (errno == EAGAIN)
+    {
+        return true;
+    }
+
+    LOG_ERROR("write({}, {}) failed {}", RECLAIM_PATH, Request, errno);
+    return false;
+}
+
+bool RunGradualTick(MemoryReclaimState& State, bool IntervalIdle)
+
+/*++
+
+Routine Description:
+
+    Runs one interval of gentle reclaim (cold-first via cgroup memory.reclaim). Reclaim is gated on CPU
+    idle and drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it
+    does not churn near the floor.
+
+Return Value:
+
+    true if memory was reclaimed this interval, false otherwise.
+
+--*/
+
+{
+    (void)State;
+
+    if (!IntervalIdle)
+    {
+        return false;
+    }
+
+    const long long Cache = GetReclaimableCacheBytes();
+    if (Cache < 0)
+    {
+        return false;
+    }
+
+    const long long Excess = Cache - c_floorBaseBytes;
+    if (Excess <= c_gradualHysteresisBytes)
+    {
+        return false;
+    }
+
+    // Best-effort: RequestCgroupReclaim never throws and does not log the expected EAGAIN, so a transient
+    // write error cannot tear down the long-lived reduction thread.
+    return RequestCgroupReclaim(Excess);
+}
+
+bool RunDropCacheTick(MemoryReclaimState& State, bool IntervalIdle)
+
+/*++
+
+Routine Description:
+
+    Runs one interval of DropCache policy: gated on sustained CPU idle because drop_caches is
+    indiscriminate (it evicts hot and cold pages alike). Drops once on becoming idle, then re-drops only
+    after the reclaimable cache grows meaningfully.
+
+Return Value:
+
+    true if the cache was dropped this interval, false otherwise.
+
+--*/
+
+{
+    if (!IntervalIdle)
+    {
+        State.IdleStreak = 0;
+        State.ReclaimedThisIdlePeriod = false;
+        return false;
+    }
+
+    if (++State.IdleStreak < c_dropCacheIdleIntervals)
+    {
+        return false;
+    }
+
+    const long long Cache = GetReclaimableCacheBytes();
+    if (Cache >= 0 && (!State.ReclaimedThisIdlePeriod || Cache > State.CacheAtLastDrop + c_cacheGrowthRearmBytes))
+    {
+        // Best-effort; WriteToFile logs internally on failure. A failed drop must not tear down the
+        // long-lived reduction thread.
+        if (WriteToFile("/proc/sys/vm/drop_caches", "1\n") == 0)
+        {
+            const long long After = GetReclaimableCacheBytes();
+            State.CacheAtLastDrop = (After < 0) ? 0 : After;
+            State.ReclaimedThisIdlePeriod = true;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void RunCompactionTick(MemoryReclaimState& State, bool Reclaimed)
+
+/*++
+
+Routine Description:
+
+    Compacts when there are newly-freed pages worth coalescing -- from our reclaim or from a process
+    exiting -- so free-page reporting can hand back large blocks. Tracks downward movement of free memory
+    so a later rise re-triggers compaction.
+
+--*/
+
+{
+    const long long Free = GetFreeMemoryBytes();
+    bool Compact = Reclaimed;
+    if (Free >= 0)
+    {
+        if (Free > State.FreeAtLastCompaction + c_compactFreeGrowthBytes)
+        {
+            Compact = true;
+        }
+
+        if (Free < State.FreeAtLastCompaction)
+        {
+            State.FreeAtLastCompaction = Free;
+        }
+    }
+
+    if (Compact)
+    {
+        // Best-effort; WriteToFile logs internally on failure. A failed compaction must not tear down the
+        // long-lived reduction thread; leave FreeAtLastCompaction unchanged so the next tick retries.
+        if (WriteToFile("/proc/sys/vm/compact_memory", "1\n") == 0 && Free >= 0)
+        {
+            State.FreeAtLastCompaction = Free;
+        }
+    }
+}
+
+} // namespace
 
 void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
@@ -3595,8 +3967,26 @@ void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
 Routine Description:
 
-    This routine starts a background thread that performs memory compaction and optional cache/memory
-    reclaim when the VM is idle. This ensures that the maximum number of pages can be discarded to the host.
+    This routine starts a background thread that reclaims memory and compacts free pages so the maximum
+    number of pages can be discarded back to the host.
+
+    The policy is:
+
+        1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is gated on sustained CPU idle and
+           drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it does
+           not churn near the floor.
+
+        2. DropCache mode (the indiscriminate sledgehammer: drop_caches evicts the entire page cache,
+           hot and cold alike) cannot run safely under load, so it stays gated on sustained CPU idle. It
+           drops once on becoming idle, then re-drops only after the cache grows meaningfully.
+
+        3. Compaction is gated on free-memory *growth*: it runs when there are newly-freed pages worth
+           coalescing -- whether they were freed by our reclaim or by a process exiting -- and is skipped
+           on ticks where nothing new was freed. This both avoids the previous "compact every tick" waste
+           and ensures naturally-freed memory still gets coalesced for efficient page reporting.
+
+    CPU utilization is measured over each interval using all non-idle CPU time (user, system, irq,
+    softirq, steal) rather than just user time, so kernel-bound work keeps the VM out of the idle state.
 
 Arguments:
 
@@ -3610,11 +4000,16 @@ Return Value:
 
 try
 {
+    if (Mode == LxMiniInitMemoryReclaimModeDisabled)
+    {
+        return;
+    }
+
     std::thread([Mode = Mode]() mutable {
         try
         {
             //
-            // Set the thread's scheduling policy to idle.
+            // Run at idle scheduling priority so reclaim never competes with real work.
             //
 
             sched_param Parameter{};
@@ -3623,25 +4018,8 @@ try
             THROW_ERRNO_IF(Result, Result != 0);
 
             //
-            // Periodically check if the machine is idle by querying procfs for CPU usage.
-            // Memory compaction will occur if both of the following conditions are true:
-            //     1. The CPU time since the last check is greater than the idle threshold.
-            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
-            //
-
-            double MemoryLow = 1024 * 1024 * 1024;
-            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
-            long long int Start, Stop = 0;
-            auto constexpr SleepDuration = std::chrono::seconds(30);
-            size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
-            long long int ReclaimWindow[20] = {}; // 10 minutes
-            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling = false;
-
-            //
-            // Fall back to drop cache if the required cgroup path is not present.
+            // Gradual mode needs the cgroup memory.reclaim knob; fall back to dropping caches if it is
+            // not present.
             //
 
             if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
@@ -3650,89 +4028,42 @@ try
                 Mode = LxMiniInitMemoryReclaimModeDropCache;
             }
 
-            if (Mode == LxMiniInitMemoryReclaimModeGradual)
-            {
-                static_assert(COUNT_OF(ReclaimWindow) >= 6);
-                ReclaimWindowLength = 6; // Set to 3 minutes.
-            }
+            MemoryReclaimState State;
 
-            for (auto i = 1; i < ReclaimWindowLength; i++)
-            {
-                ReclaimWindow[i] = LLONG_MIN;
-            }
-
-            std::this_thread::sleep_for(SleepDuration);
             for (;;)
             {
-                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
-                Start = GetUserCpuTime();
-                THROW_LAST_ERROR_IF(Start == -1);
+                std::this_thread::sleep_for(c_pollInterval);
 
-                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
+                unsigned long long Busy = 0;
+                unsigned long long Idle = 0;
+                if (!ReadAggregateCpuTimes(Busy, Idle))
                 {
-                    //
-                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
-                    //
-
-                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
-                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
-                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
-                    {
-                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
-                        {
-                            double MemorySize = GetMemoryInUse();
-                            THROW_LAST_ERROR_IF(MemorySize < 0);
-
-                            if (MemorySize > MemoryHigh)
-                            {
-                                ReclaimIdling = false;
-                            }
-
-                            if (!ReclaimIdling && MemorySize > MemoryLow)
-                            {
-                                double MemoryTargetSize = MemorySize * 0.97;
-                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
-
-                                if (MemoryTargetSize < MemoryLow)
-                                {
-                                    ReclaimIdling = true;
-                                }
-                            }
-                        }
-                        else if (!ReclaimIdling)
-                        {
-                            ReclaimIdling = true;
-                            THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/drop_caches", "1\n") < 0);
-                        }
-                    }
-                    else
-                    {
-                        ReclaimIdling = false;
-                    }
-
-                    ReclaimIndex = LastIndex;
-                    ReclaimWindow[ReclaimIndex] = Start;
+                    continue;
                 }
 
                 //
-                // Perform memory compaction if the VM is idle.
-                // This coalesces free pages into larger blocks for more efficient page reporting.
+                // Two samples are required to compute utilization over the interval.
                 //
 
-                if ((Start - Stop) > IdleThreshold)
+                if (!State.HavePreviousSample)
                 {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    Stop = GetUserCpuTime();
-                    THROW_LAST_ERROR_IF(Stop == -1);
-                    if ((Stop - Start) < IdleThreshold)
-                    {
-                        THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/compact_memory", "1\n") < 0);
-                    }
+                    State.PreviousBusy = Busy;
+                    State.PreviousIdle = Idle;
+                    State.HavePreviousSample = true;
+                    continue;
                 }
 
-                std::this_thread::sleep_until(Target);
+                const unsigned long long BusyDelta = Busy - State.PreviousBusy;
+                const unsigned long long TotalDelta = (Busy + Idle) - (State.PreviousBusy + State.PreviousIdle);
+                State.PreviousBusy = Busy;
+                State.PreviousIdle = Idle;
+
+                const bool IntervalIdle = (TotalDelta == 0) || (BusyDelta * 1000 <= TotalDelta * c_busyThresholdPerMille);
+
+                const bool Reclaimed = (Mode == LxMiniInitMemoryReclaimModeGradual) ? RunGradualTick(State, IntervalIdle)
+                                                                                    : RunDropCacheTick(State, IntervalIdle);
+
+                RunCompactionTick(State, Reclaimed);
             }
         }
         CATCH_LOG()
