@@ -1122,6 +1122,8 @@ void DockerIORelayHandle::Collect()
             if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
             {
                 ActiveHandle = nullptr;
+
+                ProcessNextHeader();
             }
         }
 

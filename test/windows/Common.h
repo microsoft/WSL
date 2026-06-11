@@ -188,6 +188,27 @@ private:
     std::optional<std::wstring> m_originalContent;
 };
 
+//
+// RAII wrapper for host file change.
+//
+
+class HostFileChange
+{
+public:
+    HostFileChange(const std::filesystem::path& Path, const std::string& NewContent);
+
+    ~HostFileChange();
+
+    NON_COPYABLE(HostFileChange);
+    NON_MOVABLE(HostFileChange);
+
+    void Update(const std::string& NewContent) const;
+
+private:
+    std::filesystem::path m_path;
+    std::optional<std::string> m_originalContent;
+};
+
 template <typename T>
 class RegistryKeyChange
 {

@@ -2717,7 +2717,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A futtatandó parancs</value>
   </data>
   <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
-    <value>Number of CPUs (e.g. 0.5, 1, 2.5)</value>
+    <value>Processzorok száma (pl. 0.5, 1, 2.5)</value>
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
@@ -2794,7 +2794,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A legutóbb létrehozott tároló megjelenítése (az összes állapotot tartalmazza)</value>
   </data>
   <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
-    <value>Memory limit (e.g. 512M, 1G)</value>
+    <value>Memóriakorlát (pl. 512MB, 1GB)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
