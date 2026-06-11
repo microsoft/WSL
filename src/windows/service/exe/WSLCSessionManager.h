@@ -32,7 +32,7 @@ Abstract:
 
 #pragma once
 #include "wslc.h"
-#include "WSLSDK.h"
+#include "WSLCCompat.h"
 #include "COMImplClass.h"
 #include "wslutil.h"
 #include <atomic>
@@ -188,7 +188,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCSDKSessionManager, IFastRundown>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:
@@ -206,9 +206,12 @@ public:
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
 
-    // IWSLCSDKSessionManager - converts the WSLCSDK types to the wslc.idl types and forwards to the methods above.
-    IFACEMETHOD(GetVersion)(_Out_ WSLCSDKVersion* Version) override;
-    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCSDKVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
+    // IWSLCCompatSessionManager - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    IFACEMETHOD(GetVersion)(_Out_ WSLCCompatVersion* Version) override;
+    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
     IFACEMETHOD(CreateSession)(
-        const WSLCSDKSessionSettings* Settings, WSLCSDKSessionFlags Flags, IWSLCSDKWarningCallback* WarningCallback, IWSLCSDKSession** Session) override;
+        const WSLCCompatSessionSettings* Settings,
+        WSLCCompatSessionFlags Flags,
+        IWSLCCompatWarningCallback* WarningCallback,
+        IWSLCCompatSession** Session) override;
 };

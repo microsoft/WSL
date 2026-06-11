@@ -23,6 +23,9 @@ Abstract:
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
+#include "APICompat.h"
+
+namespace apicompat = wsl::windows::common::apicompat;
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -292,8 +295,9 @@ void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& p
             else
             {
                 LOG_HR(result);
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
-                    volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
+                EMIT_USER_WARNING(
+                    wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
+                        volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
             }
         }
     }
@@ -678,8 +682,9 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     handles.emplace_back(
         std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
 
-    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    handles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(handles));
 
@@ -793,8 +798,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(
-                wsl::shared::string::MultiByteToWide(m_id)));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(wsl::shared::string::MultiByteToWide(m_id)));
         }
 
         if (comError.has_value() && comError->Message)
@@ -1812,8 +1817,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
-            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+        EMIT_USER_WARNING(
+            wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+                wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
     }
 
     return container;
@@ -1934,8 +1940,9 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStdout, TypedHandle{wil::unique_handle{stdoutRead.release()}, WSLCHandleTypePipe});
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
-    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
+    ioHandles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 
@@ -2460,31 +2467,35 @@ HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLCContainer) ? S_OK : S_FALSE;
 }
 
-HRESULT WSLCContainer::Stop(WSLCSDKSignal Signal, LONG TimeoutSeconds)
+HRESULT WSLCContainer::Stop(WSLCCompatSignal Signal, LONG TimeoutSeconds)
 {
-    static_assert(sizeof(WSLCSDKSignal) == sizeof(WSLCSignal), "WSLCSDKSignal and WSLCSignal size mismatch");
-
-    return Stop(static_cast<WSLCSignal>(Signal), TimeoutSeconds);
+    return Stop(apicompat::Convert(Signal), TimeoutSeconds);
 }
 
-HRESULT WSLCContainer::Start(WSLCSDKContainerStartFlags Flags)
+HRESULT WSLCContainer::Start(WSLCCompatContainerStartFlags Flags)
 {
-    return Start(static_cast<WSLCContainerStartFlags>(Flags), nullptr, nullptr);
+    return Start(apicompat::Convert(Flags), nullptr, nullptr);
 }
 
-HRESULT WSLCContainer::Delete(WSLCSDKDeleteFlags Flags)
+HRESULT WSLCContainer::Delete(WSLCCompatDeleteFlags Flags)
 {
-    return Delete(static_cast<WSLCDeleteFlags>(Flags));
+    return Delete(apicompat::Convert(Flags));
 }
 
-HRESULT WSLCContainer::GetState(WSLCSDKContainerState* State)
+HRESULT WSLCContainer::GetState(WSLCCompatContainerState* State)
+try
 {
-    static_assert(sizeof(WSLCSDKContainerState) == sizeof(WSLCContainerState), "WSLCSDKContainerState and WSLCContainerState size mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, State);
 
-    return GetState(reinterpret_cast<WSLCContainerState*>(State));
+    WSLCContainerState state{};
+    RETURN_IF_FAILED(GetState(&state));
+
+    *State = apicompat::Convert(state);
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCContainer::GetInitProcess(IWSLCSDKProcess** Process)
+HRESULT WSLCContainer::GetInitProcess(IWSLCCompatProcess** Process)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Process);
@@ -2498,16 +2509,17 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Exec(const WSLCSDKProcessOptions* Options, IWSLCSDKProcess** Process)
+HRESULT WSLCContainer::Exec(const WSLCCompatProcessOptions* Options, IWSLCCompatProcess** Process)
 try
 {
-    static_assert(sizeof(WSLCSDKProcessOptions) == sizeof(WSLCProcessOptions), "WSLCSDKProcessOptions and WSLCProcessOptions size mismatch");
-
+    RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Process);
     *Process = nullptr;
 
+    const auto options = apicompat::Convert(*Options);
+
     Microsoft::WRL::ComPtr<IWSLCProcess> process;
-    RETURN_IF_FAILED(Exec(reinterpret_cast<const WSLCProcessOptions*>(Options), nullptr, &process));
+    RETURN_IF_FAILED(Exec(&options, nullptr, &process));
     RETURN_HR_IF_NULL(E_UNEXPECTED, process);
 
     return process.CopyTo(Process);

@@ -1,4 +1,5 @@
 set(SOURCES
+    APICompat.cpp
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
@@ -57,6 +58,7 @@ set(SOURCES
 
 set(HEADERS
     ../../../generated/Localization.h
+    APICompat.h
     ../inc/docker_schema.h
     ../inc/wslc_schema.h
     ../inc/lxssbusclient.h

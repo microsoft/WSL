@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "WslcsdkPrivate.h"
 
-IOCallback::IOCallback(IWSLCSDKProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
+IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
     m_process(process), m_callbackOptions(std::make_unique<WslcContainerProcessIOCallbackOptions>(options))
 {
     using namespace wsl::windows::common::io;
@@ -55,7 +55,7 @@ IOCallback::IOCallback(IWSLCSDKProcess* process, const WslcContainerProcessIOCal
 
             if (runResult && m_process && m_callbackOptions && m_callbackOptions->onExit)
             {
-                WSLCSDKProcessState state{};
+                WSLCCompatProcessState state{};
                 int exitCode = -1;
 
                 // Prefer to make the callback even if we don't properly retrieve the exit code.
@@ -66,7 +66,7 @@ IOCallback::IOCallback(IWSLCSDKProcess* process, const WslcContainerProcessIOCal
                 }
                 else
                 {
-                    WI_ASSERT(state == WSLCSDKProcessStateExited);
+                    WI_ASSERT(state == WSLCCompatProcessStateExited);
                 }
 
                 // Regardless of our ability to get the proper exit code, inform the caller that the process
@@ -119,11 +119,11 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
     return options.onStdOut || options.onStdErr || options.onExit;
 }
 
-wil::unique_handle IOCallback::GetIOHandle(IWSLCSDKProcess* process, WslcProcessIOHandle ioHandle)
+wil::unique_handle IOCallback::GetIOHandle(IWSLCCompatProcess* process, WslcProcessIOHandle ioHandle)
 {
-    WSLCSDKHandle handle{};
+    WSLCCompatHandle handle{};
 
-    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCSDKFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
+    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCCompatFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
     // The handle value is the same regardless of the union member that was populated.
     return wil::unique_handle{handle.Handle.File};

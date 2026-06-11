@@ -8,21 +8,21 @@ Module Name:
 
 Abstract:
 
-    Header for a type that implements IWSLCSDKCrashDumpCallback. Bridges the COM
-    IWSLCSDKCrashDumpCallback interface back to the C-style SDK callback registered
+    Header for a type that implements IWSLCCompatCrashDumpCallback. Bridges the COM
+    IWSLCCompatCrashDumpCallback interface back to the C-style SDK callback registered
     via WslcRegisterSessionCrashDumpCallback.
 
 --*/
 #pragma once
-#include "WSLSDK.h"
+#include "WSLCCompat.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
-struct CrashDumpCallback : public winrt::implements<CrashDumpCallback, IWSLCSDKCrashDumpCallback>
+struct CrashDumpCallback : public winrt::implements<CrashDumpCallback, IWSLCCompatCrashDumpCallback>
 {
     CrashDumpCallback(WslcSessionCrashDumpCallback callback, PVOID context);
 
-    // IWSLCSDKCrashDumpCallback
+    // IWSLCCompatCrashDumpCallback
     HRESULT STDMETHODCALLTYPE OnCrashDump(_In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONGLONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp) override;
 
 private:

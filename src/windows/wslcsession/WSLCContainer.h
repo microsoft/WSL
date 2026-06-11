@@ -22,7 +22,7 @@ Abstract:
 #include "IORelay.h"
 #include "COMImplClass.h"
 #include "wslc_schema.h"
-#include "WSLSDK.h"
+#include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
@@ -218,7 +218,7 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCSDKContainer, IFastRundown, ISupportErrorInfo>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl>
 {
 
@@ -243,13 +243,13 @@ public:
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
     IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
 
-    // IWSLCSDKContainer - converts the WSLCSDK types to the wslc.idl types and forwards to the methods above.
-    IFACEMETHOD(Stop)(_In_ WSLCSDKSignal Signal, _In_ LONG TimeoutSeconds) override;
-    IFACEMETHOD(Start)(_In_ WSLCSDKContainerStartFlags Flags) override;
-    IFACEMETHOD(Delete)(_In_ WSLCSDKDeleteFlags Flags) override;
-    IFACEMETHOD(GetState)(_Out_ WSLCSDKContainerState* State) override;
-    IFACEMETHOD(GetInitProcess)(_Out_ IWSLCSDKProcess** Process) override;
-    IFACEMETHOD(Exec)(_In_ const WSLCSDKProcessOptions* Options, _Out_ IWSLCSDKProcess** Process) override;
+    // IWSLCCompatContainer - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    IFACEMETHOD(Stop)(_In_ WSLCCompatSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Start)(_In_ WSLCCompatContainerStartFlags Flags) override;
+    IFACEMETHOD(Delete)(_In_ WSLCCompatDeleteFlags Flags) override;
+    IFACEMETHOD(GetState)(_Out_ WSLCCompatContainerState* State) override;
+    IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
+    IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

@@ -37,7 +37,7 @@ Abstract:
 #include "helpers.hpp"
 #include "wslutil.h"
 #include "filesystem.hpp"
-#include "WSLCSDKCallbackAdapters.h"
+#include "APICompat.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -48,6 +48,7 @@ using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
+namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
 
 namespace {
@@ -285,8 +286,9 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
+        m_sessions.push_back(
+            SessionEntry{
+                std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -602,60 +604,49 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
-HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCSDKVersion* Version)
+HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
+try
 {
-    static_assert(sizeof(WSLCSDKVersion) == sizeof(WSLCVersion), "WSLCSDKVersion and WSLCVersion layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Version);
 
-    return GetVersion(reinterpret_cast<WSLCVersion*>(Version));
+    WSLCVersion version{};
+    RETURN_IF_FAILED(GetVersion(&version));
+
+    *Version = apicompat::Convert(version);
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCSDKVersion* ClientVersion, _Out_ BOOL* IsSupported)
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported)
+try
 {
-    static_assert(sizeof(WSLCSDKVersion) == sizeof(WSLCVersion), "WSLCSDKVersion and WSLCVersion layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, ClientVersion);
 
-    return IsClientVersionSupported(reinterpret_cast<const WSLCVersion*>(ClientVersion), IsSupported);
+    const auto clientVersion = apicompat::Convert(*ClientVersion);
+    return IsClientVersionSupported(&clientVersion, IsSupported);
 }
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(
-    const WSLCSDKSessionSettings* Settings, WSLCSDKSessionFlags Flags, IWSLCSDKWarningCallback* WarningCallback, IWSLCSDKSession** Session)
+    const WSLCCompatSessionSettings* Settings, WSLCCompatSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Session);
     *Session = nullptr;
 
-    const auto warning = wsl::windows::common::wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
 
     Microsoft::WRL::ComPtr<IWSLCSession> session;
     if (Settings == nullptr)
     {
-        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), static_cast<WSLCSessionFlags>(Flags), warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), apicompat::Convert(Flags), warning.Get(), &session));
     }
     else
     {
-        static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
-
-        // The TerminationCallback pointer type differs between the two settings structs, so the
-        // struct can't be reinterpret_cast as a whole. Field-copy it and wrap the callback. The
-        // factory deep-copies (AddRefs) the termination callback synchronously during CreateSession,
-        // so the locally-held adapter outlives the call.
-        const auto termination = wsl::windows::common::wslcsdk::WrapTerminationCallback(Settings->TerminationCallback);
-
-        WSLCSessionSettings settings{};
-        settings.DisplayName = Settings->DisplayName;
-        settings.StoragePath = Settings->StoragePath;
-        settings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
-        settings.CpuCount = Settings->CpuCount;
-        settings.MemoryMb = Settings->MemoryMb;
-        settings.BootTimeoutMs = Settings->BootTimeoutMs;
-        settings.NetworkingMode = static_cast<WSLCNetworkingMode>(Settings->NetworkingMode);
-        settings.TerminationCallback = termination.Get();
-        settings.FeatureFlags = static_cast<WSLCFeatureFlags>(Settings->FeatureFlags);
-        memcpy(&settings.DmesgOutput, &Settings->DmesgOutput, sizeof(settings.DmesgOutput));
-        settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(Settings->StorageFlags);
-        settings.RootVhdOverride = Settings->RootVhdOverride;
-        settings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
-
-        RETURN_IF_FAILED(CreateSession(&settings, static_cast<WSLCSessionFlags>(Flags), warning.Get(), &session));
+        // The conversion holds the wrapped termination callback so it outlives the call. The factory
+        // deep-copies (AddRefs) the termination callback synchronously during CreateSession.
+        const auto settings = apicompat::Convert(*Settings);
+        RETURN_IF_FAILED(CreateSession(settings.Get(), apicompat::Convert(Flags), warning.Get(), &session));
     }
 
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);

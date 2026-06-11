@@ -21,7 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
-#include "WSLCSDKCallbackAdapters.h"
+#include "APICompat.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -555,11 +555,13 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -669,8 +671,9 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+    io.AddHandle(
+        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+            requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
     io.Run({});
 
@@ -842,8 +845,9 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+    io.AddHandle(
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
@@ -1212,8 +1216,10 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, common::io::HandleWrapper{Request.stream.native_handle()}));
+    io.AddHandle(
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+            common::io::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -2834,100 +2840,169 @@ HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLCSession) ? S_OK : S_FALSE;
 }
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCSDKProgressCallback* ProgressCallback, IWSLCSDKWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
 {
-    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
-    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
 
     return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
 }
 
-HRESULT WSLCSession::LoadImage(WSLCSDKHandle ImageHandle, IWSLCSDKProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCSDKWarningCallback* WarningCallback)
+HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
 {
-    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
-
-    WSLCHandle handle{};
-    memcpy(&handle, &ImageHandle, sizeof(handle));
-
-    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
-    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
 
     return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
 }
 
-HRESULT WSLCSession::ImportImage(WSLCSDKHandle ImageHandle, LPCSTR ImageName, IWSLCSDKProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCSDKWarningCallback* WarningCallback)
+HRESULT WSLCSession::ImportImage(
+    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
 {
-    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
-
-    WSLCHandle handle{};
-    memcpy(&handle, &ImageHandle, sizeof(handle));
-
-    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
-    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
 
     return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
 }
 
-HRESULT WSLCSession::ListImages(const WSLCSDKListImagesOptions* Options, WSLCSDKImageInformation** Images, ULONG* Count)
+HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
+try
 {
-    static_assert(sizeof(WSLCSDKListImagesOptions) == sizeof(WSLCListImagesOptions), "WSLCSDKListImagesOptions and WSLCListImagesOptions layout mismatch");
-    static_assert(sizeof(WSLCSDKImageInformation) == sizeof(WSLCImageInformation), "WSLCSDKImageInformation and WSLCImageInformation layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Images);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
 
-    return ListImages(reinterpret_cast<const WSLCListImagesOptions*>(Options), reinterpret_cast<WSLCImageInformation**>(Images), Count);
+    *Images = nullptr;
+    *Count = 0;
+
+    WSLCImageInformation* internalImages = nullptr;
+    ULONG count = 0;
+    if (Options == nullptr)
+    {
+        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &internalImages, &count));
+    }
+    else
+    {
+        const auto options = apicompat::Convert(*Options);
+        RETURN_IF_FAILED(ListImages(options.Get(), &internalImages, &count));
+    }
+
+    auto freeInternal = wil::scope_exit([&] { CoTaskMemFree(internalImages); });
+
+    if (count > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatImageInformation[]>(count);
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (ULONG index = 0; index < count; index++)
+        {
+            converted[index] = apicompat::Convert(internalImages[index]);
+        }
+
+        *Images = converted.release();
+    }
+
+    *Count = count;
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCSession::DeleteImage(const WSLCSDKDeleteImageOptions* Options, WSLCSDKDeletedImageInformation** DeletedImages, ULONG* Count)
+HRESULT WSLCSession::DeleteImage(const WSLCCompatDeleteImageOptions* Options, WSLCCompatDeletedImageInformation** DeletedImages, ULONG* Count)
+try
 {
-    static_assert(sizeof(WSLCSDKDeleteImageOptions) == sizeof(WSLCDeleteImageOptions), "WSLCSDKDeleteImageOptions and WSLCDeleteImageOptions layout mismatch");
-    static_assert(sizeof(WSLCSDKDeletedImageInformation) == sizeof(WSLCDeletedImageInformation), "WSLCSDKDeletedImageInformation and WSLCDeletedImageInformation layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
 
-    return DeleteImage(reinterpret_cast<const WSLCDeleteImageOptions*>(Options), reinterpret_cast<WSLCDeletedImageInformation**>(DeletedImages), Count);
+    *DeletedImages = nullptr;
+    *Count = 0;
+
+    const auto options = apicompat::Convert(*Options);
+
+    WSLCDeletedImageInformation* internalImages = nullptr;
+    ULONG count = 0;
+    RETURN_IF_FAILED(DeleteImage(&options, &internalImages, &count));
+
+    auto freeInternal = wil::scope_exit([&] { CoTaskMemFree(internalImages); });
+
+    if (count > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatDeletedImageInformation[]>(count);
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (ULONG index = 0; index < count; index++)
+        {
+            converted[index] = apicompat::Convert(internalImages[index]);
+        }
+
+        *DeletedImages = converted.release();
+    }
+
+    *Count = count;
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCSession::TagImage(const WSLCSDKTagImageOptions* Options)
+HRESULT WSLCSession::TagImage(const WSLCCompatTagImageOptions* Options)
+try
 {
-    static_assert(sizeof(WSLCSDKTagImageOptions) == sizeof(WSLCTagImageOptions), "WSLCSDKTagImageOptions and WSLCTagImageOptions layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Options);
 
-    return TagImage(reinterpret_cast<const WSLCTagImageOptions*>(Options));
+    const auto options = apicompat::Convert(*Options);
+    return TagImage(&options);
 }
+CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCSDKProgressCallback* ProgressCallback, IWSLCSDKWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
 {
-    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
-    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
 
     return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
 }
 
-HRESULT WSLCSession::CreateContainer(const WSLCSDKContainerOptions* Options, IWSLCSDKWarningCallback* WarningCallback, IWSLCSDKContainer** Container)
+HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
 try
 {
-    static_assert(sizeof(WSLCSDKContainerOptions) == sizeof(WSLCContainerOptions), "WSLCSDKContainerOptions and WSLCContainerOptions layout mismatch");
-
+    RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Container);
     *Container = nullptr;
 
-    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto options = apicompat::Convert(*Options);
 
     Microsoft::WRL::ComPtr<IWSLCContainer> container;
-    RETURN_IF_FAILED(CreateContainer(reinterpret_cast<const WSLCContainerOptions*>(Options), warning.Get(), &container));
+    RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));
     RETURN_HR_IF_NULL(E_UNEXPECTED, container);
 
     return container.CopyTo(Container);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateVolume(const WSLCSDKVolumeOptions* Options, WSLCSDKVolumeInformation* VolumeInfo)
+HRESULT WSLCSession::CreateVolume(const WSLCCompatVolumeOptions* Options, WSLCCompatVolumeInformation* VolumeInfo)
+try
 {
-    static_assert(sizeof(WSLCSDKVolumeOptions) == sizeof(WSLCVolumeOptions), "WSLCSDKVolumeOptions and WSLCVolumeOptions layout mismatch");
-    static_assert(sizeof(WSLCSDKVolumeInformation) == sizeof(WSLCVolumeInformation), "WSLCSDKVolumeInformation and WSLCVolumeInformation layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Options);
 
-    return CreateVolume(reinterpret_cast<const WSLCVolumeOptions*>(Options), reinterpret_cast<WSLCVolumeInformation*>(VolumeInfo));
+    const auto options = apicompat::Convert(*Options);
+
+    WSLCVolumeInformation info{};
+    WSLCVolumeInformation* internalInfo = (VolumeInfo != nullptr) ? &info : nullptr;
+    RETURN_IF_FAILED(CreateVolume(options.Get(), internalInfo));
+
+    if (VolumeInfo != nullptr)
+    {
+        *VolumeInfo = apicompat::Convert(info);
+    }
+
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCSDKCrashDumpCallback* Callback, IUnknown** Subscription)
+HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Callback, IUnknown** Subscription)
 {
-    const auto callback = wslcsdk::WrapCrashDumpCallback(Callback);
+    const auto callback = apicompat::Convert(Callback);
 
     return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
@@ -2937,12 +3012,14 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     io::MultiHandleWait io;
 
     // Cancel with E_ABORT if the session is terminating.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
+    io.AddHandle(std::make_unique<io::EventHandle>(m_sessionTerminatingEvent.get(), [this]() {
+        THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id);
+    }));
 
     // Cancel with E_ABORT if the client process exits.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+    io.AddHandle(std::make_unique<io::EventHandle>(wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() {
+        THROW_HR_MSG(E_ABORT, "Client process has exited");
+    }));
 
     if (CancelHandle != nullptr)
     {

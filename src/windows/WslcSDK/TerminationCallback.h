@@ -8,20 +8,20 @@ Module Name:
 
 Abstract:
 
-    Header for a type that implements IWSLCSDKTerminationCallback.
+    Header for a type that implements IWSLCCompatTerminationCallback.
 
 --*/
 #pragma once
-#include "WSLSDK.h"
+#include "WSLCCompat.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
-struct TerminationCallback : public winrt::implements<TerminationCallback, IWSLCSDKTerminationCallback>
+struct TerminationCallback : public winrt::implements<TerminationCallback, IWSLCCompatTerminationCallback>
 {
     TerminationCallback(WslcSessionTerminationCallback callback, PVOID context);
 
-    // IWSLCSDKTerminationCallback
-    HRESULT STDMETHODCALLTYPE OnTermination(WSLCSDKVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
+    // IWSLCCompatTerminationCallback
+    HRESULT STDMETHODCALLTYPE OnTermination(WSLCCompatVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
 
     // Creates a TerminationCallback if the options provides a callback.
     static winrt::com_ptr<TerminationCallback> CreateIf(const WslcSessionOptionsInternal* options);

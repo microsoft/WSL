@@ -15,8 +15,10 @@ Abstract:
 #include "precomp.h"
 #include "WSLCProcess.h"
 #include "WSLCVirtualMachine.h"
+#include "APICompat.h"
 
 using wsl::windows::service::wslc::WSLCProcess;
+namespace apicompat = wsl::windows::common::apicompat;
 
 WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags) :
     m_control(std::move(Control)), m_io(std::move(Io)), m_flags(Flags)
@@ -124,16 +126,28 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(WSLCSDKFD Fd, WSLCSDKHandle* Handle)
+HRESULT WSLCProcess::GetStdHandle(WSLCCompatFD Fd, WSLCCompatHandle* Handle)
+try
 {
-    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, Handle);
 
-    return GetStdHandle(static_cast<WSLCFD>(Fd), reinterpret_cast<WSLCHandle*>(Handle));
+    WSLCHandle handle{};
+    RETURN_IF_FAILED(GetStdHandle(apicompat::Convert(Fd), &handle));
+
+    *Handle = apicompat::Convert(handle);
+    return S_OK;
 }
+CATCH_RETURN();
 
-HRESULT WSLCProcess::GetState(WSLCSDKProcessState* State, int* Code)
+HRESULT WSLCProcess::GetState(WSLCCompatProcessState* State, int* Code)
+try
 {
-    static_assert(sizeof(WSLCSDKProcessState) == sizeof(WSLCProcessState), "WSLCSDKProcessState and WSLCProcessState size mismatch");
+    RETURN_HR_IF_NULL(E_POINTER, State);
 
-    return GetState(reinterpret_cast<WSLCProcessState*>(State), Code);
+    WSLCProcessState state{};
+    RETURN_IF_FAILED(GetState(&state, Code));
+
+    *State = apicompat::Convert(state);
+    return S_OK;
 }
+CATCH_RETURN();

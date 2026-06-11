@@ -10,7 +10,7 @@ Abstract:
 
     This file contains the WSLC-related COM object definitions.
     // N.B. ABI breaking changes in this file are OK, since both client & server always ship together.
-    // The WSLC SDK must not use this file, and instead use WSLSDK.idl
+    // The WSLC SDK must not use this file, and instead use WSLCCompat.idl
 
 --*/
 

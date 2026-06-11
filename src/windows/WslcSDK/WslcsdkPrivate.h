@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 #include <windows.h>
 #include "wslcsdk.h"
-#include "WSLSDK.h"
+#include "WSLCCompat.h"
 #include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
@@ -106,8 +106,8 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLCSDKSession> session;
-    wil::com_ptr<IWSLCSDKTerminationCallback> terminationCallback;
+    wil::com_ptr<IWSLCCompatSession> session;
+    wil::com_ptr<IWSLCCompatTerminationCallback> terminationCallback;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
@@ -116,7 +116,7 @@ WslcSessionImpl* GetInternalType(WslcSession handle);
 // subscription whose release unregisters the callback.
 struct WslcCrashDumpSubscriptionImpl
 {
-    wil::com_ptr<IWSLCSDKCrashDumpCallback> callback;
+    wil::com_ptr<IWSLCCompatCrashDumpCallback> callback;
     wil::com_ptr<IUnknown> subscription;
 };
 
@@ -124,7 +124,7 @@ WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle)
 
 struct WslcContainerImpl
 {
-    wil::com_ptr<IWSLCSDKContainer> container;
+    wil::com_ptr<IWSLCCompatContainer> container;
     WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
     std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
@@ -133,7 +133,7 @@ WslcContainerImpl* GetInternalType(WslcContainer handle);
 
 struct WslcProcessImpl
 {
-    wil::com_ptr<IWSLCSDKProcess> process;
+    wil::com_ptr<IWSLCCompatProcess> process;
     std::shared_ptr<IOCallback> ioCallbacks;
 };
 
