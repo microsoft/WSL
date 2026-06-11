@@ -17,6 +17,7 @@ Abstract:
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
 #include <optional>
 
@@ -63,6 +64,9 @@ void CloseProcess(WslcProcess process)
 }
 
 using UniqueProcess = wil::unique_any<WslcProcess, decltype(CloseProcess), CloseProcess>;
+
+using UniqueCrashDumpSubscription =
+    wil::unique_any<WslcCrashDumpSubscription, decltype(&WslcReleaseCrashDumpSubscription), WslcReleaseCrashDumpSubscription>;
 
 struct ProcessOutput
 {
@@ -317,6 +321,65 @@ class WslcSdkTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(30)), std::future_status::ready);
         VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
+    }
+
+    WSLC_TEST_METHOD(CrashDumpCallback)
+    {
+        struct Invocation
+        {
+            std::wstring DumpPath;
+            std::string ProcessName;
+            uint64_t Pid;
+            uint32_t Signal;
+            uint64_t Timestamp;
+        };
+
+        std::promise<Invocation> promise;
+
+        auto callback = [](const WslcSessionCrashDumpInfo* info, PVOID context) {
+            auto* p = static_cast<std::promise<Invocation>*>(context);
+            p->set_value(Invocation{
+                info->dumpPath ? std::wstring{info->dumpPath} : std::wstring{},
+                info->processName ? std::string{info->processName} : std::string{},
+                info->pid,
+                info->signal,
+                info->timestamp});
+        };
+
+        std::filesystem::path extraStorage = m_storagePath / "wslc-crash-callback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(extraStorage, ec);
+        });
+
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-crashcb-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+
+        UniqueSession session;
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+        UniqueCrashDumpSubscription subscription;
+        VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
+
+        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+
+        wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
+        auto process = launcher.Launch(comSession);
+        auto result = process.WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
+
+        auto future = promise.get_future();
+        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
+
+        auto invocation = future.get();
+        VERIFY_IS_FALSE(invocation.DumpPath.empty());
+        VERIFY_IS_TRUE(std::filesystem::exists(invocation.DumpPath));
+        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
+        VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
+        VERIFY_ARE_EQUAL(invocation.Signal, static_cast<uint32_t>(WSLCSignalSIGSEGV));
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
     }
 
     // -----------------------------------------------------------------------

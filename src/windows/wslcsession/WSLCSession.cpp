@@ -160,6 +160,38 @@ std::string GenerateContainerName(int retry)
 
 namespace wsl::windows::service::wslc {
 
+// COM object returned by WSLCSession::RegisterCrashDumpCallback. Holds a strong reference to the
+// owning session so the session COM facade cannot be destroyed before all subscriptions are
+// released. When the last reference is dropped, the destructor removes the matching entry from
+// the session's callback list. Safe to release in any order with respect to the session pointer
+// that the client also holds.
+//
+// The subscription is returned to callers as a bare IUnknown -- the type is an opaque lifetime
+// handle with no methods of its own, so there is no need for a dedicated COM interface.
+class CrashDumpSubscription
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IUnknown, IFastRundown>
+{
+public:
+    HRESULT RuntimeClassInitialize(Microsoft::WRL::ComPtr<WSLCSession> Session, WSLCSession::CrashDumpCallbackList::iterator It)
+    {
+        m_session = std::move(Session);
+        m_iterator = It;
+        return S_OK;
+    }
+
+    ~CrashDumpSubscription()
+    {
+        if (m_session)
+        {
+            m_session->RemoveCrashDumpCallback(m_iterator);
+        }
+    }
+
+private:
+    Microsoft::WRL::ComPtr<WSLCSession> m_session;
+    WSLCSession::CrashDumpCallbackList::iterator m_iterator{};
+};
+
 UserHandle::UserHandle(WSLCSession& Session, HANDLE handle) : m_session(&Session), m_handle(handle)
 {
     WI_ASSERT(!!m_handle);
@@ -294,8 +326,13 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Create the VM.
-    m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
+    // Create the VM. The VM produces crash events; the session multiplexes them out to any
+    // registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
+    m_virtualMachine.emplace(
+        Vm,
+        Settings,
+        m_sessionTerminatingEvent.get(),
+        std::bind(&WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
@@ -2624,6 +2661,61 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLCSession::RegisterCrashDumpCallback(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription)
+try
+{
+    RETURN_HR_IF(E_POINTER, Callback == nullptr || Subscription == nullptr);
+    *Subscription = nullptr;
+
+    CrashDumpCallbackList::iterator it;
+    {
+        auto lock = m_crashDumpLock.lock_exclusive();
+        it = m_crashDumpCallbacks.emplace(m_crashDumpCallbacks.end(), Callback);
+    }
+
+    // Roll back the registration if creating the subscription object fails so we don't leak it.
+    auto removeOnFailure = wil::scope_exit([&]() { RemoveCrashDumpCallback(it); });
+
+    // The subscription holds a strong reference to this session, which guarantees that
+    // RemoveCrashDumpCallback is safe to call from the subscription destructor regardless of the
+    // order in which the client releases its session and subscription pointers.
+    Microsoft::WRL::ComPtr<CrashDumpSubscription> subscription;
+    RETURN_IF_FAILED(Microsoft::WRL::MakeAndInitialize<CrashDumpSubscription>(&subscription, Microsoft::WRL::ComPtr<WSLCSession>{this}, it));
+
+    RETURN_IF_FAILED(subscription.CopyTo(Subscription));
+
+    removeOnFailure.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) noexcept
+{
+    auto lock = m_crashDumpLock.lock_exclusive();
+    m_crashDumpCallbacks.erase(It);
+}
+
+void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+try
+{
+    // Snapshot the callback list under the lock so that cross-process callback invocations don't
+    // hold m_crashDumpLock (and can't deadlock with Register/Remove on the same thread that the
+    // callback might in turn use).
+    std::vector<wil::com_ptr<ICrashDumpCallback>> snapshot;
+    {
+        auto lock = m_crashDumpLock.lock_shared();
+        snapshot.assign(m_crashDumpCallbacks.begin(), m_crashDumpCallbacks.end());
+    }
+
+    auto comCall = RegisterUserCOMCallback();
+
+    for (const auto& callback : snapshot)
+    {
+        LOG_IF_FAILED(callback->OnCrashDump(DumpPath.c_str(), ProcessName.c_str(), Pid, Signal, Timestamp));
+    }
+}
+CATCH_LOG();
 
 HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
 try
