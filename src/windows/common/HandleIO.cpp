@@ -907,7 +907,7 @@ HANDLE WriteHandle::GetHandle() const
 }
 
 WriteNamedPipe::WriteNamedPipe(HandleWrapper&& MovedPipe, bool Reconnect) :
-    Pipe(std::move(MovedPipe)), ReconnectOnFailure(Reconnect), NeedConnect(Reconnect)
+    Pipe(std::move(MovedPipe)), ReconnectOnFailure(Reconnect)
 {
     ConnectOverlapped.hEvent = ConnectEvent.get();
 
