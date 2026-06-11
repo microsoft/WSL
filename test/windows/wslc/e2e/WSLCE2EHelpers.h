@@ -111,6 +111,11 @@ struct TestSession
         return m_storagePath;
     }
 
+    IWSLCSession& Session() const
+    {
+        return *m_session;
+    }
+
 private:
     std::wstring m_name;
     std::filesystem::path m_storagePath;
