@@ -8,19 +8,19 @@ Module Name:
 
 Abstract:
 
-    Header for a type that implements IProgressCallback.
+    Header for a type that implements IWSLCSDKProgressCallback.
 
 --*/
 #pragma once
-#include "wslc.h"
+#include "WSLSDK.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
-struct ProgressCallback : public winrt::implements<ProgressCallback, IProgressCallback>
+struct ProgressCallback : public winrt::implements<ProgressCallback, IWSLCSDKProgressCallback>
 {
     ProgressCallback(WslcContainerImageProgressCallback callback, PVOID context);
 
-    // IProgressCallback
+    // IWSLCSDKProgressCallback
     HRESULT STDMETHODCALLTYPE OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override;
 
     // Creates a ProgressCallback if the options provides a callback.

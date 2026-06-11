@@ -8,20 +8,20 @@ Module Name:
 
 Abstract:
 
-    Implementation of a type that implements ITerminationCallback.
+    Implementation of a type that implements IWSLCSDKTerminationCallback.
 
 --*/
 #include "precomp.h"
 #include "TerminationCallback.h"
 
 namespace {
-WslcSessionTerminationReason ConvertReason(WSLCVirtualMachineTerminationReason Reason)
+WslcSessionTerminationReason ConvertReason(WSLCSDKVirtualMachineTerminationReason Reason)
 {
     switch (Reason)
     {
-    case WSLCVirtualMachineTerminationReasonShutdown:
+    case WSLCSDKVirtualMachineTerminationReasonShutdown:
         return WSLC_SESSION_TERMINATION_REASON_SHUTDOWN;
-    case WSLCVirtualMachineTerminationReasonCrashed:
+    case WSLCSDKVirtualMachineTerminationReasonCrashed:
         return WSLC_SESSION_TERMINATION_REASON_CRASHED;
     default:
         return WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
@@ -35,7 +35,7 @@ TerminationCallback::TerminationCallback(WslcSessionTerminationCallback callback
 }
 
 // TODO: Details from the runtime are dropped; should the SDK callback function be updated to include the reasons string?
-HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR)
+HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLCSDKVirtualMachineTerminationReason Reason, LPCWSTR)
 {
     if (m_callback)
     {

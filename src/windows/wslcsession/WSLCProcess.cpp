@@ -123,3 +123,17 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLCProcess::GetStdHandle(WSLCSDKFD Fd, WSLCSDKHandle* Handle)
+{
+    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
+
+    return GetStdHandle(static_cast<WSLCFD>(Fd), reinterpret_cast<WSLCHandle*>(Handle));
+}
+
+HRESULT WSLCProcess::GetState(WSLCSDKProcessState* State, int* Code)
+{
+    static_assert(sizeof(WSLCSDKProcessState) == sizeof(WSLCProcessState), "WSLCSDKProcessState and WSLCProcessState size mismatch");
+
+    return GetState(reinterpret_cast<WSLCProcessState*>(State), Code);
+}

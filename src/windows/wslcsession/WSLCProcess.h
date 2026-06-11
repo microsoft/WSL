@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "WSLSDK.h"
 #include "WSLCProcessControl.h"
 #include "WSLCProcessIO.h"
 
@@ -22,7 +23,7 @@ namespace wsl::windows::service::wslc {
 class WSLCVirtualMachine;
 
 class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLCProcess
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCProcess, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCProcess, IWSLCSDKProcess, IFastRundown>
 {
 public:
     WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags);
@@ -36,6 +37,10 @@ public:
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLCProcessState* State, _Out_ int* Code) override;
     IFACEMETHOD(ResizeTty)(_In_ ULONG Rows, _In_ ULONG Columns) override;
+
+    // IWSLCSDKProcess - converts the WSLCSDK types to the wslc.idl types and forwards to the methods above.
+    IFACEMETHOD(GetStdHandle)(_In_ WSLCSDKFD Fd, _Out_ WSLCSDKHandle* Handle) override;
+    IFACEMETHOD(GetState)(_Out_ WSLCSDKProcessState* State, _Out_ int* Code) override;
 
     wil::unique_handle GetStdHandle(int Index);
     HANDLE GetExitEvent();

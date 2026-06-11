@@ -9,6 +9,8 @@ Module Name:
 Abstract:
 
     This file contains the WSLC-related COM object definitions.
+    // N.B. ABI breaking changes in this file are OK, since both client & server always ship together.
+    // The WSLC SDK must not use this file, and instead use WSLSDK.idl
 
 --*/
 
@@ -16,7 +18,10 @@ import "unknwn.idl";
 import "wtypes.idl";
 
 cpp_quote("#ifdef __cplusplus")
+cpp_quote("#ifndef WSLC_SESSIONMANAGER_COCLASS_DECLARED")
+cpp_quote("#define WSLC_SESSIONMANAGER_COCLASS_DECLARED")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCSessionManager;")
+cpp_quote("#endif")
 cpp_quote("class DECLSPEC_UUID(\"9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3\") WSLCSessionFactory;")
 cpp_quote("#endif")
 

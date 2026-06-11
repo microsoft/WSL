@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of a type that implements ICrashDumpCallback.
+    Implementation of a type that implements IWSLCSDKCrashDumpCallback.
 
 --*/
 #include "precomp.h"

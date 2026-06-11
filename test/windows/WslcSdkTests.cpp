@@ -362,10 +362,10 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
-        auto process = launcher.Launch(comSession);
+        auto process = launcher.Launch(*comSession);
         auto result = process.WaitAndCaptureOutput();
         VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
 
@@ -2239,8 +2239,8 @@ class WslcSdkTests
         launcher.AddPort(port, port, AF_INET);
 
         // Get the IWSLCSession COM object from the SDK session handle.
-        auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
 
         auto registryAddress = std::format("127.0.0.1:{}", port);
 

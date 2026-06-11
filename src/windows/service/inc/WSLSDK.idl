@@ -1,0 +1,539 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    WSLSDK.idl
+
+Abstract:
+
+    This file contains the WSLC SDK-facing COM object definitions.
+    Changes in this file must maintain backwards compatibility
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("#ifndef WSLC_SESSIONMANAGER_COCLASS_DECLARED")
+cpp_quote("#define WSLC_SESSIONMANAGER_COCLASS_DECLARED")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCSessionManager;")
+cpp_quote("#endif")
+cpp_quote("#endif")
+
+#define WSLCSDK_MAX_IMAGE_NAME_LENGTH 255
+#define WSLCSDK_MAX_VOLUME_NAME_LENGTH 255
+#define WSLCSDK_MAX_VOLUME_DRIVER_LENGTH 255
+#define WSLCSDK_CONTAINER_ID_LENGTH 64
+#define WSLCSDK_MAX_BINDING_ADDRESS_LENGTH 45
+
+typedef
+struct _WSLCSDKVersion {
+    ULONG Major;
+    ULONG Minor;
+    ULONG Revision;
+} WSLCSDKVersion;
+
+typedef enum _WSLCSDKVirtualMachineTerminationReason
+{
+    WSLCSDKVirtualMachineTerminationReasonUnknown,
+    WSLCSDKVirtualMachineTerminationReasonShutdown,
+    WSLCSDKVirtualMachineTerminationReasonCrashed,
+} WSLCSDKVirtualMachineTerminationReason;
+
+typedef enum _WSLCSDKFD
+{
+    WSLCSDKFDStdin = 0,
+    WSLCSDKFDStdout = 1,
+    WSLCSDKFDStderr = 2,
+    WSLCSDKFDTty = 3,
+} WSLCSDKFD;
+
+typedef enum _WSLCSDKSignal
+{
+    WSLCSDKSignalNone = 0,
+    WSLCSDKSignalSIGHUP = 1,
+    WSLCSDKSignalSIGINT = 2,
+    WSLCSDKSignalSIGQUIT = 3,
+    WSLCSDKSignalSIGILL = 4,
+    WSLCSDKSignalSIGTRAP = 5,
+    WSLCSDKSignalSIGABRT = 6,
+    WSLCSDKSignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
+    WSLCSDKSignalSIGBUS = 7,
+    WSLCSDKSignalSIGFPE = 8,
+    WSLCSDKSignalSIGKILL = 9,
+    WSLCSDKSignalSIGUSR1 = 10,
+    WSLCSDKSignalSIGSEGV = 11,
+    WSLCSDKSignalSIGUSR2 = 12,
+    WSLCSDKSignalSIGPIPE = 13,
+    WSLCSDKSignalSIGALRM = 14,
+    WSLCSDKSignalSIGTERM = 15,
+    WSLCSDKSignalSIGTKFLT = 16,
+    WSLCSDKSignalSIGCHLD = 17,
+    WSLCSDKSignalSIGCONT = 18,
+    WSLCSDKSignalSIGSTOP = 19,
+    WSLCSDKSignalSIGTSTP = 20,
+    WSLCSDKSignalSIGTTIN = 21,
+    WSLCSDKSignalSIGTTOU = 22,
+    WSLCSDKSignalSIGURG = 23,
+    WSLCSDKSignalSIGXCPU = 24,
+    WSLCSDKSignalSIGXFSZ = 25,
+    WSLCSDKSignalSIGVTALRM = 26,
+    WSLCSDKSignalSIGPROF = 27,
+    WSLCSDKSignalSIGWINCH = 28,
+    WSLCSDKSignalSIGIO = 29,
+    WSLCSDKSignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
+    WSLCSDKSignalSIGPWR = 30,
+    WSLCSDKSignalSIGSYS = 31
+} WSLCSDKSignal;
+
+[
+    uuid(86A807EA-F2A1-4382-93E5-09FB5F2F4A31),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKTerminationCallback : IUnknown
+{
+    HRESULT OnTermination(WSLCSDKVirtualMachineTerminationReason Reason, LPCWSTR Details);
+};
+
+[
+    uuid(EAA15E20-7FCC-485B-B798-ED4095DBACA5),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKCrashDumpCallback : IUnknown
+{
+    HRESULT OnCrashDump(
+        [in, string] LPCWSTR DumpPath,
+        [in, unique, string] LPCSTR ProcessName,
+        [in] ULONGLONG Pid,
+        [in] ULONG Signal,
+        [in] ULONGLONG Timestamp);
+};
+
+[
+    uuid(06154F2A-ACA7-461E-94FC-92781BA1F6F6),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKProgressCallback : IUnknown
+{
+    HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
+};
+
+[
+    uuid(290C58A1-328C-4E90-B09B-0A9D32C40074),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKWarningCallback : IUnknown
+{
+    HRESULT OnWarning([in, string] LPCWSTR Message);
+};
+
+typedef struct _WSLCSDKImageInformation
+{
+    char Image[WSLCSDK_MAX_IMAGE_NAME_LENGTH + 1];
+    char Hash[256];
+    char Digest[256];
+    LONGLONG Size; // Matches Docker's int64 image size
+    LONGLONG Created; // Unix timestamp
+    char ParentId[256];
+} WSLCSDKImageInformation;
+
+typedef enum _WSLCSDKListImagesFlags
+{
+    WSLCSDKListImagesFlagsNone = 0,
+    WSLCSDKListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
+    WSLCSDKListImagesFlagsDigests = 2, // Include digest information
+} WSLCSDKListImagesFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKListImagesFlags);")
+
+typedef struct _WSLCSDKKeyValuePair
+{
+    [string] LPCSTR Key;
+    [string] LPCSTR Value;
+} WSLCSDKKeyValuePair;
+
+typedef WSLCSDKKeyValuePair WSLCSDKLabel;
+typedef WSLCSDKKeyValuePair WSLCSDKDriverOption;
+typedef WSLCSDKKeyValuePair WSLCSDKFilter;
+
+typedef struct _WSLCSDKListImagesOptions
+{
+    DWORD Flags; // WSLCSDKListImagesFlags (can combine with bitwise OR)
+    [unique, size_is(FiltersCount)] const WSLCSDKFilter* Filters;
+    ULONG FiltersCount;
+} WSLCSDKListImagesOptions;
+
+typedef enum _WSLCSDKProcessFlags
+{
+    WSLCSDKProcessFlagsNone = 0,
+    WSLCSDKProcessFlagsStdin = 1,
+    WSLCSDKProcessFlagsTty = 2
+} WSLCSDKProcessFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKProcessFlags);")
+
+typedef struct _WSLCSDKStringArray
+{
+    [unique, size_is(Count)] LPCSTR const* Values;
+    ULONG Count;
+} WSLCSDKStringArray;
+
+typedef struct _WSLCSDKProcessOptions
+{
+    [unique] LPCSTR CurrentDirectory;
+    [unique] LPCSTR User;
+    WSLCSDKStringArray CommandLine;
+    WSLCSDKStringArray Environment;
+    WSLCSDKProcessFlags Flags;
+} WSLCSDKProcessOptions;
+
+typedef struct _WSLCSDKNamedVolume
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLCSDKNamedVolume;
+
+typedef struct _WSLCSDKVolume
+{
+    LPCWSTR HostPath;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLCSDKVolume;
+
+typedef struct _WSLCSDKPortMapping
+{
+    USHORT HostPort;
+    USHORT ContainerPort;
+    int Family;
+    int Protocol;
+    char BindingAddress[WSLCSDK_MAX_BINDING_ADDRESS_LENGTH + 1];
+} WSLCSDKPortMapping;
+
+typedef struct _WSLCSDKTmpfsMount
+{
+    LPCSTR Destination;
+    [unique] LPCSTR Options;
+} WSLCSDKTmpfsMount;
+
+typedef struct _WSLCSDKUlimit
+{
+    [string] LPCSTR Name;
+    LONGLONG Soft;
+    LONGLONG Hard;
+} WSLCSDKUlimit;
+
+typedef struct _WSLCSDKNetworkConnection
+{
+    [string] LPCSTR NetworkName;
+    [unique, size_is(SettingsCount)] const WSLCSDKKeyValuePair* Settings;
+    ULONG SettingsCount;
+} WSLCSDKNetworkConnection;
+
+typedef struct _WSLCSDKContainerNetwork
+{
+    [unique, string] LPCSTR NetworkMode;
+
+    [unique, size_is(NetworksCount)] const WSLCSDKNetworkConnection* Networks;
+    ULONG NetworksCount;
+} WSLCSDKContainerNetwork;
+
+typedef enum _WSLCSDKContainerFlags
+{
+    WSLCSDKContainerFlagsNone = 0,
+    WSLCSDKContainerFlagsRm = 1, // Delete the container when it exits.
+    WSLCSDKContainerFlagsGpu = 2, // Enable GPU access.
+    WSLCSDKContainerFlagsInit = 4, // Run the container under an init process.
+    WSLCSDKContainerFlagsPublishAll = 8, // Publish all exposed ports.
+} WSLCSDKContainerFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKContainerFlags);")
+
+typedef enum _WSLCSDKContainerStartFlags
+{
+    WSLCSDKContainerStartFlagsNone = 0,
+    WSLCSDKContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+} WSLCSDKContainerStartFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKContainerStartFlags);")
+
+typedef struct _WSLCSDKContainerOptions
+{
+    LPCSTR Image;
+    [unique] LPCSTR Name;
+    WSLCSDKStringArray Entrypoint;
+    WSLCSDKProcessOptions InitProcessOptions;
+    [unique, size_is(VolumesCount)] WSLCSDKVolume* Volumes;
+    ULONG VolumesCount;
+    [unique, size_is(PortsCount)] WSLCSDKPortMapping* Ports;
+    ULONG PortsCount;
+    [unique, size_is(LabelsCount)] const WSLCSDKLabel* Labels;
+    ULONG LabelsCount;
+    WSLCSDKContainerFlags Flags;
+    WSLCSDKSignal StopSignal;
+    [unique] LPCSTR HostName;
+    [unique] LPCSTR DomainName;
+
+    WSLCSDKStringArray DnsServers;
+    WSLCSDKStringArray DnsSearchDomains;
+    WSLCSDKStringArray DnsOptions;
+
+    LONGLONG ShmSize;
+    WSLCSDKContainerNetwork ContainerNetwork;
+    [unique, size_is(TmpfsCount)] const WSLCSDKTmpfsMount* Tmpfs;
+    ULONG TmpfsCount;
+
+    [unique, size_is(NamedVolumesCount)] WSLCSDKNamedVolume* NamedVolumes;
+    ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCSDKUlimit* Ulimits;
+    ULONG UlimitsCount;
+} WSLCSDKContainerOptions;
+
+typedef enum _WSLCSDKContainerState
+{
+    WSLCSDKContainerStateInvalid = 0,
+    WSLCSDKContainerStateCreated = 1,
+    WSLCSDKContainerStateRunning = 2,
+    WSLCSDKContainerStateExited = 3,
+    WSLCSDKContainerStateDeleted = 4,
+} WSLCSDKContainerState;
+
+typedef char WSLCSDKContainerId[WSLCSDK_CONTAINER_ID_LENGTH + 1];
+
+typedef [system_handle(sh_file)] HANDLE WSLCSDKFileHandle;
+typedef [system_handle(sh_pipe)] HANDLE WSLCSDKPipeHandle;
+typedef [system_handle(sh_socket)] HANDLE WSLCSDKSocketHandle;
+
+typedef enum _WSLCSDKHandleType
+{
+    WSLCSDKHandleTypeUnknown = 0,
+    WSLCSDKHandleTypeFile = 1,
+    WSLCSDKHandleTypePipe = 2,
+    WSLCSDKHandleTypeSocket = 3
+} WSLCSDKHandleType;
+
+typedef struct _WSLCSDKHandle
+{
+    WSLCSDKHandleType Type;
+
+    [switch_type(WSLCSDKHandleType), switch_is(Type)]
+    union
+    {
+        [case(WSLCSDKHandleTypeFile)]
+        WSLCSDKFileHandle File;
+        [case(WSLCSDKHandleTypePipe)]
+        WSLCSDKPipeHandle Pipe;
+        [case(WSLCSDKHandleTypeSocket)]
+        WSLCSDKSocketHandle Socket;
+        [default];
+    } Handle;
+} WSLCSDKHandle;
+
+typedef enum _WSLCSDKProcessState
+{
+    WSLCSDKProcessStateUnknown = 0,
+    WSLCSDKProcessStateRunning = 1,
+    WSLCSDKProcessStateExited = 2,
+    WSLCSDKProcessStateSignalled = 3
+} WSLCSDKProcessState;
+
+[
+    uuid(AC69DD0D-6616-4C4F-91F2-C39D6034EA82),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKProcess : IUnknown
+{
+    HRESULT Signal([in] int Signal);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
+    HRESULT GetStdHandle([in] WSLCSDKFD Fd, [out] WSLCSDKHandle* Handle);
+    HRESULT GetPid([out] int* Pid);
+    HRESULT GetState([out] WSLCSDKProcessState* State, [out] int* Code);
+}
+
+typedef enum _WSLCSDKNetworkingMode
+{
+    WSLCSDKNetworkingModeNone,
+    WSLCSDKNetworkingModeNAT,
+    WSLCSDKNetworkingModeVirtioProxy
+} WSLCSDKNetworkingMode;
+
+typedef enum _WSLCSDKFeatureFlags
+{
+    WSLCSDKFeatureFlagsNone = 0,
+    WSLCSDKFeatureFlagsDnsTunneling = 1,
+    WSLCSDKFeatureFlagsEarlyBootDmesg = 2,
+    WSLCSDKFeatureFlagsGPU = 4,
+    WSLCSDKFeatureFlagsVirtioFs = 8,
+    WSLCSDKFeatureFlagsDebug = 16,
+} WSLCSDKFeatureFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKFeatureFlags);")
+
+typedef enum _WSLCSDKSessionStorageFlags
+{
+    WSLCSDKSessionStorageFlagsNone = 0,
+    WSLCSDKSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
+} WSLCSDKSessionStorageFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKSessionStorageFlags);")
+
+typedef struct _WSLCSDKSessionSettings {
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG CpuCount;
+    ULONG MemoryMb;
+    ULONG BootTimeoutMs;
+    WSLCSDKNetworkingMode NetworkingMode;
+    [unique] IWSLCSDKTerminationCallback* TerminationCallback;
+    WSLCSDKFeatureFlags FeatureFlags;
+    WSLCSDKHandle DmesgOutput;
+    WSLCSDKSessionStorageFlags StorageFlags;
+
+    // Below options are used for debugging purposes only.
+    [unique] LPCWSTR RootVhdOverride;
+    [unique] LPCSTR RootVhdTypeOverride;
+} WSLCSDKSessionSettings;
+
+typedef enum _WSLCSDKDeleteFlags
+{
+    WSLCSDKDeleteFlagsNone = 0,
+    WSLCSDKDeleteFlagsForce = 1,
+    WSLCSDKDeleteFlagsDeleteVolumes = 2,
+} WSLCSDKDeleteFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKDeleteFlags);")
+
+[
+    uuid(8C3C91FA-D550-41B9-AD9D-23DCBF96F549),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKContainer : IUnknown
+{
+    HRESULT Stop([in] WSLCSDKSignal Signal, [in] LONG TimeoutSeconds);
+    HRESULT Start([in] WSLCSDKContainerStartFlags Flags);
+    HRESULT Delete([in] WSLCSDKDeleteFlags Flags);
+    HRESULT GetState([out] WSLCSDKContainerState* State);
+    HRESULT GetInitProcess([out] IWSLCSDKProcess** Process);
+    HRESULT Exec([in, ref] const WSLCSDKProcessOptions* Options, [out] IWSLCSDKProcess** Process);
+    HRESULT Inspect([out] LPSTR* Output);
+    HRESULT GetId([out, string] WSLCSDKContainerId Id);
+}
+
+typedef enum _WSLCSDKDeletedImageType
+{
+    WSLCSDKDeletedImageTypeDeleted = 0,
+    WSLCSDKDeletedImageTypeUntagged = 1
+} WSLCSDKDeletedImageType;
+
+typedef struct _WSLCSDKDeletedImageInformation
+{
+    char Image[WSLCSDK_MAX_IMAGE_NAME_LENGTH + 1];
+    WSLCSDKDeletedImageType Type;
+} WSLCSDKDeletedImageInformation;
+
+typedef enum _WSLCSDKDeleteImageFlags
+{
+    WSLCSDKDeleteImageFlagsNone = 0,
+    WSLCSDKDeleteImageFlagsForce = 1,
+    WSLCSDKDeleteImageFlagsNoPrune = 2,
+} WSLCSDKDeleteImageFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKDeleteImageFlags);")
+
+typedef struct _WSLCSDKDeleteImageOptions
+{
+    LPCSTR Image; // Image can be ID or Repo:Tag.
+    DWORD Flags; // WSLCSDKDeleteImageFlags
+} WSLCSDKDeleteImageOptions;
+
+typedef struct _WSLCSDKTagImageOptions
+{
+    LPCSTR Image; // Source image name or ID.
+    LPCSTR Repo;  // Target repository name.
+    LPCSTR Tag;   // Target tag name.
+} WSLCSDKTagImageOptions;
+
+typedef struct _WSLCSDKVolumeOptions
+{
+    [unique] LPCSTR Name;
+    [unique] LPCSTR Driver;
+    [unique, size_is(DriverOptsCount)] const WSLCSDKDriverOption* DriverOpts;
+    ULONG DriverOptsCount;
+    [unique, size_is(LabelsCount)] const WSLCSDKLabel* Labels;
+    ULONG LabelsCount;
+} WSLCSDKVolumeOptions;
+
+typedef char WSLCSDKVolumeName[WSLCSDK_MAX_VOLUME_NAME_LENGTH + 1];
+
+typedef struct _WSLCSDKVolumeInformation
+{
+    WSLCSDKVolumeName Name;
+    char Driver[WSLCSDK_MAX_VOLUME_DRIVER_LENGTH + 1];
+} WSLCSDKVolumeInformation;
+
+[
+    uuid(DD7B2EF9-AA01-4F21-8A3A-29D394CBB579),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKSession : IUnknown
+{
+    // Image management.
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCSDKProgressCallback* ProgressCallback, [in, unique] IWSLCSDKWarningCallback* WarningCallback);
+    HRESULT LoadImage([in] WSLCSDKHandle ImageHandle, [in, unique] IWSLCSDKProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCSDKWarningCallback* WarningCallback);
+    HRESULT ImportImage([in] WSLCSDKHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IWSLCSDKProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCSDKWarningCallback* WarningCallback);
+    HRESULT ListImages([in, unique] const WSLCSDKListImagesOptions* Options, [out, size_is(, *Count)] WSLCSDKImageInformation** Images, [out] ULONG* Count);
+    HRESULT DeleteImage([in] const WSLCSDKDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCSDKDeletedImageInformation** DeletedImages, [out] ULONG* Count);
+    HRESULT TagImage([in] const WSLCSDKTagImageOptions* Options);
+
+    // Container management.
+    HRESULT CreateContainer([in] const WSLCSDKContainerOptions* Options, [in, unique] IWSLCSDKWarningCallback* WarningCallback, [out] IWSLCSDKContainer** Container);
+
+    // Terminate the VM and containers.
+    HRESULT Terminate();
+
+    // Volume management.
+    HRESULT CreateVolume([in] const WSLCSDKVolumeOptions* Options, [out] WSLCSDKVolumeInformation* VolumeInfo);
+    HRESULT DeleteVolume([in] LPCSTR Name);
+
+    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCSDKProgressCallback* ProgressCallback, [in, unique] IWSLCSDKWarningCallback* WarningCallback);
+
+    HRESULT RegisterCrashDumpCallback([in] IWSLCSDKCrashDumpCallback* Callback, [out] IUnknown** Subscription);
+}
+
+typedef enum _WSLCSDKSessionFlags
+{
+    WSLCSDKSessionFlagsNone = 0,
+    WSLCSDKSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
+    WSLCSDKSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
+} WSLCSDKSessionFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSDKSessionFlags);")
+
+[
+    uuid(279F2047-DA35-45A3-B671-AFD2302D5D16),
+    pointer_default(unique),
+    object
+]
+interface IWSLCSDKSessionManager : IUnknown
+{
+    HRESULT GetVersion([out] WSLCSDKVersion* Version);
+    HRESULT IsClientVersionSupported([in] const WSLCSDKVersion* ClientVersion, [out] BOOL* IsSupported);
+
+    // Session management.
+    HRESULT CreateSession([in, unique] const WSLCSDKSessionSettings* Settings, WSLCSDKSessionFlags Flags, [in, unique] IWSLCSDKWarningCallback* WarningCallback, [out] IWSLCSDKSession** Session);
+}

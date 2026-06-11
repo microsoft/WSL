@@ -21,6 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
+#include "WSLCSDKCallbackAdapters.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -2831,6 +2832,104 @@ CATCH_RETURN();
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
     return riid == __uuidof(IWSLCSession) ? S_OK : S_FALSE;
+}
+
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCSDKProgressCallback* ProgressCallback, IWSLCSDKWarningCallback* WarningCallback)
+{
+    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
+    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+
+    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::LoadImage(WSLCSDKHandle ImageHandle, IWSLCSDKProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCSDKWarningCallback* WarningCallback)
+{
+    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
+
+    WSLCHandle handle{};
+    memcpy(&handle, &ImageHandle, sizeof(handle));
+
+    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
+    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+
+    return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ImportImage(WSLCSDKHandle ImageHandle, LPCSTR ImageName, IWSLCSDKProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCSDKWarningCallback* WarningCallback)
+{
+    static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
+
+    WSLCHandle handle{};
+    memcpy(&handle, &ImageHandle, sizeof(handle));
+
+    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
+    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+
+    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ListImages(const WSLCSDKListImagesOptions* Options, WSLCSDKImageInformation** Images, ULONG* Count)
+{
+    static_assert(sizeof(WSLCSDKListImagesOptions) == sizeof(WSLCListImagesOptions), "WSLCSDKListImagesOptions and WSLCListImagesOptions layout mismatch");
+    static_assert(sizeof(WSLCSDKImageInformation) == sizeof(WSLCImageInformation), "WSLCSDKImageInformation and WSLCImageInformation layout mismatch");
+
+    return ListImages(reinterpret_cast<const WSLCListImagesOptions*>(Options), reinterpret_cast<WSLCImageInformation**>(Images), Count);
+}
+
+HRESULT WSLCSession::DeleteImage(const WSLCSDKDeleteImageOptions* Options, WSLCSDKDeletedImageInformation** DeletedImages, ULONG* Count)
+{
+    static_assert(sizeof(WSLCSDKDeleteImageOptions) == sizeof(WSLCDeleteImageOptions), "WSLCSDKDeleteImageOptions and WSLCDeleteImageOptions layout mismatch");
+    static_assert(sizeof(WSLCSDKDeletedImageInformation) == sizeof(WSLCDeletedImageInformation), "WSLCSDKDeletedImageInformation and WSLCDeletedImageInformation layout mismatch");
+
+    return DeleteImage(reinterpret_cast<const WSLCDeleteImageOptions*>(Options), reinterpret_cast<WSLCDeletedImageInformation**>(DeletedImages), Count);
+}
+
+HRESULT WSLCSession::TagImage(const WSLCSDKTagImageOptions* Options)
+{
+    static_assert(sizeof(WSLCSDKTagImageOptions) == sizeof(WSLCTagImageOptions), "WSLCSDKTagImageOptions and WSLCTagImageOptions layout mismatch");
+
+    return TagImage(reinterpret_cast<const WSLCTagImageOptions*>(Options));
+}
+
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCSDKProgressCallback* ProgressCallback, IWSLCSDKWarningCallback* WarningCallback)
+{
+    const auto progress = wslcsdk::WrapProgressCallback(ProgressCallback);
+    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+
+    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::CreateContainer(const WSLCSDKContainerOptions* Options, IWSLCSDKWarningCallback* WarningCallback, IWSLCSDKContainer** Container)
+try
+{
+    static_assert(sizeof(WSLCSDKContainerOptions) == sizeof(WSLCContainerOptions), "WSLCSDKContainerOptions and WSLCContainerOptions layout mismatch");
+
+    RETURN_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
+
+    const auto warning = wslcsdk::WrapWarningCallback(WarningCallback);
+
+    Microsoft::WRL::ComPtr<IWSLCContainer> container;
+    RETURN_IF_FAILED(CreateContainer(reinterpret_cast<const WSLCContainerOptions*>(Options), warning.Get(), &container));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
+
+    return container.CopyTo(Container);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateVolume(const WSLCSDKVolumeOptions* Options, WSLCSDKVolumeInformation* VolumeInfo)
+{
+    static_assert(sizeof(WSLCSDKVolumeOptions) == sizeof(WSLCVolumeOptions), "WSLCSDKVolumeOptions and WSLCVolumeOptions layout mismatch");
+    static_assert(sizeof(WSLCSDKVolumeInformation) == sizeof(WSLCVolumeInformation), "WSLCSDKVolumeInformation and WSLCVolumeInformation layout mismatch");
+
+    return CreateVolume(reinterpret_cast<const WSLCVolumeOptions*>(Options), reinterpret_cast<WSLCVolumeInformation*>(VolumeInfo));
+}
+
+HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCSDKCrashDumpCallback* Callback, IUnknown** Subscription)
+{
+    const auto callback = wslcsdk::WrapCrashDumpCallback(Callback);
+
+    return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)

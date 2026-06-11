@@ -37,6 +37,7 @@ Abstract:
 #include "helpers.hpp"
 #include "wslutil.h"
 #include "filesystem.hpp"
+#include "WSLCSDKCallbackAdapters.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -600,6 +601,68 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
 
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
+
+HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCSDKVersion* Version)
+{
+    static_assert(sizeof(WSLCSDKVersion) == sizeof(WSLCVersion), "WSLCSDKVersion and WSLCVersion layout mismatch");
+
+    return GetVersion(reinterpret_cast<WSLCVersion*>(Version));
+}
+
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCSDKVersion* ClientVersion, _Out_ BOOL* IsSupported)
+{
+    static_assert(sizeof(WSLCSDKVersion) == sizeof(WSLCVersion), "WSLCSDKVersion and WSLCVersion layout mismatch");
+
+    return IsClientVersionSupported(reinterpret_cast<const WSLCVersion*>(ClientVersion), IsSupported);
+}
+
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCSDKSessionSettings* Settings, WSLCSDKSessionFlags Flags, IWSLCSDKWarningCallback* WarningCallback, IWSLCSDKSession** Session)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+
+    const auto warning = wsl::windows::common::wslcsdk::WrapWarningCallback(WarningCallback);
+
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    if (Settings == nullptr)
+    {
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), static_cast<WSLCSessionFlags>(Flags), warning.Get(), &session));
+    }
+    else
+    {
+        static_assert(sizeof(WSLCSDKHandle) == sizeof(WSLCHandle), "WSLCSDKHandle and WSLCHandle layout mismatch");
+
+        // The TerminationCallback pointer type differs between the two settings structs, so the
+        // struct can't be reinterpret_cast as a whole. Field-copy it and wrap the callback. The
+        // factory deep-copies (AddRefs) the termination callback synchronously during CreateSession,
+        // so the locally-held adapter outlives the call.
+        const auto termination = wsl::windows::common::wslcsdk::WrapTerminationCallback(Settings->TerminationCallback);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = Settings->DisplayName;
+        settings.StoragePath = Settings->StoragePath;
+        settings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
+        settings.CpuCount = Settings->CpuCount;
+        settings.MemoryMb = Settings->MemoryMb;
+        settings.BootTimeoutMs = Settings->BootTimeoutMs;
+        settings.NetworkingMode = static_cast<WSLCNetworkingMode>(Settings->NetworkingMode);
+        settings.TerminationCallback = termination.Get();
+        settings.FeatureFlags = static_cast<WSLCFeatureFlags>(Settings->FeatureFlags);
+        memcpy(&settings.DmesgOutput, &Settings->DmesgOutput, sizeof(settings.DmesgOutput));
+        settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(Settings->StorageFlags);
+        settings.RootVhdOverride = Settings->RootVhdOverride;
+        settings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
+
+        RETURN_IF_FAILED(CreateSession(&settings, static_cast<WSLCSessionFlags>(Flags), warning.Get(), &session));
+    }
+
+    RETURN_HR_IF_NULL(E_UNEXPECTED, session);
+
+    return session.CopyTo(Session);
+}
+CATCH_RETURN();
 
 namespace wsl::windows::service::wslc {
 

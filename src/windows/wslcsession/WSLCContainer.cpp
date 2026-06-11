@@ -2459,3 +2459,57 @@ HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
     return riid == __uuidof(IWSLCContainer) ? S_OK : S_FALSE;
 }
+
+HRESULT WSLCContainer::Stop(WSLCSDKSignal Signal, LONG TimeoutSeconds)
+{
+    static_assert(sizeof(WSLCSDKSignal) == sizeof(WSLCSignal), "WSLCSDKSignal and WSLCSignal size mismatch");
+
+    return Stop(static_cast<WSLCSignal>(Signal), TimeoutSeconds);
+}
+
+HRESULT WSLCContainer::Start(WSLCSDKContainerStartFlags Flags)
+{
+    return Start(static_cast<WSLCContainerStartFlags>(Flags), nullptr, nullptr);
+}
+
+HRESULT WSLCContainer::Delete(WSLCSDKDeleteFlags Flags)
+{
+    return Delete(static_cast<WSLCDeleteFlags>(Flags));
+}
+
+HRESULT WSLCContainer::GetState(WSLCSDKContainerState* State)
+{
+    static_assert(sizeof(WSLCSDKContainerState) == sizeof(WSLCContainerState), "WSLCSDKContainerState and WSLCContainerState size mismatch");
+
+    return GetState(reinterpret_cast<WSLCContainerState*>(State));
+}
+
+HRESULT WSLCContainer::GetInitProcess(IWSLCSDKProcess** Process)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(GetInitProcess(&process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Exec(const WSLCSDKProcessOptions* Options, IWSLCSDKProcess** Process)
+try
+{
+    static_assert(sizeof(WSLCSDKProcessOptions) == sizeof(WSLCProcessOptions), "WSLCSDKProcessOptions and WSLCProcessOptions size mismatch");
+
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(Exec(reinterpret_cast<const WSLCProcessOptions*>(Options), nullptr, &process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();
