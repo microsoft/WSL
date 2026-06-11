@@ -18,7 +18,7 @@ Abstract:
 #include <cstdint>
 #include <format>
 #include <initializer_list>
-#include <iostream>
+#include <iosfwd>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -82,10 +82,7 @@ public:
     explicit EnableVirtualTerminal(HANDLE console, Mode mode = Mode::Output, bool disableNewlineAutoReturn = false);
     ~EnableVirtualTerminal();
 
-    bool IsVTEnabled() const
-    {
-        return m_console != nullptr;
-    }
+    bool IsVTEnabled() const;
 
 private:
     HANDLE m_console = nullptr;
@@ -332,50 +329,16 @@ namespace Progress {
     ConstructedSequence Construct(State state, std::optional<uint32_t> percentage = std::nullopt);
 } // namespace Progress
 
-// operator+ overloads for direct std::string / std::wstring concatenation with sequences.
-// These allow sequences to be combined with string literals and std::string without
-// manually calling .Get() or wrapping in std::string{...}.
+// operator+ overloads for combining sequences with strings.
+std::string operator+(const Sequence& lhs, const Sequence& rhs);
+std::string operator+(const Sequence& lhs, const std::string& rhs);
+std::string operator+(const std::string& lhs, const Sequence& rhs);
+std::string operator+(const Sequence& lhs, const char* rhs);
+std::string operator+(const char* lhs, const Sequence& rhs);
+std::wstring operator+(const Sequence& lhs, const std::wstring& rhs);
+std::wstring operator+(const std::wstring& lhs, const Sequence& rhs);
 
-inline std::string operator+(const Sequence& lhs, const Sequence& rhs)
-{
-    return std::string{lhs.Get()} + std::string{rhs.Get()};
-}
-
-inline std::string operator+(const Sequence& lhs, const std::string& rhs)
-{
-    return std::string{lhs.Get()} + rhs;
-}
-
-inline std::string operator+(const std::string& lhs, const Sequence& rhs)
-{
-    return lhs + std::string{rhs.Get()};
-}
-
-inline std::string operator+(const Sequence& lhs, const char* rhs)
-{
-    return std::string{lhs.Get()} + rhs;
-}
-
-inline std::string operator+(const char* lhs, const Sequence& rhs)
-{
-    return lhs + std::string{rhs.Get()};
-}
-
-// Wide string variants — sequences are ASCII so widening is lossless.
-inline std::wstring operator+(const Sequence& lhs, const std::wstring& rhs)
-{
-    const auto sv = lhs.Get();
-    return std::wstring(sv.begin(), sv.end()) + rhs;
-}
-
-inline std::wstring operator+(const std::wstring& lhs, const Sequence& rhs)
-{
-    const auto sv = rhs.Get();
-    return lhs + std::wstring(sv.begin(), sv.end());
-}
-
-// operator== overloads so any Sequence-derived type can be compared directly against
-// string literals and std::string_view without calling .Get() at every call site.
+// operator== overloads for comparing sequences against string literals.
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
 inline bool operator==(const T& lhs, std::string_view rhs)
 {
@@ -400,24 +363,13 @@ inline bool operator==(const char* lhs, const T& rhs)
     return lhs == rhs.Get();
 }
 
-// operator+= for in-place wide string appending without a temporary wstring.
-inline std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
-{
-    const auto sv = rhs.Get();
-    lhs.append(sv.begin(), sv.end());
-    return lhs;
-}
-
-// Widens a Sequence's ASCII bytes into a std::wstring.
-inline std::wstring ToWide(const Sequence& s)
-{
-    const auto sv = s.Get();
-    return std::wstring(sv.begin(), sv.end());
-}
+// In-place wide string append and widening.
+std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs);
+std::wstring ToWide(const Sequence& s);
 
 } // namespace wsl::windows::common::vt
 
-// std::formatter specializations allowing Sequence to be used directly in std::format.
+// std::formatter specializations, must be outside namespace.
 template <>
 struct std::formatter<wsl::windows::common::vt::Sequence, char> : std::formatter<std::string_view, char>
 {

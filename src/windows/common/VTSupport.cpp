@@ -150,6 +150,11 @@ EnableVirtualTerminal::~EnableVirtualTerminal()
     }
 }
 
+bool EnableVirtualTerminal::IsVTEnabled() const
+{
+    return m_console != nullptr;
+}
+
 ConstructedSequence::ConstructedSequence()
 {
     Set(m_str);
@@ -475,4 +480,54 @@ namespace Progress {
         return ConstructedSequence{std::move(result).str()};
     }
 } // namespace Progress
+
+std::string operator+(const Sequence& lhs, const Sequence& rhs)
+{
+    return std::string{lhs.Get()} + std::string{rhs.Get()};
+}
+
+std::string operator+(const Sequence& lhs, const std::string& rhs)
+{
+    return std::string{lhs.Get()} + rhs;
+}
+
+std::string operator+(const std::string& lhs, const Sequence& rhs)
+{
+    return lhs + std::string{rhs.Get()};
+}
+
+std::string operator+(const Sequence& lhs, const char* rhs)
+{
+    return std::string{lhs.Get()} + rhs;
+}
+
+std::string operator+(const char* lhs, const Sequence& rhs)
+{
+    return lhs + std::string{rhs.Get()};
+}
+
+std::wstring operator+(const Sequence& lhs, const std::wstring& rhs)
+{
+    const auto sv = lhs.Get();
+    return std::wstring(sv.begin(), sv.end()) + rhs;
+}
+
+std::wstring operator+(const std::wstring& lhs, const Sequence& rhs)
+{
+    const auto sv = rhs.Get();
+    return lhs + std::wstring(sv.begin(), sv.end());
+}
+
+std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
+{
+    const auto sv = rhs.Get();
+    lhs.append(sv.begin(), sv.end());
+    return lhs;
+}
+
+std::wstring ToWide(const Sequence& s)
+{
+    const auto sv = s.Get();
+    return std::wstring(sv.begin(), sv.end());
+}
 } // namespace wsl::windows::common::vt
