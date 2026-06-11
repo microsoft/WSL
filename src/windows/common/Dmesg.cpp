@@ -97,7 +97,8 @@ try
     {
         const bool reconnect = m_pipeServer && !m_debugConsole;
 
-        auto com1 = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(m_com1Pipe), [this]() { m_com1Write = nullptr; }}, reconnect, !m_pipeServer);
+        auto com1 = std::make_unique<WriteNamedPipe>(
+            HandleWrapper{std::move(m_com1Pipe), [this]() { m_com1Write = nullptr; }}, reconnect, !m_pipeServer);
         m_com1Write = com1.get();
         io.AddHandle(std::move(com1), MultiHandleWait::IgnoreErrors);
     }
