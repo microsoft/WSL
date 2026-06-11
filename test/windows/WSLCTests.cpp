@@ -3417,10 +3417,9 @@ class WSLCTests
         VERIFY_ARE_EQUAL(result.Output[1], std::string("1000 100\n"));
 
         // Verify that a file created by a non-root user retains the creator's ownership.
-        // Use numeric UID via su to avoid dependency on specific usernames being configured.
         result = ExpectCommandResult(
             session.get(),
-            {"/bin/sh", "-c", "rm -f /virtiofs-ownership-test/nonroot.txt && su -s /bin/sh '#65534' -c 'touch /virtiofs-ownership-test/nonroot.txt' && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
+            {"/bin/sh", "-c", "rm -f /virtiofs-ownership-test/nonroot.txt && su -s /bin/sh nobody -c 'touch /virtiofs-ownership-test/nonroot.txt' && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
