@@ -411,6 +411,24 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_Detach)
+    {
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        constexpr auto markerPath = L"/tmp/wslc-exec-detach-marker";
+        result = RunWslc(std::format(L"container exec -d {} sh -c \"sleep 1 && echo wslc-detach-ok > {}\"", WslcContainerName, markerPath));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
+                readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(10)));
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
