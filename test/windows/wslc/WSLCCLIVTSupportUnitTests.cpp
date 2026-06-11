@@ -96,6 +96,13 @@ class WSLCCLIVTSupportUnitTests
         VERIFY_ARE_EQUAL("\x1b[5;10H", Cursor::MoveTo(5, 10));
         VERIFY_ARE_EQUAL("\x1b[H", Cursor::Home);
 
+        // cells == 0 is a no-op — returns an empty sequence rather than
+        // emitting ESC[0X, which most terminals treat as "move 1 cell".
+        VERIFY_IS_TRUE(Cursor::Up(0).Get().empty());
+        VERIFY_IS_TRUE(Cursor::Down(0).Get().empty());
+        VERIFY_IS_TRUE(Cursor::Forward(0).Get().empty());
+        VERIFY_IS_TRUE(Cursor::Backward(0).Get().empty());
+
         VERIFY_THROWS_SPECIFIC(
             Cursor::Up(-1), wil::ResultException, [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
         VERIFY_THROWS_SPECIFIC(Cursor::MoveTo(0, 1), wil::ResultException, [](const wil::ResultException& e) {

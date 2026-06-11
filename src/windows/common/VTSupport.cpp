@@ -29,7 +29,7 @@ namespace wsl::windows::common::vt {
 namespace {
     std::wstring ExtractSequence(std::wistream& inStream, std::wstring_view prefix, std::wstring_view suffix)
     {
-        std::ignore = inStream.peek();
+        (void)inStream.peek();
 
         static constexpr std::streamsize s_bufferSize = 1024;
         wchar_t buffer[s_bufferSize];
@@ -303,24 +303,40 @@ namespace Cursor {
     ConstructedSequence Up(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
+        if (cells == 0)
+        {
+            return ConstructedSequence{};
+        }
         return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}A", cells)};
     }
 
     ConstructedSequence Down(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
+        if (cells == 0)
+        {
+            return ConstructedSequence{};
+        }
         return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}B", cells)};
     }
 
     ConstructedSequence Forward(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
+        if (cells == 0)
+        {
+            return ConstructedSequence{};
+        }
         return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}C", cells)};
     }
 
     ConstructedSequence Backward(int cells)
     {
         THROW_HR_IF(E_INVALIDARG, cells < 0);
+        if (cells == 0)
+        {
+            return ConstructedSequence{};
+        }
         return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}D", cells)};
     }
 
