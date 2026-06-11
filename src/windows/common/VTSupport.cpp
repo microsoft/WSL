@@ -16,14 +16,17 @@ Abstract:
 #include "precomp.h"
 #include "VTSupport.h"
 
-#define WSL_WINDOWS_VT_ESCAPE "\x1b"
-#define WSL_WINDOWS_VT_CSI WSL_WINDOWS_VT_ESCAPE "["
-#define WSL_WINDOWS_VT_OSC WSL_WINDOWS_VT_ESCAPE "]"
-#define WSL_WINDOWS_VT_TEXTFORMAT(_id_) WSL_WINDOWS_VT_CSI #_id_ "m"
+#define WSL_WINDOWS_VT_ESCAPE L"\x1b"
+#define WSL_WINDOWS_VT_CSI WSL_WINDOWS_VT_ESCAPE L"["
+#define WSL_WINDOWS_VT_OSC WSL_WINDOWS_VT_ESCAPE L"]"
 
-// Wide-string equivalents used for wostream output in PrimaryDeviceAttributes.
-#define WSL_WINDOWS_VT_ESCAPE_W L"\x1b"
-#define WSL_WINDOWS_VT_CSI_W WSL_WINDOWS_VT_ESCAPE_W L"["
+// Two-level macro so the L prefix is pasted to the stringified token
+// before adjacent-string-literal concatenation kicks in.  Without the inner
+// helper, `L ## #_id_` would try to token-paste L onto a string literal,
+// which is not a valid preprocessing token under MSVC's conforming mode.
+#define WSL_WINDOWS_VT_WIDEN_INNER(_s_) L##_s_
+#define WSL_WINDOWS_VT_WIDEN(_s_) WSL_WINDOWS_VT_WIDEN_INNER(_s_)
+#define WSL_WINDOWS_VT_TEXTFORMAT(_id_) WSL_WINDOWS_VT_CSI WSL_WINDOWS_VT_WIDEN(#_id_) L"m"
 
 namespace wsl::windows::common::vt {
 namespace {
@@ -162,7 +165,7 @@ ConstructedSequence::ConstructedSequence()
     Set(m_str);
 }
 
-ConstructedSequence::ConstructedSequence(std::string s) : m_str(std::move(s))
+ConstructedSequence::ConstructedSequence(std::wstring s) : m_str(std::move(s))
 {
     Set(m_str);
 }
@@ -196,21 +199,21 @@ ConstructedSequence& ConstructedSequence::operator=(ConstructedSequence&& other)
 bool Sequence::IsColor() const
 {
     const auto sv = m_chars;
-    if (sv.size() < 2 || sv[0] != '\x1b')
+    if (sv.size() < 2 || sv[0] != L'\x1b')
     {
         return false;
     }
 
-    if (sv[1] == '[')
+    if (sv[1] == L'[')
     {
         // CSI sequence — color if final byte is 'm' (SGR)
-        return sv.back() == 'm';
+        return sv.back() == L'm';
     }
 
-    if (sv[1] == ']')
+    if (sv[1] == L']')
     {
         // OSC 8 hyperlink — treated as color-adjacent
-        return sv.size() >= 3 && sv[2] == '8';
+        return sv.size() >= 3 && sv[2] == L'8';
     }
 
     return false;
@@ -233,19 +236,19 @@ void ConstructedSequence::Clear()
 
 ConstructedSequence Sgr(std::initializer_list<int> params)
 {
-    std::ostringstream result;
+    std::wostringstream result;
     result << WSL_WINDOWS_VT_CSI;
     bool first = true;
     for (const int param : params)
     {
         if (!first)
         {
-            result << ';';
+            result << L';';
         }
         result << param;
         first = false;
     }
-    result << 'm';
+    result << L'm';
     return ConstructedSequence{std::move(result).str()};
 }
 
@@ -261,8 +264,7 @@ PrimaryDeviceAttributes::PrimaryDeviceAttributes(std::wostream& outStream, std::
         EnableVirtualTerminal inputMode{GetStdHandle(STD_INPUT_HANDLE), EnableVirtualTerminal::Mode::Input};
 
         // Send DA1 Primary Device Attributes request.
-        // The CSI sequence bytes are pure ASCII; L"..." widening is lossless.
-        outStream << WSL_WINDOWS_VT_CSI_W << L"0c";
+        outStream << WSL_WINDOWS_VT_CSI L"0c";
         outStream.flush();
 
         // Response is of the form ESC[?<conformance level>;<extension>...c
@@ -307,7 +309,7 @@ namespace Cursor {
         {
             return ConstructedSequence{};
         }
-        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}A", cells)};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI L"{}A", cells)};
     }
 
     ConstructedSequence Down(int cells)
@@ -317,7 +319,7 @@ namespace Cursor {
         {
             return ConstructedSequence{};
         }
-        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}B", cells)};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI L"{}B", cells)};
     }
 
     ConstructedSequence Forward(int cells)
@@ -327,7 +329,7 @@ namespace Cursor {
         {
             return ConstructedSequence{};
         }
-        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}C", cells)};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI L"{}C", cells)};
     }
 
     ConstructedSequence Backward(int cells)
@@ -337,23 +339,23 @@ namespace Cursor {
         {
             return ConstructedSequence{};
         }
-        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{}D", cells)};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI L"{}D", cells)};
     }
 
     ConstructedSequence MoveTo(int row, int col)
     {
         THROW_HR_IF(E_INVALIDARG, row < 1 || col < 1);
-        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI "{};{}H", row, col)};
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_CSI L"{};{}H", row, col)};
     }
 
-    const Sequence Home{WSL_WINDOWS_VT_CSI "H"};
-    const Sequence EnableBlink{WSL_WINDOWS_VT_CSI "?12h"};
-    const Sequence DisableBlink{WSL_WINDOWS_VT_CSI "?12l"};
-    const Sequence Show{WSL_WINDOWS_VT_CSI "?25h"};
-    const Sequence Hide{WSL_WINDOWS_VT_CSI "?25l"};
+    const Sequence Home{WSL_WINDOWS_VT_CSI L"H"};
+    const Sequence EnableBlink{WSL_WINDOWS_VT_CSI L"?12h"};
+    const Sequence DisableBlink{WSL_WINDOWS_VT_CSI L"?12l"};
+    const Sequence Show{WSL_WINDOWS_VT_CSI L"?25h"};
+    const Sequence Hide{WSL_WINDOWS_VT_CSI L"?25l"};
 
-    const Sequence BracketedPasteOn{WSL_WINDOWS_VT_CSI "?2004h"};
-    const Sequence BracketedPasteOff{WSL_WINDOWS_VT_CSI "?2004l"};
+    const Sequence BracketedPasteOn{WSL_WINDOWS_VT_CSI L"?2004h"};
+    const Sequence BracketedPasteOff{WSL_WINDOWS_VT_CSI L"?2004l"};
 } // namespace Cursor
 
 namespace Format {
@@ -388,9 +390,9 @@ namespace Format {
 
         ConstructedSequence Extended(const Color& color)
         {
-            std::ostringstream result;
-            result << WSL_WINDOWS_VT_CSI "38;2;" << static_cast<uint32_t>(color.R) << ';' << static_cast<uint32_t>(color.G) << ';'
-                   << static_cast<uint32_t>(color.B) << 'm';
+            std::wostringstream result;
+            result << WSL_WINDOWS_VT_CSI L"38;2;" << static_cast<uint32_t>(color.R) << L';' << static_cast<uint32_t>(color.G)
+                   << L';' << static_cast<uint32_t>(color.B) << L'm';
             return ConstructedSequence{std::move(result).str()};
         }
     } // namespace Fg
@@ -416,29 +418,29 @@ namespace Format {
 
         ConstructedSequence Extended(const Color& color)
         {
-            std::ostringstream result;
-            result << WSL_WINDOWS_VT_CSI "48;2;" << static_cast<uint32_t>(color.R) << ';' << static_cast<uint32_t>(color.G) << ';'
-                   << static_cast<uint32_t>(color.B) << 'm';
+            std::wostringstream result;
+            result << WSL_WINDOWS_VT_CSI L"48;2;" << static_cast<uint32_t>(color.R) << L';' << static_cast<uint32_t>(color.G)
+                   << L';' << static_cast<uint32_t>(color.B) << L'm';
             return ConstructedSequence{std::move(result).str()};
         }
     } // namespace Bg
 
-    ConstructedSequence Hyperlink(const std::string& text, const std::string& ref)
+    ConstructedSequence Hyperlink(const std::wstring& text, const std::wstring& ref)
     {
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_OSC "8;;" << ref << WSL_WINDOWS_VT_ESCAPE << "\\" << text << WSL_WINDOWS_VT_OSC << "8;;"
-               << WSL_WINDOWS_VT_ESCAPE << "\\";
+        std::wostringstream result;
+        result << WSL_WINDOWS_VT_OSC L"8;;" << ref << WSL_WINDOWS_VT_ESCAPE << L"\\" << text << WSL_WINDOWS_VT_OSC << L"8;;"
+               << WSL_WINDOWS_VT_ESCAPE << L"\\";
         return ConstructedSequence{std::move(result).str()};
     }
 } // namespace Format
 
 namespace Erase {
-    const Sequence LineForward{WSL_WINDOWS_VT_CSI "K"};
-    const Sequence LineBackward{WSL_WINDOWS_VT_CSI "1K"};
-    const Sequence LineEntirely{WSL_WINDOWS_VT_CSI "2K"};
-    const Sequence ScreenForward{WSL_WINDOWS_VT_CSI "J"};
-    const Sequence ScreenBackward{WSL_WINDOWS_VT_CSI "1J"};
-    const Sequence ScreenEntirely{WSL_WINDOWS_VT_CSI "2J"};
+    const Sequence LineForward{WSL_WINDOWS_VT_CSI L"K"};
+    const Sequence LineBackward{WSL_WINDOWS_VT_CSI L"1K"};
+    const Sequence LineEntirely{WSL_WINDOWS_VT_CSI L"2K"};
+    const Sequence ScreenForward{WSL_WINDOWS_VT_CSI L"J"};
+    const Sequence ScreenBackward{WSL_WINDOWS_VT_CSI L"1J"};
+    const Sequence ScreenEntirely{WSL_WINDOWS_VT_CSI L"2J"};
 } // namespace Erase
 
 namespace Progress {
@@ -488,64 +490,48 @@ namespace Progress {
             THROW_HR(E_UNEXPECTED);
         }
 
-        std::ostringstream result;
-        result << WSL_WINDOWS_VT_OSC "9;4;" << stateId << ";";
+        std::wostringstream result;
+        result << WSL_WINDOWS_VT_OSC L"9;4;" << stateId << L";";
         if (percentage.has_value())
         {
             result << percentage.value();
         }
-        result << WSL_WINDOWS_VT_ESCAPE << "\\";
+        result << WSL_WINDOWS_VT_ESCAPE << L"\\";
         return ConstructedSequence{std::move(result).str()};
     }
 } // namespace Progress
 
-std::string operator+(const Sequence& lhs, const Sequence& rhs)
+std::wstring operator+(const Sequence& lhs, const Sequence& rhs)
 {
-    return std::string{lhs.Get()} + std::string{rhs.Get()};
-}
-
-std::string operator+(const Sequence& lhs, const std::string& rhs)
-{
-    return std::string{lhs.Get()} + rhs;
-}
-
-std::string operator+(const std::string& lhs, const Sequence& rhs)
-{
-    return lhs + std::string{rhs.Get()};
-}
-
-std::string operator+(const Sequence& lhs, const char* rhs)
-{
-    return std::string{lhs.Get()} + rhs;
-}
-
-std::string operator+(const char* lhs, const Sequence& rhs)
-{
-    return lhs + std::string{rhs.Get()};
+    std::wstring out;
+    out.reserve(lhs.Get().size() + rhs.Get().size());
+    out.append(lhs.Get()).append(rhs.Get());
+    return out;
 }
 
 std::wstring operator+(const Sequence& lhs, const std::wstring& rhs)
 {
-    const auto sv = lhs.Get();
-    return std::wstring(sv.begin(), sv.end()) + rhs;
+    return std::wstring{lhs.Get()} + rhs;
 }
 
 std::wstring operator+(const std::wstring& lhs, const Sequence& rhs)
 {
-    const auto sv = rhs.Get();
-    return lhs + std::wstring(sv.begin(), sv.end());
+    return lhs + std::wstring{rhs.Get()};
+}
+
+std::wstring operator+(const Sequence& lhs, const wchar_t* rhs)
+{
+    return std::wstring{lhs.Get()} + rhs;
+}
+
+std::wstring operator+(const wchar_t* lhs, const Sequence& rhs)
+{
+    return lhs + std::wstring{rhs.Get()};
 }
 
 std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs)
 {
-    const auto sv = rhs.Get();
-    lhs.append(sv.begin(), sv.end());
+    lhs.append(rhs.Get());
     return lhs;
-}
-
-std::wstring ToWide(const Sequence& s)
-{
-    const auto sv = s.Get();
-    return std::wstring(sv.begin(), sv.end());
 }
 } // namespace wsl::windows::common::vt

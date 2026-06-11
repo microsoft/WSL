@@ -91,11 +91,11 @@ struct WSLCInteractiveSession
     // Convenience overloads for VT sequence helpers.
     void ExpectStdout(const wsl::windows::common::vt::Sequence& expected)
     {
-        ExpectStdout(std::string(expected.Get()));
+        ExpectStdout(wsl::windows::common::string::WideToMultiByte(expected.Get()));
     }
     void ExpectStderr(const wsl::windows::common::vt::Sequence& expected)
     {
-        ExpectStderr(std::string(expected.Get()));
+        ExpectStderr(wsl::windows::common::string::WideToMultiByte(expected.Get()));
     }
 
     void IgnoreSequence(const std::string& sequence);

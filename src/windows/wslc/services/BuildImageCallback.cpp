@@ -60,7 +60,7 @@ void BuildImageCallback::CollapseWindow()
     if (m_displayedLines > 0)
     {
         // Move cursor up to the start of the display area, then erase to end of screen.
-        WriteTerminal(MultiByteToWide(Cursor::Up(m_displayedLines) + Erase::ScreenForward));
+        WriteTerminal(Cursor::Up(m_displayedLines) + Erase::ScreenForward);
         m_displayedLines = 0;
     }
 

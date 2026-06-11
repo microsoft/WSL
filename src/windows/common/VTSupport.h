@@ -89,30 +89,32 @@ private:
     DWORD m_originalMode = 0;
 };
 
-// VT escape sequences are pure ASCII byte sequences (0x00-0x7F), so all sequences
-// are stored and manipulated as narrow strings (std::string / std::string_view).
-// Widening to std::wstring happens via ToWide() or operator+=(std::wstring&, const Sequence&);
-// use the std::formatter specializations below for std::format/std::wformat output.
+// VT escape sequences are pure ASCII byte sequences (0x00-0x7F), but the
+// Windows WSL components are wide-string throughout (WriteConsoleW, wostream,
+// std::wstring buffers).  Sequences are therefore stored as std::wstring /
+// std::wstring_view so they compose directly with the surrounding wide-string
+// code with no per-call widening.  Use the std::formatter specialization below
+// for std::wformat output.
 
 // The base for all VT sequences.
 struct Sequence
 {
     constexpr Sequence() = default;
-    explicit constexpr Sequence(std::string_view c) : m_chars(c)
+    explicit constexpr Sequence(std::wstring_view c) : m_chars(c)
     {
     }
 
-    // Prevent construction from a std::string (lvalue or rvalue): std::string is
-    // implicitly convertible to std::string_view, so without this guard
+    // Prevent construction from a std::wstring (lvalue or rvalue): std::wstring is
+    // implicitly convertible to std::wstring_view, so without this guard
     // Sequence(someString) would compile but leave m_chars dangling once the string
     // is destroyed.  Use ConstructedSequence for runtime / owned sequences.
-    // A constrained template (rather than named overloads) avoids making char[]
-    // literals ambiguous between the deleted and string_view constructors.
+    // A constrained template (rather than named overloads) avoids making wchar_t[]
+    // literals ambiguous between the deleted and wstring_view constructors.
     template <typename T>
-        requires std::is_same_v<std::remove_cvref_t<T>, std::string>
+        requires std::is_same_v<std::remove_cvref_t<T>, std::wstring>
     explicit Sequence(T&&) = delete;
 
-    std::string_view Get() const
+    std::wstring_view Get() const
     {
         return m_chars;
     }
@@ -122,20 +124,20 @@ struct Sequence
     bool IsColor() const;
 
 protected:
-    void Set(const std::string& s)
+    void Set(const std::wstring& s)
     {
         m_chars = s;
     }
 
 private:
-    std::string_view m_chars;
+    std::wstring_view m_chars;
 };
 
 // A VT sequence that is constructed at runtime.
 struct ConstructedSequence : public Sequence
 {
     ConstructedSequence();
-    explicit ConstructedSequence(std::string s);
+    explicit ConstructedSequence(std::wstring s);
 
     ConstructedSequence(const ConstructedSequence& other);
     ConstructedSequence& operator=(const ConstructedSequence& other);
@@ -147,7 +149,7 @@ struct ConstructedSequence : public Sequence
     void Clear();
 
 private:
-    std::string m_str;
+    std::wstring m_str;
 };
 
 // Constructs a single SGR (Select Graphic Rendition) sequence with one or more
@@ -166,7 +168,6 @@ struct PrimaryDeviceAttributes
     // Queries the device attributes on creation.
     // Both streams must be opened in _O_U8TEXT mode (or equivalent wide mode).
     // outStream receives the DA1 request; inStream provides the terminal's response.
-    // All DA1 sequence bytes are pure ASCII so widening/narrowing is lossless.
     PrimaryDeviceAttributes(std::wostream& outStream, std::wistream& inStream);
 
     // The extensions that a device may support.
@@ -303,7 +304,7 @@ namespace Format {
         ConstructedSequence Extended(const Color& color);
     } // namespace Bg
 
-    ConstructedSequence Hyperlink(const std::string& text, const std::string& ref);
+    ConstructedSequence Hyperlink(const std::wstring& text, const std::wstring& ref);
 } // namespace Format
 
 // Line and screen erasure sequences.
@@ -329,73 +330,50 @@ namespace Progress {
     ConstructedSequence Construct(State state, std::optional<uint32_t> percentage = std::nullopt);
 } // namespace Progress
 
-// operator+ overloads for combining sequences with strings.
-std::string operator+(const Sequence& lhs, const Sequence& rhs);
-std::string operator+(const Sequence& lhs, const std::string& rhs);
-std::string operator+(const std::string& lhs, const Sequence& rhs);
-std::string operator+(const Sequence& lhs, const char* rhs);
-std::string operator+(const char* lhs, const Sequence& rhs);
+// operator+ overloads for combining sequences with wide strings.
+std::wstring operator+(const Sequence& lhs, const Sequence& rhs);
 std::wstring operator+(const Sequence& lhs, const std::wstring& rhs);
 std::wstring operator+(const std::wstring& lhs, const Sequence& rhs);
+std::wstring operator+(const Sequence& lhs, const wchar_t* rhs);
+std::wstring operator+(const wchar_t* lhs, const Sequence& rhs);
 
 // operator== overloads for comparing sequences against string literals.
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
-inline bool operator==(const T& lhs, std::string_view rhs)
+inline bool operator==(const T& lhs, std::wstring_view rhs)
 {
     return lhs.Get() == rhs;
 }
 
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
-inline bool operator==(std::string_view lhs, const T& rhs)
+inline bool operator==(std::wstring_view lhs, const T& rhs)
 {
     return lhs == rhs.Get();
 }
 
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
-inline bool operator==(const T& lhs, const char* rhs)
+inline bool operator==(const T& lhs, const wchar_t* rhs)
 {
     return lhs.Get() == rhs;
 }
 
 template <typename T, typename = std::enable_if_t<std::is_base_of<Sequence, T>::value>>
-inline bool operator==(const char* lhs, const T& rhs)
+inline bool operator==(const wchar_t* lhs, const T& rhs)
 {
     return lhs == rhs.Get();
 }
 
-// In-place wide string append and widening.
+// In-place wide string append.
 std::wstring& operator+=(std::wstring& lhs, const Sequence& rhs);
-std::wstring ToWide(const Sequence& s);
 
 } // namespace wsl::windows::common::vt
 
 // std::formatter specializations, must be outside namespace.
 template <>
-struct std::formatter<wsl::windows::common::vt::Sequence, char> : std::formatter<std::string_view, char>
-{
-    auto format(const wsl::windows::common::vt::Sequence& s, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view, char>::format(s.Get(), ctx);
-    }
-};
-
-template <>
 struct std::formatter<wsl::windows::common::vt::Sequence, wchar_t> : std::formatter<std::wstring_view, wchar_t>
 {
     auto format(const wsl::windows::common::vt::Sequence& s, std::wformat_context& ctx) const
     {
-        const auto sv = s.Get();
-        const std::wstring wide(sv.begin(), sv.end());
-        return std::formatter<std::wstring_view, wchar_t>::format(wide, ctx);
-    }
-};
-
-template <>
-struct std::formatter<wsl::windows::common::vt::ConstructedSequence, char> : std::formatter<wsl::windows::common::vt::Sequence, char>
-{
-    auto format(const wsl::windows::common::vt::ConstructedSequence& s, std::format_context& ctx) const
-    {
-        return std::formatter<wsl::windows::common::vt::Sequence, char>::format(s, ctx);
+        return std::formatter<std::wstring_view, wchar_t>::format(s.Get(), ctx);
     }
 };
 

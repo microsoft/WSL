@@ -31,13 +31,13 @@ auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        WriteTerminal(ToWide(Cursor::Up(line)));
+        WriteTerminal(Cursor::Up(line).Get());
     }
 
     return wil::scope_exit([line = line, this]() {
         if (line > 1)
         {
-            WriteTerminal(ToWide(Cursor::Down(line - 1)));
+            WriteTerminal(Cursor::Down(line - 1).Get());
         }
     });
 }

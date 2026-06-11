@@ -32,27 +32,28 @@ namespace VT {
     inline const auto& B_END = Cursor::BracketedPasteOff;
     inline const auto& RESET = Format::Default;
     inline const auto& ERASE_LINE = Erase::LineForward;
-    inline const Sequence CR{"\r"};
+    inline const Sequence CR{L"\r"};
 
     // The shell PS1 uses SGR 1;31 (bold + red) in a single sequence.
-    // Sgr({1, 31}) produces "\x1b[1;31m" to match exactly.
+    // Sgr({1, 31}) produces L"\x1b[1;31m" to match exactly.
     inline const ConstructedSequence RED = Sgr({1, 31});
 
     // Prompt pattern used in WSLC TTY sessions.
-    inline const std::string SESSION_PROMPT = B_START + RED + "root@ [ " + RESET + "/" + RED + " ]# ";
+    inline const std::string SESSION_PROMPT =
+        wsl::shared::string::WideToMultiByte(B_START + RED + L"root@ [ " + RESET + L"/" + RED + L" ]# ");
 
     inline std::string BuildContainerPrompt(const std::string& prompt, bool withBracketedPaste = true)
     {
         if (withBracketedPaste)
         {
-            return std::format("{}{}", B_START, prompt);
+            return wsl::shared::string::WideToMultiByte(std::format(L"{}", B_START)) + prompt;
         }
         return prompt;
     }
 
     inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
+        return wsl::shared::string::WideToMultiByte(std::format(L"{}{}{}", CR, ERASE_LINE, CR)) + prompt;
     }
 } // namespace VT
 
