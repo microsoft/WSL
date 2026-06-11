@@ -2624,7 +2624,7 @@ class WslcSdkTests
     {
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-        const char* argv[] = {"/bin/sleep", "999"};
+        const char* argv[] = {"/bin/sleep", "99"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcContainerSettings containerSettings;
@@ -2718,7 +2718,7 @@ class WslcSdkTests
     {
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-        const char* argv[] = {"/bin/sh", "-c", "trap '' TERM; while :; do sleep 1; done"};
+        const char* argv[] = {"/bin/sh", "-c", "trap '' TERM; sleep 60"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcContainerSettings containerSettings;
@@ -2740,7 +2740,9 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcStopContainer(container.get(), WSLC_SIGNAL_SIGTERM, c_timeoutSeconds, nullptr));
         const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
-        VERIFY_IS_GREATER_THAN_OR_EQUAL(elapsedMs, 900LL);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(elapsedMs, 1000LL);
+        // Ensure it's not because of the sleep running out.
+        VERIFY_IS_LESS_THAN(elapsedMs, 30000LL);
 
         {
             WslcContainerState state{};
