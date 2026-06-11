@@ -264,15 +264,15 @@ private:
 };
 
 // A persistent writer for a named pipe that transparently handles the server-side connection lifecycle. Data
-// pushed via Push() is written to the pipe by the IO loop. When Reconnect is set, a write failure (client disconnect) is
-// recovered by reconnecting and resuming writes rather than tearing the handle down.
+// pushed via Push() is written to the pipe by the IO loop. 'Connected' indicates the pipe already has a connected
+// peer.
 class WriteNamedPipe : public OverlappedIOHandle
 {
 public:
     NON_COPYABLE(WriteNamedPipe);
     NON_MOVABLE(WriteNamedPipe);
 
-    WriteNamedPipe(HandleWrapper&& Pipe, bool Reconnect);
+    WriteNamedPipe(HandleWrapper&& Pipe, bool Reconnect, bool Connected);
     ~WriteNamedPipe();
     void Schedule() override;
     void Collect() override;
@@ -291,7 +291,7 @@ private:
     wil::unique_event ConnectEvent{wil::EventOptions::ManualReset};
     OVERLAPPED ConnectOverlapped{};
     bool ReconnectOnFailure = false;
-    bool NeedConnect = true;
+    bool NeedConnect = false;
     bool Connecting = false;
 };
 

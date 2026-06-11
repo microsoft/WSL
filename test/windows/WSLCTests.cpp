@@ -8250,7 +8250,7 @@ class WSLCTests
             const auto name = wsl::windows::common::helpers::GetUniquePipeName();
 
             MultiHandleWait io;
-            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
             auto* writer = writerHandle.get();
             io.AddHandle(std::move(writerHandle));
 
@@ -8273,7 +8273,7 @@ class WSLCTests
             const auto name = wsl::windows::common::helpers::GetUniquePipeName();
 
             MultiHandleWait io;
-            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
             auto* writer = writerHandle.get();
             io.AddHandle(std::move(writerHandle));
 
@@ -8299,7 +8299,7 @@ class WSLCTests
             const auto name = wsl::windows::common::helpers::GetUniquePipeName();
 
             MultiHandleWait io;
-            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true);
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
             auto* writer = writerHandle.get();
             io.AddHandle(std::move(writerHandle));
 
@@ -8330,14 +8330,14 @@ class WSLCTests
             VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
         }
 
-        // Scenario 4: a non-reconnecting writer skips the connection handshake and behaves like a
-        // persistent WriteHandle, writing queued data straight to the handle.
+        // Scenario 4: a writer over an already-connected handle (Connected=true) skips the connection
+        // handshake and behaves like a persistent WriteHandle, writing queued data straight to the handle.
         {
             auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
             PartialHandleRead reader(readPipe.get());
 
             MultiHandleWait io;
-            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(writePipe)}, false);
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(writePipe)}, false, true);
             auto* writer = writerHandle.get();
             io.AddHandle(std::move(writerHandle));
 
@@ -8347,6 +8347,30 @@ class WSLCTests
 
             VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
 
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 5: Validate that the named pipe is connected if constructed with Connected = false.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, false, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            std::string expected = "handshake-without-reconnect";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            // Connect the client after the payload is queued; the writer completes the handshake during Run().
+            wil::unique_hfile client;
+            std::thread connector([&]() { client = connect(name); });
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            connector.join();
+
+            PartialHandleRead reader(client.get());
             reader.Expect(expected);
             VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
         }
