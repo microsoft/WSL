@@ -361,7 +361,7 @@ struct Config
     bool EnableHardwarePerformanceCounters = !shared::Arm64;
     bool EnableAutoProxy = true;
     int InitialAutoProxyTimeout = 1000;
-    MemoryReclaimMode MemoryReclaim = MemoryReclaimMode::DropCache;
+    MemoryReclaimMode MemoryReclaim = MemoryReclaimMode::Gradual;
     bool EnableSparseVhd = false;
     UINT64 VhdSizeBytes = 0x10000000000; // 1TB
 
