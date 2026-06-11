@@ -368,26 +368,45 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    // GetFolderFromPathAsync does not accept hidden or system path.
-    // To avoid the temp path having those attributes (mainly hidden),
-    // we need to create a subfolder without those attributes.
-    auto downloadFolderPath = std::filesystem::temp_directory_path() / L"wsl-downloads";
-    std::filesystem::create_directories(downloadFolderPath);
-
-    const auto attributes = GetFileAttributesW(downloadFolderPath.c_str());
-    THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);
-    if (attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+    // GetFodlerFromPathAsync won't work if the folder is hidden or system.
+    auto downloadFolderPath = std::filesystem::temp_directory_path();
+    auto filenameStem = std::filesystem::path(Filename).stem().wstring();
+    auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
+    std::wstring filePath{};
+    winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
+    for (int suffix = 1; outputStream == nullptr; suffix++)
     {
-        THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(downloadFolderPath.c_str(), attributes & ~(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)));
+        if (suffix == 1)
+        {
+            filePath = (downloadFolderPath / Filename).wstring();
+        }
+        else
+        {
+            filePath = (downloadFolderPath / std::format(L"{} ({}){}", filenameStem, suffix, filenameExtension)).wstring();
+        }
+        try
+        {
+            outputStream = winrt::Windows::Storage::Streams::FileRandomAccessStream::OpenAsync(
+                               filePath,
+                               winrt::Windows::Storage::FileAccessMode::ReadWrite,
+                               winrt::Windows::Storage::StorageOpenOptions::None,
+                               winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
+                               .get();
+        }
+        catch (const winrt::hresult_error& e)
+        {
+            if (e.code() != HRESULT_FROM_WIN32(ERROR_FILE_EXISTS))
+            {
+                throw;
+            }
+        }
     }
 
-    const auto downloadFolder = winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(downloadFolderPath.wstring()).get();
-
-    const auto file =
-        downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
-    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { file.DeleteAsync().get(); });
-
-    const auto outputStream = file.OpenAsync(winrt::Windows::Storage::FileAccessMode::ReadWrite).get().GetOutputStreamAt(0);
+    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        outputStream.Close();
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    });
 
     // By default downloaded files are cached in %appdata%/local/packages/{package-family}/AC/InetCache .
     // Disable caching since there's no reason to keep local copies of .msixbundle files.
@@ -421,7 +440,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     download.get();
     deleteFileOnFailure.release();
 
-    return file.Path().c_str();
+    return filePath;
 }
 
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
