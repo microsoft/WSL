@@ -3732,6 +3732,52 @@ Return Value:
     return static_cast<long long>(Info.freeram) * Info.mem_unit;
 }
 
+static double GetMemoryPressureAvg10()
+
+/*++
+
+Routine Description:
+
+    This routine returns the PSI "some" 10-second memory pressure average from
+    /proc/pressure/memory. This is the fraction of time (0-100) that some task
+    stalled waiting on memory in the last 10 seconds; ~0 means there is slack to
+    reclaim cold pages without hurting the workload, regardless of CPU activity.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    The "some avg10" pressure value, or -1.0 if PSI is unavailable.
+
+--*/
+
+{
+    //
+    // PSI may be unavailable (kernel built without CONFIG_PSI), which is a normal
+    // condition the caller handles, so failures are not logged.
+    //
+
+    char Buffer[256];
+    if (!ReadProcFile("/proc/pressure/memory", Buffer, sizeof(Buffer), false))
+    {
+        return -1.0;
+    }
+
+    //
+    // The first line is "some avg10=<value> avg60=<value> avg300=<value> total=<value>".
+    //
+
+    const char* Marker = strstr(Buffer, "avg10=");
+    if (Marker == nullptr)
+    {
+        return -1.0;
+    }
+
+    return strtod(Marker + (sizeof("avg10=") - 1), nullptr);
+}
+
 namespace {
 
 //
@@ -3753,6 +3799,14 @@ constexpr long long c_cacheGrowthRearmBytes = 256ll * 1024 * 1024;
 // hysteresis margin) is reclaimed.
 constexpr long long c_floorBaseBytes = 128ll * 1024 * 1024;
 constexpr long long c_gradualHysteresisBytes = 128ll * 1024 * 1024;
+
+// Gradual is driven by PSI: reclaim cold cache while the "some avg10" memory pressure is below this
+// value (in percent), and back off above it.
+constexpr double c_pressureReclaimMax = 1.0;
+
+// While the VM is busy, reclaim at most this much per interval so a large backlog is drained gently;
+// an idle interval drains the full excess at once.
+constexpr long long c_gradualStepBusyBytes = 256ll * 1024 * 1024;
 
 // Compaction runs once free memory grows by at least this much since the last compaction.
 constexpr long long c_compactFreeGrowthBytes = 256ll * 1024 * 1024;
@@ -3783,9 +3837,11 @@ bool RunGradualTick(MemoryReclaimState& State, bool IntervalIdle)
 
 Routine Description:
 
-    Runs one interval of gentle reclaim (cold-first via cgroup memory.reclaim). Reclaim is gated on CPU
-    idle and drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it
-    does not churn near the floor.
+    Runs one interval of pressure-driven gentle reclaim (cold-first via cgroup memory.reclaim) toward a
+    fixed floor. While the kernel reports little/no memory pressure (PSI) there is cold cache the guest is
+    not really using, so it is reclaimed -- even while the VM is busy. A busy interval reclaims at most a
+    bounded step so a large backlog is drained gently; an idle interval drains the full excess. When PSI
+    is unavailable, reclaim falls back to gating on CPU idle.
 
 Return Value:
 
@@ -3796,7 +3852,27 @@ Return Value:
 {
     (void)State;
 
-    if (!IntervalIdle)
+    const double Pressure = GetMemoryPressureAvg10();
+
+    bool MayReclaim;
+    if (Pressure < 0.0)
+    {
+        //
+        // No PSI brake available: gate reclaim on CPU idle.
+        //
+
+        MayReclaim = IntervalIdle;
+    }
+    else
+    {
+        //
+        // Reclaim only while pressure is low; back off once the workload starts stalling on memory.
+        //
+
+        MayReclaim = Pressure < c_pressureReclaimMax;
+    }
+
+    if (!MayReclaim)
     {
         return false;
     }
@@ -3813,7 +3889,8 @@ Return Value:
         return false;
     }
 
-    const std::string Bytes = std::to_string(Excess);
+    const long long ToFree = IntervalIdle ? Excess : (std::min)(Excess, c_gradualStepBusyBytes);
+    const std::string Bytes = std::to_string(ToFree);
 
     // Best-effort: WriteToFile logs internally on failure. EAGAIN merely means the kernel could not evict
     // the full amount this pass (pages were still freed), so it counts as reclaim. Never throw on a
@@ -3920,9 +3997,13 @@ Routine Description:
 
     The policy is:
 
-        1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is gated on sustained CPU idle and
-           drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it does
-           not churn near the floor.
+        1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is driven by *memory pressure*,
+           not CPU idleness. While the kernel reports little/no memory pressure (PSI), there is cold
+           memory the guest is not really using, so it is reclaimed toward a fixed floor -- even while
+           the VM is busy. This is important because a CPU-bound workload can sit on gigabytes of cold
+           cache that a CPU-idle check would never reclaim. A busy interval reclaims at most a bounded
+           step so a large backlog is drained gently; an idle interval drains the full excess. When PSI
+           is unavailable, Gradual falls back to reclaiming only while CPU-idle.
 
         2. DropCache mode (the indiscriminate sledgehammer: drop_caches evicts the entire page cache,
            hot and cold alike) cannot run safely under load, so it stays gated on sustained CPU idle. It
