@@ -27,6 +27,8 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
         return true;
     }
 
@@ -34,6 +36,8 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
         return true;
     }
 
@@ -62,6 +66,17 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MultipleUnusedImages_Success)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
+        VerifyImageIsNotUsed(DebianImage);
+        VerifyImageIsNotUsed(AlpineImage);
+
+        auto result = RunWslc(std::format(L"image delete {} {}", DebianImage.Name, AlpineImage.Name));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -106,14 +121,35 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
     {
-        // TODO: Implement once 'image tag' is implemented
-        SKIP_TEST_NOT_IMPL();
+        // Tag debian a second time, then remove via the alias with --no-prune.
+        // The alias must disappear while the original tag stays resolvable.
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
+
+        auto tagResult = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), NoPruneTaggedImage.NameAndTag()));
+        tagResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto removeResult = RunWslc(std::format(L"image delete --no-prune {}", NoPruneTaggedImage.NameAndTag()));
+        removeResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyImageIsListed(DebianImage);
+
+        auto listAfter = RunWslc(L"image list -q");
+        listAfter.Verify({.Stderr = L"", .ExitCode = 0});
+        for (const auto& line : listAfter.GetStdoutLines())
+        {
+            VERIFY_IS_TRUE(
+                line.find(NoPruneTaggedImage.NameAndTag()) == std::wstring::npos,
+                L"Secondary tag should have been removed by `image delete --no-prune`");
+        }
     }
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+    const TestImage NoPruneTaggedImage{L"wslc-test-noprune", L"alias", L""};
 
     std::wstring GetHelpMessage() const
     {

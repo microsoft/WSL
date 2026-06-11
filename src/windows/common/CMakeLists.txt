@@ -48,6 +48,7 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
@@ -133,6 +134,7 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
     EnumVariantMap.h

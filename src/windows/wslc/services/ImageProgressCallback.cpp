@@ -84,22 +84,65 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     std::wstring line;
     if (total != 0)
     {
-        line = std::format(L"{} '{}': {}%", status, id, current * 100 / total);
+        constexpr int c_progressBarWidth = 30;
+
+        int filled = 0;
+        if (current >= total)
+        {
+            filled = c_progressBarWidth;
+        }
+        else
+        {
+            auto ratio = static_cast<long double>(current) / static_cast<long double>(total);
+            filled = static_cast<int>(ratio * c_progressBarWidth);
+        }
+
+        filled = std::clamp(filled, 0, c_progressBarWidth);
+
+        std::wstring bar;
+        bar.reserve(c_progressBarWidth);
+        bar.append(filled, L'=');
+        bar.append(L">");
+        bar.resize(c_progressBarWidth, L' ');
+
+        // Docker's reported total is an estimate of the compressed layer size, so the actual bytes
+        // transferred can exceed it. Drop the total in that case to avoid displaying a count over 100%.
+        auto progress = wsl::shared::string::FormatBytes(current);
+
+        if (current <= total)
+        {
+            progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
+        }
+
+        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{} '{}': {}s", status, id, current);
+        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
     }
     else
     {
-        line = std::format(L"{} '{}'", status, id);
+        line = std::format(L"{}: {}", id, status);
+    }
+
+    // Use the visible window width (not the buffer width) to prevent wrapping.
+    const auto visibleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left + 1);
+
+    // Truncate to console width to prevent wrapping that would break cursor repositioning.
+    if (line.size() > static_cast<size_t>(visibleWidth))
+    {
+        line.resize(visibleWidth);
+
+        // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
+        // drop it so we don't emit an invalid UTF-16 sequence.
+        if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+        {
+            line.pop_back();
+        }
     }
 
     // Erase any previously written char on that line.
-    while (line.size() < info.dwSize.X)
-    {
-        line += L' ';
-    }
+    line.resize(visibleWidth, L' ');
 
     return line;
 }

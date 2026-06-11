@@ -17,6 +17,7 @@ Abstract:
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
 #include <optional>
 
@@ -63,6 +64,9 @@ void CloseProcess(WslcProcess process)
 }
 
 using UniqueProcess = wil::unique_any<WslcProcess, decltype(CloseProcess), CloseProcess>;
+
+using UniqueCrashDumpSubscription =
+    wil::unique_any<WslcCrashDumpSubscription, decltype(&WslcReleaseCrashDumpSubscription), WslcReleaseCrashDumpSubscription>;
 
 struct ProcessOutput
 {
@@ -317,6 +321,65 @@ class WslcSdkTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(30)), std::future_status::ready);
         VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
+    }
+
+    WSLC_TEST_METHOD(CrashDumpCallback)
+    {
+        struct Invocation
+        {
+            std::wstring DumpPath;
+            std::string ProcessName;
+            uint64_t Pid;
+            uint32_t Signal;
+            uint64_t Timestamp;
+        };
+
+        std::promise<Invocation> promise;
+
+        auto callback = [](const WslcSessionCrashDumpInfo* info, PVOID context) {
+            auto* p = static_cast<std::promise<Invocation>*>(context);
+            p->set_value(Invocation{
+                info->dumpPath ? std::wstring{info->dumpPath} : std::wstring{},
+                info->processName ? std::string{info->processName} : std::string{},
+                info->pid,
+                info->signal,
+                info->timestamp});
+        };
+
+        std::filesystem::path extraStorage = m_storagePath / "wslc-crash-callback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(extraStorage, ec);
+        });
+
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-crashcb-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+
+        UniqueSession session;
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+        UniqueCrashDumpSubscription subscription;
+        VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
+
+        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+
+        wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
+        auto process = launcher.Launch(comSession);
+        auto result = process.WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
+
+        auto future = promise.get_future();
+        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
+
+        auto invocation = future.get();
+        VERIFY_IS_FALSE(invocation.DumpPath.empty());
+        VERIFY_IS_TRUE(std::filesystem::exists(invocation.DumpPath));
+        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
+        VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
+        VERIFY_ARE_EQUAL(invocation.Signal, static_cast<uint32_t>(WSLCSignalSIGSEGV));
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
     }
 
     // -----------------------------------------------------------------------
@@ -1870,6 +1933,73 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(stdoutData.size(), c_expectedBytes);
     }
 
+    WSLC_TEST_METHOD(ReleaseFromIOCallbackFails)
+    {
+        struct Context
+        {
+            std::atomic<WslcProcess> process{nullptr};
+            std::atomic<WslcContainer> container{nullptr};
+            std::atomic<HRESULT> releaseProcessHr{S_OK};
+            std::atomic<HRESULT> releaseContainerHr{S_OK};
+            std::atomic<bool> captured{false};
+            wil::unique_event done{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            auto* cx = static_cast<Context*>(c);
+
+            // Wait until the test thread has published both handles before sampling.
+            auto process = cx->process.load(std::memory_order_acquire);
+            auto container = cx->container.load(std::memory_order_acquire);
+            if (!process || !container)
+            {
+                return;
+            }
+
+            // Only capture on the first eligible callback; later callbacks no-op.
+            bool expected = false;
+            if (!cx->captured.compare_exchange_strong(expected, true))
+            {
+                return;
+            }
+
+            // Both calls should fail with ERROR_INVALID_HANDLE_STATE without consuming the handles.
+            cx->releaseProcessHr.store(WslcReleaseProcess(process));
+            cx->releaseContainerHr.store(WslcReleaseContainer(container));
+            cx->done.SetEvent();
+        };
+
+        // Continuous writer for the init process so onStdOut fires repeatedly.
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "while true; do echo LINE; sleep 0.05; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        UniqueProcess process;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+        // Publish handles to the callback now that both are valid.
+        ctx.container.store(container.get(), std::memory_order_release);
+        ctx.process.store(process.get(), std::memory_order_release);
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.done.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        VERIFY_ARE_EQUAL(ctx.releaseProcessHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        VERIFY_ARE_EQUAL(ctx.releaseContainerHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+    }
+
     // -----------------------------------------------------------------------
     // Storage tests
     // -----------------------------------------------------------------------
@@ -2509,9 +2639,11 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
         THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
 
-        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
+        // Validate /dev/dxg is available and the dynamic linker is configured to resolve the WSL
+        // GPU libraries.
         {
-            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
+            const char* initArgv[] = {
+                "/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"};
 
             auto output = RunContainerAndCapture(
                 gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);

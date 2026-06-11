@@ -15,12 +15,18 @@ static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel,
+    VirtioNetworkingFlags flags,
+    LPCWSTR dnsOptions,
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+    wil::shared_handle userToken,
+    std::wstring swiotlbConfig) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
-    m_dnsOptions(dnsOptions)
+    m_dnsOptions(dnsOptions),
+    m_swiotlbOption(std::move(swiotlbConfig))
 {
 }
 
@@ -210,7 +216,13 @@ void VirtioNetworking::RefreshGuestConnection()
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
-                VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, c_eth0DeviceName, nullptr, device_options.c_str(), 0, m_userToken.get());
+                VIRTIO_NET_DEVICE_ID,
+                VIRTIO_NET_CLASS_ID,
+                c_eth0DeviceName,
+                m_swiotlbOption.c_str(),
+                device_options.c_str(),
+                0,
+                m_userToken.get());
         }
         else
         {
@@ -244,7 +256,7 @@ void VirtioNetworking::SetupLoopbackDevice()
         VIRTIO_NET_DEVICE_ID,
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
-        nullptr,
+        m_swiotlbOption.c_str(),
         L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
         0,
         m_userToken.get());

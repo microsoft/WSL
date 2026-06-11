@@ -762,7 +762,7 @@ try
 }
 CATCH_LOG()
 
-void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder)
+void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes)
 {
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
@@ -772,4 +772,24 @@ void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::w
 
     // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
     kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
+
+    // Reserve a swiotlb bounce buffer for virtio devices.
+    if (swiotlbSizeBytes != 0)
+    {
+        kernelCmdLine += std::format(L" swiotlb=force hv_pci_swiotlb={}", swiotlbSizeBytes);
+    }
+}
+
+UINT64 wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes)
+{
+    constexpr UINT64 c_swiotlbSize = 64 * _1MB;
+
+    // Skip swiotlb on VMs that cannot fit the reserved buffer. Users can still opt in explicitly
+    // via experimental.swiotlb in .wslconfig.
+    if (memoryBytes < _1GB + c_swiotlbSize)
+    {
+        return {};
+    }
+
+    return c_swiotlbSize;
 }

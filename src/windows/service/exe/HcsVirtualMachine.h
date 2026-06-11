@@ -24,6 +24,8 @@ Abstract:
 #include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
+#include <optional>
+#include <string>
 
 #define MAX_VHD_COUNT 254
 
@@ -44,6 +46,7 @@ public:
     IFACEMETHOD(DetachDisk)(_In_ ULONG Lun) override;
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
+    IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
 
 private:
@@ -79,6 +82,9 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
 
+    // Swiotlb device-options token sized to fit inside the VM's RAM (empty when too small).
+    std::wstring m_swiotlbOption;
+
     wil::unique_socket m_listenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
@@ -99,6 +105,46 @@ private:
     std::atomic<bool> m_crashLogCaptured = false;
 
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
+};
+
+//
+// WSLCVirtualMachineFactory - Implements IWSLCVirtualMachineFactory.
+//
+// Owns a deep copy of the WSLCSessionSettings needed to construct a VM and creates a
+// fresh HcsVirtualMachine on demand. This lets the per-user session recreate a VM that
+// was idle-terminated, without the SYSTEM service holding a VM up front.
+//
+class WSLCVirtualMachineFactory
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
+{
+public:
+    explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);
+
+    IFACEMETHOD(CreateVirtualMachine)(_Out_ IWSLCVirtualMachine** Vm) override;
+
+private:
+    // Rebuilds a WSLCSessionSettings that points at this factory's owned storage.
+    // The returned struct is only valid while this factory is alive.
+    WSLCSessionSettings BuildSettings();
+
+    std::wstring m_displayName;
+    std::wstring m_storagePath;
+    std::optional<std::wstring> m_rootVhdOverride;
+    std::optional<std::string> m_rootVhdTypeOverride;
+
+    // Duplicated dmesg sink (best-effort): only the first VM is guaranteed a live sink;
+    // subsequent VMs reuse this duplicate, whose writes simply fail if the sink is gone.
+    wil::unique_handle m_dmesgOutput;
+
+    wil::com_ptr<ITerminationCallback> m_terminationCallback;
+
+    ULONGLONG m_maximumStorageSizeMb{};
+    ULONG m_cpuCount{};
+    ULONG m_memoryMb{};
+    ULONG m_bootTimeoutMs{};
+    WSLCNetworkingMode m_networkingMode{};
+    WSLCFeatureFlags m_featureFlags{};
+    WSLCSessionStorageFlags m_storageFlags{};
 };
 
 } // namespace wsl::windows::service::wslc

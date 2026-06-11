@@ -33,6 +33,10 @@ Abstract:
 #include <mutex>
 #include "mountutilcpp.h"
 #include <filesystem>
+#include <iostream>
+#include "JsonUtils.h"
+#include "cdi_schema.h"
+#include "lxfsshares.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -64,10 +68,89 @@ struct WSLCState
 
 static WSLCState g_state;
 
-int CreateCaptureCrashSymlink()
+void WriteWslcCdiSpec()
 try
 {
-    THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0);
+    wsl::shared::cdi::DeviceNode dxg{};
+    dxg.path = "/dev/dxg";
+    dxg.permissions = "rwm";
+
+    wsl::shared::cdi::Mount libs{};
+    libs.hostPath = LXSS_LIB_PATH;
+    libs.containerPath = LXSS_LIB_PATH;
+    libs.options = {"ro", "rbind"};
+
+    wsl::shared::cdi::Mount drivers{};
+    drivers.hostPath = LXSS_GPU_DRIVERS_PATH;
+    drivers.containerPath = LXSS_GPU_DRIVERS_PATH;
+    drivers.options = {"ro", "rbind"};
+
+    wsl::shared::cdi::Hook hook{};
+    hook.hookName = "createContainer";
+    hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
+    hook.args = {LX_INIT_WSLC_GPU_HOOK};
+
+    wsl::shared::cdi::Device gpu{};
+    gpu.name = "gpu";
+    gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.mounts.push_back(std::move(libs));
+    gpu.containerEdits.mounts.push_back(std::move(drivers));
+    gpu.containerEdits.hooks.push_back(std::move(hook));
+
+    wsl::shared::cdi::Spec spec{};
+    spec.cdiVersion = "0.6.0";
+    spec.kind = LX_WSLC_CDI_KIND;
+    spec.devices.push_back(std::move(gpu));
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/cdi", 0755) < 0);
+    THROW_LAST_ERROR_IF(
+        WriteToFile("/etc/cdi/microsoft.com-wslc.json", nlohmann::json(spec).dump().c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
+}
+CATCH_LOG()
+
+void WriteDockerDaemonConfig()
+try
+{
+    constexpr auto c_daemonConfigPath = "/etc/docker/daemon.json";
+
+    THROW_ERRNO_IF(EEXIST, std::filesystem::exists(c_daemonConfigPath));
+
+    nlohmann::json config = nlohmann::json::object();
+    config["features"]["cdi"] = true;
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile(c_daemonConfigPath, config.dump().c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
+}
+CATCH_LOG()
+
+int WslcGpuHookEntry()
+try
+{
+    // OCI runtime hooks receive the container state as JSON on stdin.
+    const auto state = nlohmann::json::parse(std::cin);
+    const std::filesystem::path bundle = state.at("bundle").get<std::string>();
+    THROW_ERRNO_IF(EINVAL, !bundle.is_absolute());
+
+    // Read the OCI spec's root.path from <bundle>/config.json. This is either an absolute path to
+    // the overlay-merged rootfs or a path relative to the bundle directory.
+    const auto spec = nlohmann::json::parse(UtilReadFileContent((bundle / "config.json").native()));
+    std::filesystem::path rootfsPath = spec.at("root").at("path").get<std::string>();
+    if (rootfsPath.is_relative())
+    {
+        rootfsPath = bundle / rootfsPath;
+    }
+
+    rootfsPath = std::filesystem::canonical(rootfsPath);
+    THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
+
+    THROW_LAST_ERROR_IF(chroot(rootfsPath.c_str()) < 0);
+
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
+    THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
+
+    // Run the container's own ldconfig so it updates /etc/ld.so.cache.
+    const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
+    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
     return 0;
 }
@@ -75,8 +158,9 @@ CATCH_RETURN_ERRNO()
 
 void WSLCEnableCrashDumpCollection()
 {
-    if (CreateCaptureCrashSymlink() < 0)
+    if (symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0 && errno != EEXIST)
     {
+        LOG_ERROR("symlink(/init, /" LX_INIT_WSL_CAPTURE_CRASH ") failed {}", errno);
         return;
     }
 
@@ -103,6 +187,23 @@ void HandleMessageImpl(
     }
 
     Transaction.Send<WSLC_GET_DISK::TResponse>(writer.Span());
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel,
+    wsl::shared::Transaction& Transaction,
+    const WSLC_GET_GUEST_CAPABILITIES& Message,
+    const gsl::span<gsl::byte>& Buffer)
+{
+    WSLC_GET_GUEST_CAPABILITIES_RESULT response{};
+    response.Header.MessageType = WSLC_GET_GUEST_CAPABILITIES_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    auto pool = UtilReadHvPciSwiotlbPool();
+    response.HvPciSwiotlbBase = pool.Base;
+    response.HvPciSwiotlbSize = pool.Size;
+
+    Transaction.Send<WSLC_GET_GUEST_CAPABILITIES_RESULT>(response);
 }
 
 void HandleMessageImpl(
@@ -551,8 +652,19 @@ void HandleMessageImpl(
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
-        THROW_LAST_ERROR_IF(
-            UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        auto type = readField(Message.TypeIndex);
+        THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+
+        // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
+        // TODO: Remove once fixed upstream.
+        if (wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE))
+        {
+            struct stat targetStat{};
+            if (stat(target, &targetStat) < 0)
+            {
+                LOG_ERROR("stat({}) after virtiofs mount failed {}", target, errno);
+            }
+        }
 
         std::optional<std::string> overlayTarget;
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs))
@@ -620,8 +732,12 @@ void HandleMessageImpl(
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
-            // Recreate the crash dump symlink inside the new root.
-            CreateCaptureCrashSymlink();
+            // Recreate the /init symlinks inside the new root.
+            THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0 && errno != EEXIST);
+            THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSLC_GPU_HOOK) < 0 && errno != EEXIST);
+
+            WriteWslcCdiSpec();
+            WriteDockerDaemonConfig();
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
@@ -836,7 +952,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

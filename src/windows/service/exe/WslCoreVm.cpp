@@ -324,7 +324,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
-    m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    {
+        SlowOperationWatcher slowOperation{"HcsCreateSystem"};
+        m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    }
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
@@ -349,6 +352,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Start the utility VM.
     try
     {
+        SlowOperationWatcher slowOperation{"HcsStartSystem"};
         wsl::windows::common::hcs::StartComputeSystem(m_system.get(), json.c_str());
     }
     catch (...)
@@ -415,6 +419,34 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         addShare(TEXT(LXSS_GPU_PACKAGED_LIB_SHARE), path.c_str());
     }
 
+    // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
+    {
+        SlowOperationWatcher slowOperation{"WaitForMiniInitConnect"};
+        m_miniInitChannel =
+            wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", {m_terminatingEvent.get()}};
+    }
+
+    // Accept the connection from the Linux guest for notifications.
+    m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
+
+    // Receive and parse the guest kernel version
+    {
+        SlowOperationWatcher slowOperation{"ReadGuestCapabilities"};
+        ReadGuestCapabilities();
+    }
+
+    // Cache the effective swiotlb configuration. The kernel picks a valid GPA, allocates the pool,
+    // and publishes the actual (base, size) via sysfs. Only warn when swiotlb was actually
+    // requested via the kernel command line; otherwise the kernel correctly doesn't allocate.
+    if (m_hvPciSwiotlbBase != 0 && m_hvPciSwiotlbSize != 0)
+    {
+        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", m_hvPciSwiotlbBase, m_hvPciSwiotlbSize);
+    }
+    else if (m_vmConfig.SwiotlbSizeBytes != 0)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSwiotlbKernelUnsupported());
+    }
+
     // Asynchronously add drvfs devices if supported.
     if (m_vmConfig.EnableHostFileSystemAccess)
     {
@@ -437,16 +469,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
         }).detach();
     }
-
-    // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
-    m_miniInitChannel =
-        wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", {m_terminatingEvent.get()}};
-
-    // Accept the connection from the Linux guest for notifications.
-    m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
-
-    // Receive and parse the guest kernel version
-    ReadGuestCapabilities();
 
     // Mount the system distro.
     // N.B. If using SCSI, the system distro is added during VM creation.
@@ -555,7 +577,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
         if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
-            natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            {
+                SlowOperationWatcher slowOperation{"CreateNatNetwork"};
+                natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            }
             if (!natNetwork)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
@@ -586,8 +611,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to virtio proxy after the early-config message; drop the unused DNS hvsocket.
                 dnsTunnelingSocket.reset();
+
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, m_swiotlbOption);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1150,7 +1176,9 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
 {
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
+    SlowOperationWatcher slowOperation{"AttachDistroVhd"};
     const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    slowOperation.Reset();
 
     // Launch the init daemon and create the instance.
     int flags = LxMiniInitMessageFlagNone;
@@ -1214,7 +1242,9 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     WI_ClearFlagIf(localConfig.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING, !m_vmConfig.EnableHostFileSystemAccess);
 
     // Establish a communication channel with the init daemon.
+    SlowOperationWatcher slowOperation{"WaitForInitDaemonConnect"};
     auto initSocket = AcceptConnection(ReceiveTimeout);
+    slowOperation.Reset();
 
     // If the system distro is enabled, establish a communication channel with its init daemon.
     wil::unique_socket systemDistroSocket;
@@ -1539,13 +1569,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     kernelCmdLine += std::format(L" nr_cpus={}", m_vmConfig.ProcessorCount);
 
     // Append common kernel parameters shared between WSL2 and WSLC.
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder);
-
-    // If using virtio features, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
-    if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
-    {
-        kernelCmdLine += L" swiotlb=force";
-    }
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder, m_vmConfig.SwiotlbSizeBytes);
 
     if (m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported())
     {
@@ -2162,10 +2186,23 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
 
     sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
 
+    // Append the swiotlb token here so it covers fixed-drive, dynamic add, and remount paths.
+    // Duplicate swiotlb tokens are harmless: VirtioFsShare parses options into a map.
+    std::wstring effectiveOptions(Options);
+    if (!m_swiotlbOption.empty())
+    {
+        if (!effectiveOptions.empty())
+        {
+            effectiveOptions += L';';
+        }
+
+        effectiveOptions += m_swiotlbOption;
+    }
+
     // Check if a matching share already exists.
     bool created = false;
     std::wstring tag;
-    VirtioFsShare key(sharePath.c_str(), Options, Admin);
+    VirtioFsShare key(sharePath.c_str(), effectiveOptions.c_str(), Admin);
     if (!m_virtioFsShares.contains(key))
     {
         // Generate a new unique tag for the share.
@@ -2198,7 +2235,7 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
         "WslCoreVmAddVirtioFsShare",
         TraceLoggingValue(Admin, "admin"),
         TraceLoggingValue(sharePath.c_str(), "path"),
-        TraceLoggingValue(Options, "options"),
+        TraceLoggingValue(effectiveOptions.c_str(), "options"),
         TraceLoggingValue(tag.c_str(), "tag"),
         TraceLoggingValue(created, "created"),
         TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
@@ -2309,9 +2346,13 @@ void WslCoreVm::ReadGuestCapabilities()
     }
 
     m_seccompAvailable = info.SeccompAvailable;
+    m_hvPciSwiotlbBase = info.HvPciSwiotlbBase;
+    m_hvPciSwiotlbSize = info.HvPciSwiotlbSize;
     WSL_LOG(
         "GuestKernelInfo",
         TraceLoggingValue(m_seccompAvailable, "SeccompAvailable"),
+        TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"),
         TraceLoggingValue(std::get<0>(m_kernelVersion), "Version"),
         TraceLoggingValue(std::get<1>(m_kernelVersion), "Revision"),
         TraceLoggingValue(std::get<2>(m_kernelVersion), "Minor"));

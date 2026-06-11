@@ -57,8 +57,9 @@ std::tuple<HRESULT, int, std::optional<ServiceRunningProcess>> ServiceProcessLau
     int error = -1;
 
     std::optional<ServiceRunningProcess> process;
-    auto result = wil::ResultFromException(
-        [&]() { process.emplace(virtualMachine.CreateLinuxProcess(m_executable.c_str(), options, &error), m_flags); });
+    auto result = wil::ResultFromException([&]() {
+        process.emplace(virtualMachine.CreateLinuxProcess(m_executable.c_str(), options, m_rows, m_columns, &error), m_flags);
+    });
 
     return {result, error, std::move(process)};
 }
