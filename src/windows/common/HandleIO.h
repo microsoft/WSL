@@ -315,12 +315,21 @@ public:
         // If the Buffer is empty, then we're reading.
         if (PendingBuffer.empty())
         {
-            // If the output buffer is empty and the reading end is completed, then we're done.
             if (Read.GetState() == IOHandleStatus::Completed)
             {
+                // If all reading is complete, flush any pending writes before transitioning to Completed.
                 Write.SetCompleteOnDrained(true);
 
-                State = IOHandleStatus::Completed;
+                if (Write.PendingBytes() > 0)
+                {
+                    Write.Schedule();
+                    State = Write.GetState();
+                }
+                else
+                {
+                    State = IOHandleStatus::Completed;
+                }
+
                 return;
             }
 
