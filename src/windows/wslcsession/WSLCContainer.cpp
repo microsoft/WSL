@@ -766,15 +766,14 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         const auto [code, message] = m_volumes.GetVolumeStatus(volumeName);
         if (FAILED(code))
         {
-            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(
-                wsl::shared::string::MultiByteToWide(volumeName), wsl::shared::string::MultiByteToWide(message)));
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
             unavailableVolumes.push_back(volumeName);
         }
     }
 
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_VOLUME_NOT_AVAILABLE,
-        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(unavailableVolumes, ','))),
+        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);

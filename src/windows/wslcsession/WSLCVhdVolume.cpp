@@ -258,7 +258,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         // and delete it; containers that reference it should refuse to start. The reason is surfaced via Inspect(), not the warning.
         const auto hr = wil::ResultFromCaughtException();
         const auto message = wslutil::GetErrorString(hr);
-        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(Volume.Name)));
+        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(Volume.Name));
         status = {hr, wsl::shared::string::WideToMultiByte(message)};
     }
 
