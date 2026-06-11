@@ -314,6 +314,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- ICrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801}">
+                    <RegistryValue Value="ICrashDumpCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IProgressCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
                     <RegistryValue Value="IProgressCallback" Type="string" />

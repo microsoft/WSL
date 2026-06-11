@@ -2801,7 +2801,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Afficher le dernier conteneur créé (inclut tous les états)</value>
   </data>
   <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
-    <value>Memory limit (e.g. 512M, 1G)</value>
+    <value>Limite de mémoire (par exemple 512M, 1G)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
@@ -2811,14 +2811,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Nom du conteneur</value>
   </data>
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
-    <value>Connect a container to a network</value>
+    <value>Connectez un conteneur à un réseau</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
-    <value>host mode networking is not supported</value>
+    <value>la mise en réseau en mode hôte n’est pas prise en charge</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Ne pas utiliser le cache lors de la création de l’image</value>

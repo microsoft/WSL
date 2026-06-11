@@ -110,6 +110,21 @@ interface ITerminationCallback : IUnknown
 };
 
 [
+    uuid(8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801),
+    pointer_default(unique),
+    object
+]
+interface ICrashDumpCallback : IUnknown
+{
+    HRESULT OnCrashDump(
+        [in, string] LPCWSTR DumpPath,
+        [in, unique, string] LPCSTR ProcessName,
+        [in] ULONGLONG Pid,
+        [in] ULONG Signal,
+        [in] ULONGLONG Timestamp);
+};
+
+[
     uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
     pointer_default(unique),
     object
@@ -815,6 +830,8 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 }
 
 //

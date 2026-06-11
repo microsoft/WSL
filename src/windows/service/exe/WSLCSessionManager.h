@@ -68,6 +68,8 @@ struct SessionEntry
 
     wil::shared_handle UserToken;
     std::vector<BYTE> UserSid;
+
+    wil::unique_handle JobObject;
 };
 
 class WSLCSessionManagerImpl
@@ -163,10 +165,9 @@ private:
         }
     }
 
-    void AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory);
+    [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory);
     WSLCSessionInitSettings CreateSessionSettings(
         _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
-    void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
@@ -174,11 +175,6 @@ private:
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;
-
-    // Job object that automatically terminates all child COM server processes
-    // when this service exits or crashes (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE).
-    std::once_flag m_jobObjectInitFlag;
-    wil::unique_handle m_sessionJobObject;
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Sessions are automatically cleaned up when the underlying session is released.
