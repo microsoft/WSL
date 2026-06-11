@@ -8243,6 +8243,52 @@ class WSLCTests
 
             runTest(input, largeStdout + "regularStdout", largeStderr);
         }
+
+        // Validate that behavior is correct with various input sizes.
+        {
+            const std::string marker1 = "--start--";
+            const std::string marker2 = "--end--";
+
+            auto runTest = [&](size_t payloadSize) {
+                std::vector<char> input;
+                insert(input, 1, marker1);
+                insert(input, 1, std::string(payloadSize, 'A'));
+                insert(input, 1, marker2);
+                const std::string expected = marker1 + std::string(payloadSize, 'A') + marker2;
+
+                auto [inputRead, inputWrite] =
+                    wsl::windows::common::wslutil::OpenAnonymousPipe(static_cast<DWORD>(input.size() + 1), true, false);
+                auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(4096, true, true);
+                auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(4096, true, true);
+
+                DWORD written = 0;
+                THROW_IF_WIN32_BOOL_FALSE(WriteFile(inputWrite.get(), input.data(), static_cast<DWORD>(input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(written, static_cast<DWORD>(input.size()));
+
+                std::string output;
+                MultiHandleWait io;
+
+                io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+
+                io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                    output.append(buffer.data(), buffer.size());
+                    if (output.find(marker2) != std::string::npos)
+                    {
+                        io.Cancel();
+                    }
+                }));
+
+                io.Run(std::chrono::seconds(60));
+
+                VERIFY_ARE_EQUAL(expected, output);
+            };
+
+            for (const size_t payloadSize : {1, 100, 4096, 8192, 32768, 64036, 65535, 65536, 65537, 65556, 65571, 65572, 65576, 130000})
+            {
+                runTest(payloadSize);
+            }
+        }
     }
 
     WSLC_TEST_METHOD(ContainerRecoveryFromStorage)
