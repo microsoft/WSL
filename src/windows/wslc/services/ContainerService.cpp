@@ -62,6 +62,24 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.AddAdditionalNetwork(options.Networks[i]);
     }
 
+    if (!options.NetworkAliases.empty())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
+
+        for (const auto& alias : options.NetworkAliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
+    }
+
     // Set port options if provided
     for (const auto& port : options.Ports)
     {

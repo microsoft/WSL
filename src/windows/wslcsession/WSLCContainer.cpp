@@ -220,10 +220,45 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     return std::string{mode};
 }
 
-std::map<std::string, EmptyObject> ResolveEndpoints(
+// Parses the primary endpoint's Settings KVP. Today only "Aliases" is recognised; unknown
+// keys are rejected to avoid silently dropping caller data (mirrors the per-connection guard).
+EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkMode)
+{
+    EndpointConfig config{};
+    if (count == 0)
+    {
+        return config;
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, settings == nullptr, "Settings is null with SettingsCount=%lu", count);
+
+    auto parsed = ParseKeyMultiValuePairs(settings, count);
+
+    for (const auto& [key, _] : parsed)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkMode}), key != "Aliases");
+    }
+
+    if (auto it = parsed.find("Aliases"); it != parsed.end())
+    {
+        for (const auto& alias : it->second)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcAliasEmpty(),
+                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
+        }
+        config.Aliases = std::move(it->second);
+    }
+
+    return config;
+}
+
+std::map<std::string, EndpointConfig> ResolveEndpoints(
     const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
 {
-    std::map<std::string, EmptyObject> resolved;
+    std::map<std::string, EndpointConfig> resolved;
     if (count == 0)
     {
         return resolved;
@@ -1314,6 +1349,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcEndpoint.Gateway = endpoint.Gateway;
         wslcEndpoint.MacAddress = endpoint.MacAddress;
         wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
+        wslcEndpoint.Aliases = endpoint.Aliases.value_or(std::vector<std::string>{});
         wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
     }
 
@@ -1586,6 +1622,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto endpoints = ResolveEndpoints(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
 
+    auto primaryConfig =
+        ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+
+    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+        primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
@@ -1593,9 +1638,14 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Docker API v1.44 (Docker 25.x) requires the primary network to be present in EndpointsConfig
     // when EndpointsConfig is non-empty. Insert it so Docker attaches all networks at create time.
-    if (!request.NetworkingConfig.EndpointsConfig.empty() && NetworkModeAllocatesVmPorts(networkMode))
+    // Also insert when the caller supplied aliases for the primary endpoint.
+    if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || primaryConfig.Aliases.has_value()))
     {
-        request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+        auto [it, _] = request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+        if (primaryConfig.Aliases.has_value())
+        {
+            it->second.Aliases = std::move(primaryConfig.Aliases);
+        }
     }
 
     for (const auto& e : mappedPorts)

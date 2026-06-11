@@ -291,6 +291,11 @@ typedef struct _WSLCContainerNetwork
 
     [unique, size_is(NetworksCount)] const WSLCNetworkConnection* Networks;
     ULONG NetworksCount;
+
+    // Settings for the primary endpoint (the network identified by NetworkMode).
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
 } WSLCContainerNetwork;
 
 typedef enum _WSLCContainerFlags
