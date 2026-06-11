@@ -336,8 +336,9 @@ struct InspectContainer
     ContainerConfig Config;
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
+    std::vector<Mount> Mounts;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings, Mounts);
 };
 
 struct InspectExec

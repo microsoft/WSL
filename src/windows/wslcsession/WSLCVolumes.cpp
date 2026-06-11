@@ -151,6 +151,22 @@ bool WSLCVolumes::EnsureVolumeExists(const std::string& Name)
     return true;
 }
 
+void WSLCVolumes::TrackExistingVolume(const std::string& Name)
+{
+    if (Name.empty())
+    {
+        return;
+    }
+
+    auto lock = m_lock.lock_exclusive();
+
+    // OpenVolumeExclusiveLockHeld is a no-op when the volume is already tracked,
+    // and inspects + adopts it from the backend otherwise. It does not enqueue
+    // an expected create event, which is correct here: the volume already exists
+    // and OnVolumeEvent will not see a matching create.
+    OpenVolumeExclusiveLockHeld(Name);
+}
+
 void WSLCVolumes::DeleteVolume(LPCSTR Name)
 {
     THROW_HR_IF(E_POINTER, Name == nullptr);

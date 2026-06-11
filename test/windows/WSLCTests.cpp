@@ -2026,7 +2026,25 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        const std::vector<WSLCFilter> anonymousVolumeFilters = {{"driver", "guest"}, {"label", "com.docker.volume.anonymous="}};
+        // Anonymous volumes are surfaced as guest-driver volumes. podman does not tag them with
+        // docker's "com.docker.volume.anonymous" label (and its compat API exposes no anonymity
+        // signal), so identify the volume podman creates for the image's VOLUME instruction by
+        // diffing the guest-volume set across the container launch instead of filtering by label.
+        const std::vector<WSLCFilter> guestDriverFilter = {{"driver", "guest"}};
+        auto guestVolumes = [&]() { return ListVolumes(guestDriverFilter); };
+        auto newGuestVolumeSince = [&](const std::set<std::string>& baseline) {
+            std::string found;
+            for (const auto& name : guestVolumes())
+            {
+                if (!baseline.contains(name))
+                {
+                    VERIFY_IS_TRUE(found.empty()); // exactly one anonymous volume expected per container
+                    found = name;
+                }
+            }
+            VERIFY_IS_FALSE(found.empty());
+            return found;
+        };
 
         // Session-restart scenario: an anonymous volume-backed container survives a session reset.
         {
@@ -2058,50 +2076,54 @@ class WSLCTests
 
         // Delete container without WSLCDeleteFlagsDeleteVolumes -> anonymous volume is leaked.
         {
+            auto baseline = guestVolumes();
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-leak", {"test", "-d", "/volume"});
             auto container = launcher.Launch(*m_defaultSession);
             container.GetInitProcess().Wait();
             container.SetDeleteOnClose(false);
 
-            // Clean up any leaked anonymous volumes when this block exits.
+            const std::string anonVolume = newGuestVolumeSince(baseline);
+
+            // Clean up the leaked anonymous volume when this block exits.
             auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
                 ULONGLONG spaceReclaimed = 0;
                 LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, 0, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
             });
 
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 1u);
-
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
 
-            // Anonymous volume was NOT deleted by Docker.
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 1u);
+            // Anonymous volume was NOT deleted along with the container.
+            VERIFY_IS_TRUE(guestVolumes().contains(anonVolume));
         }
 
         // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
         {
+            auto baseline = guestVolumes();
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
             auto container = launcher.Launch(*m_defaultSession);
             container.SetDeleteOnClose(false);
 
-            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            const std::string anonVolume = newGuestVolumeSince(baseline);
 
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 1u);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_IS_TRUE(guestVolumes().contains(anonVolume));
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsDeleteVolumes));
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 0u);
+            VERIFY_IS_FALSE(guestVolumes().contains(anonVolume));
         }
 
         // Container with WSLCContainerFlagsRm -> anonymous volume cleaned up when the container auto-removes on exit.
         {
+            auto baseline = guestVolumes();
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
             launcher.SetContainerFlags(WSLCContainerFlagsRm);
 
             auto container = launcher.Launch(*m_defaultSession);
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 1u);
-            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            const std::string anonVolume = newGuestVolumeSince(baseline);
 
-            VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 0u);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_IS_FALSE(guestVolumes().contains(anonVolume));
         }
     }
 
@@ -4016,22 +4038,23 @@ class WSLCTests
             expectReject(opts, ARRAYSIZE(opts), L"unsupported volume driver options: type=nfs");
         }
 
-        // Blocked by Docker: device without type.
+        // Blocked: device without type. Docker's local driver rejects this; podman's does not,
+        // so WSLC validates it itself (see WSLCGuestVolumeImpl::ValidateDriverOpts).
         {
             WSLCDriverOption opts[] = {{"device", "/some/path"}};
-            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+            expectReject(opts, ARRAYSIZE(opts), L"\"type\" is required when \"device\" or \"o\" is set");
         }
 
-        // Blocked by Docker: device=tmpfs without type.
+        // Blocked: device=tmpfs without type.
         {
             WSLCDriverOption opts[] = {{"device", "tmpfs"}};
-            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+            expectReject(opts, ARRAYSIZE(opts), L"\"type\" is required when \"device\" or \"o\" is set");
         }
 
-        // Blocked by Docker: device and o without type.
+        // Blocked: device and o without type.
         {
             WSLCDriverOption opts[] = {{"device", "tmpfs"}, {"o", "size=100m"}};
-            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+            expectReject(opts, ARRAYSIZE(opts), L"\"type\" is required when \"device\" or \"o\" is set");
         }
     }
 

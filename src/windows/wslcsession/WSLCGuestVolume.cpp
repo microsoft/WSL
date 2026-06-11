@@ -42,6 +42,15 @@ namespace {
 
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
+
+        // Docker's local driver requires "type" whenever "device" or "o" is set.
+        // podman's local driver does not enforce this and silently creates an
+        // unusable volume, so validate it here to keep behavior consistent
+        // across backends.
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcUnsupportedVolumeDriverOpts("\"type\" is required when \"device\" or \"o\" is set"),
+            type.empty() && (DriverOpts.contains("device") || DriverOpts.contains("o")));
     }
 
 } // namespace

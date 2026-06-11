@@ -46,6 +46,15 @@ public:
     // new volume was created, false if it already existed.
     bool EnsureVolumeExists(_In_ const std::string& Name);
 
+    // Adopt an already-existing backend volume into tracking if it is not
+    // tracked yet. Used by the container-create path to register anonymous
+    // volumes that podman creates implicitly for a container (e.g. from an
+    // image VOLUME instruction). Unlike EnsureVolumeExists, this never creates
+    // the volume and never enqueues an expected create event, since the volume
+    // already exists and no further create event is expected. No-op if the
+    // volume is already tracked or does not exist in the backend.
+    void TrackExistingVolume(_In_ const std::string& Name);
+
     void DeleteVolume(_In_ LPCSTR Name);
 
     std::vector<WSLCVolumeInformation> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;

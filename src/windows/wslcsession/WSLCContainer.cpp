@@ -1800,6 +1800,19 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // from this function.
     EventTracker.WaitForObjectCreated(result.Id);
 
+    // Register any anonymous volumes podman created implicitly for this container (e.g. from an
+    // image VOLUME instruction). Named volumes were already owned by ProcessNamedVolumes; this is a
+    // no-op for those. podman's docker-compat /events stream does not reliably emit volume.create
+    // for container-driven implicit volumes, so without this they would never be tracked and would
+    // be invisible to ListVolumes / wslc volume management.
+    for (const auto& mount : inspectData.Mounts)
+    {
+        if (mount.Type == "volume" && !mount.Name.empty())
+        {
+            Volumes.TrackExistingVolume(mount.Name);
+        }
+    }
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
