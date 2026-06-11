@@ -1322,7 +1322,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 continue;
             }
 
-            // N.B. A Idle handle cannot be waiting for since it's not doing any IO.
+            // N.B. An Idle handle cannot be waited for since it's not doing any IO.
             if (entry.Handle->GetState() == IOHandleStatus::Idle)
             {
                 ++it;
