@@ -6836,7 +6836,7 @@ class WSLCTests
         {
             auto [hr, _] = launchWithAliasesNoThrow("alias-ctr-bridge", "bridge", {"db"});
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Network aliases require a user-defined network. Use '--network' to specify one.");
+            ValidateCOMErrorMessage(L"Network aliases require a user-defined network. Use --network to specify one.");
         }
 
         // Alias on 'none' mode — rejected.
