@@ -9,6 +9,11 @@ Param (
 
 Set-StrictMode -Version Latest
 
+# Make wsl.exe emit UTF-8 (instead of UTF-16) and have the console decode it as
+# such, so output captured from wsl.exe below is saved to log files readably.
+$env:WSL_UTF8 = "1"
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+
 function Test-WslApplication {
     param (
         $Name
@@ -78,6 +83,41 @@ function Collect-WindowsNetworkState {
     try { & vfpctrl.exe /list-vmswitch-port 2>&1 > $Folder/vfpctrl_list_vmswitch_port_"$ReproStep".log } catch {}
     try { Get-VMSwitch | select Name,Id,SwitchType | Out-File -FilePath "$Folder/Get-VMSwitch_$ReproStep.log" -Append } catch {}
     try { Get-NetUdpEndpoint | Out-File -FilePath "$Folder/Get-NetUdpEndpoint_$ReproStep.log" -Append } catch {}
+}
+
+function Collect-LinuxDiagnostics {
+    param (
+        $Folder
+    )
+
+    # Collect guest-side state that is useful for diagnosing in-distro failures
+    # (e.g. "Resource temporarily unavailable" / EAGAIN from hitting process,
+    # thread, file-descriptor or memory limits). Best-effort: skipped if WSL is
+    # not installed or no distribution is available.
+    try
+    {
+        # Detect the super user (uid=0, not necessarily named "root" - see #11693)
+        $superUser = & wsl.exe -- id -nu 0 2>$null
+        if ([string]::IsNullOrWhiteSpace($superUser))
+        {
+            return
+        }
+
+        $script = @(
+            'echo "=== uname -a ==="; uname -a',
+            'echo "=== uptime ==="; uptime',
+            'echo "=== free -m ==="; free -m',
+            'echo "=== ulimit -a ==="; ulimit -a',
+            'echo "=== /proc/sys/kernel/pid_max ==="; cat /proc/sys/kernel/pid_max',
+            'echo "=== /proc/sys/kernel/threads-max ==="; cat /proc/sys/kernel/threads-max',
+            'echo "=== process/thread count (ps -eLf | wc -l) ==="; ps -eLf | wc -l',
+            'echo "=== top processes by RSS ==="; ps -eo pid,ppid,rss,comm --sort=-rss | head -n 20',
+            'echo "=== dmesg ==="; dmesg'
+        ) -join '; '
+
+        & wsl.exe -u $superUser -e sh -lc $script 2>&1 | Out-File -FilePath "$Folder/linux_diagnostics.log" -Encoding utf8
+    }
+    catch {}
 }
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
@@ -184,6 +224,14 @@ reg.exe export "HKEY_CLASSES_ROOT\CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce7e}" 
 Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" > $folder/windows-version.txt
 
 Get-Service wslservice -ErrorAction Ignore | Format-list * -Force  > $folder/wslservice.txt
+
+# Collect WSL version and distribution state. This is more reliable and readable
+# than inferring the version/distro layout from the appx package and registry.
+& wsl.exe --version  > $folder/wsl-info.txt 2>&1
+"`n=== wsl --status ==="    | Out-File -FilePath $folder/wsl-info.txt -Append
+& wsl.exe --status        2>&1 | Out-File -FilePath $folder/wsl-info.txt -Append
+"`n=== wsl --list --verbose ===" | Out-File -FilePath $folder/wsl-info.txt -Append
+& wsl.exe --list --verbose 2>&1 | Out-File -FilePath $folder/wsl-info.txt -Append
 
 $wslconfig = "$env:USERPROFILE/.wslconfig"
 if (Test-Path $wslconfig)
@@ -316,6 +364,10 @@ finally
     wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
 }
 
+# Collect guest-side diagnostics after the repro (dmesg retains history, so this
+# captures kernel messages emitted during the repro).
+Collect-LinuxDiagnostics -Folder $folder
+
 # Networking-specific post-repro collection
 if ($LogProfile -eq "networking")
 {
@@ -383,6 +435,9 @@ if ($Dump)
         if (-not $Result)
         {
             Write-Host "Failed to write dump for: $($dumpFile)"
+            # Remove the empty file so the archive isn't littered with 0-byte
+            # dumps that look like real (but truncated) captures.
+            Remove-Item $dumpFile -ErrorAction Ignore
         }
     }
 }
