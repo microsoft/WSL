@@ -45,6 +45,7 @@ using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
+using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace settings = wsl::windows::wslc::settings;
 
@@ -268,8 +269,10 @@ void WSLCSessionManagerImpl::CreateSession(
         notifier = wil::MakeOrThrow<WSLCPluginNotifier>(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
-        // Create the VM in the SYSTEM service (privileged).
-        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        // Create the VM factory in the SYSTEM service (privileged). The per-user session
+        // uses it to create the VM. Funneling VM creation through a factory lets the session
+        // own when VMs are created, rather than having one handed to it up front.
+        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
@@ -278,7 +281,7 @@ void WSLCSessionManagerImpl::CreateSession(
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
+        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{

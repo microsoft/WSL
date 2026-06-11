@@ -362,6 +362,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLCVirtualMachineFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B}">
+                    <RegistryValue Value="IWSLCVirtualMachineFactory" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLCPluginNotifier-->
                 <RegistryKey Root="HKCR" Key="Interface\{F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2}">
                     <RegistryValue Value="IWSLCPluginNotifier" Type="string" />
