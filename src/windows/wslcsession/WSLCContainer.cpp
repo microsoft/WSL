@@ -230,6 +230,8 @@ EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG 
         return config;
     }
 
+    THROW_HR_IF_MSG(E_INVALIDARG, settings == nullptr, "Settings is null with SettingsCount=%lu", count);
+
     auto parsed = ParseKeyMultiValuePairs(settings, count);
 
     for (const auto& [key, _] : parsed)
