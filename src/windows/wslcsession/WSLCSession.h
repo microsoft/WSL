@@ -229,13 +229,9 @@ private:
     void OnVmExited();
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+    void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
-
-    // Mirrors the host's trusted root certificate authorities into the UVM so that dockerd/containerd
-    // can establish TLS connections to private registries that use a certificate chaining up to a
-    // CA trusted by Windows. Best-effort: failures are logged but do not fail session initialization.
-    void InstallTrustedRootCertificates();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();

@@ -43,7 +43,6 @@ void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string&
         CERT_STORE_PROV_SYSTEM_W, 0, NULL, StoreFlags | CERT_STORE_READONLY_FLAG | CERT_STORE_OPEN_EXISTING_FLAG, L"ROOT")};
     if (!store)
     {
-        // The store may not exist (for example, no per-user root store); this is not fatal.
         LOG_LAST_ERROR_MSG("CertOpenStore failed for ROOT store (flags 0x%x)", StoreFlags);
         return;
     }
@@ -72,7 +71,6 @@ std::string CollectTrustedRootCertificatesPem()
     std::set<std::string> seen;
     std::string pem;
 
-    // Machine roots first: enterprise CAs distributed via group policy land here.
     AppendRootStore(CERT_SYSTEM_STORE_LOCAL_MACHINE, seen, pem);
     AppendRootStore(CERT_SYSTEM_STORE_CURRENT_USER, seen, pem);
 

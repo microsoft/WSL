@@ -309,8 +309,7 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    // Mirror the host's trusted root CAs into the UVM before the daemons start so that they trust
-    // private registries using certificates issued by a CA trusted by Windows.
+    // Mirror the host's trusted root CAs into the VM before dockerd starts.
     InstallTrustedRootCertificates();
 
     // Launch containerd first
@@ -570,16 +569,15 @@ try
         return;
     }
 
-    // dockerd and containerd are Go binaries that read the certificates found in /etc/ssl/certs into
-    // their default system certificate pool, so dropping a bundle there is sufficient for both daemons.
+    // dockerd and containerd read the certificates found in /etc/ssl/certs into
+    // their default system certificate pool.
     constexpr auto c_certPath = "/etc/ssl/certs/wsl-windows-roots.pem";
     const auto script = std::format("set -e; mkdir -p /etc/ssl/certs && cat > {}", c_certPath);
 
     ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", script}, {}, WSLCProcessFlagsStdin);
     auto process = launcher.Launch(*m_virtualMachine);
 
-    // Stream the PEM bundle to the process's stdin. The io context (and the WriteHandle it owns) are
-    // scoped so that stdin is closed once the write completes, signaling EOF so that `cat` exits.
+    // Stream the PEM bundle.
     {
         auto io = CreateIOContext();
         io.AddHandle(
@@ -592,16 +590,14 @@ try
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
     WSL_LOG(
-        "InstallTrustedRootCertificates",
+        "InstalledTrustedRootCertificates",
         TraceLoggingValue(c_certPath, "Path"),
         TraceLoggingValue(static_cast<uint64_t>(pem.size()), "BundleBytes"));
 }
 catch (...)
 {
-    // Best-effort: failing to install the host's trusted roots must not prevent the session from
-    // starting. Registries using a certificate from a publicly trusted CA continue to work through
-    // the guest's built-in CA bundle.
-    LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the UVM");
+    // Best-effort: failing to install the host's trusted roots must not prevent the session from starting.
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the VM");
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
