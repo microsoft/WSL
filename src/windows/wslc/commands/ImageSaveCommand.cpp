@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::ImageId, true, NO_LIMIT),
         Argument::Create(ArgType::Output),
         Argument::Create(ArgType::Session),
     };

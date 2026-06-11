@@ -918,6 +918,10 @@ Faller tilbake til NAT-nettverk.</value>
     <value>DNS-tunnelering støttes ikke</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows-vertsfilen er for stor og vil ikke vises i WSL. Vurder å redusere størrelsen på %SystemRoot%\System32\drivers\etc\hosts</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Innstillingen wsl2.localhostForwarding har ingen effekt ved bruk av avspeilet nettverksmodus</value>
   </data>
@@ -2111,16 +2115,13 @@ Bruk:
     <value>Beholderen «{}» kjører ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress støttes ikke ennå.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Beholderen «{}» kjører.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Tilleggsnettverk er ikke tillatt med beholdernettverksmodus.</value>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress støttes ikke ennå.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttilordninger støttes ikke med beholdernettverksmodus. porter eies av målbeholderen.</value>
@@ -2135,9 +2136,6 @@ Bruk:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>Beholder {} ikke funnet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Navn på beholdernettverk kreves for egendefinert nettverkstype.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nettverksnavnet kan ikke være tomt</value>
@@ -2332,12 +2330,20 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Nettverket {} finnes allerede.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Nettverksmodusen støttes ikke: «{}»</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
     <value>Flere nettverk er ikke tillatt når den primære nettverksmodusen er «vert» (host) eller «ingen» (none).</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplisert nettverk: «{}»</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Endepunktinnstillinger støttes ikke ennå (nettverk «{}»).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2370,6 +2376,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Ugyldig bildemerkeformat: «{}». Forventet format er «navn:merke»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Lagring pågår.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC er beholder-CLI-verktøyet for Windows-undersystemet for Linux.</value>
@@ -2707,6 +2716,14 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Kommandoen som skal kjøres</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Antall CPUer (f.eks. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Ugyldig {} argumentverdi: {}. Forventet et positivt antall CPU-er (f.eks. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Slett beholdere selv om de kjører</value>
   </data>
@@ -2776,11 +2793,25 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Vis den sist opprettede beholderen (inkluderer alle tilstander)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Minnegrense (f.eks. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Beholderens vertsnavn</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Navn på beholderen</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Koble containeren til et nettverk</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Ugyldig {}-verdi: nettverksnavnet kan ikke være tomt eller inneholde mellomrom</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>Nettverk i vertmodus støttes ikke</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Ikke bruk hurtigbuffer når du bygger avbildningen</value>
@@ -2835,13 +2866,13 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Antall linjer som skal vises fra slutten av loggene</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>Vis timestamps i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logger siden timestamp (f.eks. unix epoch-sekunder)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>Vis logger før timestamp (f.eks. unix epoch-sekunder)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildereferanse i bilde-navn[:merke]-format</value>
@@ -2864,6 +2895,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeidsmappe i beholderen</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Ugyldig {}-verdi: arbeidsmappen kan ikke være tom eller inneholde mellomrom</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Skriv beholder-ID-en til banen som er angitt</value>
@@ -2908,6 +2943,14 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Monter tmpfs til beholderen på angitt bane</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit-alternativer (format: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], bruk -1 for ubegrenset)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Ugyldig {} argumentverdi: {}. Forventet &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (bruk -1 for ubegrenset)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>Bruker-ID for prosessen (name|uid|uid:gid)</value>
@@ -2963,6 +3006,50 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Forespurt lasting, men ingen inndata oppgitt.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Administrer nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>Administrer livssyklusen til WSL nettverk, inkludert oppretting, inspeksjon, oppføring og sletting av dem.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Opprett et nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Oppretter et nytt nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Angi navn på nettverksdriver (standard: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Innstilling for nettverksmetadata</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Fjern ett eller flere nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Fjerner ett eller flere nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>Vis detaljert informasjon på ett eller flere nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>Vis detaljert informasjon på ett eller flere nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>Vis nettverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Viser alle nettverk i økten.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Nettverksnavn</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Sender bare nettverksnavn</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Administrer volumer.</value>
@@ -3117,6 +3204,40 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
     <value>Advarsel: Innstillingsfilen på {} er tom eller har ugyldig struktur. Forventet en YAML-tilordning.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>Kan ikke gjenopprette beholderen {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>Kan ikke gjenopprette nettverket {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>Kan ikke gjenopprette volumet {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>Kan ikke initialisere bytte</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>Kan ikke gjenopprette tidsstempel for beholderen {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>Kunne ikke tolke fremdriften for bildeimport</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>Kan ikke demontere volumet {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>Kan ikke stoppe beholderen {} etter avvisning av programtillegg</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>Kan ikke frigi vertsressurser for volum {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

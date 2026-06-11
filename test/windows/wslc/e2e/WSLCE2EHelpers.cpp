@@ -52,7 +52,7 @@ namespace {
     {
         const auto sessionManager = OpenSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -244,6 +244,36 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
     }
 }
 
+void VerifyNetworkIsListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Network '{}' not found in network list output", networkName).c_str());
+}
+
+void VerifyNetworkIsNotListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            VERIFY_FAIL(std::format(L"Network '{}' found in network list output", networkName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -422,6 +452,31 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
     }
 }
 
+void EnsureNetworkDoesNotExist(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            auto deleteResult = RunWslc(std::format(L"network rm {}", networkName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+wslc_schema::Network InspectNetwork(const std::wstring& networkName)
+{
+    auto result = RunWslc(std::format(L"network inspect {}", networkName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::Network>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 {
     // Ensure the default elevated session exists before opening it via COM.
@@ -497,5 +552,45 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
     return std::format(L"python3 -m http.server {}", port);
+}
+
+namespace {
+
+    void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+    {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const std::string data = session.GetStdoutData();
+                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
+                },
+                std::chrono::milliseconds(200),
+                std::chrono::seconds(60));
+        }
+        catch (...)
+        {
+            const std::string data = session.GetStdoutData();
+            VERIFY_FAIL(std::format(
+                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
+                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                            .c_str());
+        }
+    }
+
+} // namespace
+
+void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+{
+    constexpr SHORT resizedColumns = 100;
+    constexpr SHORT resizedRows = 37;
+    VERIFY_IS_TRUE(columns != resizedColumns || rows != resizedRows, L"Resized tty size must differ from the initial size");
+
+    WaitForTtySize(session, columns, rows);
+
+    session.ResizePseudoConsole(resizedColumns, resizedRows);
+    WaitForTtySize(session, resizedColumns, resizedRows);
+
+    session.Terminate();
 }
 } // namespace WSLCE2ETests

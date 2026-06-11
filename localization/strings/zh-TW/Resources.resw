@@ -924,6 +924,10 @@ Windows 版本： {}</value>
     <value>不支援 DNS 通道</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows 主機檔案太大，將不會反映在 WSL 內。請考慮縮小 %SystemRoot%\System32\drivers\etc\hosts 的大小</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>使用鏡像網路模式時，wsl2.localhostForwarding 設定沒有作用</value>
   </data>
@@ -2117,16 +2121,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器 '{}' 未執行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress 尚未支援。</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>容器 '{}' 正在執行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>容器網路模式不允許其他網路。</value>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress 尚未支援。</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器網路模式不支援連接埠對應；連接埠由目標容器擁有。</value>
@@ -2141,9 +2142,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>找不到容器 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>自訂網路類型需要容器網路名稱。</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>網路名稱不可為空白。</value>
@@ -2338,12 +2336,20 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>網路 '{}' 已存在。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>不支援的網路模式: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
     <value>當主要網路模式為 'host' 或 'none' 時，不允許使用其他網路。</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>重複的網路: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>網路 '{}' 尚不支援端點設定 ()。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2376,6 +2382,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>影像標籤格式無效: '{}'.預期格式為 name:tag</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>正在進行儲存。</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC 是 Windows 子系統 Linux 版容器 CLI 工具。</value>
@@ -2713,6 +2722,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>要執行的命令</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>CPU 數量 (例如 0.5、1、2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>無效的 {} 引數值: '{}'。預期 CPU 數量應為正值 (例如 0.5、1、2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>即使容器正在執行，仍將其刪除</value>
   </data>
@@ -2782,11 +2799,25 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>顯示最新建立的容器 (包含所有狀態)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>記憶體限制 (例如 512M、1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>容器主機名稱</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>容器名稱</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>將容器連線到網路</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>{} 值無效： 網路名稱不可為空白或空白字元</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>不支援主機模式網路</value>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>建置影像時請勿使用快取</value>
@@ -2841,13 +2872,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>從記錄結尾所要顯示的行數</value>
   </data>
   <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
+    <value>在記錄輸出中顯示時間戳記</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
+    <value>顯示時間戳記之後的記錄 (例如: Unix Epoch 秒數)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
+    <value>顯示時間戳記之前的記錄 (例如: Unix Epoch 秒數)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>影像名稱[:tag] 格式中的新影像參考</value>
@@ -2870,6 +2901,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器內的工作目錄</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>{} 值無效： 工作目錄不可為空白或空白字元</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>將容器識別碼寫入提供的路徑</value>
@@ -2914,6 +2949,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>在指定路徑將 tmpfs 掛接至容器</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit 選項 (格式： &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]，使用 -1 不受限制)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>{} 引數值無效： '{}'。預期 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (使用 -1 進行無限制的)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>處理序的使用者識別碼 (name|uid|uid:gid)</value>
@@ -2969,6 +3012,50 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>已要求載入，但未提供輸入。</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>管理網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>管理 WSL 網路的生命週期，包括建立、檢查、列出及刪除網路。</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>建立網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>建立新的網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>指定網路驅動程式名稱 (預設值: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>網路中繼資料設定</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>移除一或多個網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>移除一或多個網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>顯示一或多個網路上的詳細資訊。</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>顯示一或多個網路上的詳細資訊。</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>列出網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>列出工作階段中的所有網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>網路名稱</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>僅輸出網路名稱</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>管理磁碟區。</value>
@@ -3123,6 +3210,40 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
     <value>警告： 位於 {} 的設定檔案是空的或具有無效的結構。必須是 YAML 對應。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>無法復原容器 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>無法復原網路 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>無法復原磁碟區 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>無法初始化交換</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>無法還原容器 '{}' 的時間戳記</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>無法剖析映像匯入進度</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>無法卸載磁碟區 '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>無法在外掛程式拒絕後停止容器 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>無法釋放磁碟區 '{}' 的主機資源</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

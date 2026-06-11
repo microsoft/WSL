@@ -23,6 +23,9 @@ WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
  
+WslcRegisterSessionCrashDumpCallback
+WslcReleaseCrashDumpSubscription
+ 
 WslcTerminateSession
 WslcSessionAuthenticate
 WslcPullSessionImage

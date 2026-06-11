@@ -369,6 +369,8 @@ bool HcsVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 HRESULT HcsVirtualMachine::GetId(_Out_ GUID* VmId)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, VmId);
+
     *VmId = m_vmId;
     return S_OK;
 }
@@ -377,6 +379,8 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::AcceptConnection(_Out_ HANDLE* Socket)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Socket);
+
     auto socket = wsl::windows::common::hvsocket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
@@ -652,6 +656,8 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::GetTerminationEvent(_Out_ HANDLE* Event)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Event);
+
     *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
 
     return S_OK;

@@ -34,6 +34,8 @@ CATCH_RETURN();
 HRESULT WSLCProcess::GetExitEvent(HANDLE* Event)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Event);
+
     *Event = wsl::windows::common::wslutil::DuplicateHandle(m_control->GetExitEvent().get(), SYNCHRONIZE, FALSE);
     return S_OK;
 }
@@ -42,6 +44,7 @@ CATCH_RETURN();
 HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCHandle* Handle)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Handle);
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
 
     auto typedHandle = m_io->OpenFd(Fd);
@@ -68,6 +71,8 @@ CATCH_RETURN();
 HRESULT WSLCProcess::GetFlags(WSLCProcessFlags* Flags)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Flags);
+
     *Flags = m_flags;
     return S_OK;
 }
@@ -88,6 +93,8 @@ HANDLE WSLCProcess::GetExitEvent()
 HRESULT WSLCProcess::GetPid(int* Pid)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Pid);
+
     *Pid = m_control->GetPid();
     return S_OK;
 }
@@ -101,6 +108,9 @@ int WSLCProcess::GetPid() const
 HRESULT WSLCProcess::GetState(WSLCProcessState* State, int* Code)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, State);
+    RETURN_HR_IF_NULL(E_POINTER, Code);
+
     std::tie(*State, *Code) = m_control->GetState();
     return S_OK;
 }

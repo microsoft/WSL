@@ -33,10 +33,14 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachine* Vm,
     _In_ IWSLCPluginNotifier* PluginNotifier,
+    _In_opt_ IWarningCallback* WarningCallback,
     _Out_ IWSLCSession** Session,
     _Out_ IWSLCSessionReference** ServiceRef)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    RETURN_HR_IF_NULL(E_POINTER, ServiceRef);
+
     *Session = nullptr;
     *ServiceRef = nullptr;
 
@@ -48,7 +52,7 @@ try
     session->SetDestructionCallback(std::move(m_destructionCallback));
 
     // Initialize the session with the VM.
-    RETURN_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier));
+    RETURN_IF_FAILED(session->Initialize(Settings, Vm, PluginNotifier, WarningCallback));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());
@@ -70,6 +74,8 @@ CATCH_RETURN()
 HRESULT wslc::WSLCSessionFactory::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
+
     wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
     RETURN_LAST_ERROR_IF(!process);
 

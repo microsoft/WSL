@@ -294,6 +294,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     //
 
     ConsoleState Io;
+    Io.SetInteractiveMode();
     COORD WindowSize = Io.GetWindowSize();
     ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
     if (WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_USE_SYSTEM_DISTRO))
