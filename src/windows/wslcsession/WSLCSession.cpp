@@ -2979,7 +2979,7 @@ try
     *Event = nullptr;
 
     // Duplicate the "terminated" event. The caller owns the returned handle, which stays valid even after the session is released.
-    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get());
+    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get(), SYNCHRONIZE);
 
     return S_OK;
 }

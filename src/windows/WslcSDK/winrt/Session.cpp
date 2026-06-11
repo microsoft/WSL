@@ -45,18 +45,6 @@ Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& setti
     }
 }
 
-Session::~Session()
-{
-    // Stop watching the termination handle and drain any in-flight callback before the rest of the
-    // session is torn down. Releasing the session handle below can signal the termination event, so the
-    // wait must be cancelled first to avoid the callback running against a half-destructed object.
-    if (m_terminationWait)
-    {
-        SetThreadpoolWait(m_terminationWait.get(), nullptr, nullptr);
-        WaitForThreadpoolWaitCallbacks(m_terminationWait.get(), TRUE);
-    }
-}
-
 void Session::Start()
 {
     if (m_session)
