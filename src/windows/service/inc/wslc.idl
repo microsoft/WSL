@@ -533,6 +533,26 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 }
 
+//
+// IWSLCVirtualMachineFactory - Creates VMs on demand for a session.
+//
+// Held by the per-user session process and implemented by the SYSTEM service.
+// This lets the session create a fresh VM at any time (e.g. to recreate a VM that
+// was idle-terminated when it had no running containers), instead of the service
+// eagerly creating a single VM up front. Each successful call returns a new VM whose
+// lifetime is owned by the caller: releasing the IWSLCVirtualMachine tears it down.
+//
+[
+    uuid(2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B),
+    pointer_default(unique),
+    object
+]
+interface IWSLCVirtualMachineFactory : IUnknown
+{
+    // Creates a new VM using the settings captured at session creation time.
+    HRESULT CreateVirtualMachine([out] IWSLCVirtualMachine** Vm);
+}
+
 typedef enum _WSLCSessionStorageFlags
 {
     WSLCSessionStorageFlagsNone = 0,
@@ -803,10 +823,10 @@ interface IWSLCSession : IUnknown
     // Returns a handle to this COM server process (used to add to job object).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Initializes the session with a pre-created VM.
+    // Initializes the session with a VM factory. VMs are created through the factory.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCVirtualMachineFactory* VmFactory,
         [in] IWSLCPluginNotifier* PluginNotifier,
         [in, unique] IWarningCallback* WarningCallback);
 
@@ -863,7 +883,7 @@ interface IWSLCSessionFactory : IUnknown
     // Creates a new session and returns both the session interface and a service reference.
     HRESULT CreateSession(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCVirtualMachineFactory* VmFactory,
         [in] IWSLCPluginNotifier* PluginNotifier,
         [in, unique] IWarningCallback* WarningCallback,
         [out] IWSLCSession** Session,
