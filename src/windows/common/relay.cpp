@@ -324,12 +324,30 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
         DWORD leftBytesRead = 0;
         if (!leftReadPending && LeftHandle)
         {
+            bool leftEof = false;
             if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
             {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-                leftReadPending = true;
+                const auto lastError = GetLastError();
+                if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE))
+                {
+                    leftEof = true;
+                }
+                else
+                {
+                    THROW_LAST_ERROR_IF(lastError != ERROR_IO_PENDING);
+                    leftReadPending = true;
+                }
             }
             else if (leftBytesRead == 0)
+            {
+                leftEof = true;
+            }
+            else
+            {
+                leftReadPending = true;
+            }
+
+            if (leftEof)
             {
                 LeftHandle = nullptr;
                 if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
@@ -339,21 +357,35 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
 
                 continue;
             }
-            else
-            {
-                leftReadPending = true;
-            }
         }
 
         DWORD rightBytesRead = 0;
         if (!rightReadPending && RightHandle)
         {
+            bool rightEof = false;
             if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
             {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-                rightReadPending = true;
+                const auto lastError = GetLastError();
+                if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE))
+                {
+                    rightEof = true;
+                }
+                else
+                {
+                    THROW_LAST_ERROR_IF(lastError != ERROR_IO_PENDING);
+                    rightReadPending = true;
+                }
             }
             else if (rightBytesRead == 0)
+            {
+                rightEof = true;
+            }
+            else
+            {
+                rightReadPending = true;
+            }
+
+            if (rightEof)
             {
                 RightHandle = nullptr;
                 if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
@@ -362,10 +394,6 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
                 }
 
                 continue;
-            }
-            else
-            {
-                rightReadPending = true;
             }
         }
 
@@ -997,8 +1025,12 @@ try
             }
         }
 
-        // Only wait if all non-completed inputs have a scheduled ReadFile to avoid a pipe hang.
-        if (std::all_of(Inputs.begin(), Inputs.end(), [](const auto& e) { return e.State == Eof || e.State == Pending; }))
+        // Only wait if every non-completed input has a scheduled ReadFile (to avoid a pipe hang) and at least
+        // one input is still pending. If all inputs have reached EOF there is nothing to wait for, so loop back
+        // and let the top-of-loop check terminate the relay instead of blocking forever on the exit event.
+        const bool anyPending = std::any_of(Inputs.begin(), Inputs.end(), [](const auto& e) { return e.State == Pending; });
+        if (anyPending &&
+            std::all_of(Inputs.begin(), Inputs.end(), [](const auto& e) { return e.State == Eof || e.State == Pending; }))
         {
             // Wait until a handle is signaled.
             std::vector<HANDLE> waits{m_exitEvent.get()};
