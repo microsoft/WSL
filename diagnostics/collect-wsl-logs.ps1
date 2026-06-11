@@ -14,6 +14,44 @@ Set-StrictMode -Version Latest
 $env:WSL_UTF8 = "1"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
+function Invoke-WslWithTimeout {
+    param (
+        [string[]]$Arguments,
+        [int]$TimeoutSeconds = 30,
+        [switch]$IncludeStderr
+    )
+
+    # Invoke wsl.exe with a timeout so log collection never hangs if the WSL
+    # service is deadlocked or the VM is in a bad state. The call runs in a
+    # background job (preserving native argument handling) and is stopped if it
+    # exceeds the timeout. Returns an object with the captured output (UTF-8)
+    # and whether the call timed out.
+    $job = Start-Job -ScriptBlock {
+        param ($WslArgs, $IncludeStderr)
+        $env:WSL_UTF8 = "1"
+        if ($IncludeStderr)
+        {
+            $output = & wsl.exe @WslArgs 2>&1
+        }
+        else
+        {
+            $output = & wsl.exe @WslArgs 2>$null
+        }
+        return ($output | Out-String)
+    } -ArgumentList (, $Arguments), ([bool]$IncludeStderr)
+
+    if (Wait-Job $job -Timeout $TimeoutSeconds)
+    {
+        $output = Receive-Job $job
+        Remove-Job $job -Force -ErrorAction Ignore
+        return [PSCustomObject]@{ TimedOut = $false; Output = ($output | Out-String) }
+    }
+
+    Stop-Job $job -ErrorAction Ignore
+    Remove-Job $job -Force -ErrorAction Ignore
+    return [PSCustomObject]@{ TimedOut = $true; Output = "" }
+}
+
 function Test-WslApplication {
     param (
         $Name
@@ -93,31 +131,34 @@ function Collect-LinuxDiagnostics {
     # Collect guest-side state that is useful for diagnosing in-distro failures
     # (e.g. "Resource temporarily unavailable" / EAGAIN from hitting process,
     # thread, file-descriptor or memory limits). Best-effort: skipped if WSL is
-    # not installed or no distribution is available.
-    try
+    # not installed or no distribution is available. Every wsl.exe call is
+    # timeout-guarded so a deadlocked service / bad VM state cannot hang here.
+
+    # Detect the super user (uid=0, not necessarily named "root" - see #11693)
+    $superUserResult = Invoke-WslWithTimeout -Arguments @("--", "id", "-nu", "0")
+    $superUser = $superUserResult.Output.Trim()
+    if ($superUserResult.TimedOut -or [string]::IsNullOrWhiteSpace($superUser))
     {
-        # Detect the super user (uid=0, not necessarily named "root" - see #11693)
-        $superUser = & wsl.exe -- id -nu 0 2>$null
-        if ([string]::IsNullOrWhiteSpace($superUser))
-        {
-            return
-        }
-
-        $script = @(
-            'echo "=== uname -a ==="; uname -a',
-            'echo "=== uptime ==="; uptime',
-            'echo "=== free -m ==="; free -m',
-            'echo "=== ulimit -a ==="; ulimit -a',
-            'echo "=== /proc/sys/kernel/pid_max ==="; cat /proc/sys/kernel/pid_max',
-            'echo "=== /proc/sys/kernel/threads-max ==="; cat /proc/sys/kernel/threads-max',
-            'echo "=== process/thread count (ps -eLf | wc -l) ==="; ps -eLf | wc -l',
-            'echo "=== top processes by RSS ==="; ps -eo pid,ppid,rss,comm --sort=-rss | head -n 20',
-            'echo "=== dmesg ==="; dmesg'
-        ) -join '; '
-
-        & wsl.exe -u $superUser -e sh -lc $script 2>&1 | Out-File -FilePath "$Folder/linux_diagnostics.log" -Encoding utf8
+        return
     }
-    catch {}
+
+    $script = @(
+        'echo "=== uname -a ==="; uname -a',
+        'echo "=== uptime ==="; uptime',
+        'echo "=== free -m ==="; free -m',
+        'echo "=== ulimit -a ==="; ulimit -a',
+        'echo "=== /proc/sys/kernel/pid_max ==="; cat /proc/sys/kernel/pid_max',
+        'echo "=== /proc/sys/kernel/threads-max ==="; cat /proc/sys/kernel/threads-max',
+        'echo "=== process/thread count (ps -eLf | wc -l) ==="; ps -eLf | wc -l',
+        'echo "=== top processes by RSS ==="; ps -eo pid,ppid,rss,comm --sort=-rss | head -n 20',
+        'echo "=== dmesg ==="; dmesg'
+    ) -join '; '
+
+    $result = Invoke-WslWithTimeout -Arguments @("-u", $superUser, "-e", "sh", "-lc", $script) -TimeoutSeconds 60 -IncludeStderr
+    if (-not $result.TimedOut)
+    {
+        $result.Output | Out-File -FilePath "$Folder/linux_diagnostics.log" -Encoding utf8
+    }
 }
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
@@ -227,11 +268,25 @@ Get-Service wslservice -ErrorAction Ignore | Format-list * -Force  > $folder/wsl
 
 # Collect WSL version and distribution state. This is more reliable and readable
 # than inferring the version/distro layout from the appx package and registry.
-& wsl.exe --version  > $folder/wsl-info.txt 2>&1
-"`n=== wsl --status ==="    | Out-File -FilePath $folder/wsl-info.txt -Append
-& wsl.exe --status        2>&1 | Out-File -FilePath $folder/wsl-info.txt -Append
-"`n=== wsl --list --verbose ===" | Out-File -FilePath $folder/wsl-info.txt -Append
-& wsl.exe --list --verbose 2>&1 | Out-File -FilePath $folder/wsl-info.txt -Append
+# Each wsl.exe call is timeout-guarded so a deadlocked service / bad VM state
+# cannot hang collection, and output is written as UTF-8 for cross-platform tools.
+$wslInfoFile = "$folder/wsl-info.txt"
+foreach ($entry in @(
+        @{ Header = "=== wsl --version ===";        Arguments = @("--version") },
+        @{ Header = "=== wsl --status ===";         Arguments = @("--status") },
+        @{ Header = "=== wsl --list --verbose ==="; Arguments = @("--list", "--verbose") }))
+{
+    $entry.Header | Out-File -FilePath $wslInfoFile -Append -Encoding utf8
+    $result = Invoke-WslWithTimeout -Arguments $entry.Arguments -IncludeStderr
+    if ($result.TimedOut)
+    {
+        "(wsl.exe $($entry.Arguments -join ' ') timed out)" | Out-File -FilePath $wslInfoFile -Append -Encoding utf8
+    }
+    else
+    {
+        $result.Output | Out-File -FilePath $wslInfoFile -Append -Encoding utf8
+    }
+}
 
 $wslconfig = "$env:USERPROFILE/.wslconfig"
 if (Test-Path $wslconfig)
@@ -457,28 +512,6 @@ function Get-Prop
     return $null
 }
 
-# Enumerate installed distributions from the registry.
-$distributions = @()
-$lxssKey = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss"
-if (Test-Path $lxssKey)
-{
-    foreach ($subKey in (Get-ChildItem $lxssKey -ErrorAction Ignore))
-    {
-        $props = Get-ItemProperty $subKey.PSPath -ErrorAction Ignore
-        $name = Get-Prop $props "DistributionName"
-        if ($name -ne $null)
-        {
-            $distributions += [ordered]@{
-                name    = $name
-                state   = Get-Prop $props "State"
-                version = Get-Prop $props "Version"
-                flavor  = Get-Prop $props "Flavor"
-                modern  = Get-Prop $props "Modern"
-            }
-        }
-    }
-}
-
 # Inventory the dumps that were actually written (empty ones were removed above).
 $dumps = @()
 $dumpFolder = Join-Path $folder "dumps"
@@ -490,20 +523,13 @@ if (Test-Path $dumpFolder)
     }
 }
 
-# Determine the networking mode (defaults to NAT unless overridden in .wslconfig).
-$networkingMode = "default (NAT)"
-if (Test-Path $wslconfig)
-{
-    $match = Select-String -Path $wslconfig -Pattern '^\s*networkingMode\s*=\s*(\S+)' -ErrorAction Ignore | Select-Object -First 1
-    if ($match -ne $null)
-    {
-        $networkingMode = $match.Matches[0].Groups[1].Value
-    }
-}
-
 $appx = Get-AppxPackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore | Select-Object -First 1
 $winCV = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction Ignore
 
+# Keep this summary basic: profile, versions and the dump inventory. State that
+# can be readily derived from the rest of the archive (the installed
+# distributions in HKCU.txt, the networking mode in .wslconfig) is intentionally
+# not duplicated here.
 $summary = [ordered]@{
     collectedAt         = (Get-Date -Format "o")
     logProfile          = $logProfileDisplay
@@ -516,9 +542,7 @@ $summary = [ordered]@{
         displayVersion = Get-Prop $winCV "DisplayVersion"
         edition        = Get-Prop $winCV "EditionID"
     }
-    networkingMode      = $networkingMode
     wslConfigPresent    = [bool](Test-Path $wslconfig)
-    distributions       = $distributions
     dumps               = $dumps
 }
 $summary | ConvertTo-Json -Depth 5 | Out-File -FilePath "$folder/summary.json" -Encoding utf8
@@ -541,7 +565,7 @@ Start with ``summary.json`` (machine-readable overview) and
 
 | File | What it is |
 |------|------------|
-| summary.json | Machine-readable overview: profile, versions, distros, networking mode, dumps. |
+| summary.json | Machine-readable overview: profile, versions, dumps. |
 | collection-info.txt | Which WPR profile / switches were used for this capture. |
 | logs.etl | ETW trace captured during the repro (binary; see note above). |
 | wsl-info.txt | Output of ``wsl --version`` / ``--status`` / ``--list --verbose``. |
