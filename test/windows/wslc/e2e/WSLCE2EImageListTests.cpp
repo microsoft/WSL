@@ -260,12 +260,7 @@ class WSLCE2EImageListTests
         }
         VERIFY_ARE_NOT_EQUAL(std::string{}, fullDebianId, L"Debian image was not present in `image list --format json` output");
 
-        // Docker prefixes ids with "sha256:"; the table output omits it.
-        constexpr std::string_view shaPrefix = "sha256:";
-        if (fullDebianId.starts_with(shaPrefix))
-        {
-            fullDebianId.erase(0, shaPrefix.size());
-        }
+        fullDebianId = GetHashId(fullDebianId, true);
         VERIFY_IS_GREATER_THAN(fullDebianId.size(), 12u);
         const auto fullDebianIdW = wsl::shared::string::MultiByteToWide(fullDebianId);
         const auto truncatedDebianIdW = fullDebianIdW.substr(0, 12);
