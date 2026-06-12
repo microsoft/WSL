@@ -11,8 +11,7 @@ Abstract:
     End-to-end test for private-registry SSL trust. Stands up a registry that serves TLS with a
     private CA, verifies that a push fails with an "unknown authority" error while the CA is not
     trusted, then adds the CA to the machine's Trusted Root store and verifies that a push from a
-    freshly created session succeeds (the session service mirrors the host's trusted roots into the
-    UVM at init via InstallTrustedRootCertificates).
+    freshly created session succeeds.
 
 --*/
 
@@ -20,6 +19,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include <wslutil.h>
 #include <ncrypt.h>
 
 namespace WSLCE2ETests {
@@ -27,26 +27,13 @@ using namespace wsl::shared;
 using namespace wsl::windows::common;
 
 namespace {
-
     // The bridge IP assigned to the first container started in a fresh session. The registry is always
-    // the first container we start, so this is deterministic; the cert SAN and the pushed reference both
-    // use it. The test asserts the container actually received this IP so a mismatch fails clearly.
+    // the first container we start in this test's session, so this is deterministic.
     constexpr auto c_registryIp = "172.17.0.2";
     constexpr USHORT c_registryPort = 5000;
 
-    std::array<BYTE, 4> ParseIpv4(const std::string& ip)
-    {
-        std::array<BYTE, 4> octets{};
-        int values[4]{};
-        VERIFY_ARE_EQUAL(4, sscanf_s(ip.c_str(), "%d.%d.%d.%d", &values[0], &values[1], &values[2], &values[3]));
-        for (size_t i = 0; i < octets.size(); ++i)
-        {
-            octets[i] = static_cast<BYTE>(values[i]);
-        }
-        return octets;
-    }
-
-    std::vector<BYTE> EncodeObject(LPCSTR Oid, const void* StructInfo)
+    // DER-encodes a certificate-extension value structure (e.g. CERT_ALT_NAME_INFO for the SAN OID).
+    std::vector<BYTE> EncodeCertExtensionValue(LPCSTR Oid, const void* StructInfo)
     {
         DWORD size = 0;
         THROW_IF_WIN32_BOOL_FALSE(CryptEncodeObjectEx(X509_ASN_ENCODING, Oid, StructInfo, 0, nullptr, nullptr, &size));
@@ -67,13 +54,12 @@ namespace {
         return std::format("-----BEGIN {}-----\n{}-----END {}-----\n", Label, base64, Label);
     }
 
-    // Generates a self-signed certificate usable as both a TLS server cert and a trust anchor
-    // (CA:TRUE + keyCertSign + serverAuth EKU + the given IP in the SAN), writes server.crt and
-    // server.key (PEM) into OutDir for the registry to serve, and returns the certificate context so
-    // the caller can add it to a trust store.
+    // Generates a self-signed certificate usable as both a TLS server cert and a CA,
+    // writes server.crt and server.key (PEM) into OutDir for the registry to serve,
+    // and returns the certificate context so the test can add it to a trust store later.
     wil::unique_cert_context GenerateRegistryTlsCertificate(const std::string& IpAddress, const std::filesystem::path& OutDir)
     {
-        // 1. Create an exportable RSA key (CNG, persisted so CertCreateSelfSignCertificate can reference it).
+        // Create an exportable RSA key
         NCRYPT_PROV_HANDLE prov{};
         THROW_IF_FAILED(NCryptOpenStorageProvider(&prov, MS_KEY_STORAGE_PROVIDER, 0));
         auto freeProv = wil::scope_exit([&] { NCryptFreeObject(prov); });
@@ -93,28 +79,29 @@ namespace {
         THROW_IF_FAILED(NCryptSetProperty(key, NCRYPT_EXPORT_POLICY_PROPERTY, reinterpret_cast<PBYTE>(&exportPolicy), sizeof(exportPolicy), 0));
         THROW_IF_FAILED(NCryptFinalizeKey(key, 0));
 
-        // 2. Build the extensions (SAN, basic constraints, key usage, extended key usage).
-        auto octets = ParseIpv4(IpAddress);
+        // Build the extensions (SAN, basic constraints, key usage, extended key usage)
+        in_addr ipv4{};
+        wslutil::ParseIpv4Address(IpAddress.c_str(), ipv4);
         CERT_ALT_NAME_ENTRY altEntry{};
         altEntry.dwAltNameChoice = CERT_ALT_NAME_IP_ADDRESS;
-        altEntry.IPAddress.cbData = static_cast<DWORD>(octets.size());
-        altEntry.IPAddress.pbData = octets.data();
+        altEntry.IPAddress.cbData = sizeof(ipv4);
+        altEntry.IPAddress.pbData = reinterpret_cast<BYTE*>(&ipv4);
         CERT_ALT_NAME_INFO altInfo{1, &altEntry};
-        auto sanEncoded = EncodeObject(szOID_SUBJECT_ALT_NAME2, &altInfo);
+        auto sanEncoded = EncodeCertExtensionValue(szOID_SUBJECT_ALT_NAME2, &altInfo);
 
         CERT_BASIC_CONSTRAINTS2_INFO basicConstraints{};
         basicConstraints.fCA = TRUE;
-        auto bcEncoded = EncodeObject(szOID_BASIC_CONSTRAINTS2, &basicConstraints);
+        auto bcEncoded = EncodeCertExtensionValue(szOID_BASIC_CONSTRAINTS2, &basicConstraints);
 
         BYTE keyUsageBits = CERT_DIGITAL_SIGNATURE_KEY_USAGE | CERT_KEY_ENCIPHERMENT_KEY_USAGE | CERT_KEY_CERT_SIGN_KEY_USAGE;
         CRYPT_BIT_BLOB keyUsage{};
         keyUsage.cbData = 1;
         keyUsage.pbData = &keyUsageBits;
-        auto kuEncoded = EncodeObject(szOID_KEY_USAGE, &keyUsage);
+        auto kuEncoded = EncodeCertExtensionValue(szOID_KEY_USAGE, &keyUsage);
 
         LPSTR serverAuthOid = const_cast<LPSTR>(szOID_PKIX_KP_SERVER_AUTH);
         CERT_ENHKEY_USAGE enhKeyUsage{1, &serverAuthOid};
-        auto ekuEncoded = EncodeObject(szOID_ENHANCED_KEY_USAGE, &enhKeyUsage);
+        auto ekuEncoded = EncodeCertExtensionValue(szOID_ENHANCED_KEY_USAGE, &enhKeyUsage);
 
         CERT_EXTENSION extensions[4]{};
         extensions[0] = {const_cast<LPSTR>(szOID_SUBJECT_ALT_NAME2), FALSE, {static_cast<DWORD>(sanEncoded.size()), sanEncoded.data()}};
@@ -123,7 +110,7 @@ namespace {
         extensions[3] = {const_cast<LPSTR>(szOID_ENHANCED_KEY_USAGE), FALSE, {static_cast<DWORD>(ekuEncoded.size()), ekuEncoded.data()}};
         CERT_EXTENSIONS certExtensions{ARRAYSIZE(extensions), extensions};
 
-        // 3. Subject / issuer name.
+        // Subject / issuer name.
         const auto subject = L"CN=" + wsl::shared::string::MultiByteToWide(IpAddress);
         DWORD nameSize = 0;
         THROW_IF_WIN32_BOOL_FALSE(CertStrToNameW(X509_ASN_ENCODING, subject.c_str(), CERT_X500_NAME_STR, nullptr, nullptr, &nameSize, nullptr));
@@ -139,15 +126,21 @@ namespace {
         CRYPT_ALGORITHM_IDENTIFIER signatureAlgorithm{};
         signatureAlgorithm.pszObjId = const_cast<LPSTR>(szOID_RSA_SHA256RSA);
 
+        FILETIME nowFt{};
+        GetSystemTimeAsFileTime(&nowFt);
+        ULARGE_INTEGER ticks{};
+        ticks.LowPart = nowFt.dwLowDateTime;
+        ticks.HighPart = nowFt.dwHighDateTime;
+        ticks.QuadPart += 100ULL * 24 * 60 * 60 * 10'000'000; // 100 days, in 100-ns intervals
+        FILETIME endFt{ticks.LowPart, ticks.HighPart};
         SYSTEMTIME notAfter{};
-        GetSystemTime(&notAfter);
-        notAfter.wYear += 10;
+        THROW_IF_WIN32_BOOL_FALSE(FileTimeToSystemTime(&endFt, &notAfter));
 
         wil::unique_cert_context cert{CertCreateSelfSignCertificate(
             key, &subjectBlob, 0, &keyProvInfo, &signatureAlgorithm, nullptr, &notAfter, &certExtensions)};
         THROW_LAST_ERROR_IF_NULL(cert);
 
-        // 4. Export server.crt (the certificate) and server.key (PKCS#8 private key).
+        // Export server.crt and server.key
         const auto certPem = ToPem(cert.get()->pbCertEncoded, cert.get()->cbCertEncoded, "CERTIFICATE");
 
         DWORD keyBlobSize = 0;
@@ -158,7 +151,7 @@ namespace {
 
         const auto writeFile = [](const std::filesystem::path& path, const std::string& contents) {
             std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-            VERIFY_IS_TRUE(stream.is_open());
+            THROW_HR_IF_MSG(E_FAIL, !stream.is_open(), "Failed to open %ls for writing", path.c_str());
             stream.write(contents.data(), contents.size());
         };
         writeFile(OutDir / "server.crt", certPem);
@@ -167,19 +160,37 @@ namespace {
         return cert;
     }
 
-    // Adds the certificate to the machine's Trusted Root store and returns the in-store context so the
-    // caller can remove it during cleanup.
-    wil::unique_cert_context AddCertificateToTrustedRoot(const CERT_CONTEXT& Cert)
+    // Helper that adds a certificate to the machine's Trusted Root store and removes it on destruction.
+    class TrustedRootCertificate
     {
-        const wil::unique_hcertstore store{
-            CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"ROOT")};
-        THROW_LAST_ERROR_IF_NULL(store);
+    public:
+        NON_COPYABLE(TrustedRootCertificate);
+        NON_MOVABLE(TrustedRootCertificate);
 
-        PCCERT_CONTEXT added{};
-        THROW_IF_WIN32_BOOL_FALSE(CertAddEncodedCertificateToStore(
-            store.get(), X509_ASN_ENCODING, Cert.pbCertEncoded, Cert.cbCertEncoded, CERT_STORE_ADD_REPLACE_EXISTING, &added));
-        return wil::unique_cert_context{added};
-    }
+        explicit TrustedRootCertificate(const CERT_CONTEXT& Cert)
+        {
+            m_store.reset(CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"ROOT"));
+            THROW_LAST_ERROR_IF_NULL(m_store);
+
+            PCCERT_CONTEXT added{};
+            THROW_IF_WIN32_BOOL_FALSE(CertAddEncodedCertificateToStore(
+                m_store.get(), X509_ASN_ENCODING, Cert.pbCertEncoded, Cert.cbCertEncoded, CERT_STORE_ADD_REPLACE_EXISTING, &added));
+            m_added.reset(added);
+        }
+
+        ~TrustedRootCertificate()
+        {
+            if (m_added)
+            {
+                // CertDeleteCertificateFromStore frees the context; the store is still open here.
+                LOG_IF_WIN32_BOOL_FALSE(CertDeleteCertificateFromStore(m_added.release()));
+            }
+        }
+
+    private:
+        wil::unique_hcertstore m_store;
+        wil::unique_cert_context m_added;
+    };
 
     // Starts a TLS-enabled registry container on the docker bridge (so dockerd reaches it at a
     // non-loopback IP and performs real TLS verification). The certs in HostCertDir are mounted at
@@ -225,8 +236,11 @@ namespace {
         {
             result = RunWslc(std::format(L"push {} --session {}", ImageRef, SessionName));
             const auto& err = result.Stderr.value_or(L"");
-            const bool notReady = err.find(L"connection refused") != std::wstring::npos ||
-                                  err.find(L"no route to host") != std::wstring::npos || err.find(L"EOF") != std::wstring::npos;
+            // Only a connection-level error means "registry not up yet". Do NOT treat "EOF" as
+            // transient: an untrusted-CA rejection can surface as EOF, and retrying would mask the
+            // very failure Phase 1 asserts on.
+            const bool notReady =
+                err.find(L"connection refused") != std::wstring::npos || err.find(L"no route to host") != std::wstring::npos;
             if (!notReady)
             {
                 break;
@@ -263,6 +277,9 @@ class WSLCE2ETlsRegistryTests
 
         // Phase 1: CA NOT trusted -> the push must fail because the cert chains to an untrusted root.
         {
+            // Defensively terminate any session left behind by a previously crashed run so this one
+            // creates a fresh session (and the registry reclaims the expected bridge IP).
+            EnsureSessionIsTerminated(L"wslc-tls-untrusted");
             auto session = TestSession::Create(L"wslc-tls-untrusted");
             EnsureImageIsLoaded(image, session.Name());
 
@@ -280,17 +297,12 @@ class WSLCE2ETlsRegistryTests
         }
 
         // Trust the CA on the host. The session service mirrors LocalMachine\Root into the UVM at init.
-        auto added = AddCertificateToTrustedRoot(*caCert.get());
-        auto removeFromRoot = wil::scope_exit([&] {
-            if (added)
-            {
-                // CertDeleteCertificateFromStore frees the context.
-                CertDeleteCertificateFromStore(added.release());
-            }
-        });
+        // The RAII object removes the cert from the store when it goes out of scope at the end of the test.
+        TrustedRootCertificate trustedCa{*caCert.get()};
 
         // Phase 2: CA trusted + a fresh session (so the mirror includes it) -> the push must succeed.
         {
+            EnsureSessionIsTerminated(L"wslc-tls-trusted");
             auto session = TestSession::Create(L"wslc-tls-trusted");
             EnsureImageIsLoaded(image, session.Name());
 

@@ -45,7 +45,7 @@ std::optional<std::string> TryEncodeCertificateAsPem(const CERT_CONTEXT& Cert)
 }
 
 // Enumerates every certificate in the given "ROOT" system store and appends each
-// (deduplicated by its raw encoded bytes) to the output PEM bundle.
+// (deduplicated by cert thumbprint) to the output PEM bundle.
 void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string& Pem)
 {
     const wil::unique_hcertstore store{CertOpenStore(
@@ -61,13 +61,25 @@ void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string&
     PCCERT_CONTEXT cert = nullptr;
     while ((cert = CertEnumCertificatesInStore(store.get(), cert)) != nullptr)
     {
-        std::string der{reinterpret_cast<const char*>(cert->pbCertEncoded), cert->cbCertEncoded};
-        if (!Seen.insert(der).second)
+        if (cert->cbCertEncoded == 0)
         {
             continue;
         }
 
-        // Skip any certificate that fails to encode rather than aborting the whole bundle.
+        // Use cert Thumbprint for dedupe.
+        BYTE hash[20];
+        DWORD hashSize = sizeof(hash);
+        if (!CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID, hash, &hashSize))
+        {
+            LOG_LAST_ERROR_MSG("CertGetCertificateContextProperty(CERT_SHA1_HASH_PROP_ID) failed; skipping a root certificate");
+            continue;
+        }
+
+        if (!Seen.insert(std::string{reinterpret_cast<const char*>(hash), hashSize}).second)
+        {
+            continue;
+        }
+
         if (auto pem = TryEncodeCertificateAsPem(*cert))
         {
             Pem += *pem;
