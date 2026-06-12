@@ -206,8 +206,6 @@ class InstallerTests
                 .AddPackageAsync(winrt::Windows::Foundation::Uri{m_msixPackagePath}, nullptr, winrt::Windows::Management::Deployment::DeploymentOptions::None)
                 .get();
 
-        LogInfo("AddPackage result: 0x%08x, %ls", result.ExtendedErrorCode(), result.ErrorText().c_str());
-
         VERIFY_ARE_EQUAL(result.ExtendedErrorCode(), S_OK);
     }
 
