@@ -17,6 +17,7 @@ set_target_properties(wslinstaller PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /
 target_link_libraries(wslinstaller
                       ${COMMON_LINK_LIBRARIES}
                       ${MSI_LINK_LIBRARIES}
+                      Wtsapi32.lib
                       common
                       legacy_stdio_definitions)
 

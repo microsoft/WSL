@@ -15,6 +15,8 @@ Abstract:
 #include "precomp.h"
 #include "install.h"
 #include "WslInstaller.h"
+#include "WslActivityMarker.h"
+#include <wtsapi32.h>
 
 extern wil::unique_event g_stopEvent;
 
@@ -164,6 +166,74 @@ std::pair<bool, std::wstring> IsUpdateNeeded()
     }
 }
 
+static bool DeferUpdatePromptEnabled()
+try
+{
+    const auto key = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
+
+    auto value = wsl::windows::common::registry::ReadDword(key.get(), L"MSI", L"EnableMsixDeferUpdatePrompt", 1);
+
+    return value == 1;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return true;
+}
+
+static bool PromptUserToUpgradeWhileActive()
+try
+{
+    // For test automation purpose
+    if (!DeferUpdatePromptEnabled())
+    {
+        wsl::windows::common::install::WriteInstallLog("DeferUpdatePrompt is disabled");
+        return false;
+    }
+
+    constexpr DWORD c_upgradePromptTimeoutSeconds = 60;
+
+    const DWORD sessionId = WTSGetActiveConsoleSessionId();
+    if (sessionId == 0xFFFFFFFF)
+    {
+        wsl::windows::common::install::WriteInstallLog("No active console session");
+        return false;
+    }
+
+    auto title = wsl::shared::Localization::MessageUpgradeWhileActiveTitle();
+    auto message = wsl::shared::Localization::MessageUpgradeWhileActivePrompt();
+
+    DWORD response = 0;
+    if (!WTSSendMessageW(
+            WTS_CURRENT_SERVER_HANDLE,
+            sessionId,
+            title.data(),
+            static_cast<DWORD>(title.size() * sizeof(wchar_t)),
+            message.data(),
+            static_cast<DWORD>(message.size() * sizeof(wchar_t)),
+            MB_YESNO | MB_ICONQUESTION | MB_TOPMOST,
+            c_upgradePromptTimeoutSeconds,
+            &response,
+            TRUE))
+    {
+        LOG_LAST_ERROR_MSG("WTSSendMessageW failed");
+        return false;
+    }
+
+    if (response != IDYES)
+    {
+        wsl::windows::common::install::WriteInstallLog(std::format("User declined upgrade prompt (response {})", response));
+        return false;
+    }
+
+    return true;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return false;
+}
+
 std::shared_ptr<InstallContext> LaunchInstall()
 {
     static wil::srwlock mutex;
@@ -174,6 +244,12 @@ std::shared_ptr<InstallContext> LaunchInstall()
     auto [updateNeeded, existingVersion] = IsUpdateNeeded();
     if (!updateNeeded)
     {
+        return {};
+    }
+
+    if (wsl::windows::common::WslActivityMarker::IsWslActive() && !PromptUserToUpgradeWhileActive())
+    {
+        wsl::windows::common::install::WriteInstallLog("WSL is active; deferring MSI upgrade until WSL is idle.");
         return {};
     }
 

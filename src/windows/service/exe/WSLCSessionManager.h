@@ -34,6 +34,7 @@ Abstract:
 #include "wslc.h"
 #include "COMImplClass.h"
 #include "wslutil.h"
+#include "WslActivityMarker.h"
 #include <atomic>
 #include <algorithm>
 #include <string>
@@ -70,6 +71,8 @@ struct SessionEntry
     std::vector<BYTE> UserSid;
 
     wil::unique_handle JobObject;
+
+    std::unique_ptr<wsl::windows::common::WslActivityMarker> ActivityMarker;
 };
 
 class WSLCSessionManagerImpl

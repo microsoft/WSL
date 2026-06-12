@@ -119,7 +119,7 @@ class InstallerTests
 
         try
         {
-            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::hours(3), std::chrono::minutes(2));
+            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::seconds(3), std::chrono::minutes(2));
         }
         catch (...)
         {
@@ -205,6 +205,8 @@ class InstallerTests
             m_packageManager
                 .AddPackageAsync(winrt::Windows::Foundation::Uri{m_msixPackagePath}, nullptr, winrt::Windows::Management::Deployment::DeploymentOptions::None)
                 .get();
+
+        LogInfo("AddPackage result: 0x%08x, %ls", result.ExtendedErrorCode(), result.ErrorText().c_str());
 
         VERIFY_ARE_EQUAL(result.ExtendedErrorCode(), S_OK);
     }
@@ -692,6 +694,43 @@ class InstallerTests
             L"Update failed (exit code: 1603).\r\n"
             L"Error code: Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE\r\n",
             output);
+    }
+
+    TEST_METHOD(MsixUpgradeDefer)
+    {
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
+        RegistryKeyChange<std::wstring> changeVersion(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"Version", L"1.0.0");
+
+        RegistryKeyChange<DWORD> disablePrompt(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"EnableMsixDeferUpdatePrompt", 0);
+
+        const auto commandLine = LxssGenerateWslCommandLine(L"sleep infinity");
+        wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+        auto processHandle = process.Start();
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            []() { THROW_HR_IF(E_ABORT, GetDistributionState() != LxssDistributionStateRunning); },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30));
+
+        // Cannot redeploy directly even with ForceUpdateFromAnyVersion set.
+        UninstallMsix();
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        InstallMsix();
+        VERIFY_IS_TRUE(IsMsixInstalled());
+
+        WaitForInstallerServiceStop();
+
+        const auto key = wsl::windows::common::registry::OpenLxssMachineKey();
+        VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadString(key.get(), L"MSI", L"Version"), L"1.0.0");
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(processHandle.get(), 0), static_cast<DWORD>(WAIT_TIMEOUT));
     }
 
     TEST_METHOD(WslUpdateNoNewVersion)

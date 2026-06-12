@@ -2476,6 +2476,20 @@ std::optional<GUID> GetDistributionId(LPCWSTR Name)
     return {};
 }
 
+LxssDistributionState GetDistributionState(LPCWSTR Name)
+{
+    wsl::windows::common::SvcComm service;
+    for (const auto& e : service.EnumerateDistributions())
+    {
+        if (wsl::shared::string::IsEqual(e.DistroName, Name))
+        {
+            return e.State;
+        }
+    }
+
+    return LxssDistributionStateInvalid;
+}
+
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name)
 {
     const auto id = GetDistributionId(Name);

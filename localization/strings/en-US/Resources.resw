@@ -1054,6 +1054,16 @@ Falling back to NAT networking.</value>
   <data name="MessageUpdate" xml:space="preserve">
     <value>Update</value>
   </data>
+  <data name="MessageUpgradeWhileActiveTitle" xml:space="preserve">
+    <value>WSL Update</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="MessageUpgradeWhileActivePrompt" xml:space="preserve">
+    <value>An update for WSL is ready to install, but it is currently in use.
+
+Select Yes to shutdown WSL and install now. Select No to install on the next reboot.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
   <data name="MessageViewReleaseNotes" xml:space="preserve">
     <value>See Docs</value>
   </data>

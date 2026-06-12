@@ -53,7 +53,8 @@ set(SOURCES
     wslutil.cpp
     install.cpp
     WSLCUserSettings.cpp
-    notifications.cpp)
+    notifications.cpp
+    WslActivityMarker.cpp)
 
 set(HEADERS
     ../../../generated/Localization.h
@@ -140,6 +141,7 @@ set(HEADERS
     EnumVariantMap.h
     WSLCUserSettings.h
     WSLCSessionDefaults.h
+    WslActivityMarker.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
