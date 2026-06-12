@@ -154,6 +154,18 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 constexpr std::string_view c_containerNetworkPrefix = "container:";
 
+// podman names its built-in default network "podman", whereas Docker (and the WSLC API contract)
+// call it "bridge". wslc does not reconfigure podman's default network, so this name is fixed; we
+// translate between the two at the API boundary so callers always see the Docker name "bridge".
+constexpr std::string_view c_podmanDefaultNetwork = "podman";
+
+// Map a caller-supplied (Docker-semantic) network name to the name podman expects. Only the default
+// network differs ("bridge" -> "podman"); every other name is identical across runtimes.
+std::string ToBackendNetworkName(std::string_view name)
+{
+    return name == "bridge" ? std::string{c_podmanDefaultNetwork} : std::string{name};
+}
+
 bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
 {
     return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
@@ -1430,7 +1442,9 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     // Map labels. m_labels should already exclude internal metadata labels.
     wslcInspect.Labels = m_labels;
 
-    // Map per-endpoint network settings from Docker inspect data.
+    // Map per-endpoint network settings from the backend inspect data. podman reports its built-in
+    // default network under the name "podman"; translate it back to the Docker name "bridge" so the
+    // inspect output honors the Docker contract (consistent with HostConfig.NetworkMode above).
     for (const auto& [name, endpoint] : dockerInspect.NetworkSettings.Networks)
     {
         wslc_schema::InspectEndpointSettings wslcEndpoint{};
@@ -1439,7 +1453,9 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcEndpoint.MacAddress = endpoint.MacAddress;
         wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
         wslcEndpoint.Aliases = endpoint.Aliases.value_or(std::vector<std::string>{});
-        wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
+
+        std::string key = (name == c_podmanDefaultNetwork) ? std::string{"bridge"} : name;
+        wslcInspect.NetworkSettings.Networks[std::move(key)] = std::move(wslcEndpoint);
     }
 
     return wslcInspect;
@@ -1789,10 +1805,25 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
     // Post-create verification: confirm every requested network is actually attached.
-    // If Docker rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
-    // container:<id> mode shares the target's netns, so the mode string is not a network name and
-    // won't appear in NetworkSettings.Networks. Skip the check for that mode.
-    if (!networkMode.starts_with(c_containerNetworkPrefix))
+    // If the backend rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
+    //
+    // The primary network can only be verified by name for user-defined networks, whose names are
+    // authoritative and identical across runtimes. The built-in modes need special handling:
+    //   - container:<id> shares the target's netns, so the mode string is not a network name and
+    //     never appears in NetworkSettings.Networks.
+    //   - host/none attach no named endpoint at all (podman reports NetworkSettings.Networks as
+    //     empty), so there is nothing to verify. NetworkModeAllocatesVmPorts() is false for these.
+    //   - bridge is the default network: podman attaches it under its own fixed name "podman" rather
+    //     than the Docker name "bridge" (wslc does not reconfigure podman's default network), so
+    //     match against podman's name.
+    if (networkMode == "bridge")
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(std::string{c_podmanDefaultNetwork}),
+            "Container was created but the default network was not attached");
+    }
+    else if (NetworkModeAllocatesVmPorts(networkMode))
     {
         THROW_HR_IF_MSG(
             E_UNEXPECTED,
@@ -1842,7 +1873,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(result.Id),
         CleanContainerName(inspectData.Name),
         std::string(containerOptions.Image),
-        std::move(networkMode),
+        networkMode,
         std::move(volumes),
         std::move(mappedPorts),
         std::move(labels),
@@ -1857,7 +1888,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Preserve the Docker-semantic network mode we requested; podman's inspect would otherwise
     // report any bridge-driver network (default or custom) as just "bridge" (see member doc).
-    container->m_requestedNetworkMode = networkMode;
+    // N.B. networkMode is copied into the constructor above (for m_networkMode), so it is still
+    // valid to move here.
+    container->m_requestedNetworkMode = std::move(networkMode);
 
     deleteOnFailure.release();
     return container;
@@ -2545,7 +2578,7 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
 
     try
     {
-        m_dockerClient.ConnectContainerToNetwork(Options->NetworkName, request);
+        m_dockerClient.ConnectContainerToNetwork(ToBackendNetworkName(Options->NetworkName), request);
     }
     catch (const DockerHTTPException& e)
     {
@@ -2577,7 +2610,7 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
 
     try
     {
-        m_dockerClient.DisconnectContainerFromNetwork(NetworkName, request);
+        m_dockerClient.DisconnectContainerFromNetwork(ToBackendNetworkName(NetworkName), request);
     }
     catch (const DockerHTTPException& e)
     {

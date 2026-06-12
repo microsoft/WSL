@@ -6874,10 +6874,10 @@ class WSLCTests
             WSLCNetworkConnectionOptions options{};
             options.NetworkName = "bridge";
             VERIFY_ARE_EQUAL(E_FAIL, container.Get().ConnectToNetwork(&options));
-            // Docker returns the container name in the error, not the ID.
-            const auto expectedError = std::format(
-                L"endpoint with name {} already exists in network bridge", std::wstring(containerName.begin(), containerName.end()));
-            ValidateCOMErrorMessage(expectedError);
+            // podman reports the already-connected condition with backend/version-specific wording
+            // (e.g. "...is already connected to ... network..."), so match the stable "already" token
+            // rather than Docker's exact phrasing.
+            ValidateCOMErrorMessageContains(L"already");
 
             // Disconnect from primary should succeed.
             VERIFY_SUCCEEDED(container.Get().DisconnectFromNetwork("bridge"));
@@ -6899,12 +6899,10 @@ class WSLCTests
             options.NetworkName = networkName.c_str();
             VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
             VERIFY_ARE_EQUAL(E_FAIL, container.Get().ConnectToNetwork(&options));
-            // Docker returns the container name in the error, not the ID.
-            const auto expectedError = std::format(
-                L"endpoint with name {} already exists in network {}",
-                std::wstring(containerName.begin(), containerName.end()),
-                std::wstring(networkName.begin(), networkName.end()));
-            ValidateCOMErrorMessage(expectedError);
+            // podman reports the already-connected condition with backend/version-specific wording
+            // (e.g. "...is already connected to ... network..."), so match the stable "already" token
+            // rather than Docker's exact phrasing.
+            ValidateCOMErrorMessageContains(L"already");
         }
     }
 

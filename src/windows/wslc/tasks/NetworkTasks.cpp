@@ -86,10 +86,10 @@ void CreateNetwork(CLIExecutionContext& context)
         options.Labels.push_back(validation::ParseLabel(label));
     }
 
-    if (context.Args.Contains(ArgType::Driver))
-    {
-        options.Driver = WideToMultiByte(context.Args.Get<ArgType::Driver>());
-    }
+    // Default to the bridge driver when the caller doesn't specify one. This matches the documented
+    // `--driver` default and satisfies the WSLCNetworkOptions contract, whose Driver field must be
+    // non-null (the service returns E_POINTER otherwise).
+    options.Driver = context.Args.Contains(ArgType::Driver) ? WideToMultiByte(context.Args.Get<ArgType::Driver>()) : "bridge";
 
     NetworkService::Create(context.Data.Get<Data::Session>(), options);
     PrintMessage(MultiByteToWide(options.Name));

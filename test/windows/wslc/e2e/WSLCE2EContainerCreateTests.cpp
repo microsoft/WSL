@@ -842,6 +842,8 @@ class WSLCE2EContainerCreateTests
             L"container create --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        auto cleanupContainer = wil::scope_exit([&] { EnsureContainerDoesNotExist(WslcContainerName); });
+
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
     }
@@ -870,6 +872,8 @@ class WSLCE2EContainerCreateTests
         result = RunWslc(std::format(
             L"container create --name {} --network {} --network-alias db {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto cleanupContainer = wil::scope_exit([&] { EnsureContainerDoesNotExist(WslcContainerName); });
 
         const auto inspect = InspectContainer(WslcContainerName);
         const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
