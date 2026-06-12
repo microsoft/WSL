@@ -9276,20 +9276,38 @@ class WSLCTests
         auto process = container.GetInitProcess();
         ValidateProcessOutput(process, {{1, "OK\n"}});
 
-        // Start a blocking export
-        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
-
-        // Validate that various operations can be done while the export is in progress.
+        // Phase 1: while a blocking export is in progress, validate that WSLC itself does not
+        // serialize behind it - operations that WSLC answers from its own tracked state must stay
+        // responsive.
+        //
+        // N.B. podman takes a per-container mutex (see libpod/lock) and `export` holds it for the
+        // entire duration of the stream, so podman-backed operations on the same container (reading
+        // Logs payload, Inspect, a second Export) block until the export completes. That is podman's
+        // behavior, not WSLC's. Those are therefore exercised in Phase 2 (after the export is
+        // released), not concurrently with the export. Only WSLC-side operations are validated here.
         {
+            BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
+
+            // Completing the operation (releasing the export and verifying it succeeded) runs on
+            // scope exit, so it happens on both the normal and the exception path before the
+            // BlockingOperation destructor joins its threads.
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+            // Init process exit is tracked WSLC-side via the docker event stream.
             VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
-        }
 
-        {
+            // State and labels are served from WSLC's cached container metadata (no podman call).
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+            VERIFY_ARE_EQUAL(container.Labels().size(), 0);
+
+            // Exec on a non-running container is rejected by WSLC from cached state before any podman
+            // call, so it must not get stuck behind the in-flight export.
+            auto [result, _] = WSLCProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
         }
 
+        // Phase 2: with the export finished and podman's per-container lock released, podman-backed
+        // operations work.
         {
             COMOutputHandle stdoutHandle;
             COMOutputHandle stderrHandle;
@@ -9303,19 +9321,9 @@ class WSLCTests
         }
 
         {
-            VERIFY_ARE_EQUAL(container.Labels().size(), 0);
-        }
-
-        {
-            // Validate that another export can run.
+            // A second export works once the first has completed.
             BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
             secondExport.Complete();
-        }
-
-        {
-            // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
-            auto [result, _] = WSLCProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
         }
     }
 
