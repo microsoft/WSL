@@ -200,16 +200,7 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
 // Starts a local registry container using the COM API and returns the running container (holds it
-// alive) plus the registry address.
-//
-// Plain HTTP (tlsCertDir empty): host networking + a published loopback port; address is
-// "127.0.0.1:PORT" and the registry is probed for readiness over HTTP.
-//
-// TLS (tlsCertDir set to a host directory containing server.crt / server.key): the registry serves
-// HTTPS with those certs on the docker bridge, so dockerd reaches it at a non-loopback IP and
-// performs real TLS verification; address is "<bridge-ip>:PORT". No readiness probe is done in this
-// mode (the bridge IP is not reachable from the test host and the cert is untrusted) -- callers
-// should poll via the push/pull itself.
+// alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
     IWSLCSession& session,
     const std::string& username = "",

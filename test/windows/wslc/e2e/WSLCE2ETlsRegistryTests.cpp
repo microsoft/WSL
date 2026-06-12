@@ -229,7 +229,6 @@ class WSLCE2ETlsRegistryTests
 
             RunWslcAndVerify(std::format(L"image tag {} {} --session {}", image.NameAndTag(), registryImage, session.Name()), {.ExitCode = 0});
 
-            // StartLocalRegistry already waited for the registry to be ready, so a single push is enough.
             auto result = RunWslc(std::format(L"push {} --session {}", registryImage, session.Name()));
             VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0), L"Push should fail while the CA is not trusted");
             VERIFY_IS_TRUE(result.Stderr.has_value());
