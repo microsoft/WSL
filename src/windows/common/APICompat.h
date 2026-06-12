@@ -36,6 +36,8 @@ WSLCNetworkingMode Convert(WSLCCompatNetworkingMode Mode);
 WSLCFeatureFlags Convert(WSLCCompatFeatureFlags Flags);
 WSLCSessionStorageFlags Convert(WSLCCompatSessionStorageFlags Flags);
 WSLCSessionFlags Convert(WSLCCompatSessionFlags Flags);
+WSLCListImagesFlags Convert(WSLCCompatListImagesFlags Flags);
+WSLCDeleteImageFlags Convert(WSLCCompatDeleteImageFlags Flags);
 WSLCHandleType Convert(WSLCCompatHandleType Type);
 
 // Reverse (wslc.idl -> WSLCCompat).
@@ -67,10 +69,7 @@ WSLCCompatDeletedImageInformation Convert(const WSLCDeletedImageInformation& Ima
 WSLCCompatVolumeInformation Convert(const WSLCVolumeInformation& Volume);
 
 //
-// Composite struct conversions. These contain nested arrays whose element types
-// differ between the two contracts, so the converted struct owns backing
-// storage that must outlive the forwarded call. Construct the conversion as a
-// local and pass Get() to the wslc.idl method.
+// Composite struct conversions.
 //
 
 class ContainerOptionsConversion
@@ -175,6 +174,7 @@ inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settin
 
 //
 // Callback conversions.
+//
 
 Microsoft::WRL::ComPtr<ITerminationCallback> Convert(IWSLCCompatTerminationCallback* Callback);
 Microsoft::WRL::ComPtr<ICrashDumpCallback> Convert(IWSLCCompatCrashDumpCallback* Callback);

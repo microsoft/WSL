@@ -924,8 +924,6 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
 interface IWSLCSessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLCVersion* Version);
-    HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
-
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
     HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);

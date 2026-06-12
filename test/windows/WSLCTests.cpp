@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslc.h"
+#include "wslccompat.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
@@ -235,23 +236,23 @@ class WSLCTests
 
     WSLC_TEST_METHOD(IsClientVersionSupported)
     {
-        wil::com_ptr<IWSLCSessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wil::com_ptr<IWSLCCompatSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(IWSLCCompatSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
         BOOL isSupported = FALSE;
 
         // The current version should always be supported.
-        const WSLCVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        const WSLCCompatVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&currentVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
 
         // A very old version should not be supported.
-        const WSLCVersion oldVersion{1, 0, 0};
+        const WSLCCompatVersion oldVersion{1, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&oldVersion, &isSupported));
         VERIFY_IS_FALSE(isSupported);
 
         // A very high version should be supported.
-        const WSLCVersion futureVersion{99, 0, 0};
+        const WSLCCompatVersion futureVersion{99, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&futureVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
     }

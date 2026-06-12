@@ -185,7 +185,8 @@ class WslcSdkWinRtTests
         launcher.AddPort(port, port, AF_INET);
 
         // Get the IWSLCSession COM object from the SDK session handle.
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
         auto container = launcher.Launch(*comSession, WSLCContainerStartFlagsNone);
 
         auto registryAddress = std::format("127.0.0.1:{}", port);

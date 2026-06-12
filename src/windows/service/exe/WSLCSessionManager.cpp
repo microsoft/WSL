@@ -286,9 +286,8 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back(
-            SessionEntry{
-                std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
+        m_sessions.push_back(SessionEntry{
+            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -544,7 +543,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported)
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported)
 try
 {
     RETURN_HR_IF(E_POINTER, ClientVersion == nullptr || IsSupported == nullptr);
@@ -614,16 +613,6 @@ try
 
     *Version = apicompat::Convert(version);
     return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, ClientVersion);
-
-    const auto clientVersion = apicompat::Convert(*ClientVersion);
-    return IsClientVersionSupported(&clientVersion, IsSupported);
 }
 CATCH_RETURN();
 

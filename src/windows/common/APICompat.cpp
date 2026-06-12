@@ -300,6 +300,26 @@ WSLCSessionFlags Convert(WSLCCompatSessionFlags Flags)
     return result;
 }
 
+WSLCListImagesFlags Convert(WSLCCompatListImagesFlags Flags)
+{
+    ThrowIfUnknownFlags(Flags, WSLCCompatListImagesFlagsAll | WSLCCompatListImagesFlagsDigests, "WSLCCompatListImagesFlags");
+
+    WSLCListImagesFlags result = WSLCListImagesFlagsNone;
+    WI_SetFlagIf(result, WSLCListImagesFlagsAll, WI_IsFlagSet(Flags, WSLCCompatListImagesFlagsAll));
+    WI_SetFlagIf(result, WSLCListImagesFlagsDigests, WI_IsFlagSet(Flags, WSLCCompatListImagesFlagsDigests));
+    return result;
+}
+
+WSLCDeleteImageFlags Convert(WSLCCompatDeleteImageFlags Flags)
+{
+    ThrowIfUnknownFlags(Flags, WSLCCompatDeleteImageFlagsForce | WSLCCompatDeleteImageFlagsNoPrune, "WSLCCompatDeleteImageFlags");
+
+    WSLCDeleteImageFlags result = WSLCDeleteImageFlagsNone;
+    WI_SetFlagIf(result, WSLCDeleteImageFlagsForce, WI_IsFlagSet(Flags, WSLCCompatDeleteImageFlagsForce));
+    WI_SetFlagIf(result, WSLCDeleteImageFlagsNoPrune, WI_IsFlagSet(Flags, WSLCCompatDeleteImageFlagsNoPrune));
+    return result;
+}
+
 WSLCHandleType Convert(WSLCCompatHandleType Type)
 {
     switch (Type)
@@ -539,12 +559,9 @@ WSLCUlimit Convert(const WSLCCompatUlimit& Ulimit)
 
 WSLCDeleteImageOptions Convert(const WSLCCompatDeleteImageOptions& Options)
 {
-    ThrowIfUnknownFlags(
-        Options.Flags, WSLCCompatDeleteImageFlagsForce | WSLCCompatDeleteImageFlagsNoPrune, "WSLCCompatDeleteImageFlags");
-
     WSLCDeleteImageOptions result{};
     result.Image = Options.Image;
-    result.Flags = Options.Flags;
+    result.Flags = static_cast<DWORD>(Convert(static_cast<WSLCCompatDeleteImageFlags>(Options.Flags)));
     return result;
 }
 
@@ -622,17 +639,21 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
     // Container network (nested arrays whose elements have their own arrays).
     m_value.ContainerNetwork.NetworkMode = Options.ContainerNetwork.NetworkMode;
     const ULONG networksCount = Options.ContainerNetwork.NetworksCount;
+    THROW_HR_IF(E_INVALIDARG, networksCount > 0 && Options.ContainerNetwork.Networks == nullptr);
+
     m_networks.reserve(networksCount);
     m_networkSettings.reserve(networksCount);
     for (ULONG index = 0; index < networksCount; index++)
     {
-        const auto& sourceConnection = Options.ContainerNetwork.Networks[index];
-        m_networkSettings.push_back(ConvertArray<KeyValuePair>(sourceConnection.Settings, sourceConnection.SettingsCount));
+        const auto& network = Options.ContainerNetwork.Networks[index];
+        THROW_HR_IF(E_INVALIDARG, network.SettingsCount > 0 && network.Settings == nullptr);
+
+        m_networkSettings.push_back(ConvertArray<KeyValuePair>(network.Settings, network.SettingsCount));
 
         WSLCNetworkConnection connection{};
-        connection.NetworkName = sourceConnection.NetworkName;
+        connection.NetworkName = network.NetworkName;
         connection.Settings = m_networkSettings.back().empty() ? nullptr : m_networkSettings.back().data();
-        connection.SettingsCount = sourceConnection.SettingsCount;
+        connection.SettingsCount = network.SettingsCount;
         m_networks.push_back(connection);
     }
 
@@ -657,11 +678,7 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)
 {
-    ThrowIfUnknownFlags(
-        Options.Flags, WSLCCompatListImagesFlagsAll | WSLCCompatListImagesFlagsDigests, "WSLCCompatListImagesFlags");
-
-    // Flags is a DWORD bitmask with identical bit meanings in both contracts.
-    m_value.Flags = Options.Flags;
+    m_value.Flags = static_cast<DWORD>(Convert(static_cast<WSLCCompatListImagesFlags>(Options.Flags)));
 
     m_filters = ConvertArray<WSLCFilter>(Options.Filters, Options.FiltersCount);
     m_value.Filters = m_filters.empty() ? nullptr : m_filters.data();
