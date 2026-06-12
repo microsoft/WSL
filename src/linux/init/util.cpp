@@ -3743,8 +3743,9 @@ constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
 constexpr int c_dropCacheIdleIntervals = 30; // 5 minutes
 constexpr long long c_cacheGrowthRearmBytes = 256ll * 1024 * 1024;
 
-// Gradual: reclaimable cache below this floor is always retained; only the excess above it (beyond a
-// hysteresis margin) is reclaimed.
+// Gradual: reclaimable cache below c_floorBaseBytes is always retained. Reclaim only triggers once the
+// excess above the floor exceeds c_gradualHysteresisBytes; this is a trigger threshold (not a retained
+// margin) that keeps reclaim from churning near the floor. Once triggered it drains toward the floor.
 constexpr long long c_floorBaseBytes = 128ll * 1024 * 1024;
 constexpr long long c_gradualHysteresisBytes = 128ll * 1024 * 1024;
 
@@ -4038,6 +4039,18 @@ try
                     State.PreviousBusy = Busy;
                     State.PreviousIdle = Idle;
                     State.HavePreviousSample = true;
+
+                    //
+                    // Seed the compaction baseline so the first tick measures free-memory growth from
+                    // startup rather than from zero (which would always trigger an initial compaction).
+                    //
+
+                    const long long Free = GetFreeMemoryBytes();
+                    if (Free >= 0)
+                    {
+                        State.FreeAtLastCompaction = Free;
+                    }
+
                     continue;
                 }
 
