@@ -19,55 +19,41 @@ Abstract:
 #include <wslc_schema.h>
 #include <ContainerModel.h>
 #include <WSLCContainerLauncher.h>
+#include "VTSupport.h"
 
 namespace WSLCE2ETests {
 
-// VT100/ANSI escape sequence constants for TTY testing
+// VT sequence constants and helpers for TTY testing.
+// Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {
-// Bracketed paste mode control sequences
-#define VT_B_START "\x1b[?2004h" // Enable bracketed paste mode
-#define VT_B_END "\x1b[?2004l"   // Disable bracketed paste mode
+    using namespace wsl::windows::common::vt;
 
-// Color/formatting sequences
-#define VT_RESET "\x1b[0m"  // Reset all attributes
-#define VT_RED "\x1b[1;31m" // Bold red text
+    inline const auto& B_START = Cursor::BracketedPasteOn;
+    inline const auto& B_END = Cursor::BracketedPasteOff;
+    inline const auto& RESET = Format::Default;
+    inline const auto& ERASE_LINE = Erase::LineForward;
+    inline const Sequence CR{L"\r"};
 
-// Terminal control sequences
-#define VT_ERASE_LINE "\x1b[K" // Erase from cursor to end of line
-#define VT_CR "\r"             // Carriage return
+    // The shell PS1 uses SGR 1;31 (bold + red) in a single sequence.
+    // Sgr({1, 31}) produces L"\x1b[1;31m" to match exactly.
+    inline const ConstructedSequence RED = Sgr({1, 31});
 
-    // Prompt patterns used in WSLC.
-    constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
+    // Prompt pattern used in WSLC TTY sessions.
+    inline const std::string SESSION_PROMPT =
+        wsl::shared::string::WideToMultiByte(B_START + RED + L"root@ [ " + RESET + L"/" + RED + L" ]# ");
 
-    // Constexpr representations of the control sequences for use in tests.
-    constexpr auto B_START = VT_B_START;
-    constexpr auto B_END = VT_B_END;
-    constexpr auto RESET = VT_RESET;
-    constexpr auto RED = VT_RED;
-    constexpr auto ERASE_LINE = VT_ERASE_LINE;
-    constexpr auto CR = VT_CR;
-
-// Remove macros to avoid polluting global namespace.
-#undef VT_B_START
-#undef VT_B_END
-#undef VT_RESET
-#undef VT_RED
-#undef VT_ERASE_LINE
-#undef VT_CR
-
-    // Helper function to build container prompt
     inline std::string BuildContainerPrompt(const std::string& prompt, bool withBracketedPaste = true)
     {
         if (withBracketedPaste)
         {
-            return std::format("{}{}", B_START, prompt);
+            return wsl::shared::string::WideToMultiByte(std::format(L"{}", B_START)) + prompt;
         }
-        return std::format("{}", prompt);
+        return prompt;
     }
 
     inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
+        return wsl::shared::string::WideToMultiByte(std::format(L"{}{}{}", CR, ERASE_LINE, CR)) + prompt;
     }
 } // namespace VT
 
