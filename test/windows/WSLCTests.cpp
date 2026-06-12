@@ -10350,8 +10350,7 @@ class WSLCTests
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
-                L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(c_volumeName)));
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
