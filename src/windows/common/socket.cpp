@@ -49,7 +49,16 @@ std::optional<wil::unique_socket> wsl::windows::common::socket::CancellableAccep
         timeout = std::chrono::milliseconds(Timeout);
     }
 
-    io.Run(timeout);
+    try
+    {
+
+        io.Run(timeout);
+    }
+    catch (...)
+    {
+        auto hr = wil::ResultFromCaughtException();
+        THROW_HR_MSG(hr, "Failed to accept socket. From: %hs", std::format("{}", Location).c_str());
+    }
 
     return accepted;
 }
