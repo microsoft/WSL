@@ -524,6 +524,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::string&& Image,
     std::string NetworkMode,
     std::vector<WSLCVolumeMount>&& volumes,
+    std::vector<std::string>&& namedVolumes,
+    WSLCVolumes& Volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
@@ -542,6 +544,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_networkMode(std::move(NetworkMode)),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
+    m_namedVolumes(std::move(namedVolumes)),
+    m_volumes(Volumes),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
@@ -789,6 +793,23 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
     });
+
+    // Refuse to start if any referenced named volume is in a failed state.
+    std::vector<std::string> unavailableVolumes;
+    for (const auto& volumeName : m_namedVolumes)
+    {
+        const auto [code, message] = m_volumes.GetVolumeStatus(volumeName);
+        if (FAILED(code))
+        {
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
+            unavailableVolumes.push_back(volumeName);
+        }
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_AVAILABLE,
+        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
+        !unavailableVolumes.empty());
 
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
 
@@ -1363,6 +1384,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCVirtualMachine& virtualMachine,
     IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    WSLCVolumes& volumesManager,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1731,6 +1753,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // from this function.
     EventTracker.WaitForObjectCreated(result.Id);
 
+    // Collect the names of referenced docker named volumes so Start() can verify
+    // they are available before running the container.
+    std::vector<std::string> namedVolumes;
+    namedVolumes.reserve(containerOptions.NamedVolumesCount);
+    for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
+    {
+        namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
+    }
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
@@ -1740,6 +1771,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::string(containerOptions.Image),
         std::move(networkMode),
         std::move(volumes),
+        std::move(namedVolumes),
+        volumesManager,
         std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
@@ -1769,19 +1802,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    // Validate that all named volumes mounted by the container were successfully recovered
-    // by the volumes manager. If any are missing (e.g. backing VHD removed while the service was
-    // down), refuse to open the container so it cannot enter a broken state.
+    // Collect the names of referenced docker named volumes.
+    std::vector<std::string> namedVolumes;
     for (const auto& mount : dockerContainer.Mounts)
     {
         if (mount.Type == "volume" && !mount.Name.empty())
         {
-            THROW_HR_IF_MSG(
-                E_UNEXPECTED,
-                !volumes.ContainsVolume(mount.Name),
-                "Cannot open container %hs: referenced volume '%hs' is not available",
-                dockerContainer.Id.c_str(),
-                mount.Name.c_str());
+            namedVolumes.push_back(mount.Name);
         }
     }
 
@@ -1836,6 +1863,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(networkMode),
         std::move(metadata.Volumes),
+        std::move(namedVolumes),
+        volumes,
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
