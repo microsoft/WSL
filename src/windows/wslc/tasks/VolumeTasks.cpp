@@ -14,7 +14,6 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
-#include "ImageModel.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
@@ -217,6 +216,6 @@ void PruneVolumes(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_VolumePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_VolumePruneSpaceReclaimed(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task
