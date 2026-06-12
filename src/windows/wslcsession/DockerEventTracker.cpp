@@ -64,21 +64,39 @@ DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
 DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSession& session, IORelay& relay) : m_session(session)
 {
     auto onChunk = [this](const gsl::span<char>& buffer) {
-        if (!buffer.empty()) // docker inserts empty lines between events, skip those.
+        // docker/podman /events is newline-delimited JSON. A single event can span multiple HTTP
+        // chunks - podman flushes large events (e.g. a container with a big label whose create event
+        // carries the labels) at ~8KB boundaries - so accumulate chunk bytes and only parse complete,
+        // newline-terminated events. Parsing a partial chunk as a whole event would throw and silently
+        // drop the event, which previously caused WaitForObjectCreated to time out for large events.
+        m_eventBuffer.append(buffer.data(), buffer.size());
+
+        size_t start = 0;
+        for (size_t newline; (newline = m_eventBuffer.find('\n', start)) != std::string::npos; start = newline + 1)
         {
+            auto event = std::string_view(m_eventBuffer).substr(start, newline - start);
+            if (event.empty()) // docker inserts empty lines between events, skip those.
+            {
+                continue;
+            }
+
             try
             {
-                OnEvent(std::string_view(buffer.data(), buffer.size()));
+                OnEvent(event);
             }
             catch (...)
             {
                 WSL_LOG(
                     "DockerEventParseError",
-                    TraceLoggingValue(buffer.data(), "Data"),
+                    TraceLoggingCountedString(
+                        event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
                     TraceLoggingValue(m_session.Id(), "SessionId"));
             }
         }
+
+        // Retain any incomplete trailing event for the next chunk.
+        m_eventBuffer.erase(0, start);
     };
 
     auto socket = dockerClient.MonitorEvents();

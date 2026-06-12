@@ -101,5 +101,10 @@ private:
     WSLCSession& m_session;
     std::recursive_mutex m_lock;
     std::atomic<size_t> m_callbackId{0};
+
+    // Accumulates raw bytes from the /events stream. Events are newline-delimited JSON and a single
+    // event can span multiple HTTP chunks, so chunk data is buffered here and split on newlines.
+    // Only touched on the (single-threaded) IORelay callback thread, so it needs no lock.
+    std::string m_eventBuffer;
 };
 } // namespace wsl::windows::service::wslc
