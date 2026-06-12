@@ -403,11 +403,7 @@ void AcceptHandle::CreateAcceptSocket()
 
 void AcceptHandle::OnComplete()
 {
-    // Mark the accepted socket as connected (this also updates its context from the listen socket).
-    const auto listenSocket = reinterpret_cast<SOCKET>(ListenSocket.Get());
-    THROW_LAST_ERROR_IF(
-        setsockopt(AcceptedSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
-        SOCKET_ERROR);
+    wsl::windows::common::socket::SetAcceptContext(AcceptedSocket.get(), reinterpret_cast<SOCKET>(ListenSocket.Get()));
 
     OnAccepted(std::move(AcceptedSocket));
 
