@@ -371,7 +371,8 @@ AcceptHandle::AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::f
     WSAPROTOCOL_INFOW protocolInfo{};
     int length = sizeof(protocolInfo);
     THROW_LAST_ERROR_IF(
-        getsockopt(reinterpret_cast<SOCKET>(this->ListenSocket.Get()), SOL_SOCKET, SO_PROTOCOL_INFOW, reinterpret_cast<char*>(&protocolInfo), &length) == SOCKET_ERROR);
+        getsockopt(reinterpret_cast<SOCKET>(this->ListenSocket.Get()), SOL_SOCKET, SO_PROTOCOL_INFOW, reinterpret_cast<char*>(&protocolInfo), &length) ==
+        SOCKET_ERROR);
 
     AddressFamily = protocolInfo.iAddressFamily;
     SocketType = protocolInfo.iSocketType;
@@ -397,7 +398,8 @@ void AcceptHandle::CreateAcceptSocket()
     {
         ULONG enable = 1;
         THROW_LAST_ERROR_IF(
-            setsockopt(AcceptedSocket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECTED_SUSPEND, reinterpret_cast<char*>(&enable), sizeof(enable)) == SOCKET_ERROR);
+            setsockopt(AcceptedSocket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECTED_SUSPEND, reinterpret_cast<char*>(&enable), sizeof(enable)) ==
+            SOCKET_ERROR);
     }
 }
 
@@ -406,7 +408,8 @@ void AcceptHandle::OnComplete()
     // Mark the accepted socket as connected (this also updates its context from the listen socket).
     const auto listenSocket = reinterpret_cast<SOCKET>(ListenSocket.Get());
     THROW_LAST_ERROR_IF(
-        setsockopt(AcceptedSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) == SOCKET_ERROR);
+        setsockopt(AcceptedSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
+        SOCKET_ERROR);
 
     OnAccepted(std::move(AcceptedSocket));
 

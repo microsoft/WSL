@@ -293,8 +293,8 @@ try
 
     for (;;)
     {
-        auto InetSocket = wsl::windows::common::socket::CancellableAccept(
-            Arguments->ListenSocket.get(), INFINITE, Arguments->ExitEvent.get());
+        auto InetSocket =
+            wsl::windows::common::socket::CancellableAccept(Arguments->ListenSocket.get(), INFINITE, Arguments->ExitEvent.get());
         if (!InetSocket)
         {
             break; // Exit event was signaled, exit.
