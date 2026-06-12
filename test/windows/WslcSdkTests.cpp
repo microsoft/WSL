@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -2225,30 +2226,9 @@ class WslcSdkTests
     std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
-        VERIFY_IS_TRUE(HasImage("wslc-registry:latest"));
-
-        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-        if (!username.empty())
-        {
-            env.push_back(std::format("USERNAME={}", username));
-            env.push_back(std::format("PASSWORD={}", password));
-        }
-
-        wsl::windows::common::WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddPort(port, port, AF_INET);
-
-        // Get the IWSLCSession COM object from the SDK session handle.
+        // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
         auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
-
-        auto registryAddress = std::format("127.0.0.1:{}", port);
-
-        // Wait for the registry to be ready by probing from the host.
-        auto hostUrl = std::format(L"http://{}", registryAddress);
-        ExpectHttpResponse(hostUrl.c_str(), 200, true);
-
-        return {std::move(container), registryAddress};
+        return WSLCE2ETests::StartLocalRegistry(session, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.
