@@ -489,6 +489,39 @@ class WSLCTests
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
             ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the path is not a directory", storagePathString));
         }
+
+        // Reject invalid session flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-session-flags");
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, static_cast<WSLCSessionFlags>(0x4), nullptr, &session));
+        }
+
+        // Reject invalid feature flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
+            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x20);
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        }
+
+        // Reject NULL output pointers across the session manager API.
+        {
+            auto settings = GetDefaultSessionSettings(L"null-out-session");
+            VERIFY_ARE_EQUAL(
+                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSession(0, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSessionByName(c_testSessionName, nullptr));
+
+            WSLCSessionListEntry* entries = nullptr;
+            ULONG count = 0;
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->ListSessions(nullptr, &count));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->ListSessions(&entries, nullptr));
+        }
+
+        // The session object must reject NULL output pointers.
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
     }
 
     struct VmInfo
@@ -1060,17 +1093,13 @@ class WSLCTests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage(*m_defaultSession, "alpine:latest");
             WSLCTagImageOptions tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";
             tagOptions.Tag = "latest";
             VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
-            auto alpineCleanup = wil::scope_exit([&]() {
-                RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
-                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
-            });
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LoadTestImage(*m_defaultSession, "alpine:latest"); });
 
             // List only dangling images
             WSLCFilter danglingTrueFilter{.Key = "dangling", .Value = "true"};
@@ -1343,11 +1372,10 @@ class WSLCTests
 
     WSLC_TEST_METHOD(DeleteImage)
     {
-        // Prepare alpine image to delete.
-        LoadTestImage(*m_defaultSession, "alpine:latest");
-
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+        auto restore = wil::scope_exit([&]() { LoadTestImage(*m_defaultSession, "alpine:latest"); });
 
         // Launch a container to ensure that image deletion fails when in use.
         WSLCContainerLauncher launcher("alpine:latest", "test-delete-container-in-use", {"sleep", "99999"}, {}, "host");
@@ -2530,6 +2558,142 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(SaveImages)
+    {
+        auto BuildStringArray = [](const std::vector<LPCSTR>& values) -> WSLCStringArray {
+            return WSLCStringArray{.Values = values.empty() ? nullptr : values.data(), .Count = static_cast<ULONG>(values.size())};
+        };
+
+        // Save multiple images to a single tar, delete one, then load back and verify.
+        {
+            std::filesystem::path imageTar = L"MultiImageExport.tar";
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                DeleteFileW(imageTar.c_str());
+
+                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+                ULONGLONG spaceReclaimed = 0;
+
+                LOG_IF_FAILED(m_defaultSession->PruneImages(
+                    nullptr, 0, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            });
+
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+                std::vector<LPCSTR> names = {"hello-world:latest", "alpine:latest"};
+                WSLCStringArray array = BuildStringArray(names);
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_IS_TRUE(fileSize.QuadPart > 0);
+            }
+
+            // Delete hello-world:latest and verify it's gone.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deleted;
+            WSLCDeleteImageOptions delOpts{};
+            delOpts.Image = "hello-world:latest";
+            delOpts.Flags = WSLCDeleteImageFlagsForce;
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&delOpts, &deleted, deleted.size_address<ULONG>()));
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest", false);
+
+            // Load it back from the multi-image tar — hello-world should reappear and alpine should still be present.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart, nullptr));
+            }
+
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+            // Sanity check that the loaded hello-world image is functional.
+            WSLCContainerLauncher launcher("hello-world:latest", "wslc-multi-save-container");
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto output = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, output.Code);
+            VERIFY_IS_TRUE(output.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Single image via SaveImages — must produce a valid tar archive.
+        {
+            std::filesystem::path imageTar = L"MultiImageSingle.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            std::vector<LPCSTR> names = {"hello-world:latest"};
+            WSLCStringArray array = BuildStringArray(names);
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_IS_TRUE(fileSize.QuadPart > 0);
+        }
+
+        // Validate that invalid input parameters are rejected.
+        {
+            // Use a real temp file so ToCOMInputHandle doesn't throw before SaveImages runs.
+            std::filesystem::path placeholderTar = L"MultiImageValidation.tar";
+            auto placeholderCleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(placeholderTar.c_str())); });
+
+            wil::unique_handle placeholder{CreateFileW(
+                placeholderTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == placeholder.get());
+            HANDLE phHandle = placeholder.get();
+
+            // Empty array (Count=0).
+            WSLCStringArray emptyArray{.Values = nullptr, .Count = 0};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &emptyArray, nullptr, nullptr));
+
+            // Empty string entry.
+            LPCSTR emptyEntry[] = {""};
+            WSLCStringArray emptyEntryArray{.Values = emptyEntry, .Count = 1};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &emptyEntryArray, nullptr, nullptr));
+
+            // Name longer than WSLC_MAX_IMAGE_NAME_LENGTH.
+            std::string longName(WSLC_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            LPCSTR longEntry[] = {longName.c_str()};
+            WSLCStringArray longEntryArray{.Values = longEntry, .Count = 1};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &longEntryArray, nullptr, nullptr));
+
+            // Too many images.
+            std::vector<LPCSTR> names(WSLC_MAX_SAVE_IMAGES_COUNT + 1, "foo");
+            WSLCStringArray tooManyArray = BuildStringArray(names);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->SaveImages(ToCOMInputHandle(phHandle), &tooManyArray, nullptr, nullptr));
+        }
+
+        // Try to save with one of the images not found — must fail
+        {
+            std::filesystem::path imageTar = L"MultiImageError.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+            wil::unique_handle imageTarFileHandle{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            std::vector<LPCSTR> names = {"alpine:latest", "not-found"};
+            WSLCStringArray array = BuildStringArray(names);
+            VERIFY_FAILED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
+
+            ValidateCOMErrorMessage(L"No such image: not-found");
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(0ull, static_cast<ULONGLONG>(fileSize.QuadPart));
+        }
+    }
+
     WSLC_TEST_METHOD(SynchronousIoCancellation)
     {
         // Create a blocked operation that will cause the service to get stuck on a ReadFile() call.
@@ -2790,6 +2954,74 @@ class WSLCTests
         auto [reason, details] = future.get();
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
+    }
+
+    WSLC_TEST_METHOD(CrashDumpCallback)
+    {
+        struct Invocation
+        {
+            std::wstring DumpPath;
+            std::string ProcessName;
+            ULONGLONG Pid;
+            ULONG Signal;
+            ULONGLONG Timestamp;
+        };
+
+        class DECLSPEC_UUID("8C5A7B14-9D26-4FAE-AB31-7E5BC23F4802") CallbackInstance
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback, IFastRundown, Microsoft::WRL::FtmBase>
+        {
+        public:
+            CallbackInstance(std::promise<Invocation>& promise, wil::unique_event& release) :
+                m_promise(promise), m_release(release)
+            {
+            }
+
+            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+            {
+                m_promise.set_value(Invocation{
+                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+
+                // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
+                m_release.wait();
+                return S_OK;
+            }
+
+        private:
+            std::promise<Invocation>& m_promise;
+            wil::unique_event& m_release;
+        };
+
+        std::promise<Invocation> promise;
+        wil::unique_event release{wil::EventOptions::ManualReset};
+        auto callback = Microsoft::WRL::Make<CallbackInstance>(promise, release);
+        auto releaseCallback = wil::scope_exit([&]() { release.SetEvent(); });
+
+        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"crash-dump-callback-test");
+        auto session = CreateSession(sessionSettings);
+
+        // Register the callback through IWSLCSession::RegisterCrashDumpCallback. Holding the
+        // returned subscription keeps the registration alive; releasing it auto-unregisters.
+        wil::com_ptr<IUnknown> subscription;
+        VERIFY_SUCCEEDED(session->RegisterCrashDumpCallback(callback.Get(), &subscription));
+
+        // Trigger a Linux process crash. The shell exits with 128 + SIGSEGV.
+        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "kill -SEGV $$"}, 128 + WSLCSignalSIGSEGV);
+
+        auto future = promise.get_future();
+        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(60)), std::future_status::ready);
+
+        auto invocation = future.get();
+        VERIFY_IS_FALSE(invocation.DumpPath.empty());
+        VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
+        VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
+
+        // The dump file should be readable and non-empty.
+        wil::unique_hfile dumpFile{CreateFileW(
+            invocation.DumpPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(dumpFile.is_valid());
+        VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
     }
 
     WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
@@ -3271,6 +3503,8 @@ class WSLCTests
         {
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true), E_INVALIDARG);
             VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
             VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
@@ -3461,6 +3695,19 @@ class WSLCTests
 
             ValidateContainerOutput(container, {{1, ""}}, 1);
         }
+
+        // Validate that the directories are readable by non-root users.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-container-gpu-nobody", {"/bin/ls", "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"});
+
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            launcher.SetUser("nobody");
+
+            auto container = launcher.Launch(*session);
+
+            ValidateContainerOutput(container, {}, 0);
+        }
     }
 
     WSLC_TEST_METHOD(Modules)
@@ -3477,6 +3724,15 @@ class WSLCTests
 
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
     {
+        // Reject invalid process flags.
+        {
+            WSLCProcessOptions options{};
+            options.Flags = static_cast<WSLCProcessFlags>(0x4);
+            wil::com_ptr<IWSLCProcess> process;
+            int err = 0;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, 0, 0, &process, &err));
+        }
+
         // Simple case
         {
             auto result = ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
@@ -3518,6 +3774,17 @@ class WSLCTests
             // Validate that a null out handle is rejected.
 
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            // Validate that every IWSLCProcess output pointer is rejected when null.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetExitEvent(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetPid(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetState(nullptr, nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetFlags(nullptr));
+
+            // GetFlags succeeds with a valid pointer and reports the launched flags.
+            WSLCProcessFlags flags{};
+            VERIFY_SUCCEEDED(process.Get().GetFlags(&flags));
+            VERIFY_IS_TRUE(WI_IsFlagSet(flags, WSLCProcessFlagsStdin));
         }
 
         // Create a stuck process and kill it.
@@ -3969,11 +4236,31 @@ class WSLCTests
             VERIFY_ARE_EQUAL(error, std::error_code{});
         }
 
-        wil::com_ptr<IWSLCContainer> notFound;
-        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+        // The container can still be opened even though its backing volume is gone, so the
+        // user is able to inspect and delete it.
+        wil::com_ptr<IWSLCContainer> recoveredContainer;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &recoveredContainer));
 
-        // Deleting the named volume should fail since the volume was not recovered.
-        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLC_E_VOLUME_NOT_FOUND);
+        // Starting it must fail since the referenced volume cannot be brought online.
+        VERIFY_ARE_EQUAL(recoveredContainer->Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
+        ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
+
+        // Inspecting the volume reports the failure via an "Error" entry in its status.
+        {
+            wil::unique_cotaskmem_ansistring inspectOutput;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput));
+            auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(inspectOutput.get());
+            VERIFY_IS_TRUE(inspect.Status.has_value());
+            VERIFY_IS_TRUE(inspect.Status->contains("Error"));
+
+            // The backing .vhdx was deleted, so recovery fails to attach it with ERROR_FILE_NOT_FOUND.
+            const auto expectedError = wsl::shared::string::WideToMultiByte(GetErrorString(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)));
+            VERIFY_ARE_EQUAL(inspect.Status->at("Error"), expectedError);
+        }
+
+        // The unavailable volume can still be deleted once the container referencing it is removed.
+        VERIFY_SUCCEEDED(recoveredContainer->Delete(WSLCDeleteFlagsForce));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
     }
 
     WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
@@ -5000,6 +5287,25 @@ class WSLCTests
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().GetInitProcess(nullptr));
         }
 
+        // Validate that CreateContainer rejects a null image and invalid flags.
+        {
+            WSLCContainerOptions options{};
+            wil::com_ptr<IWSLCContainer> container;
+
+            // A null Image field is rejected with E_POINTER.
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            // Invalid container flags are rejected with E_INVALIDARG.
+            options.Image = "debian:latest";
+            options.Flags = static_cast<WSLCContainerFlags>(0x10);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            // Invalid init process flags are rejected with E_INVALIDARG.
+            options.Flags = WSLCContainerFlagsNone;
+            options.InitProcessOptions.Flags = static_cast<WSLCProcessFlags>(0x4);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+        }
+
         // Validate that env is correctly wired.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-env", {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}});
@@ -5328,7 +5634,7 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_ARE_EQUAL(hr, E_POINTER);
         }
 
         // Test null container name
@@ -5341,6 +5647,15 @@ class WSLCTests
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, nullptr, &container));
             VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsNone));
+        }
+
+        // Validate that invalid tty sizes are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "invalid-tty-size-init", {"/bin/sh"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            launcher.SetTtySize(0, 0);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
     }
 
@@ -5492,6 +5807,13 @@ class WSLCTests
 
         // Test error paths
         {
+            // A null id and a null output pointer are rejected by the marshaller.
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->OpenContainer(nullptr, &container));
+                VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->OpenContainer("named-container", nullptr));
+            }
+
             expectOpen("", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: ''");
 
@@ -6430,6 +6752,281 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteNetwork(additionalNetwork.c_str()));
     }
 
+    WSLC_TEST_METHOD(ConnectDisconnectContainerNetworkTest)
+    {
+        auto launchContainer = [&](const std::string& name, std::string networkMode = "bridge") {
+            WSLCContainerLauncher launcher("debian:latest", name, {"sleep", "99999"}, {}, std::move(networkMode));
+            return launcher.Launch(*m_defaultSession);
+        };
+
+        auto createNetwork = [&](const std::string& name, const char* subnet) {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(name.c_str()));
+            WSLCDriverOption opts[] = {{"Subnet", subnet}};
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = name.c_str();
+            netOpts.Driver = "bridge";
+            netOpts.DriverOpts = opts;
+            netOpts.DriverOptsCount = ARRAYSIZE(opts);
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+        };
+
+        // Verifies both ConnectToNetwork and DisconnectFromNetwork reject with the same error for the given network name.
+        auto expectBothReject = [&](auto& container, LPCSTR networkName, HRESULT hr, LPCWSTR message) {
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName;
+            VERIFY_ARE_EQUAL(hr, container.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessage(message);
+            VERIFY_ARE_EQUAL(hr, container.Get().DisconnectFromNetwork(networkName));
+            ValidateCOMErrorMessage(message);
+        };
+
+        // Round-trip: connect to a network, verify via inspect, then disconnect.
+        {
+            const std::string networkName = "test-connect-disconnect-net";
+            createNetwork(networkName, "172.53.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchContainer("test-connect-disconnect-ctr");
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.at(networkName).IPAddress.empty());
+
+            VERIFY_SUCCEEDED(container.Get().DisconnectFromNetwork(networkName.c_str()));
+
+            auto inspectAfter = container.Inspect();
+            VERIFY_IS_FALSE(inspectAfter.NetworkSettings.Networks.contains(networkName));
+            VERIFY_IS_TRUE(inspectAfter.NetworkSettings.Networks.contains("bridge"));
+        }
+
+        // Empty and non-existent network name.
+        {
+            auto container = launchContainer("test-connect-invalid-name");
+
+            expectBothReject(container, "", E_INVALIDARG, L"Network name cannot be empty.");
+
+            const std::string nonExistentNetwork = "nonexistent-network";
+            const auto expectedError =
+                std::format(L"Network not found: '{}'", std::wstring(nonExistentNetwork.begin(), nonExistentNetwork.end()));
+            expectBothReject(container, nonExistentNetwork.c_str(), WSLC_E_NETWORK_NOT_FOUND, expectedError.c_str());
+        }
+
+        // Host and none mode rejection.
+        {
+            const std::string networkName = "test-connect-mode-net";
+            createNetwork(networkName, "172.52.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto expectModeRejection = [&](const std::string& name, std::string mode) {
+                auto container = launchContainer(name, std::move(mode));
+                expectBothReject(
+                    container,
+                    networkName.c_str(),
+                    E_INVALIDARG,
+                    L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            };
+
+            expectModeRejection("test-connect-host-ctr", "host");
+            expectModeRejection("test-connect-none-ctr", "none");
+        }
+
+        // ContainerIpAddress not supported.
+        {
+            auto container = launchContainer("test-connect-ip-ctr");
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = "bridge";
+            options.ContainerIpAddress = "10.0.0.5";
+            VERIFY_ARE_EQUAL(E_NOTIMPL, container.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
+        }
+
+        // Connect and disconnect from the container's primary network.
+        {
+            const std::string containerName = "test-connect-primary-ctr";
+            auto container = launchContainer(containerName);
+
+            // Connect to primary should fail — already connected.
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = "bridge";
+            VERIFY_ARE_EQUAL(E_FAIL, container.Get().ConnectToNetwork(&options));
+            // Docker returns the container name in the error, not the ID.
+            const auto expectedError = std::format(
+                L"endpoint with name {} already exists in network bridge", std::wstring(containerName.begin(), containerName.end()));
+            ValidateCOMErrorMessage(expectedError);
+
+            // Disconnect from primary should succeed.
+            VERIFY_SUCCEEDED(container.Get().DisconnectFromNetwork("bridge"));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.contains("bridge"));
+        }
+
+        // Connect to same secondary network twice.
+        {
+            const std::string networkName = "test-connect-twice-net";
+            const std::string containerName = "test-connect-twice-ctr";
+            createNetwork(networkName, "172.51.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchContainer(containerName);
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+            VERIFY_ARE_EQUAL(E_FAIL, container.Get().ConnectToNetwork(&options));
+            // Docker returns the container name in the error, not the ID.
+            const auto expectedError = std::format(
+                L"endpoint with name {} already exists in network {}",
+                std::wstring(containerName.begin(), containerName.end()),
+                std::wstring(networkName.begin(), networkName.end()));
+            ValidateCOMErrorMessage(expectedError);
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkAliasCreateTest)
+    {
+        auto createNetwork = [&](const std::string& name, const char* subnet) {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(name.c_str()));
+            WSLCDriverOption opts[] = {{"Subnet", subnet}};
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = name.c_str();
+            netOpts.Driver = "bridge";
+            netOpts.DriverOpts = opts;
+            netOpts.DriverOptsCount = ARRAYSIZE(opts);
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+        };
+
+        auto launchWithAliases = [&](const std::string& containerName, const std::string& networkMode, const std::vector<std::string>& aliases) {
+            WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, networkMode);
+            for (const auto& a : aliases)
+            {
+                launcher.AddPrimaryNetworkAlias(a);
+            }
+            return launcher.Launch(*m_defaultSession);
+        };
+
+        auto expectError = [&](const std::string& containerName,
+                               const std::string& networkMode,
+                               const std::vector<std::string>& aliases,
+                               HRESULT expectedResult,
+                               const std::wstring& expectedErrorMessage) {
+            auto result = wil::ResultFromException([&] { launchWithAliases(containerName, networkMode, aliases); });
+            VERIFY_ARE_EQUAL(result, expectedResult);
+            ValidateCOMErrorMessage(expectedErrorMessage);
+        };
+
+        // Single user-defined network + single alias — success, round-trips via inspect.
+        {
+            const std::string networkName = "alias-net-single";
+            createNetwork(networkName, "172.60.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchWithAliases("alias-ctr-single", networkName, {"db"});
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+        }
+
+        // Multiple aliases on a single network — all present.
+        {
+            const std::string networkName = "alias-net-multi";
+            createNetwork(networkName, "172.61.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto container = launchWithAliases("alias-ctr-multi", networkName, {"db", "primary", "backup"});
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "backup") != endpoint.Aliases.end());
+        }
+
+        // Alias on 'host' mode — rejected at the IDL layer.
+        {
+            expectError(
+                "alias-ctr-host",
+                "host",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
+        }
+
+        // Alias on default 'bridge' mode — rejected (aliases require a user-defined network).
+        {
+            expectError(
+                "alias-ctr-bridge",
+                "bridge",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
+        }
+
+        // Alias on 'none' mode — rejected.
+        {
+            expectError(
+                "alias-ctr-none",
+                "none",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
+        }
+
+        // Alias on 'container:' mode — rejected.
+        {
+            WSLCContainerLauncher targetLauncher("debian:latest", "alias-ctr-target", {"sleep", "99999"}, {});
+            auto target = targetLauncher.Launch(*m_defaultSession);
+
+            expectError(
+                "alias-ctr-container",
+                "container:alias-ctr-target",
+                {"db"},
+                E_INVALIDARG,
+                L"Network aliases require a user-defined network. Use --network to specify one.");
+        }
+
+        // Empty alias string — rejected.
+        {
+            const std::string networkName = "alias-net-empty";
+            createNetwork(networkName, "172.62.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            expectError("alias-ctr-empty", networkName, {""}, E_INVALIDARG, L"Network alias cannot be empty.");
+        }
+
+        // Unknown KVP key on primary settings — rejected with E_NOTIMPL.
+        {
+            const std::string networkName = "alias-net-unknown";
+            createNetwork(networkName, "172.63.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {{"IPAddress", "10.0.0.5"}};
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-unknown";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
+            ValidateCOMErrorMessage(std::format(
+                                        L"Endpoint settings are not yet supported (network '{}').",
+                                        std::wstring(networkName.begin(), networkName.end()))
+                                        .c_str());
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerNetworkModeHappyPathTest)
     {
         // Start container A on the default (bridged) network, then start container B sharing A's
@@ -6610,6 +7207,10 @@ class WSLCTests
             launcher.AddTmpfs("/mnt/wslc-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
+
+            // Validate that inspect fails with a null pointer.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Inspect(nullptr));
+
             auto details = container.Inspect();
 
             // Verify basic container metadata.
@@ -6710,6 +7311,19 @@ class WSLCTests
             auto process = WSLCProcessLauncher({}, {"echo", "OK"}).Launch(container.Get());
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
+        }
+
+        // Validate that Exec rejects invalid flags and a null output pointer.
+        {
+            WSLCProcessOptions options{};
+            wil::com_ptr<IWSLCProcess> process;
+
+            // A null output pointer is rejected by the marshaller.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Exec(&options, nullptr, nullptr));
+
+            // Invalid process flags are rejected with E_INVALIDARG.
+            options.Flags = static_cast<WSLCProcessFlags>(0x4);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Exec(&options, nullptr, &process));
         }
 
         // Validate that the working directory is correctly wired.
@@ -6841,6 +7455,18 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
             ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+        }
+
+        // Validate that invalid tty sizes are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "invalid-tty-size-exec", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCProcessLauncher execLauncher({}, {"/bin/sh", "-c", "stty size"}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            execLauncher.SetTtySize(0, 0);
+
+            auto [result, process] = execLauncher.LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
     }
 
@@ -7735,6 +8361,216 @@ class WSLCTests
             VERIFY_ARE_EQUAL(static_cast<DWORD>(fileSize), bytesRead);
             VERIFY_IS_TRUE(readBuffer == writeBuffer);
         }
+
+        // Validate that WriteHandle behaves correctly when its buffer is fully written, and CompleteOnDrained is false.
+        {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            PartialHandleRead reader(readPipe.get());
+
+            wsl::windows::common::io::MultiHandleWait io;
+            auto writerHandle =
+                std::make_unique<WriteHandle>(wsl::windows::common::io::HandleWrapper{std::move(writePipe)}, std::vector<char>{}, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // A reusable writer with nothing queued is Idle, so Run() has no handle to wait on and returns.
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            // First write: a single Push() transitions the writer out of Idle and is delivered.
+            std::string first = "first-chunk";
+            writer->Push(gsl::make_span(first.data(), first.size()));
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), first.size());
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.ExpectConsume(first);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+
+            // Reuse: the writer returned to Idle (not Completed) so it is still registered, and several
+            // queued Push() calls accumulate and are written in order during the next Run().
+            std::string a = "aaa";
+            std::string b = "bbbb";
+            std::string c = "cc";
+            writer->Push(gsl::make_span(a.data(), a.size()));
+            writer->Push(gsl::make_span(b.data(), b.size()));
+            writer->Push(gsl::make_span(c.data(), c.size()));
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), a.size() + b.size() + c.size());
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.ExpectConsume(a + b + c);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+
+            // Close the writer.
+            writer->SetCompleteOnDrained(true);
+            std::string exit = "exit";
+            writer->Push(gsl::make_span(exit.data(), exit.size()));
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            reader.Expect(exit);
+            reader.ExpectClosed();
+        }
+    }
+
+    TEST_METHOD(WriteNamedPipeContent)
+    {
+        using wsl::windows::common::io::HandleWrapper;
+        using wsl::windows::common::io::MultiHandleWait;
+        using wsl::windows::common::io::WriteNamedPipe;
+
+        auto createServerPipe = [](const std::wstring& name) {
+            wil::unique_hfile pipe(CreateNamedPipeW(
+                name.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, nullptr));
+            THROW_LAST_ERROR_IF(!pipe);
+
+            return pipe;
+        };
+
+        auto connect = [](const std::wstring& name) {
+            for (;;)
+            {
+                wil::unique_hfile client(CreateFileW(name.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr));
+                if (client)
+                {
+                    return client;
+                }
+
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND);
+
+                THROW_IF_WIN32_BOOL_FALSE(WaitNamedPipeW(name.c_str(), 30 * 1000));
+            }
+        };
+
+        auto push = [](WriteNamedPipe& writer, std::string& data) { writer.Push(gsl::make_span(data.data(), data.size())); };
+
+        // Scenario 1: a payload queued before any client exists is delivered once a client connects,
+        // and PendingBytes() drops to zero after the write drains.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // Connect a client up-front; the writer completes the handshake during Run().
+            auto client = connect(name);
+            PartialHandleRead reader(client.get());
+
+            std::string expected = "hello-named-pipe";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 2: multiple Push() calls accumulate and are delivered, in order, as a single stream.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            auto client = connect(name);
+            PartialHandleRead reader(client.get());
+
+            std::string a = "aaaa";
+            std::string b = "bbbbbb";
+            std::string c = "cc";
+            push(*writer, a);
+            push(*writer, b);
+            push(*writer, c);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), a.size() + b.size() + c.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(a + b + c);
+        }
+
+        // Scenario 3: when the connected client disconnects, the next write fails and the writer
+        // reconnects, resuming delivery to a new client without losing the buffered payload.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, true, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            // Phase 1: the first client connects, reads the first payload, then disconnects (the reader
+            // and client are scoped so the reader thread joins before the client handle closes).
+            std::string first = "first-payload";
+            {
+                auto client1 = connect(name);
+                PartialHandleRead reader1(client1.get());
+
+                push(*writer, first);
+                VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+                reader1.Expect(first);
+            }
+
+            // Phase 2: the next write fails against the now-closed client, triggering a reconnect. A
+            // second client connects while Run() performs the reconnect and receives the buffered payload.
+            std::string second = "second-payload";
+            push(*writer, second);
+
+            wil::unique_hfile client2;
+            std::thread connector([&]() { client2 = connect(name); });
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            connector.join();
+
+            PartialHandleRead reader2(client2.get());
+            reader2.Expect(second);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 4: a writer over an already-connected handle (Connected=true) skips the connection
+        // handshake and behaves like a persistent WriteHandle, writing queued data straight to the handle.
+        {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            PartialHandleRead reader(readPipe.get());
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{std::move(writePipe)}, false, true);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            std::string expected = "no-reconnect-path";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
+
+        // Scenario 5: Validate that the named pipe is connected if constructed with Connected = false.
+        {
+            const auto name = wsl::windows::common::helpers::GetUniquePipeName();
+
+            MultiHandleWait io;
+            auto writerHandle = std::make_unique<WriteNamedPipe>(HandleWrapper{createServerPipe(name)}, false, false);
+            auto* writer = writerHandle.get();
+            io.AddHandle(std::move(writerHandle));
+
+            std::string expected = "handshake-without-reconnect";
+            push(*writer, expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), expected.size());
+
+            // Connect the client after the payload is queued; the writer completes the handshake during Run().
+            wil::unique_hfile client;
+            std::thread connector([&]() { client = connect(name); });
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(30)));
+            connector.join();
+
+            PartialHandleRead reader(client.get());
+            reader.Expect(expected);
+            VERIFY_ARE_EQUAL(writer->PendingBytes(), static_cast<size_t>(0));
+        }
     }
 
     TEST_METHOD(DockerIORelay)
@@ -7814,6 +8650,79 @@ class WSLCTests
 
             runTest(input, largeStdout + "regularStdout", largeStderr);
         }
+
+        // Validate that behavior is correct with various input sizes.
+        {
+            const std::string marker1 = "--start--";
+            const std::string marker2 = "--end--";
+
+            auto runTest = [&](size_t payloadSize) {
+                std::vector<char> input;
+                insert(input, 1, marker1);
+                insert(input, 1, std::string(payloadSize, 'A'));
+                insert(input, 1, marker2);
+                const std::string expected = marker1 + std::string(payloadSize, 'A') + marker2;
+
+                auto [inputRead, inputWrite] =
+                    wsl::windows::common::wslutil::OpenAnonymousPipe(static_cast<DWORD>(input.size() + 1), true, false);
+                auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(4096, true, true);
+                auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(4096, true, true);
+
+                DWORD written = 0;
+                THROW_IF_WIN32_BOOL_FALSE(WriteFile(inputWrite.get(), input.data(), static_cast<DWORD>(input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(written, static_cast<DWORD>(input.size()));
+
+                std::string output;
+                MultiHandleWait io;
+
+                io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+
+                io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                    output.append(buffer.data(), buffer.size());
+                    if (output.find(marker2) != std::string::npos)
+                    {
+                        io.Cancel();
+                    }
+                }));
+
+                io.Run(std::chrono::seconds(60));
+
+                VERIFY_ARE_EQUAL(expected, output);
+            };
+
+            for (const size_t payloadSize : {1, 100, 4096, 8192, 32768, 64036, 65535, 65536, 65537, 65556, 65571, 65572, 65576, 130000})
+            {
+                runTest(payloadSize);
+            }
+        }
+    }
+
+    TEST_METHOD(RelayHandleLargeBuffer)
+    {
+        using namespace wsl::windows::common::io;
+
+        auto [srcRead, srcWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, true);
+        auto [dstRead, dstWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, true);
+
+        // A payload larger than the relay read buffer forces several read -> write cycles through the
+        // RelayHandle's reused WriteHandle.
+        const std::string payload(LX_RELAY_BUFFER_SIZE * 4 + 123, 'x');
+
+        MultiHandleWait io;
+
+        io.AddHandle(std::make_unique<WriteHandle>(std::move(srcWrite), std::vector<char>(payload.begin(), payload.end())));
+        io.AddHandle(std::make_unique<RelayHandle<>>(std::move(srcRead), std::move(dstWrite)));
+
+        // Collect the relayed output.
+        std::string output;
+        io.AddHandle(std::make_unique<ReadHandle>(
+            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+
+        io.Run({});
+
+        VERIFY_ARE_EQUAL(payload.size(), output.size());
+        VERIFY_IS_TRUE(payload == output);
     }
 
     WSLC_TEST_METHOD(ContainerRecoveryFromStorage)
@@ -7829,7 +8738,7 @@ class WSLCTests
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Create and start a container
-            WSLCContainerLauncher launcher("debian:latest", containerName.c_str(), {"/bin/echo", "OK"});
+            WSLCContainerLauncher launcher("debian:latest", containerName.c_str(), {"sleep", "9999"});
 
             auto container = launcher.Launch(*session);
             container.SetDeleteOnClose(false);
@@ -8641,6 +9550,44 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(TtySize)
+    {
+        constexpr ULONG c_rows = 43;
+        constexpr ULONG c_columns = 42;
+        const std::string expectedSize = "43 42";
+
+        // Container init process.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "tty-size-init", {"/bin/sh", "-c", "while true; do stty size; sleep 1; done"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            launcher.SetTtySize(c_rows, c_columns);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            auto tty = process.GetStdHandle(WSLCFDTty);
+
+            // Wait for the size to be reflected in a loop, since the tty size is applied asynchronously.
+            PartialHandleRead reader(tty.get());
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, reader.GetData().find(expectedSize) == std::string::npos); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(60));
+        }
+
+        // Exec process.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "tty-size-exec", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCProcessLauncher execLauncher({}, {"/usr/bin/stty", "size"}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+            execLauncher.SetTtySize(c_rows, c_columns);
+
+            auto process = execLauncher.Launch(container.Get());
+
+            ValidateProcessOutput(process, {{WSLCFDTty, expectedSize + "\r\n"}});
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerStats_RunningContainer)
     {
         // Start a long-lived detached container on a bridged network so network stats are populated.
@@ -9234,7 +10181,12 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-detach", {"sleep", "9999999"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
 
             auto container = launcher.Create(*m_defaultSession);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, DetachKeys, nullptr));
+
+            WSLCProcessStartOptions startOptions{};
+            startOptions.TtyRows = 24;
+            startOptions.TtyColumns = 80;
+            startOptions.DetachKeys = DetachKeys;
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, &startOptions, nullptr));
 
             auto initProcess = container.GetInitProcess();
 
@@ -9285,7 +10237,11 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-detach", {"cat"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             auto container = launcher.Create(*m_defaultSession);
 
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsAttach, "invalid", nullptr), E_INVALIDARG);
+            WSLCProcessStartOptions invalidDetachOptions{};
+            invalidDetachOptions.TtyRows = 24;
+            invalidDetachOptions.TtyColumns = 80;
+            invalidDetachOptions.DetachKeys = "invalid";
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsAttach, &invalidDetachOptions, nullptr), E_INVALIDARG);
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
 
@@ -9865,6 +10821,69 @@ class WSLCTests
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+    }
+
+    WSLC_TEST_METHOD(WarningCallbackGuestVolumeRecovery)
+    {
+        SKIP_TEST_SERVER();
+
+        constexpr auto c_sessionName = L"warning-guest-volume-recovery";
+        constexpr auto c_volumeName = "wslc-test-warning-guest-recovery";
+        auto storagePath = (std::filesystem::current_path() / "test-warning-guest-volume-recovery").wstring();
+        auto cleanupDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storagePath, ec);
+        });
+
+        // Create a session and, via the docker CLI, inject a "local" volume with driver options we don't support (type=nfs).
+        // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
+        // session recovers it.
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+            auto session = CreateSession(settings);
+
+            ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/docker",
+                 "volume",
+                 "create",
+                 "--driver",
+                 "local",
+                 "--opt",
+                 "type=nfs",
+                 "--opt",
+                 "o=addr=127.0.0.1,rw",
+                 "--opt",
+                 "device=:/exports/test",
+                 c_volumeName},
+                0);
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+
+        // Restart with a warning callback and verify the unsupported volume triggers a recovery warning when the session loads.
+        {
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+
+            const auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+            auto warnings = warningCallback->GetWarnings();
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+
+            // Clean up the volume from Docker's metadata.
+            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);
 
             VERIFY_SUCCEEDED(session->Terminate());
         }

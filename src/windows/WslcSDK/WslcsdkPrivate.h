@@ -112,6 +112,16 @@ struct WslcSessionImpl
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
 
+// Backs a WslcCrashDumpSubscription handle. Keeps the COM shim alive and holds the service-side
+// subscription whose release unregisters the callback.
+struct WslcCrashDumpSubscriptionImpl
+{
+    wil::com_ptr<ICrashDumpCallback> callback;
+    wil::com_ptr<IUnknown> subscription;
+};
+
+WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle);
+
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLCContainer> container;

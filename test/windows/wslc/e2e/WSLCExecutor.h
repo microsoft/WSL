@@ -17,6 +17,7 @@ Abstract:
 
 #include "precomp.h"
 #include "windows/Common.h"
+#include "VTSupport.h"
 
 namespace WSLCE2ETests {
 
@@ -47,6 +48,18 @@ struct WSLCExecutionResult
     bool StdoutContainsSubstring(const std::wstring& substring) const;
 };
 
+struct PseudoConsole
+{
+    NON_COPYABLE(PseudoConsole);
+    DEFAULT_MOVABLE(PseudoConsole);
+
+    PseudoConsole(SHORT columns, SHORT rows);
+
+    wil::unique_hfile InputWrite;
+    wil::unique_hfile OutputRead;
+    wsl::windows::common::helpers::unique_pseudo_console Handle;
+};
+
 // Interactive session for testing wslc commands that require stdin/stdout interaction.
 // Uses PartialHandleRead for race-free output validation
 struct WSLCInteractiveSession
@@ -57,7 +70,8 @@ struct WSLCInteractiveSession
         wil::unique_hfile stdoutRead,
         wil::unique_hfile stderrRead,
         wil::unique_handle processHandle,
-        wil::unique_handle nonElevatedToken = wil::unique_handle{});
+        wil::unique_handle nonElevatedToken = wil::unique_handle{},
+        wsl::windows::common::helpers::unique_pseudo_console pseudoConsole = {});
     ~WSLCInteractiveSession();
 
     // Non-copyable, non-movable
@@ -74,6 +88,22 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
 
+    // Convenience overloads for VT sequence helpers.
+    void ExpectStdout(const wsl::windows::common::vt::Sequence& expected)
+    {
+        ExpectStdout(wsl::windows::common::string::WideToMultiByte(expected.Get()));
+    }
+    void ExpectStderr(const wsl::windows::common::vt::Sequence& expected)
+    {
+        ExpectStderr(wsl::windows::common::string::WideToMultiByte(expected.Get()));
+    }
+
+    void IgnoreSequence(const std::string& sequence);
+
+    std::string GetStdoutData() const;
+
+    void ResizePseudoConsole(SHORT columns, SHORT rows);
+
     bool IsRunning() const;
     void CloseStdin();
     std::optional<int> GetExitCode() const;
@@ -88,10 +118,12 @@ private:
     wil::unique_hfile m_stdinWrite;
     wil::unique_hfile m_stdoutRead;
     wil::unique_hfile m_stderrRead;
+    wsl::windows::common::helpers::unique_pseudo_console m_pseudoConsole;
     wil::unique_handle m_processHandle;
     wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
     std::unique_ptr<PartialHandleRead> m_stdoutReader;
     std::unique_ptr<PartialHandleRead> m_stderrReader;
+    std::optional<std::string> m_ignoreSequence;
 };
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
@@ -102,6 +134,7 @@ WSLCExecutionResult RunWslcAndRedirectToFile(
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
 
 std::wstring GetWslcHeader();
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
+WSLCInteractiveSession RunWslcInteractive(
+    const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<PseudoConsole> pseudoConsole = std::nullopt);
 
 } // namespace WSLCE2ETests

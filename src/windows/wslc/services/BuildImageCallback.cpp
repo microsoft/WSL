@@ -18,15 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::string::MultiByteToWide;
-
-namespace {
-    constexpr std::wstring_view c_escapeMoveCursorUpAndClear = L"\033[{}A\033[J";
-    constexpr std::wstring_view c_escapeBrightGreen = L"\033[92m";
-    constexpr std::wstring_view c_escapeResetAttributes = L"\033[0m";
-    constexpr std::wstring_view c_escapeHideCursorDim = L"\033[?25l\033[2m";
-    constexpr std::wstring_view c_escapeClearLineAndNewline = L"\033[K\n";
-    constexpr std::wstring_view c_escapeUndimShowCursor = L"\033[22m\033[?25h";
-} // namespace
+using namespace wsl::windows::common::vt;
 
 BuildImageCallback::~BuildImageCallback()
 try
@@ -67,7 +59,8 @@ void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(c_escapeMoveCursorUpAndClear, m_displayedLines));
+        // Move cursor up to the start of the display area, then erase to end of screen.
+        WriteTerminal(Cursor::Up(m_displayedLines) + Erase::ScreenForward);
         m_displayedLines = 0;
     }
 
@@ -184,7 +177,7 @@ try
     const auto newlines = wide.substr(bodyLength);
     wide.resize(bodyLength);
 
-    WriteTerminal(std::format(L"{}{}{}{}", c_escapeBrightGreen, wide, c_escapeResetAttributes, newlines));
+    WriteTerminal(std::format(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines));
     return S_OK;
 }
 CATCH_RETURN();
@@ -193,50 +186,52 @@ void BuildImageCallback::Redraw()
 {
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    // Use the visible window width (not buffer width), minus one column to avoid the
-    // deferred-wrap edge case when a line is exactly the window width. Clamp to at
-    // least zero so the value never goes negative (which would underflow when passed
-    // to std::wstring::resize).
-    const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
+    const int consoleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left);
 
-    // Determine how many completed lines to show, leaving room for the pending line and pull progress.
     const bool showPending = !m_pendingLine.empty();
-    const SHORT pullCount = static_cast<SHORT>(m_pullLines.size());
-    SHORT completedCount = static_cast<SHORT>(m_lines.size());
-    const SHORT reservedLines = (showPending ? 1 : 0) + pullCount;
+    const int pullCount = static_cast<int>(m_pullLines.size());
+    int completedCount = static_cast<int>(m_lines.size());
+    const int reservedLines = (showPending ? 1 : 0) + pullCount;
     if (completedCount + reservedLines > c_maxDisplayLines)
     {
-        completedCount = std::max<SHORT>(0, c_maxDisplayLines - reservedLines);
+        completedCount = std::max(0, c_maxDisplayLines - reservedLines);
     }
-    const SHORT displayCount = completedCount + reservedLines;
+    const int displayCount = completedCount + reservedLines;
 
     // Build the entire frame in one buffer to minimize console writes. Hide the cursor
     // during the redraw so the user doesn't see it bouncing through the cursor movement,
     // then show it again at the final position. The dim attribute (\033[2m) renders the
     // scrolling lines de-emphasized regardless of the user's theme.
-    std::wstring buffer{c_escapeHideCursorDim};
+    //
+    // m_frameBuffer is a member so its backing allocation is reused across frames -
+    // it grows to the high-water mark and is never freed between redraws.
+    m_frameBuffer.clear();
+    m_frameBuffer += Cursor::Hide;
+    m_frameBuffer += Format::Dim;
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
     // previous one (e.g. when \r clears the pending line without a replacement).
     if (m_displayedLines > 0)
     {
-        buffer += std::format(c_escapeMoveCursorUpAndClear, m_displayedLines);
+        m_frameBuffer += Cursor::Up(m_displayedLines);
+        m_frameBuffer += Erase::ScreenForward;
     }
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (static_cast<SHORT>(wline.size()) > consoleWidth)
+        if (wline.size() > static_cast<size_t>(consoleWidth))
         {
-            wline.resize(consoleWidth);
+            wline.resize(static_cast<size_t>(consoleWidth));
         }
-        buffer += wline;
-        buffer += c_escapeClearLineAndNewline;
+        m_frameBuffer += std::move(wline);
+        m_frameBuffer += Erase::LineForward;
+        m_frameBuffer += L'\n';
     };
 
     // Print completed lines (skip older ones if we need room for the pending line).
     auto it = m_lines.begin();
-    if (completedCount < static_cast<SHORT>(m_lines.size()))
+    if (completedCount < static_cast<int>(m_lines.size()))
     {
         std::advance(it, m_lines.size() - completedCount);
     }
@@ -257,9 +252,10 @@ void BuildImageCallback::Redraw()
         appendLine(line);
     }
 
-    buffer += c_escapeUndimShowCursor;
+    m_frameBuffer += Format::Normal;
+    m_frameBuffer += Cursor::Show;
 
-    WriteTerminal(buffer);
+    WriteTerminal(m_frameBuffer);
     m_displayedLines = displayCount;
 }
 

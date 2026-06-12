@@ -492,6 +492,25 @@ class WSLCE2EGlobalTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Session_List_Verbose)
+    {
+        auto result = RunWslc(L"container list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto verboseResult = RunWslc(L"system session list --verbose");
+        verboseResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(verboseResult.Stdout.has_value());
+        VERIFY_IS_TRUE(
+            verboseResult.Stdout->find(L"[wslc] Found ") != std::wstring::npos, L"--verbose should print a session summary line");
+
+        auto plainResult = RunWslc(L"system session list");
+        plainResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(plainResult.Stdout.has_value());
+        VERIFY_IS_TRUE(
+            plainResult.Stdout->find(L"[wslc] Found ") == std::wstring::npos,
+            L"plain list should not print a session summary line");
+    }
+
 private:
     std::wstring GetHelpMessage() const
     {
@@ -525,6 +544,7 @@ private:
         std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
             {L"container", Localization::WSLCCLI_ContainerCommandDesc()},
             {L"image", Localization::WSLCCLI_ImageCommandDesc()},
+            {L"network", Localization::WSLCCLI_NetworkCommandDesc()},
             {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
             {L"system", Localization::WSLCCLI_SystemCommandDesc()},

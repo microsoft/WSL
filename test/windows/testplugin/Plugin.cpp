@@ -441,6 +441,8 @@ try
 
         const auto testFolder = L"C:\\";
         constexpr auto testFileName = L"plugin-test.txt";
+        constexpr auto rwMountpoint = "/mnt/wsl-plugin/plugin-rw-test";
+        constexpr auto roMountpoint = "/mnt/wsl-plugin/plugin-ro-test";
 
         // Validate rw mounts.
         {
@@ -453,8 +455,7 @@ try
             }
 
             // Mount read-write and verify the file can be read from Linux.
-            char rwMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, false, L"plugin-rw-test", rwMountpoint));
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, rwMountpoint, false));
 
             g_logfile << "WSLC RW folder mounted at: " << rwMountpoint << std::endl;
 
@@ -466,8 +467,7 @@ try
 
         // Validate ro mounts.
         {
-            char roMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"plugin-ro-test", roMountpoint));
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", roMountpoint, TRUE));
 
             g_logfile << "WSLC RO folder mounted at: " << roMountpoint << std::endl;
 
@@ -479,24 +479,12 @@ try
         }
 
         // Validate that trying to mount a folder that doesn't exist fails with the expected error code.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(nonexistent): "
-                      << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", TRUE, L"plugin-ro-test", mountpoint) << std::endl;
-        }
+        g_logfile << "WSLCMountFolder(nonexistent): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", roMountpoint, TRUE)
+                  << std::endl;
 
-        // Validate that trying to escape the /mnt folder fails.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(../escape): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"../escape", mountpoint)
-                      << std::endl;
-        }
-
-        // Validate that empty names are rejected.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"", mountpoint) << std::endl;
-        }
+        // Validate that non-absolute mountpoints are rejected.
+        g_logfile << "WSLCMountFolder(relative): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "relative-mountpoint", TRUE)
+                  << std::endl;
 
         g_logfile << "Test completed" << std::endl;
     }

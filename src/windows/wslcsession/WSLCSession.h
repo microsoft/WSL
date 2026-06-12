@@ -22,6 +22,7 @@ Abstract:
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include <list>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -83,11 +84,15 @@ public:
     // Used by the COM server host to signal process exit.
     void SetDestructionCallback(std::function<void()>&& callback);
 
+    // Type of m_crashDumpCallbacks. Exposed so CrashDumpSubscription can hold an iterator into
+    // it as an O(1) registration handle.
+    using CrashDumpCallbackList = std::list<wil::com_ptr<ICrashDumpCallback>>;
+
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
     IFACEMETHOD(Initialize)(
         _In_ const WSLCSessionInitSettings* Settings,
-        _In_ IWSLCVirtualMachine* Vm,
+        _In_ IWSLCVirtualMachineFactory* VmFactory,
         _In_ IWSLCPluginNotifier* PluginNotifier,
         _In_opt_ IWarningCallback* WarningCallback) override;
 
@@ -109,6 +114,7 @@ public:
         _In_ ULONGLONG ContentLength,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
+    IFACEMETHOD(SaveImages)(_In_ WSLCHandle OutputHandle, _In_ const WSLCStringArray* ImageNames, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImagesOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
@@ -139,7 +145,12 @@ public:
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
-        _In_ LPCSTR Executable, _In_ const WSLCProcessOptions* Options, _Out_ IWSLCProcess** VirtualMachine, _Out_ int* Errno) override;
+        _In_ LPCSTR Executable,
+        _In_ const WSLCProcessOptions* Options,
+        _In_ ULONG TtyRows,
+        _In_ ULONG TtyColumns,
+        _Out_ IWSLCProcess** VirtualMachine,
+        _Out_ int* Errno) override;
 
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
@@ -166,6 +177,12 @@ public:
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
     IFACEMETHOD(Terminate()) override;
+
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
+
+    // Called by CrashDumpSubscription when its last reference is released. The iterator must
+    // have been returned by RegisterCrashDumpCallback against this session.
+    void RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) noexcept;
 
     // ISupportErrorInfo
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
@@ -201,11 +218,17 @@ private:
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
+
+    _Requires_shared_lock_held_(m_lock)
+    void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     _Requires_shared_lock_held_(m_lock)
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
+
+    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     _Requires_shared_lock_held_(m_lock)
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
@@ -234,6 +257,7 @@ private:
     std::optional<DockerEventTracker> m_eventTracker;
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
+    std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
 
@@ -266,6 +290,15 @@ private:
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
     std::recursive_mutex m_userCOMCallbacksLock;
     __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
+
+    // Callbacks registered via RegisterCrashDumpCallback. std::list gives stable iterators that
+    // survive insertions and unrelated erasures, so each CrashDumpSubscription stashes its own
+    // iterator and uses it as an O(1) removal handle when the last reference is released.
+    // The session's lifetime extends past Terminate() (the COM object outlives the VM), so this
+    // list may outlive m_virtualMachine; that's fine because dispatch only runs while the VM
+    // thread is alive.
+    mutable wil::srwlock m_crashDumpLock;
+    _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;
