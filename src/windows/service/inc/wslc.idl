@@ -527,9 +527,8 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
-    // Returns the cached termination reason and details. The values are only meaningful
-    // after the termination event has been signaled; before that the reason is
-    // WSLCVirtualMachineTerminationReasonUnknown and Details is an empty string.
+    // Returns the cached termination reason and details. These are only available after the
+    // termination event has been signaled; before that the call fails.
     HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 }
 
@@ -787,9 +786,8 @@ interface IWSLCSession : IUnknown
     // caller and remains valid (and observes the signaled state) even after the session is released.
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
-    // Returns the cached termination reason and details. The values are only meaningful after the
-    // termination event has been signaled; before that the reason is
-    // WSLCVirtualMachineTerminationReasonUnknown and Details is an empty string.
+    // Returns the cached termination reason and details. These are only available after the
+    // termination event has been signaled; before that the call fails.
     HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 
     // Image management.
