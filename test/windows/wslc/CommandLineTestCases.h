@@ -25,6 +25,20 @@ COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
+// Global options (RootCommand::GetGlobalArguments). These must be accepted by
+// the root-level options-only pass before any subcommand is resolved. A
+// non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.
+COMMAND_LINE_TEST_CASE(L"--debug", L"root", true)
+COMMAND_LINE_TEST_CASE(L"-D", L"root", true)
+COMMAND_LINE_TEST_CASE(L"--debug system session list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"-D container list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--debug run ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--debug image list --verbose", L"list", true)
+// Cases that fail because the unknown/misplaced option falls through to a
+// command that doesn't accept it:
+COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false) // Unknown option falls through to root, which rejects it
+COMMAND_LINE_TEST_CASE(L"system --debug list", L"system", false)    // --debug must come before the subcommand
+
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)

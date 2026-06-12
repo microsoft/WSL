@@ -85,7 +85,7 @@ struct Command
         return {};
     }
 
-    // Settable from environment only; never parsed from the command line.
+    // Args eligible for environment binding.
     virtual std::vector<Argument> GetEnvArguments() const
     {
         return {};
@@ -99,13 +99,16 @@ struct Command
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 
-    // When optionsOnly is true, stops at the first positional without consuming it
-    // and advances inv past the consumed range.
-    void ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false) const;
+    // optionsOnly:   stop (without consuming) at the first positional token and
+    //                advance inv past the consumed range.
+    // stopOnUnknown: stop (without consuming) at the first unknown option token
+    //                instead of throwing. Used by the root-level globals scan
+    //                so unrecognized options flow to the regular pipeline.
+    void ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false, bool stopOnUnknown = false) const;
 
     void ParseArguments(Invocation& inv, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments(), false);
+        ParseArguments(inv, target, GetAllArguments());
     }
 
     void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;

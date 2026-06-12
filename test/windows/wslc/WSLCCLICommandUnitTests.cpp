@@ -24,6 +24,7 @@ Abstract:
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
+#include "EnvironmentOptions.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -187,6 +188,60 @@ class WSLCCLICommandUnitTests
         }
 
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
+    }
+
+    // RootCommand currently exposes Debug as the only CLI global option.
+    TEST_METHOD(RootCommand_GlobalArguments_OnlyDebug)
+    {
+        auto root = RootCommand();
+        auto globals = root.GetGlobalArguments();
+
+        VERIFY_ARE_EQUAL(1u, globals.size());
+        VERIFY_ARE_EQUAL(ArgType::Debug, globals[0].Type());
+        VERIFY_ARE_EQUAL(Kind::Flag, globals[0].Kind());
+    }
+
+    // RootCommand exposes Debug and NoColor as env-eligible. Debug being both
+    // global and env-eligible is the canonical "both" case; NoColor is env-only.
+    TEST_METHOD(RootCommand_EnvArguments_DebugAndNoColor)
+    {
+        auto root = RootCommand();
+        auto envArgs = root.GetEnvArguments();
+
+        VERIFY_ARE_EQUAL(2u, envArgs.size());
+
+        std::unordered_set<size_t> types;
+        for (const auto& a : envArgs)
+        {
+            types.insert(static_cast<size_t>(a.Type()));
+        }
+
+        VERIFY_IS_TRUE(types.count(static_cast<size_t>(ArgType::Debug)) == 1);
+        VERIFY_IS_TRUE(types.count(static_cast<size_t>(ArgType::NoColor)) == 1);
+    }
+
+    // Every ArgType advertised by GetEnvArguments() must have at least one entry
+    // in c_envBindings; otherwise ApplyEnvironmentOptions() has nothing to apply
+    // and help output would lie about env support.
+    TEST_METHOD(RootCommand_EnvArguments_AllHaveBindings)
+    {
+        auto root = RootCommand();
+        auto envArgs = root.GetEnvArguments();
+
+        for (const auto& a : envArgs)
+        {
+            bool found = false;
+            for (const auto& b : c_envBindings)
+            {
+                if (b.Type == a.Type())
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
+        }
     }
 
     // Walk every command in the root tree and verify no argument collisions.

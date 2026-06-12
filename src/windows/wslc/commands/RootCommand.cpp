@@ -86,6 +86,7 @@ std::vector<Argument> RootCommand::GetGlobalArguments() const
 std::vector<Argument> RootCommand::GetEnvArguments() const
 {
     return {
+        Argument::Create(ArgType::Debug),
         Argument::Create(ArgType::NoColor),
     };
 }

@@ -33,7 +33,6 @@ try
     EnableContextualizedErrors(false, true);
     HRESULT result = S_OK;
 
-    // Initialize runtime and COM.
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
@@ -44,14 +43,11 @@ try
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
 
-    // The execution context must be declared after COM is initialized because it stores internal
-    // COM references.
+    // Must be declared after COM init; it holds COM references.
     CLIExecutionContext context;
 
-    // Register a console control handler so Ctrl-C signals the cancel event.
-    // This allows long-running operations (e.g. image build) to be cancelled.
-    // The static pointer is required because SetConsoleCtrlHandler only accepts function pointers.
-    // CancelEvent starts null; when a task creates it, the handler picks it up automatically.
+    // SetConsoleCtrlHandler only accepts plain function pointers, so route Ctrl-C
+    // through a static reference into the context.
     static auto& s_cancelEvent = context.CancelEvent;
     auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
         if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
@@ -73,8 +69,7 @@ try
 
     std::unique_ptr<Command> command = std::make_unique<RootCommand>();
 
-    // Non-owning pointer to the root command so we can reach GetGlobalArguments()
-    // for parse/validate even after `command` is moved to the deepest subcommand.
+    // Stable handle to the root command; `command` is moved during subcommand resolution.
     const Command* const rootCommand = command.get();
 
     try
@@ -87,21 +82,27 @@ try
 
         Invocation invocation{std::move(args)};
 
-        // Parse and apply global options supplied in the command line or by environment variables.
+        // Globals scan: consume only the global options we recognize at the
+        // front of the invocation. Anything else (subcommands, unknown options,
+        // --help, --version, malformed tokens) is left in place for the regular
+        // pipeline to parse and report against the right command.
         auto cliGlobals = rootCommand->GetGlobalArguments();
         auto envOnly = rootCommand->GetEnvArguments();
-
         auto envDefs = cliGlobals;
         envDefs.insert(envDefs.end(), envOnly.begin(), envOnly.end());
 
-        rootCommand->ParseArguments(invocation, context.GlobalArgs, cliGlobals, /*optionsOnly*/ true);
+        rootCommand->ParseArguments(
+            invocation,
+            context.GlobalArgs,
+            cliGlobals,
+            /*optionsOnly*/ true,
+            /*stopOnUnknown*/ true);
         ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
         rootCommand->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
         context.ApplyGlobalOptions();
 
-        // Anything above this point is not affected by global options, including output (debug).
+        // Past this point, global options (debug logging, color, ...) are in effect.
 
-        // Find the subcommand being executed and then parse its options.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
         while (subCommand)
         {
@@ -113,24 +114,17 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
-    // Exceptions specific to parsing the arguments of a command
     catch (const CommandException& ce)
     {
-        // A command exception means there was an input failure. Display the help
-        // along with the error message to help the user correct their input.
+        // Input failure: show help alongside the error so the user can correct it.
         command->OutputHelp(&ce);
         return 1;
     }
-    // Any other type of error unrelated to the command parsing.
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
-
-        // Using WSL shared utility to get the HRESULT from the caught exception.
-        // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
         result = wil::ResultFromCaughtException();
 
-        // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
         if (context.CancelEvent && context.CancelEvent.is_signaled())
         {
             fwprintf(stderr, L"\nCancelled.\n");
@@ -147,7 +141,6 @@ try
             }
             else
             {
-                // Fallback for errors without context
                 wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
             }
         }

@@ -16,6 +16,7 @@ Abstract:
 
 #include "Argument.h"
 #include "ArgumentTypes.h"
+#include "RootCommand.h"
 #include <string>
 #include <vector>
 
@@ -24,6 +25,8 @@ enum class ArgumentSet
 {
     Run,
     List,
+    // RootCommand globals; parsed in optionsOnly mode (stops at first positional).
+    Globals,
 };
 
 // ParserTestCase - represents a single test case
@@ -33,6 +36,14 @@ struct ParserTestCase
     bool expectedResult;
     std::wstring commandLine;
 };
+
+// True for argument sets that mirror the root-level "global options" parsing
+// pass in Main.cpp, which uses optionsOnly=true so the parser stops at the
+// first positional / subcommand token without consuming it.
+inline bool IsOptionsOnlySet(ArgumentSet argumentSet)
+{
+    return argumentSet == ArgumentSet::Globals;
+}
 
 // Function to get the argument definitions for a given ArgumentSet
 inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet argumentSet)
@@ -62,6 +73,12 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
         };
+
+    case ArgumentSet::Globals:
+        // Pulled directly from RootCommand so the test moves in lockstep with
+        // the production definition. Mirrors what Main.cpp passes as cliGlobals
+        // to the first (optionsOnly) parse pass.
+        return wsl::windows::wslc::RootCommand().GetGlobalArguments();
 
     default:
         return {};
@@ -143,5 +160,18 @@ WSLC_PARSER_TEST_CASE(List, false, LR"(wslc -i cont1 cont2)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc -vp cont1)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 -v cont2 -12)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 --verbose=false cont2)") \
-WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 cont2 --invalidarg)")
+WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 cont2 --invalidarg)") \
+\
+/* Root-level globals: strict optionsOnly parsing. Stops cleanly at the first \
+ * non-option token; recognized globals before that are consumed. Production \
+ * uses an additional stopOnUnknown bool that is covered separately by       \
+ * OptionsOnly_StopOnUnknown_LeavesTokenForCaller.                           */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug system list)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc system --verbose)")
 // clang-format on

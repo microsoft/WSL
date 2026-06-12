@@ -17,8 +17,13 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly) :
-    m_invocation(inv), m_executionArgs(execArgs), m_arguments(std::move(arguments)), m_invocationItr(m_invocation.begin()), m_optionsOnly(optionsOnly)
+ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown) :
+    m_invocation(inv),
+    m_executionArgs(execArgs),
+    m_arguments(std::move(arguments)),
+    m_invocationItr(m_invocation.begin()),
+    m_optionsOnly(optionsOnly),
+    m_stopOnUnknown(stopOnUnknown)
 {
     // Create sublists by Kind for easier processing in the state machine.
     for (const auto& arg : m_arguments)
@@ -88,35 +93,34 @@ bool ParseArgumentsStateMachine::HasNextPositional() const
     return itr != m_positionalArgs.end();
 }
 
-// Parse arguments as such:
-//  1. If argument starts with a single -, the alias is considered (can be 1-2 characters).
-//      a. If the named argument alias (a or ab) needs a VALUE, it can be provided in these ways:
-//          -a=VALUE or -ab=VALUE
-//          -a VALUE or -ab VALUE
-//      b. If the argument is a flag, additional characters after are treated as if they start
-//          with a -, repeatedly until the end of the argument is reached.  Fails if non-flags hit.
-//  2. If the argument starts with a double --, only the full name is considered.
-//      a. If the named argument (arg) needs a VALUE, it can be provided in these ways:
-//          --arg=VALUE
-//          --arg VALUE
-//  3. If the argument does not start with any -, it is considered the next positional argument.
-//  4. Once a positional argument is encountered, all subsequent arguments are considered positional
-//  5. If the command only has 1 positional argument, all subsequent arguments are considered forwarded.
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::BackUpAndStop()
+{
+    --m_invocationItr;
+    m_stopped = true;
+    return {};
+}
+
+// Parse rules:
+//  1. Token starting with a single '-' is an alias (1-2 chars):
+//     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
+//     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
+//  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
+//  3. Anything else is the next positional.
+//  4. Once a positional is seen, everything after stays positional.
+//  5. If only one positional is defined, everything after it is forwarded.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 {
-    // Get the next argument from the invocation.
     auto currArg = std::wstring_view{*m_invocationItr};
     ++m_invocationItr;
 
-    // If current state has a type, then that means this must be a value for the previous argument.
+    // Pending value from the previous token.
     if (m_state.Type())
     {
         m_executionArgs.Add(m_state.Type().value(), std::wstring{currArg});
         return {};
     }
 
-    // If this command has forwarded args present and we have found a positional argument,
-    // the all remaining args are considered positional or forwarded.
+    // Anchored: remaining tokens are positional or forwarded.
     if (!m_forwardArgs.empty() && m_anchorPositional.has_value())
     {
         return ProcessAnchoredPositionals(currArg);
@@ -129,9 +133,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         {
             // Options-only mode: stop cleanly at the first positional token without
             // consuming it so the caller can resume parsing (e.g. subcommand resolution).
-            --m_invocationItr;
-            m_stopped = true;
-            return {};
+            return BackUpAndStop();
         }
 
         return ProcessPositionalArgument(currArg);
@@ -147,7 +149,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
             return ProcessPositionalArgument(currArg);
         }
 
-        // No positional argument remaining means this is an invalid argument.
+        // No positional argument remaining. In stopOnUnknown mode this token isn't ours;
+        // back up and let the next pass deal with it.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
     }
 
@@ -263,6 +271,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     const Argument* firstArg = findArgumentByAlias(currArg, 1, aliasLength);
     if (!firstArg)
     {
+        // Leading alias is unknown. In stopOnUnknown mode nothing has been added
+        // to m_executionArgs for this token yet, so it is safe to back up and stop.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
@@ -290,7 +305,9 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return {};
     }
 
-    // Boolean flag - add it and process any adjoined flags
+    // Boolean flag - add it and process any adjoined flags. Once we have added a
+    // flag to m_executionArgs for this token, stopOnUnknown no longer applies for
+    // mid-chain unknowns; the token has already been claimed.
     m_executionArgs.Add(firstArg->Type(), true);
 
     // Process remaining adjoined flags
@@ -340,7 +357,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
 
     if (currArg.length() == 2)
     {
-        // Missing argument name after double dash, this is an error.
+        // Bare '--': not a name we recognize. In stopOnUnknown mode hand it off
+        // to the next pass; otherwise it's a malformed token at this level.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
     }
 
@@ -391,7 +414,12 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
         }
     }
 
-    // We found no matching argument for this name, this is an invalid argument name.
+    // Unknown name. In stopOnUnknown mode hand it off to the next pass.
+    if (m_stopOnUnknown)
+    {
+        return BackUpAndStop();
+    }
+
     return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
 }
 

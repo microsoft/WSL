@@ -311,14 +311,14 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
-void Command::ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly) const
+void Command::ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly};
+    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown};
 
     while (stateMachine.Step())
     {
@@ -326,7 +326,8 @@ void Command::ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argume
     }
     stateMachine.ThrowIfError();
 
-    if (optionsOnly)
+    // Both modes leave the iterator at the first unconsumed token; sync inv.
+    if (optionsOnly || stopOnUnknown)
     {
         inv.consumeUntil(stateMachine.Position());
     }

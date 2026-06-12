@@ -19,13 +19,11 @@ namespace {
         ArgType Type;
     };
 
-    // Many-to-one allowed: list multiple bindings for the same ArgType to give
-    // users alternate spellings (e.g. NO_COLOR alongside WSLC_CLI_NO_COLOR).
+    // Many-to-one allowed: alternate spellings for the same ArgType (e.g. NO_COLOR and WSLC_CLI_NO_COLOR).
     constexpr EnvBinding c_bindings[] = {
         {L"WSLC_CLI_DEBUG", ArgType::Debug},
         {L"WSLC_CLI_NO_COLOR", ArgType::NoColor},
         {L"NO_COLOR", ArgType::NoColor},
-        {L"WSLC_CLI_VERBOSE", ArgType::Verbose},
     };
 
     std::optional<std::wstring> ReadEnv(const wchar_t* name)
@@ -45,8 +43,7 @@ namespace {
         return value;
     }
 
-    // Follows the NO_COLOR convention: any value is truthy, with explicit
-    // opt-out values so the var can be set-but-disabled without unsetting it.
+    // NO_COLOR convention: any value is truthy except explicit opt-outs.
     bool IsTruthy(const std::wstring& v)
     {
         if (v.empty())
@@ -58,55 +55,66 @@ namespace {
         return !(eq(L"0") || eq(L"false") || eq(L"no") || eq(L"off"));
     }
 
-    const Argument* FindArg(const std::vector<Argument>& defs, ArgType type)
-    {
-        for (const auto& a : defs)
-        {
-            if (a.Type() == type)
-            {
-                return &a;
-            }
-        }
-        return nullptr;
-    }
-
 } // namespace
 
 void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs)
 {
-    for (const auto& b : c_bindings)
+    // Iterate by arg so per-ArgType policy lives in one place.
+    for (const auto& arg : definedArgs)
     {
-        if (target.Contains(b.Type))
+        // CLI wins over environment.
+        if (target.Contains(arg.Type()))
         {
             continue;
         }
 
-        const Argument* arg = FindArg(definedArgs, b.Type);
-        if (!arg)
+        std::vector<std::wstring> values;
+        for (const auto& b : c_bindings)
+        {
+            if (b.Type != arg.Type())
+            {
+                continue;
+            }
+
+            auto v = ReadEnv(b.Name);
+            if (v.has_value())
+            {
+                values.push_back(std::move(*v));
+            }
+        }
+
+        if (values.empty())
         {
             continue;
         }
 
-        auto value = ReadEnv(b.Name);
-        if (!value.has_value())
-        {
-            continue;
-        }
-
-        switch (arg->Kind())
+        switch (arg.Kind())
         {
         case Kind::Flag:
-            if (IsTruthy(*value))
+        {
+            // OR across all bindings: any truthy value sets the flag.
+            bool any = false;
+            for (const auto& v : values)
             {
-                target.Add(b.Type, true);
+                if (IsTruthy(v))
+                {
+                    any = true;
+                    break;
+                }
+            }
+            if (any)
+            {
+                target.Add(arg.Type(), true);
             }
             break;
+        }
         case Kind::Value:
-            target.Add(b.Type, std::move(*value));
+            // TODO: no defined policy for multiple value bindings; first wins for now.
+            target.Add(arg.Type(), std::move(values.front()));
             break;
-        case Kind::Positional:
-        case Kind::Forward:
-            break;
+        default:
+            // Programming error: these kinds are not supported for environment binding.
+            THROW_HR_MSG(E_UNEXPECTED, "ApplyEnvironmentOptions: ArgType %u is not supported.", static_cast<unsigned>(arg.Type()));
         }
     }
 }
