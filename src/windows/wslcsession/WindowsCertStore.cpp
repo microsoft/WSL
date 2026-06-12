@@ -38,7 +38,8 @@ std::optional<std::string> TryEncodeCertificateAsPem(const CERT_CONTEXT& Cert)
         return std::nullopt;
     }
 
-    // CryptBinaryToStringA reports the size including the terminating null; drop it.
+    // The pemSize after the actual write call does not include terminating null,
+    // and is 1 less than the ealier query call.
     pem.resize(pemSize);
 
     return pem;
