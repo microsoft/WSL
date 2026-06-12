@@ -27,10 +27,13 @@ namespace {
 
         std::wstring value(len - 1, L'\0');
         DWORD got = ::GetEnvironmentVariableW(name, value.data(), len);
-        if (got >= len)
+        if (got == 0 || got >= len)
         {
             return std::nullopt;
         }
+
+        // Race hardening: if the var shrank between the sizing and read calls, trim the trailing
+        value.resize(got);
         return value;
     }
     catch (...)
