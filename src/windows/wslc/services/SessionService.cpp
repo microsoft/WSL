@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
+#include "WarningCallback.h"
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
@@ -56,6 +57,7 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console{};
+    console.SetInteractiveMode();
     const auto windowSize = console.GetWindowSize();
 
     const std::string shell = "/bin/sh";
@@ -113,7 +115,8 @@ Session SessionService::CreateDefaultSession()
 
     // Null Settings = default session with server-determined name and settings.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(nullptr, WSLCSessionFlagsNone, &session));
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED(sessionManager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -128,7 +131,8 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &session));
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), warningCallback.Get(), &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
 
@@ -139,7 +143,7 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     const auto windowSize = console.GetWindowSize();
     launcher.SetTtySize(windowSize.Y, windowSize.X);
 
-    return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.get()));
+    return ConsoleService::AttachToCurrentConsole(console, launcher.Launch(*session.get()));
 }
 
 std::vector<SessionInformation> SessionService::List()

@@ -18,6 +18,9 @@ Abstract:
 
 namespace wsl::windows::common::socket {
 
+// Sets SO_UPDATE_ACCEPT_CONTEXT on a socket accepted via AcceptEx to mark it as connected.
+void SetAcceptContext(_In_ SOCKET AcceptedSocket, _In_ SOCKET ListenSocket, _In_ const std::source_location& Location = std::source_location::current());
+
 bool CancellableAccept(
     _In_ SOCKET ListenSocket,
     _In_ SOCKET Socket,

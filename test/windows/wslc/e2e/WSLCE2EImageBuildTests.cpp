@@ -241,6 +241,46 @@ class WSLCE2EImageBuildTests
              .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_NoCache_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-no-cache";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        // `RUN date +%N` produces a different output each invocation, so without caching the
+        // resulting layer (and therefore the image id) changes every build.
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(
+            dockerfilePath,
+            "FROM debian:latest\n"
+            "RUN date +%N > /timestamp.txt\n");
+
+        const auto buildCmd =
+            std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageNoCache.NameAndTag());
+
+        // Seed the cache.
+        auto firstBuild = RunWslc(buildCmd);
+        firstBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto firstId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_NOT_EQUAL(std::string{}, firstId);
+
+        // A repeated build without --no-cache should hit the cache and produce the same id.
+        auto cachedBuild = RunWslc(buildCmd);
+        cachedBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
+
+        // --no-cache must re-run the non-deterministic step, producing a new id.
+        auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
+        noCacheBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -249,6 +289,7 @@ private:
     const TestImage BuiltImageTarget{L"wslc-e2e-build-target", L"latest", L""};
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
+    const TestImage BuiltImageNoCache{L"wslc-e2e-build-no-cache", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
@@ -275,6 +316,7 @@ private:
         EnsureImageIsDeleted(BuiltImageTarget);
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
+        EnsureImageIsDeleted(BuiltImageNoCache);
     }
 
     static auto SetupTestDirectory(const std::filesystem::path& testRoot)

@@ -87,7 +87,7 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerNamedVolume* namedVolumes;
     uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    WSLCContainerNetworkType networking;
+    PCSTR networkMode;
     WslcContainerFlags containerFlags;
 
 } WslcContainerOptionsInternal;
@@ -111,6 +111,16 @@ struct WslcSessionImpl
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
+
+// Backs a WslcCrashDumpSubscription handle. Keeps the COM shim alive and holds the service-side
+// subscription whose release unregisters the callback.
+struct WslcCrashDumpSubscriptionImpl
+{
+    wil::com_ptr<ICrashDumpCallback> callback;
+    wil::com_ptr<IUnknown> subscription;
+};
+
+WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle);
 
 struct WslcContainerImpl
 {

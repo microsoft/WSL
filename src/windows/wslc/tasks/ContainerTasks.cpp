@@ -22,7 +22,6 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
-#include "VolumeModel.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
@@ -423,6 +422,24 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
     }
 
+    if (context.Args.Contains(ArgType::Memory))
+    {
+        options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
+    }
+
+    if (context.Args.Contains(ArgType::Cpus))
+    {
+        options.NanoCpus = validation::GetNanoCpusFromString(context.Args.Get<ArgType::Cpus>());
+    }
+
+    if (context.Args.Contains(ArgType::Ulimit))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::Ulimit>())
+        {
+            options.Ulimits.emplace_back(validation::ParseUlimit(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
@@ -499,6 +516,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::Network))
+    {
+        auto networks = context.Args.GetAll<ArgType::Network>();
+        options.Networks.reserve(options.Networks.size() + networks.size());
+        for (const auto& value : networks)
+        {
+            options.Networks.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::NetworkAlias))
+    {
+        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        options.NetworkAliases.reserve(aliases.size());
+        for (const auto& value : aliases)
+        {
+            options.NetworkAliases.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
@@ -518,7 +555,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         for (const auto& label : context.Args.GetAll<ArgType::Label>())
         {
-            auto parsed = Label::Parse(label);
+            auto parsed = validation::ParseLabel(label);
             options.Labels.emplace_back(parsed.first, parsed.second);
         }
     }

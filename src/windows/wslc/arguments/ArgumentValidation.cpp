@@ -11,6 +11,8 @@ Abstract:
     Implementation of the Argument Validation.
 
 --*/
+
+#include "precomp.h"
 #include "Argument.h"
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
@@ -46,6 +48,18 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::ShmSize:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
+        break;
+
+    case ArgType::Memory:
+        validation::ValidateMemorySize(execArgs.GetAll<ArgType::Memory>(), m_name);
+        break;
+
+    case ArgType::Cpus:
+        validation::ValidateNanoCpus(execArgs.GetAll<ArgType::Cpus>(), m_name);
+        break;
+
+    case ArgType::Ulimit:
+        validation::ValidateUlimit(execArgs.GetAll<ArgType::Ulimit>(), m_name);
         break;
 
     case ArgType::Tail:
@@ -87,7 +101,38 @@ void Argument::Validate(const ArgMap& execArgs) const
         if (value.empty() ||
             std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
         {
-            throw ArgumentException(std::format(L"Invalid {} argument value: working directory cannot be empty or whitespace", m_name));
+            throw ArgumentException(Localization::WSLCCLI_WorkingDirEmptyError(m_name));
+        }
+        break;
+    }
+
+    case ArgType::Network:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::Network>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
+            }
+
+            if (IsEqual(value, L"host", true))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
+            }
+        }
+        break;
+    }
+
+    case ArgType::NetworkAlias:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::NetworkAlias>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
+            }
         }
         break;
     }
@@ -226,13 +271,17 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
     {
         return InspectType::Container;
     }
+    else if (IsEqual(input, L"network"))
+    {
+        return InspectType::Network;
+    }
     else if (IsEqual(input, L"volume"))
     {
         return InspectType::Volume;
     }
     else
     {
-        constexpr std::wstring_view supportedValues = L"image, container, volume";
+        constexpr std::wstring_view supportedValues = L"image, container, network, volume";
         throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
     }
 }
@@ -265,6 +314,112 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
     }
 
     return static_cast<int64_t>(parsed.value());
+}
+
+void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetNanoCpusFromString(value, argName);
+    }
+}
+
+int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName)
+{
+    constexpr double NanosPerCpu = 1'000'000'000.0;
+    constexpr double MaxCpus = static_cast<double>(std::numeric_limits<int64_t>::max()) / NanosPerCpu;
+
+    const std::string narrow = WideToMultiByte(input);
+    const char* begin = narrow.c_str();
+    const char* end = begin + narrow.size();
+
+    double cpus{};
+    const auto result = std::from_chars(begin, end, cpus, std::chars_format::fixed);
+    if (result.ec != std::errc() || result.ptr != end || cpus <= 0.0 || cpus > MaxCpus)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
+    }
+
+    return static_cast<int64_t>(cpus * NanosPerCpu);
+}
+
+void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = ParseUlimit(value, argName);
+    }
+}
+
+std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName)
+{
+    // Accepts <name>=<soft>[:<hard>]; if hard is omitted hard = soft. -1 means unlimited.
+    const auto equalsPos = input.find(L'=');
+    if (equalsPos == std::wstring::npos || equalsPos == 0)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+    }
+
+    const std::wstring valuesPart = input.substr(equalsPos + 1);
+    const auto colonPos = valuesPart.find(L':');
+
+    auto parseLimit = [&](const std::wstring& limitStr) -> int64_t {
+        if (limitStr.empty())
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+        }
+
+        try
+        {
+            return GetIntegerFromString<int64_t>(limitStr, argName, [](int64_t v) { return v >= -1; });
+        }
+        catch (const ArgumentException&)
+        {
+            // Re-throw with the ulimit-specific error message so the user sees the full input.
+            throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+        }
+    };
+
+    const int64_t soft = parseLimit(colonPos == std::wstring::npos ? valuesPart : valuesPart.substr(0, colonPos));
+    const int64_t hard = colonPos == std::wstring::npos ? soft : parseLimit(valuesPart.substr(colonPos + 1));
+
+    // This rejects "-1:1024" and "-1:<finite>" while allowing "<finite>:-1", "-1:-1", and "-1".
+    const bool invalidRange = (soft == -1) ? (hard != -1) : (hard != -1 && hard < soft);
+    if (invalidRange)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+    }
+
+    return {WideToMultiByte(input.substr(0, equalsPos)), soft, hard};
+}
+
+std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
+{
+    std::pair<std::string, std::string> result{};
+    auto pos = value.find('=');
+    if (pos == std::wstring::npos)
+    {
+        result.first = WideToMultiByte(value);
+    }
+    else
+    {
+        result.first = WideToMultiByte(value.substr(0, pos));
+        result.second = WideToMultiByte(value.substr(pos + 1));
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_LabelKeyEmptyError(), result.first.empty());
+    return result;
+}
+
+std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
+{
+    auto pos = value.find('=');
+    if (pos == std::wstring::npos)
+    {
+        return {WideToMultiByte(value), std::string{}};
+    }
+
+    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
 }
 
 } // namespace wsl::windows::wslc::validation

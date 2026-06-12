@@ -158,7 +158,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     }
 
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent.get(), true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
@@ -375,6 +375,8 @@ bool HcsVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 HRESULT HcsVirtualMachine::GetId(_Out_ GUID* VmId)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, VmId);
+
     *VmId = m_vmId;
     return S_OK;
 }
@@ -383,6 +385,8 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::AcceptConnection(_Out_ HANDLE* Socket)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Socket);
+
     auto socket = wsl::windows::common::hvsocket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
@@ -658,6 +662,8 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::GetTerminationEvent(_Out_ HANDLE* Event)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Event);
+
     *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
 
     return S_OK;
@@ -831,3 +837,79 @@ void HcsVirtualMachine::FreeLun(ULONG Lun)
 
     m_lunBitmap[Lun] = false;
 }
+
+namespace wsl::windows::service::wslc {
+
+WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings)
+{
+    THROW_HR_IF(E_POINTER, Settings == nullptr);
+
+    m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_storagePath = Settings->StoragePath ? Settings->StoragePath : L"";
+
+    if (Settings->RootVhdOverride != nullptr)
+    {
+        m_rootVhdOverride.emplace(Settings->RootVhdOverride);
+    }
+
+    if (Settings->RootVhdTypeOverride != nullptr)
+    {
+        m_rootVhdTypeOverride.emplace(Settings->RootVhdTypeOverride);
+    }
+
+    // Keep our own duplicate of the dmesg sink so recreated VMs can reuse it.
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
+    {
+        m_dmesgOutput.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
+    }
+
+    m_terminationCallback = Settings->TerminationCallback;
+    m_maximumStorageSizeMb = Settings->MaximumStorageSizeMb;
+    m_cpuCount = Settings->CpuCount;
+    m_memoryMb = Settings->MemoryMb;
+    m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_networkingMode = Settings->NetworkingMode;
+    m_featureFlags = Settings->FeatureFlags;
+    m_storageFlags = Settings->StorageFlags;
+}
+
+WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
+{
+    WSLCSessionSettings settings{};
+    settings.DisplayName = m_displayName.c_str();
+    settings.StoragePath = m_storagePath.empty() ? nullptr : m_storagePath.c_str();
+    settings.MaximumStorageSizeMb = m_maximumStorageSizeMb;
+    settings.CpuCount = m_cpuCount;
+    settings.MemoryMb = m_memoryMb;
+    settings.BootTimeoutMs = m_bootTimeoutMs;
+    settings.NetworkingMode = m_networkingMode;
+    settings.TerminationCallback = m_terminationCallback.get();
+    settings.FeatureFlags = m_featureFlags;
+    settings.StorageFlags = m_storageFlags;
+    settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
+    settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;
+
+    if (m_dmesgOutput)
+    {
+        settings.DmesgOutput = wslutil::ToCOMInputHandle(m_dmesgOutput.get());
+    }
+
+    return settings;
+}
+
+HRESULT WSLCVirtualMachineFactory::CreateVirtualMachine(_Out_ IWSLCVirtualMachine** Vm)
+try
+{
+    RETURN_HR_IF(E_POINTER, Vm == nullptr);
+    *Vm = nullptr;
+
+    const auto settings = BuildSettings();
+    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(&settings);
+    THROW_IF_NULL_ALLOC(vm);
+
+    *Vm = vm.Detach();
+    return S_OK;
+}
+CATCH_RETURN()
+
+} // namespace wsl::windows::service::wslc

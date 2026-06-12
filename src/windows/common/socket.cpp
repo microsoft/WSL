@@ -17,6 +17,15 @@ Abstract:
 #include "socket.hpp"
 #pragma hdrstop
 
+void wsl::windows::common::socket::SetAcceptContext(_In_ SOCKET AcceptedSocket, _In_ SOCKET ListenSocket, _In_ const std::source_location& Location)
+{
+    // Set the accept context to mark the socket as connected.
+    THROW_LAST_ERROR_IF_MSG(
+        setsockopt(AcceptedSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&ListenSocket), sizeof(ListenSocket)) == SOCKET_ERROR,
+        "From: %hs",
+        std::format("{}", Location).c_str());
+}
+
 bool wsl::windows::common::socket::CancellableAccept(
     _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
@@ -38,11 +47,7 @@ bool wsl::windows::common::socket::CancellableAccept(
         return false; // Accept was cancelled by the exit event.
     }
 
-    // Set the accept context to mark the socket as connected.
-    THROW_LAST_ERROR_IF_MSG(
-        setsockopt(Socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char*>(&ListenSocket), sizeof(ListenSocket)) == SOCKET_ERROR,
-        "From: %hs",
-        std::format("{}", Location).c_str());
+    SetAcceptContext(Socket, ListenSocket, Location);
 
     return true;
 }
