@@ -104,17 +104,23 @@ EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool dis
     if (mode == Mode::Input)
     {
         const DWORD newMode = (current & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT;
-        if (newMode != current)
+        if (newMode == current)
         {
-            if (SetConsoleMode(console, newMode))
-            {
-                m_console = console;
-                m_originalMode = current;
-            }
-            else
-            {
-                LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
-            }
+            // Already in the desired mode; nothing to restore, but VT input is
+            // still enabled on the handle.
+            m_vtEnabled = (current & ENABLE_VIRTUAL_TERMINAL_INPUT) != 0;
+            return;
+        }
+
+        if (SetConsoleMode(console, newMode))
+        {
+            m_console = console;
+            m_originalMode = current;
+            m_vtEnabled = true;
+        }
+        else
+        {
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_INVALID_PARAMETER);
         }
     }
     else
@@ -123,7 +129,9 @@ EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool dis
             const DWORD newMode = current | flags;
             if (newMode == current)
             {
-                // Flags already set; no mode change needed and nothing to restore.
+                // Flags already set; no mode change needed and nothing to restore,
+                // but VT processing is already enabled on the handle.
+                m_vtEnabled = true;
                 return true;
             }
 
@@ -131,6 +139,7 @@ EnableVirtualTerminal::EnableVirtualTerminal(HANDLE console, Mode mode, bool dis
             {
                 m_console = console;
                 m_originalMode = current;
+                m_vtEnabled = true;
                 return true;
             }
 
@@ -157,7 +166,7 @@ EnableVirtualTerminal::~EnableVirtualTerminal()
 
 bool EnableVirtualTerminal::IsVTEnabled() const
 {
-    return m_console != nullptr;
+    return m_vtEnabled;
 }
 
 ConstructedSequence::ConstructedSequence()

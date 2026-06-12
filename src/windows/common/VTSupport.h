@@ -82,11 +82,17 @@ public:
     explicit EnableVirtualTerminal(HANDLE console, Mode mode = Mode::Output, bool disableNewlineAutoReturn = false);
     ~EnableVirtualTerminal();
 
+    // Returns true if VT processing is currently enabled on the console handle,
+    // whether this instance enabled it or it was already enabled at construction.
+    // This is the correct gate for "should we emit VT escape sequences?".
+    // It is independent of whether the destructor will restore the prior mode
+    // (that ownership is tracked separately by m_console).
     bool IsVTEnabled() const;
 
 private:
-    HANDLE m_console = nullptr;
+    HANDLE m_console = nullptr; // non-null only when this instance must restore on destruction
     DWORD m_originalMode = 0;
+    bool m_vtEnabled = false; // true when VT processing is active on the console handle
 };
 
 // VT escape sequences are pure ASCII byte sequences (0x00-0x7F), but the

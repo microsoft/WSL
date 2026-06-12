@@ -397,6 +397,114 @@ class WSLCCLIVTSupportUnitTests
         VERIFY_IS_FALSE(EnableVirtualTerminal(INVALID_HANDLE_VALUE, EnableVirtualTerminal::Mode::Input).IsVTEnabled());
     }
 
+    TEST_METHOD(VT_EnableVirtualTerminal_AlreadyEnabled_Output)
+    {
+        // Regression: when VT_PROC is already set on the console, EnableVirtualTerminal
+        // must report VT as enabled (so callers gate VT output correctly) AND must not
+        // claim restore ownership — destruction must leave the pre-existing mode alone.
+        auto buffer = MakeScreenBuffer();
+        HANDLE h = buffer.get();
+
+        DWORD baseline{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &baseline));
+        const DWORD scopeExitRestore = baseline;
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(h, scopeExitRestore); });
+
+        // Pre-enable VT processing so the constructor's tryEnable() short-circuits
+        // on the "flags already set" path.
+        const DWORD preEnabled = baseline | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(h, preEnabled));
+
+        {
+            EnableVirtualTerminal vt{h};
+            VERIFY_IS_TRUE(vt.IsVTEnabled(), L"VT must be reported as enabled when it was already enabled on the handle");
+
+            DWORD mode{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &mode));
+            VERIFY_ARE_EQUAL(preEnabled, mode, L"Constructor must not change the mode when the requested flags are already set");
+        }
+
+        // Destructor must not have restored anything — the pre-existing VT_PROC
+        // bit must still be set after the EnableVirtualTerminal instance goes
+        // out of scope.
+        DWORD afterScope{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &afterScope));
+        VERIFY_ARE_EQUAL(preEnabled, afterScope, L"Destructor must not restore mode when constructor did not change it");
+    }
+
+    TEST_METHOD(VT_EnableVirtualTerminal_AlreadyEnabled_OutputWithDisableNewlineAutoReturn)
+    {
+        // Same regression as above, exercising the disableNewlineAutoReturn=true path
+        // where the constructor tries (VT_PROC | DISABLE_NEWLINE_AUTO_RETURN) first.
+        auto buffer = MakeScreenBuffer();
+        HANDLE h = buffer.get();
+
+        DWORD baseline{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &baseline));
+        const DWORD scopeExitRestore = baseline;
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(h, scopeExitRestore); });
+
+        const DWORD preEnabled = baseline | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+        if (!SetConsoleMode(h, preEnabled))
+        {
+            // DISABLE_NEWLINE_AUTO_RETURN is not supported on all conhost builds; skip
+            // rather than fail in environments where it cannot be set.
+            LogSkipped("Skipping DISABLE_NEWLINE_AUTO_RETURN test: SetConsoleMode rejected the flag");
+            return;
+        }
+
+        {
+            EnableVirtualTerminal vt{h, EnableVirtualTerminal::Mode::Output, true};
+            VERIFY_IS_TRUE(vt.IsVTEnabled());
+
+            DWORD mode{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &mode));
+            VERIFY_ARE_EQUAL(preEnabled, mode);
+        }
+
+        DWORD afterScope{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(h, &afterScope));
+        VERIFY_ARE_EQUAL(preEnabled, afterScope);
+    }
+
+    TEST_METHOD(VT_EnableVirtualTerminal_AlreadyEnabled_Input)
+    {
+        // Regression: when CONIN$ is already in the exact target mode
+        // (ENABLE_VIRTUAL_TERMINAL_INPUT + ENABLE_EXTENDED_FLAGS, no ENABLE_LINE_INPUT,
+        // no ENABLE_ECHO_INPUT), the constructor's "no change needed" early-return
+        // must still report IsVTEnabled()==true and must not touch the mode.
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin)
+        {
+            LogSkipped("Skipping input-mode VT already-enabled test: CONIN$ is not available (no attached console)");
+            return;
+        }
+
+        DWORD baseline{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
+        const DWORD scopeExitRestore = baseline;
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+
+        // Pre-configure CONIN$ to exactly match what EnableVirtualTerminal would set,
+        // so the constructor takes the newMode == current early-return path.
+        const DWORD preEnabled = (baseline & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)) | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(conin.get(), preEnabled));
+
+        {
+            EnableVirtualTerminal vt{conin.get(), EnableVirtualTerminal::Mode::Input};
+            VERIFY_IS_TRUE(vt.IsVTEnabled(), L"VT input must be reported as enabled when CONIN$ was already in the target mode");
+
+            DWORD mode{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &mode));
+            VERIFY_ARE_EQUAL(preEnabled, mode, L"Constructor must not change input mode when it already matches the target");
+        }
+
+        DWORD afterScope{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterScope));
+        VERIFY_ARE_EQUAL(preEnabled, afterScope, L"Destructor must not restore input mode when constructor did not change it");
+    }
+
     TEST_METHOD(VT_PrimaryDeviceAttributes)
     {
         // Clean DA1 response: conformance level 62, extensions Columns132 (1) and Sixel (4).
