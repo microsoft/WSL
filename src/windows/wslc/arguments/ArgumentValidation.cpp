@@ -106,6 +106,17 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
     }
 
+    case ArgType::Driver:
+    {
+        const auto& value = execArgs.Get<ArgType::Driver>();
+        if (value.empty() ||
+            std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        {
+            throw ArgumentException(Localization::WSLCCLI_DriverEmptyError(m_name));
+        }
+        break;
+    }
+
     case ArgType::Network:
     {
         for (const auto& value : execArgs.GetAll<ArgType::Network>())
@@ -413,13 +424,20 @@ std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
 
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
 {
+    std::pair<std::string, std::string> result{};
     auto pos = value.find('=');
     if (pos == std::wstring::npos)
     {
-        return {WideToMultiByte(value), std::string{}};
+        result.first = WideToMultiByte(value);
+    }
+    else
+    {
+        result.first = WideToMultiByte(value.substr(0, pos));
+        result.second = WideToMultiByte(value.substr(pos + 1));
     }
 
-    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_DriverOptionKeyEmptyError(), result.first.empty());
+    return result;
 }
 
 } // namespace wsl::windows::wslc::validation
