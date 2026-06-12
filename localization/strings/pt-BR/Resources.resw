@@ -2126,6 +2126,10 @@ Uso:
     <value>O contêiner '{}' está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress ainda não tem suporte.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Não há suporte para mapeamentos de porta com o modo de rede de contêineres; As portas são de propriedade do contêiner de destino.</value>
   </data>
@@ -2337,6 +2341,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Modo de rede sem suporte: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Redes adicionais não são permitidas quando o modo de rede principal é 'host' ou 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Rede duplicada: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2344,6 +2352,17 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
     <value>Ainda não há suporte para as configurações de ponto de extremidade (rede '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Network alias cannot be empty.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Os aliases de rede exigem uma rede definida pelo usuário. Use --network para especificar um.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Não é possível especificar aliases de rede quando várias redes são solicitadas. Use um único argumento --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Falha ao criar o volume ''{}'': {}</value>
@@ -2715,6 +2734,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>O comando a ser executado</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Número de CPUs (por exemplo, 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Valor de argumento {} inválido: '{}'. Esperava-se um número positivo de CPUs (por exemplo, 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Excluir contêineres mesmo que estejam em execução</value>
   </data>
@@ -2784,11 +2811,32 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Mostrar o contêiner criado mais recentemente (inclui todos os estados)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Limite de memória (por exemplo, 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nome do host do contêiner</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Nome do contêiner</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Conectar um contêiner a uma rede</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Valor {} inválido: o nome da rede não pode estar vazio nem conter espaços em branco</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>não há suporte para a rede no modo de host</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Adicionar um alias com escopo de rede para o contêiner</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Valor {} inválido: o alias de rede não pode estar vazio ou ter espaços em branco</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Não usar cache ao compilar a imagem</value>
@@ -2873,6 +2921,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Diretório de trabalho dentro do contêiner</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Valor {} inválido: o diretório de trabalho não pode estar vazio nem ter espaços em branco</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Gravar a ID do contêiner no caminho fornecido</value>
   </data>
@@ -2916,6 +2968,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Montar tmpfs no contêiner no caminho especificado</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Opções Ulimit (formato: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], use -1 para ilimitado)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Valor de argumento {} inválido: '{}'. Esperado &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (use -1 para ilimitado)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>ID do usuário para o processo (name|uid|uid:gid)</value>

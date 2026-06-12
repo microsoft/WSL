@@ -63,6 +63,7 @@ public:
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddPrimaryNetworkAlias(const std::string& Alias);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
     RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -86,6 +87,7 @@ public:
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
+    using WSLCProcessLauncher::SetTtySize;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 
@@ -109,6 +111,7 @@ private:
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
     std::vector<std::string> m_additionalNetworks;
+    std::vector<std::string> m_primaryNetworkAliases;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;

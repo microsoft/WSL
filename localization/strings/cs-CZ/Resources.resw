@@ -2119,6 +2119,10 @@ Využití:
     <value>Kontejner {} je spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress zatím není podporováno.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapování portů režim sítě kontejneru nepodporuje; porty patří cílovému kontejneru.</value>
   </data>
@@ -2330,6 +2334,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Nepodporovaný režim sítě: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Další sítě nejsou povoleny, pokud je primární síťový režim 'host' nebo 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplicitní síť: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2337,6 +2345,17 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
     <value>Nastavení koncového bodu zatím není podporováno (síť '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Network alias cannot be empty.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Network aliases require a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nepodařilo se vytvořit svazek '{}': {}</value>
@@ -2708,6 +2727,14 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Příkaz ke spuštění</value>
   </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Počet procesorů (např. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Neplatná hodnota argumentu {}: '{}'. Očekával se kladný počet procesorů (např. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
+  </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Odstranit kontejnery, i když běží</value>
   </data>
@@ -2777,11 +2804,32 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Zobrazit nejnovější vytvořený kontejner (včetně všech stavů)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Limit paměti (např. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Název hostitele kontejneru</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Název kontejneru</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Připojte kontejner k síti</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Neplatná hodnota {}: název sítě nemůže být prázdný ani obsahovat prázdné znaky.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>Síť v hostitelském režimu není podporována</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Add a network-scoped alias for the container</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Neplatná hodnota {}: alias sítě nemůže být prázdný ani obsahovat jen prázdné znaky.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Nepoužívejte mezipaměť při sestavování image</value>
@@ -2866,6 +2914,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Pracovní adresář v kontejneru</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Neplatná hodnota {}: pracovní adresář nemůže být prázdný ani obsahovat prázdné znaky.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Zapsat ID kontejneru do zadané cesty</value>
   </data>
@@ -2909,6 +2961,14 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Připojit tmpfs do kontejneru na zadané cestě</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Možnosti Ulimit (formát: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], pro neomezený počet použijte -1)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Neplatná hodnota argumentu {}: '{}'. Očekávaný &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (použijte -1 pro neomezený počet)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>ID uživatele pro proces (name|uid|uid:gid)</value>

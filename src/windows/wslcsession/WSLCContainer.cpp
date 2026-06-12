@@ -220,10 +220,45 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     return std::string{mode};
 }
 
-std::map<std::string, EmptyObject> ResolveEndpoints(
+// Parses the primary endpoint's Settings KVP. Today only "Aliases" is recognised; unknown
+// keys are rejected to avoid silently dropping caller data (mirrors the per-connection guard).
+EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkMode)
+{
+    EndpointConfig config{};
+    if (count == 0)
+    {
+        return config;
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, settings == nullptr, "Settings is null with SettingsCount=%lu", count);
+
+    auto parsed = ParseKeyMultiValuePairs(settings, count);
+
+    for (const auto& [key, _] : parsed)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkMode}), key != "Aliases");
+    }
+
+    if (auto it = parsed.find("Aliases"); it != parsed.end())
+    {
+        for (const auto& alias : it->second)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcAliasEmpty(),
+                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
+        }
+        config.Aliases = std::move(it->second);
+    }
+
+    return config;
+}
+
+std::map<std::string, EndpointConfig> ResolveEndpoints(
     const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
 {
-    std::map<std::string, EmptyObject> resolved;
+    std::map<std::string, EndpointConfig> resolved;
     if (count == 0)
     {
         return resolved;
@@ -690,7 +725,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 }
 
-void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
     // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
     auto lock = m_lock.lock_exclusive();
@@ -704,6 +739,20 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_id.c_str(),
         m_state);
 
+    std::optional<std::string> detachKeys;
+
+    if (StartOptions != nullptr)
+    {
+        detachKeys = StartOptions->DetachKeys != nullptr ? std::optional<std::string>(StartOptions->DetachKeys) : std::nullopt;
+
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && (StartOptions->TtyColumns == 0 || StartOptions->TtyRows == 0),
+            "Invalid tty size: %lu:%lu",
+            StartOptions->TtyRows,
+            StartOptions->TtyColumns);
+    }
+
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLCProcessIO> io;
 
@@ -711,8 +760,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     {
         if (WI_IsFlagSet(Flags, WSLCContainerStartFlagsAttach))
         {
-            auto detachKeys = DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys);
-
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
                 io = std::make_unique<TTYProcessIO>(TypedHandle{
@@ -753,9 +800,18 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
 
     try
     {
-        m_dockerClient.StartContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
+        m_dockerClient.StartContainer(m_id, detachKeys);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
+
+    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && StartOptions != nullptr)
+    {
+        try
+        {
+            m_dockerClient.ResizeContainerTty(m_id, StartOptions->TtyRows, StartOptions->TtyColumns);
+        }
+        CATCH_LOG();
+    }
 
     auto inspectJson = InspectLockHeld();
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
@@ -1072,13 +1128,23 @@ void WSLCContainerImpl::GetInitProcess(IWSLCProcess** Process) const
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLCProcess), (void**)Process));
 }
 
-void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
+void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id), m_state != WslcContainerStateRunning);
+
+    if (StartOptions != nullptr)
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty) && (StartOptions->TtyRows == 0 || StartOptions->TtyColumns == 0),
+            "Invalid tty size: %lu:%lu",
+            StartOptions->TtyRows,
+            StartOptions->TtyColumns);
+    }
 
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
@@ -1100,6 +1166,11 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
     if (WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty))
     {
         request.Tty = true;
+
+        if (StartOptions != nullptr)
+        {
+            request.ConsoleSize = {StartOptions->TtyRows, StartOptions->TtyColumns};
+        }
     }
 
     if (WI_IsFlagSet(Options->Flags, WSLCProcessFlagsStdin))
@@ -1107,9 +1178,9 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         request.AttachStdin = true;
     }
 
-    if (DetachKeys != nullptr)
+    if (StartOptions != nullptr && StartOptions->DetachKeys != nullptr)
     {
-        request.DetachKeys = DetachKeys;
+        request.DetachKeys = StartOptions->DetachKeys;
     }
 
     try
@@ -1278,6 +1349,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcEndpoint.Gateway = endpoint.Gateway;
         wslcEndpoint.MacAddress = endpoint.MacAddress;
         wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
+        wslcEndpoint.Aliases = endpoint.Aliases.value_or(std::vector<std::string>{});
         wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
     }
 
@@ -1550,6 +1622,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto endpoints = ResolveEndpoints(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
 
+    auto primaryConfig =
+        ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+
+    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+        primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
@@ -1557,9 +1638,14 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Docker API v1.44 (Docker 25.x) requires the primary network to be present in EndpointsConfig
     // when EndpointsConfig is non-empty. Insert it so Docker attaches all networks at create time.
-    if (!request.NetworkingConfig.EndpointsConfig.empty() && NetworkModeAllocatesVmPorts(networkMode))
+    // Also insert when the caller supplied aliases for the primary endpoint.
+    if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || primaryConfig.Aliases.has_value()))
     {
-        request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+        auto [it, _] = request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+        if (primaryConfig.Aliases.has_value())
+        {
+            it->second.Aliases = std::move(primaryConfig.Aliases);
+        }
     }
 
     for (const auto& e : mappedPorts)
@@ -2120,7 +2206,7 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
     return hr;
 }
 
-HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
+HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
 {
     WSLCExecutionContext context(&m_session);
 
@@ -2129,7 +2215,7 @@ HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys
     RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     *Process = nullptr;
-    return CallImpl(&WSLCContainerImpl::Exec, Options, DetachKeys, Process);
+    return CallImpl(&WSLCContainerImpl::Exec, Options, StartOptions, Process);
 }
 
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
@@ -2146,14 +2232,14 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 
-HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys, IWarningCallback* WarningCallback)
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(&m_session, WarningCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
-    return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
+    return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
 }
 CATCH_RETURN();
 
