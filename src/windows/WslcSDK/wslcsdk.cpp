@@ -22,6 +22,7 @@ Abstract:
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
+#include "APICompat.h"
 #include "WindowsUpdateIntegration.h"
 
 using namespace std::string_view_literals;
@@ -1380,46 +1381,17 @@ try
 }
 CATCH_RETURN();
 
-static WSLCCompatHandle ToWSLCCompatInputHandle(HANDLE Handle)
-{
-    const auto type = GetFileType(Handle);
-    if (type == FILE_TYPE_PIPE)
-    {
-        int socketType{};
-        int len = sizeof(socketType);
-
-        // N.B. FILE_TYPE_PIPE can describe a pipe, a named pipe, or a socket.
-        // Check for a named pipe first, since getsockopt() can return success for a named pipe.
-        if (GetNamedPipeInfo(Handle, nullptr, nullptr, nullptr, nullptr))
-        {
-            return WSLCCompatHandle{.Type = WSLCCompatHandleTypePipe, .Handle = {.Pipe = Handle}};
-        }
-        else if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
-        {
-            return WSLCCompatHandle{.Type = WSLCCompatHandleTypeSocket, .Handle = {.Socket = Handle}};
-        }
-        else
-        {
-            return WSLCCompatHandle{.Type = WSLCCompatHandleTypePipe, .Handle = {.Pipe = Handle}};
-        }
-    }
-    else if (type == FILE_TYPE_DISK)
-    {
-        return WSLCCompatHandle{.Type = WSLCCompatHandleTypeFile, .Handle = {.File = Handle}};
-    }
-    else
-    {
-        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", type);
-    }
-}
-
 static HRESULT WslcImportSessionImageImpl(
     WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        ToWSLCCompatInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length(), nullptr));
+        wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())),
+        imageName,
+        progressCallback.get(),
+        imageFile.Length(),
+        nullptr));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1457,7 +1429,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->LoadImage(
-        ToWSLCCompatInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length(), nullptr));
+        wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcLoadSessionImage(

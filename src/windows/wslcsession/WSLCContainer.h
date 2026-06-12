@@ -243,7 +243,7 @@ public:
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
     IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
 
-    // IWSLCCompatContainer - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // IWSLCCompatContainer.
     IFACEMETHOD(Stop)(_In_ WSLCCompatSignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Start)(_In_ WSLCCompatContainerStartFlags Flags) override;
     IFACEMETHOD(Delete)(_In_ WSLCCompatDeleteFlags Flags) override;

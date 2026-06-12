@@ -632,8 +632,6 @@ try
     }
     else
     {
-        // The conversion holds the wrapped termination callback so it outlives the call. The factory
-        // deep-copies (AddRefs) the termination callback synchronously during CreateSession.
         const auto settings = apicompat::Convert(*Settings);
         RETURN_IF_FAILED(CreateSession(settings.Get(), apicompat::Convert(Flags), warning.Get(), &session));
     }

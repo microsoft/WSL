@@ -205,7 +205,7 @@ public:
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
 
-    // IWSLCCompatSessionManager - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // IWSLCCompatSessionManager.
     IFACEMETHOD(GetVersion)(_Out_ WSLCCompatVersion* Version) override;
     IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
     IFACEMETHOD(CreateSession)(

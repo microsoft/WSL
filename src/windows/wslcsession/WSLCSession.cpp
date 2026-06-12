@@ -2870,19 +2870,18 @@ try
     *Images = nullptr;
     *Count = 0;
 
-    WSLCImageInformation* internalImages = nullptr;
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> imagesImpl;
+
     ULONG count = 0;
     if (Options == nullptr)
     {
-        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &internalImages, &count));
+        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &imagesImpl, &count));
     }
     else
     {
         const auto options = apicompat::Convert(*Options);
-        RETURN_IF_FAILED(ListImages(options.Get(), &internalImages, &count));
+        RETURN_IF_FAILED(ListImages(options.Get(), &imagesImpl, &count));
     }
-
-    auto freeInternal = wil::scope_exit([&] { CoTaskMemFree(internalImages); });
 
     if (count > 0)
     {
@@ -2891,7 +2890,7 @@ try
 
         for (ULONG index = 0; index < count; index++)
         {
-            converted[index] = apicompat::Convert(internalImages[index]);
+            converted[index] = apicompat::Convert(imagesImpl[index]);
         }
 
         *Images = converted.release();
@@ -2914,11 +2913,10 @@ try
 
     const auto options = apicompat::Convert(*Options);
 
-    WSLCDeletedImageInformation* internalImages = nullptr;
-    ULONG count = 0;
-    RETURN_IF_FAILED(DeleteImage(&options, &internalImages, &count));
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> imagesImpl;
 
-    auto freeInternal = wil::scope_exit([&] { CoTaskMemFree(internalImages); });
+    ULONG count = 0;
+    RETURN_IF_FAILED(DeleteImage(&options, &imagesImpl, &count));
 
     if (count > 0)
     {
@@ -2927,7 +2925,7 @@ try
 
         for (ULONG index = 0; index < count; index++)
         {
-            converted[index] = apicompat::Convert(internalImages[index]);
+            converted[index] = apicompat::Convert(imagesImpl[index]);
         }
 
         *DeletedImages = converted.release();
