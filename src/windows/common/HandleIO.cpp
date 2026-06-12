@@ -4,6 +4,7 @@
 #include "HandleIO.h"
 #pragma hdrstop
 
+using wsl::windows::common::io::AcceptHandle;
 using wsl::windows::common::io::BufferWrapper;
 using wsl::windows::common::io::DockerIORelayHandle;
 using wsl::windows::common::io::EventHandle;
@@ -16,7 +17,6 @@ using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::ReadNamedPipe;
 using wsl::windows::common::io::ReadSocketMessageHandle;
-using wsl::windows::common::io::SingleAcceptHandle;
 using wsl::windows::common::io::WriteHandle;
 using wsl::windows::common::io::WriteNamedPipe;
 
@@ -360,41 +360,81 @@ void ReadNamedPipe::Collect()
     ReadHandle::Collect();
 }
 
-// SingleAcceptHandle
+// AcceptHandle
 
-SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted) :
-    ListenSocket(std::move(ListenSocket)), AcceptedSocket(std::move(AcceptedSocket)), OnAccepted(std::move(OnAccepted))
+AcceptHandle::AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::function<void(wil::unique_socket&&)>&& OnAccepted) :
+    ListenSocket(std::move(ListenSocket)), AcceptOnce(AcceptOnce), OnAccepted(std::move(OnAccepted))
 {
     Overlapped.hEvent = Event.get();
+
+    // Query the listen socket so accepted sockets can be created with a matching address family, type, and protocol.
+    WSAPROTOCOL_INFOW protocolInfo{};
+    int length = sizeof(protocolInfo);
+    THROW_LAST_ERROR_IF(
+        getsockopt(reinterpret_cast<SOCKET>(this->ListenSocket.Get()), SOL_SOCKET, SO_PROTOCOL_INFOW, reinterpret_cast<char*>(&protocolInfo), &length) == SOCKET_ERROR);
+
+    AddressFamily = protocolInfo.iAddressFamily;
+    SocketType = protocolInfo.iSocketType;
+    Protocol = protocolInfo.iProtocol;
+
+    CreateAcceptSocket();
 }
 
-SingleAcceptHandle::~SingleAcceptHandle()
+AcceptHandle::~AcceptHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
-
-        DWORD bytesProcessed{};
-        DWORD flagsReturned{};
-        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
-        {
-            auto error = GetLastError();
-            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-        }
+        CancelPendingIo(reinterpret_cast<SOCKET>(ListenSocket.Get()), Overlapped);
     }
 }
 
-void SingleAcceptHandle::Schedule()
+void AcceptHandle::CreateAcceptSocket()
+{
+    AcceptedSocket.reset(WSASocketW(AddressFamily, SocketType, Protocol, nullptr, 0, WSA_FLAG_OVERLAPPED));
+    THROW_LAST_ERROR_IF(!AcceptedSocket);
+
+    // Configure the socket like hvsocket::Create() does so Hyper-V connections survive VM suspend.
+    if (AddressFamily == AF_HYPERV)
+    {
+        ULONG enable = 1;
+        THROW_LAST_ERROR_IF(
+            setsockopt(AcceptedSocket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECTED_SUSPEND, reinterpret_cast<char*>(&enable), sizeof(enable)) == SOCKET_ERROR);
+    }
+}
+
+void AcceptHandle::OnComplete()
+{
+    // Mark the accepted socket as connected (this also updates its context from the listen socket).
+    const auto listenSocket = reinterpret_cast<SOCKET>(ListenSocket.Get());
+    THROW_LAST_ERROR_IF(
+        setsockopt(AcceptedSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) == SOCKET_ERROR);
+
+    OnAccepted(std::move(AcceptedSocket));
+
+    if (AcceptOnce)
+    {
+        State = IOHandleStatus::Completed;
+    }
+    else
+    {
+        // Prepare a fresh socket for the next accept and return to standby so the loop reschedules.
+        CreateAcceptSocket();
+        State = IOHandleStatus::Standby;
+    }
+}
+
+void AcceptHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
 
+    Event.ResetEvent();
+
     // Schedule the accept.
     DWORD bytesReturned{};
-    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
+    if (AcceptEx((SOCKET)ListenSocket.Get(), AcceptedSocket.get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
     {
         // Accept completed immediately.
-        State = IOHandleStatus::Completed;
-        OnAccepted();
+        OnComplete();
     }
     else
     {
@@ -405,7 +445,7 @@ void SingleAcceptHandle::Schedule()
     }
 }
 
-void SingleAcceptHandle::Collect()
+void AcceptHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
 
@@ -414,11 +454,10 @@ void SingleAcceptHandle::Collect()
 
     THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesReceived, false, &flagsReturned));
 
-    State = IOHandleStatus::Completed;
-    OnAccepted();
+    OnComplete();
 }
 
-HANDLE SingleAcceptHandle::GetHandle() const
+HANDLE AcceptHandle::GetHandle() const
 {
     return Event.get();
 }
