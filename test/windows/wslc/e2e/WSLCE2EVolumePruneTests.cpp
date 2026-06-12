@@ -68,10 +68,10 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_FALSE(
-            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
-            L"Named volume should not be pruned without --all");
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        auto output = result.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2u, output.size());
+        VERIFY_ARE_EQUAL(output[0], L"");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[1].find(L"Total reclaimed space:"));
 
         VerifyVolumeIsListed(TestVolumeName);
     }
@@ -86,8 +86,11 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        auto output = result.GetStdoutLines();
+        VERIFY_ARE_EQUAL(3u, output.size());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[0].find(std::format(L"Deleted: {}", TestVolumeName)));
+        VERIFY_ARE_EQUAL(output[1], L"");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[2].find(L"Total reclaimed space:"));
 
         VerifyVolumeIsNotListed(TestVolumeName);
     }
@@ -146,7 +149,7 @@ class WSLCE2EVolumePruneTests
 
         auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(TestVolumeName); });
 
-        // A label filter that does not match the volume should preserve it...
+        // A label filter that does not match the volume should preserve it
         const auto filteredPrune = RunWslc(L"volume prune --all --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
@@ -154,8 +157,8 @@ class WSLCE2EVolumePruneTests
             L"Filtered prune should not have deleted the non-matching volume");
         VerifyVolumeIsListed(TestVolumeName);
 
-        // ...and a subsequent unfiltered prune --all should still remove it, proving the
-        // filter (not absence of eligible volumes) was the reason it survived.
+        // Subsequent unfiltered prune --all should still remove it, proving
+        // the filter was the reason it survived.
         const auto unfilteredPrune = RunWslc(L"volume prune --all");
         unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
@@ -212,7 +215,6 @@ class WSLCE2EVolumePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_MalformedValue)
     {
-        // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"volume prune --filter label");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"label") + L"\r\n", .ExitCode = 1});
     }
@@ -220,9 +222,7 @@ class WSLCE2EVolumePruneTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_InvalidKey)
     {
         const auto result = RunWslc(L"volume prune --filter color=red");
-        VERIFY_ARE_EQUAL(1u, static_cast<unsigned int>(result.ExitCode.value_or(0)));
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter"));
+        result.Verify({.Stdout = L"", .Stderr = L"invalid filter 'color'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
 private:
