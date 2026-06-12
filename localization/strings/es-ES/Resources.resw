@@ -2353,7 +2353,7 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
-    <value>Network alias cannot be empty.</value>
+    <value>El alias de red no puede estar vacío.</value>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Los alias de red requieren una red definida por el usuario. Use --network para especificar uno.</value>
@@ -2834,7 +2834,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Agregar un alias con ámbito de red para el contenedor</value>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
-    <value>Invalid {} value: network alias cannot be empty or whitespace</value>
+    <value>Valor {} no válido: el alias de red no puede estar vacío ni tener espacios en blanco</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
