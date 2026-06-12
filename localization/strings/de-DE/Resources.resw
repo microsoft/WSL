@@ -2353,7 +2353,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
-    <value>Network alias cannot be empty.</value>
+    <value>Der Netzwerkalias darf nicht leer sein.</value>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Netzwerkaliase erfordern ein benutzerdefiniertes Netzwerk. Verwenden Sie --network , um eine anzugeben.</value>

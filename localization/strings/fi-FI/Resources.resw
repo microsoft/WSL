@@ -2347,7 +2347,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
-    <value>Network alias cannot be empty.</value>
+    <value>Verkkotunnus ei voi olla tyhjä.</value>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
@@ -2825,7 +2825,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Isäntätilan verkkoa ei tueta</value>
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
-    <value>Add a network-scoped alias for the container</value>
+    <value>Lisää säilölle verkkokohtainen alias</value>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Virheellinen {}-arvo: verkkotunnus ei voi olla tyhjä tai välilyönti</value>

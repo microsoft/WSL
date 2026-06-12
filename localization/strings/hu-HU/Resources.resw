@@ -2347,14 +2347,14 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
-    <value>Network alias cannot be empty.</value>
+    <value>A hálózati alias nem lehet üres.</value>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
-    <value>Network aliases require a user-defined network. Use --network to specify one.</value>
+    <value>Hálózati aliasokhoz felhasználó által definiált hálózat szükséges. A --network használatával adhat meg egyet.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <value>Hálózati aliasok nem adhatók meg, ha több hálózatra van szükség. Használjon egyetlen --network argumentumot.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2825,7 +2825,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>a gazdagép módú hálózatkezelés nem támogatott</value>
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
-    <value>Add a network-scoped alias for the container</value>
+    <value>Hálózati hatókörű alias hozzáadása a tárolóhoz</value>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Érvénytelen {} érték: a hálózati alias nem lehet üres vagy szóköz</value>
