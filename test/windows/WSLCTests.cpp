@@ -3866,14 +3866,22 @@ class WSLCTests
         const std::string volumeName = std::format("wslc-test-named-volume-{}", driver);
         const std::string containerName = std::format("wslc-test-container-{}", driver);
 
-        // Best-effort cleanup in case prior failed runs left artifacts behind.
-        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
-        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-
-        auto cleanup = wil::scope_exit([&]() {
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+        // Remove the container (and its volume) via the session API, both for best-effort cleanup of
+        // leftovers from a prior failed run and on exit. The recovered container is created with
+        // DeleteOnClose=false, and the backend's /usr/bin/docker shim is not wired to podman in this
+        // environment (it targets a non-existent dockerd socket), so it cannot remove it - using the
+        // session API also detaches the backing .vhdx so the volume can then be deleted.
+        auto removeContainerAndVolume = [&]() {
+            wil::com_ptr<IWSLCContainer> existing;
+            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &existing)))
+            {
+                LOG_IF_FAILED(existing->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            }
             LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-        });
+        };
+
+        removeContainerAndVolume();
+        auto cleanup = wil::scope_exit([&]() { removeContainerAndVolume(); });
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
