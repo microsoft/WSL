@@ -707,12 +707,11 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
         }
     }
 
-    // Cache the termination reason and details before signaling the exit event.
-    {
-        std::lock_guard lock(m_lock);
-        m_terminationReason = reason;
-        m_terminationDetails = Event->EventData;
-    }
+    // Cache the termination reason and details before signaling the exit event. These fields are
+    // written once here (OnExit fires once and m_vmExitEvent is never reset) and published to readers
+    // by the SetEvent below; GetTerminationReason only reads them after observing the signaled event.
+    m_terminationReason = reason;
+    m_terminationDetails = Event->EventData;
 
     m_vmExitEvent.SetEvent();
 }
@@ -722,7 +721,13 @@ try
 {
     RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
 
-    std::lock_guard lock(m_lock);
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once in OnExit before m_vmExitEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vmExitEvent.is_signaled());
+
     *Reason = m_terminationReason;
     *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
 
@@ -872,7 +877,6 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
         m_dmesgOutput.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
-    m_terminationCallback = Settings->TerminationCallback;
     m_maximumStorageSizeMb = Settings->MaximumStorageSizeMb;
     m_cpuCount = Settings->CpuCount;
     m_memoryMb = Settings->MemoryMb;
@@ -892,7 +896,6 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.MemoryMb = m_memoryMb;
     settings.BootTimeoutMs = m_bootTimeoutMs;
     settings.NetworkingMode = m_networkingMode;
-    settings.TerminationCallback = m_terminationCallback.get();
     settings.FeatureFlags = m_featureFlags;
     settings.StorageFlags = m_storageFlags;
     settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
