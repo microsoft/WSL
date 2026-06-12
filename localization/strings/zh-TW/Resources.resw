@@ -2352,6 +2352,17 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>網路 '{}' 尚不支援端點設定 ()。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>網路別名不可為空白。</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>網路別名需要使用者定義的網路。使用 --network 指定一個。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>要求多個網路時，無法指定網路別名。使用單一 --network 引數。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>無法建立磁碟區 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2818,6 +2829,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>不支援主機模式網路</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>為容器新增網路範圍的別名</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>{} 值無效： 網路別名不可為空白或空白字元</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>建置影像時請勿使用快取</value>

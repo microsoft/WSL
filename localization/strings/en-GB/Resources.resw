@@ -2346,6 +2346,17 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Endpoint settings are not yet supported (network '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Network alias cannot be empty.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Network aliases require a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Failed to create volume '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2812,6 +2823,13 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>host mode networking is not supported</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Add a network-scoped alias for the container</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Invalid {} value: network alias cannot be empty or whitespace</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Do not use cache when building the image</value>

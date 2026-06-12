@@ -2352,6 +2352,17 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Todavía no se admite la configuración del punto de conexión (red '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>El alias de red no puede estar vacío.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Los alias de red requieren una red definida por el usuario. Use --network para especificar uno.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>No se pueden especificar alias de red cuando se solicitan varias redes. Use un único argumento --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>No se pudo crear el volumen '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2818,6 +2829,13 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>no se admiten redes en modo host</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Agregar un alias con ámbito de red para el contenedor</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Valor {} no válido: el alias de red no puede estar vacío ni tener espacios en blanco</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>No usar caché al compilar la imagen</value>

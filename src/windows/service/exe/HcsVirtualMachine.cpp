@@ -158,7 +158,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     }
 
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent.get(), true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
