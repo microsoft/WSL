@@ -4178,11 +4178,31 @@ class WSLCTests
             VERIFY_ARE_EQUAL(error, std::error_code{});
         }
 
-        wil::com_ptr<IWSLCContainer> notFound;
-        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+        // The container can still be opened even though its backing volume is gone, so the
+        // user is able to inspect and delete it.
+        wil::com_ptr<IWSLCContainer> recoveredContainer;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &recoveredContainer));
 
-        // Deleting the named volume should fail since the volume was not recovered.
-        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLC_E_VOLUME_NOT_FOUND);
+        // Starting it must fail since the referenced volume cannot be brought online.
+        VERIFY_ARE_EQUAL(recoveredContainer->Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
+        ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
+
+        // Inspecting the volume reports the failure via an "Error" entry in its status.
+        {
+            wil::unique_cotaskmem_ansistring inspectOutput;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput));
+            auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(inspectOutput.get());
+            VERIFY_IS_TRUE(inspect.Status.has_value());
+            VERIFY_IS_TRUE(inspect.Status->contains("Error"));
+
+            // The backing .vhdx was deleted, so recovery fails to attach it with ERROR_FILE_NOT_FOUND.
+            const auto expectedError = wsl::shared::string::WideToMultiByte(GetErrorString(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)));
+            VERIFY_ARE_EQUAL(inspect.Status->at("Error"), expectedError);
+        }
+
+        // The unavailable volume can still be deleted once the container referencing it is removed.
+        VERIFY_SUCCEEDED(recoveredContainer->Delete(WSLCDeleteFlagsForce));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
     }
 
     WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
@@ -10743,6 +10763,69 @@ class WSLCTests
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+    }
+
+    WSLC_TEST_METHOD(WarningCallbackGuestVolumeRecovery)
+    {
+        SKIP_TEST_SERVER();
+
+        constexpr auto c_sessionName = L"warning-guest-volume-recovery";
+        constexpr auto c_volumeName = "wslc-test-warning-guest-recovery";
+        auto storagePath = (std::filesystem::current_path() / "test-warning-guest-volume-recovery").wstring();
+        auto cleanupDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storagePath, ec);
+        });
+
+        // Create a session and, via the docker CLI, inject a "local" volume with driver options we don't support (type=nfs).
+        // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
+        // session recovers it.
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+            auto session = CreateSession(settings);
+
+            ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/docker",
+                 "volume",
+                 "create",
+                 "--driver",
+                 "local",
+                 "--opt",
+                 "type=nfs",
+                 "--opt",
+                 "o=addr=127.0.0.1,rw",
+                 "--opt",
+                 "device=:/exports/test",
+                 c_volumeName},
+                0);
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+
+        // Restart with a warning callback and verify the unsupported volume triggers a recovery warning when the session loads.
+        {
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+
+            const auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+            auto warnings = warningCallback->GetWarnings();
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+
+            // Clean up the volume from Docker's metadata.
+            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);
 
             VERIFY_SUCCEEDED(session->Terminate());
         }
