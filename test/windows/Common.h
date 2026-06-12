@@ -309,7 +309,7 @@ private:
 class ScopedEnvVariable
 {
 public:
-    ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value, bool restore = false);
+    ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
     ~ScopedEnvVariable();
 
     NON_COPYABLE(ScopedEnvVariable);

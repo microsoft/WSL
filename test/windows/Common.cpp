@@ -2474,17 +2474,14 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value, bool restore) : m_name(Name)
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
 {
-    if (restore)
+    std::wstring value;
+    const auto result = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (result != HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
     {
-        std::wstring value;
-        const auto result = wil::GetEnvironmentVariableW(Name.c_str(), value);
-        if (result != HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
-        {
-            VERIFY_SUCCEEDED(result);
-            m_originalValue = std::move(value);
-        }
+        VERIFY_SUCCEEDED(result);
+        m_originalValue = std::move(value);
     }
 
     VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));

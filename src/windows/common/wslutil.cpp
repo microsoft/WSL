@@ -368,7 +368,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    // GetFodlerFromPathAsync won't work if the folder is hidden or system.
+    // GetFolderFromPathAsync won't work if the folder is hidden or system.
     auto downloadFolderPath = std::filesystem::temp_directory_path();
     auto filenameStem = std::filesystem::path(Filename).stem().wstring();
     auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
@@ -393,9 +393,9 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
                                winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
                                .get();
         }
-        catch (const winrt::hresult_error& e)
+        catch (...)
         {
-            if (e.code() != HRESULT_FROM_WIN32(ERROR_FILE_EXISTS))
+            if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
             {
                 throw;
             }
