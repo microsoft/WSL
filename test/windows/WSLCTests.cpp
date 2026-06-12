@@ -4472,7 +4472,9 @@ class WSLCTests
         // Prune with no eligible volumes (none created yet) returns an empty set.
         expectPrune({}, {{"all", "true"}});
 
-        // Default (no all=true) only prunes anonymous volumes; with none present, returns empty.
+        // podman has no docker-style "anonymous-only" default: prune always targets all unused
+        // volumes regardless of the all filter (WSLC strips the unsupported all filter). With none
+        // present, returns empty.
         expectPrune({});
 
         // all=true prunes unused named guest volumes.
@@ -4562,10 +4564,13 @@ class WSLCTests
             expectPrune({drop}, {{"all", "true"}, {"label!", "wslc-prune-keep"}});
         }
 
-        // VHD volumes are not pruned (docker skips bind-mount volumes).
+        // podman prunes VHD volumes too: unlike dockerd (which exposed them as bind mounts and so
+        // skipped them in volume prune), podman treats the backing volume as an ordinary unused
+        // local volume and removes it. WSLC reconciles the prune by detaching and deleting the
+        // backing .vhdx, so neither the volume nor its file is left behind.
         {
-            const std::string vhdName = "wslc-prune-vhd-skip";
-            const std::string guestName = "wslc-prune-vhd-skip-guest";
+            const std::string vhdName = "wslc-prune-vhd";
+            const std::string guestName = "wslc-prune-vhd-guest";
 
             auto cleanup = wil::scope_exit([&]() {
                 LOG_IF_FAILED(m_defaultSession->DeleteVolume(vhdName.c_str()));
@@ -4575,9 +4580,13 @@ class WSLCTests
             CreateNamedVolume(vhdName, "vhd", {}, {{"SizeBytes", "1073741824"}});
             CreateNamedVolume(guestName, "guest");
 
-            expectPrune({guestName}, {{"all", "true"}});
+            const std::filesystem::path vhdPath = m_storagePath / "volumes" / (vhdName + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
 
-            VERIFY_IS_TRUE(ListVolumes().contains(vhdName));
+            expectPrune({guestName, vhdName}, {{"all", "true"}});
+
+            VERIFY_IS_FALSE(ListVolumes().contains(vhdName));
+            VERIFY_IS_FALSE(std::filesystem::exists(vhdPath)); // backing .vhdx removed, no leak
         }
 
         // ListVolumes / InspectVolume reflect prune results.
