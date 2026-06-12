@@ -237,7 +237,7 @@ class WSLCTests
     WSLC_TEST_METHOD(IsClientVersionSupported)
     {
         wil::com_ptr<IWSLCCompatSessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(IWSLCCompatSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
         BOOL isSupported = FALSE;
 

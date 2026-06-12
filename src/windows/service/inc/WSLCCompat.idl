@@ -17,10 +17,8 @@ import "unknwn.idl";
 import "wtypes.idl";
 
 cpp_quote("#ifdef __cplusplus")
-cpp_quote("#ifndef WSLC_SESSIONMANAGER_COCLASS_DECLARED")
-cpp_quote("#define WSLC_SESSIONMANAGER_COCLASS_DECLARED")
-cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCSessionManager;")
-cpp_quote("#endif")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCCompatSessionManager;")
+cpp_quote("class DECLSPEC_UUID(\"9fcd2067-9fc6-4efa-9eb0-698169ebf7d3\") WSLCCompatSessionManagerFactory;")
 cpp_quote("#endif")
 
 #define WSLCCompat_MAX_IMAGE_NAME_LENGTH 255
