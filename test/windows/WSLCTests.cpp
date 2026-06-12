@@ -4438,11 +4438,13 @@ class WSLCTests
         // label=<key> (key-only) matches the volume with the marker label regardless of stored value.
         expectList({emptyValVol}, {{"label", "marker"}});
 
-        // label=<key>= (explicit empty value) matches only volumes whose stored value is also the empty string.
+        // podman ignores the explicit-empty-value distinction: label=<key>= behaves like label=<key>
+        // (key-only), matching any volume that has the key regardless of its stored value. Only
+        // emptyValVol has the `marker` key, so the result matches the dockerd empty-value case.
         expectList({emptyValVol}, {{"label", "marker="}});
 
-        // No volume stores `env` with an empty value, so env= matches nothing.
-        expectList({}, {{"label", "env="}});
+        // Same podman semantics: env= matches every volume with the `env` key (not just empty values).
+        expectList({vhdA, vhdB, guestA, otherName}, {{"label", "env="}});
 
         // env (key-only) matches every volume that has the key, regardless of its stored value.
         expectList({vhdA, vhdB, guestA, otherName}, {{"label", "env"}});

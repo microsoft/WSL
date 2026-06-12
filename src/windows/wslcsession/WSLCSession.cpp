@@ -2120,6 +2120,17 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
+    // Validate filter keys client-side: podman returns HTTP 500 (-> E_FAIL) for an unknown filter,
+    // but an unknown filter key is a bad argument. The volume-list endpoint supports
+    // driver/name/label/label!/dangling.
+    for (const auto& [key, values] : filters)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            std::format("invalid filter '{}'", key),
+            key != "driver" && key != "name" && key != "label" && key != "label!" && key != "dangling");
+    }
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
