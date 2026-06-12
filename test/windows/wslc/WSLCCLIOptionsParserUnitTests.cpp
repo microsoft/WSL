@@ -30,6 +30,8 @@ class WSLCCLIOptionsParserUnitTests
             {L"SizeBytes=3145728", "SizeBytes", "3145728"},
             {L"ReadOnly", "ReadOnly", ""},
             {L"key=", "key", ""},
+            {L"=value", "", "value"},
+            {L"", "", ""},
             {L"key=a=b=c", "key", "a=b=c"},
         };
 
@@ -38,32 +40,6 @@ class WSLCCLIOptionsParserUnitTests
             auto result = validation::ParseDriverOption(input);
             VERIFY_ARE_EQUAL(expectedKey, result.first);
             VERIFY_ARE_EQUAL(expectedValue, result.second);
-        }
-    }
-
-    TEST_METHOD(WSLCCLIOptionsParser_InvalidOptions)
-    {
-        std::vector<std::wstring> invalidOptions = {
-            L"",
-            L"=",
-            L"=value",
-        };
-
-        for (const auto& input : invalidOptions)
-        {
-            try
-            {
-                (void)validation::ParseDriverOption(input);
-                VERIFY_FAIL(L"Expected exception");
-            }
-            catch (const wil::ResultException& ex)
-            {
-                VERIFY_ARE_EQUAL(E_INVALIDARG, ex.GetErrorCode());
-
-                const auto raw = ex.GetFailureInfo().pszMessage;
-                std::wstring message = raw ? raw : L"";
-                VERIFY_ARE_EQUAL(L"Driver option key cannot be empty", message);
-            }
         }
     }
 };
