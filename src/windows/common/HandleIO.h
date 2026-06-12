@@ -139,11 +139,6 @@ private:
     bool m_connected = false;
 };
 
-// Accepts connections on a listen socket using overlapped IO. The accepted sockets are created internally to
-// match the address family, type, and protocol of the listen socket, so callers no longer need to pre-create them.
-// Hyper-V sockets are additionally configured to match hvsocket::Create() (HVSOCKET_CONNECTED_SUSPEND). When
-// AcceptOnce is true the handle completes after a single accept; otherwise it keeps accepting until the loop is
-// cancelled. OnAccepted is invoked with ownership of each accepted socket.
 class AcceptHandle : public OverlappedIOHandle
 {
 public:

@@ -2636,7 +2636,7 @@ try
                     }
 
                     THROW_HR_IF_MSG(
-                        E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %lu", pendingBytes->size());
+                        E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
 
                     try
                     {
@@ -2661,6 +2661,8 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
     const auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(Request);
     THROW_HR_IF(E_UNEXPECTED, !header);
 
+    WSL_LOG("VirtiofsMessageRequest", TraceLoggingValue(header->PrettyPrint().c_str(), "Content"));
+
     auto buildResponse = [header](const std::wstring& tag, const std::wstring& source, HRESULT result) {
         // Respond to the guest with the tag that should be used to mount the device.
         wsl::shared::MessageWriter<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE> response(LxInitMessageAddVirtioFsDeviceResponse);
@@ -2671,6 +2673,8 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
         // Echo the request's transaction id and mark the message as the first (and only) reply.
         response->Header.TransactionId = header->TransactionId;
         response->Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::FIRST_REPLY);
+
+        WSL_LOG("VirtiofsMessageResponse", TraceLoggingValue(response->PrettyPrint().c_str(), "Content"));
 
         const auto span = response.Span();
         return std::vector<char>(reinterpret_cast<const char*>(span.data()), reinterpret_cast<const char*>(span.data()) + span.size());

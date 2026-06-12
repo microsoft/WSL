@@ -393,7 +393,6 @@ void AcceptHandle::CreateAcceptSocket()
     AcceptedSocket.reset(WSASocketW(AddressFamily, SocketType, Protocol, nullptr, 0, WSA_FLAG_OVERLAPPED));
     THROW_LAST_ERROR_IF(!AcceptedSocket);
 
-    // Configure the socket like hvsocket::Create() does so Hyper-V connections survive VM suspend.
     if (AddressFamily == AF_HYPERV)
     {
         ULONG enable = 1;
