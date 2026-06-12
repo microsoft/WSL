@@ -39,7 +39,7 @@ std::optional<std::string> TryEncodeCertificateAsPem(const CERT_CONTEXT& Cert)
     }
 
     // The pemSize after the actual write call does not include terminating null,
-    // and is 1 less than the ealier query call.
+    // and is 1 less than the value returned by the earlier query call.
     pem.resize(pemSize);
 
     return pem;
