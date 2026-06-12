@@ -79,7 +79,7 @@ struct Command
         return args;
     }
 
-    // Recognized as options before any subcommand on the command line.
+    // Options accepted before any subcommand on the command line.
     virtual std::vector<Argument> GetGlobalArguments() const
     {
         return {};
@@ -91,6 +91,11 @@ struct Command
         return {};
     }
 
+    // Union of GetGlobalArguments() and GetEnvArguments(), deduped by ArgType
+    // (globals win on conflict). Use this anywhere the two sets are combined
+    // so duplicates are not parsed/validated twice.
+    std::vector<Argument> GetGlobalsAndEnvArguments() const;
+
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
@@ -99,12 +104,19 @@ struct Command
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 
-    // optionsOnly:   stop (without consuming) at the first positional token and
-    //                advance inv past the consumed range.
-    // stopOnUnknown: stop (without consuming) at the first unknown option token
-    //                instead of throwing. Used by the root-level globals scan
-    //                so unrecognized options flow to the regular pipeline.
-    void ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false, bool stopOnUnknown = false) const;
+    // optionsOnly:          stop (without consuming) at the first positional token.
+    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    //                       token instead of throwing.
+    // overridableDefaults:  args whose preloaded entries in target are treated
+    //                       as defaults (e.g. env-applied) and may be replaced
+    //                       by the first CLI occurrence.
+    void ParseArguments(
+        Invocation& inv,
+        ArgMap& target,
+        std::vector<Argument> definedArgs,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        const std::vector<Argument>& overridableDefaults = {}) const;
 
     void ParseArguments(Invocation& inv, ArgMap& target) const
     {

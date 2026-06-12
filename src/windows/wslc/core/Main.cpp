@@ -72,6 +72,16 @@ try
     // Stable handle to the root command; `command` is moved during subcommand resolution.
     const Command* const rootCommand = command.get();
 
+    // Environment variable scanning.
+    // The env-bound argument set is the only state needed before NO_COLOR is
+    // applied; keep just this and the noexcept env apply outside the try so a
+    // throw can't reroute through the colored-help error path.
+    auto envDefs = rootCommand->GetGlobalsAndEnvArguments();
+    ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
+    context.ApplyGlobalOptions();
+
+    // Past this point, environment variable options are in effect.
+
     try
     {
         std::vector<std::wstring> args;
@@ -82,27 +92,24 @@ try
 
         Invocation invocation{std::move(args)};
 
-        // Globals scan: consume only the global options we recognize at the
-        // front of the invocation. Anything else (subcommands, unknown options,
-        // --help, --version, malformed tokens) is left in place for the regular
-        // pipeline to parse and report against the right command.
+        // Pass 1 — CLI globals. Consume only the global options we recognize at
+        // the front of the invocation; anything else (subcommands, unknown
+        // options, --help, --version, malformed tokens) is left in place for
+        // the regular pipeline to parse and report against the right command.
         auto cliGlobals = rootCommand->GetGlobalArguments();
-        auto envOnly = rootCommand->GetEnvArguments();
-        auto envDefs = cliGlobals;
-        envDefs.insert(envDefs.end(), envOnly.begin(), envOnly.end());
-
         rootCommand->ParseArguments(
             invocation,
             context.GlobalArgs,
             cliGlobals,
             /*optionsOnly*/ true,
-            /*stopOnUnknown*/ true);
-        ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
+            /*stopOnUnknown*/ true,
+            /*overridableDefaults*/ envDefs);
         rootCommand->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
         context.ApplyGlobalOptions();
 
-        // Past this point, global options (debug logging, color, ...) are in effect.
+        // Past this point, global options are in effect.
 
+        // Pass 2 - Subcommand and leaf command resolution.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
         while (subCommand)
         {

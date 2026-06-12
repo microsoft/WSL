@@ -103,7 +103,7 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 -p 443:443 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 -p=443:443 image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose --verbose image1)") \
 \
 /* Flag parse tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -? image1)") \
@@ -173,5 +173,8 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug image1)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D image1)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc image1)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug system list)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc system --verbose)")
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc system --verbose)") \
+/* Docker-style idempotency: duplicate global flags collapse to a single entry. */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug --debug)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D -D system list)")
 // clang-format on

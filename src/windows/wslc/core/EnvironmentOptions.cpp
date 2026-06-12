@@ -13,20 +13,11 @@ Module Name:
 namespace wsl::windows::wslc {
 namespace {
 
-    struct EnvBinding
-    {
-        const wchar_t* Name;
-        ArgType Type;
-    };
-
-    // Many-to-one allowed: alternate spellings for the same ArgType (e.g. NO_COLOR and WSLC_CLI_NO_COLOR).
-    constexpr EnvBinding c_bindings[] = {
-        {L"WSLC_CLI_DEBUG", ArgType::Debug},
-        {L"WSLC_CLI_NO_COLOR", ArgType::NoColor},
-        {L"NO_COLOR", ArgType::NoColor},
-    };
-
-    std::optional<std::wstring> ReadEnv(const wchar_t* name)
+    // Noexcept: swallows allocation failure as "no value" rather than propagating.
+    // Note: distinguishes neither "missing" nor "empty" from caller's perspective;
+    // both yield nullopt. Use IsEnvPresent() when presence alone matters.
+    std::optional<std::wstring> ReadEnv(const wchar_t* name) noexcept
+    try
     {
         DWORD len = ::GetEnvironmentVariableW(name, nullptr, 0);
         if (len == 0)
@@ -36,15 +27,29 @@ namespace {
 
         std::wstring value(len - 1, L'\0');
         DWORD got = ::GetEnvironmentVariableW(name, value.data(), len);
-        if (got == 0 || got >= len)
+        if (got >= len)
         {
             return std::nullopt;
         }
         return value;
     }
+    catch (...)
+    {
+        return std::nullopt;
+    }
 
-    // NO_COLOR convention: any value is truthy except explicit opt-outs.
-    bool IsTruthy(const std::wstring& v)
+    // Presence-only check: returns true if the env var is defined in the
+    // process environment, regardless of value (including empty).
+    bool IsEnvPresent(const wchar_t* name) noexcept
+    {
+        ::SetLastError(ERROR_SUCCESS);
+        (void)::GetEnvironmentVariableW(name, nullptr, 0);
+        return ::GetLastError() != ERROR_ENVVAR_NOT_FOUND;
+    }
+
+    // Vendor-specific convention: any value is truthy except explicit opt-outs.
+    // NOT used for NO_COLOR — that binding is presence-only per spec.
+    bool IsTruthy(const std::wstring& v) noexcept
     {
         if (v.empty())
         {
@@ -57,33 +62,14 @@ namespace {
 
 } // namespace
 
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs)
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept
+try
 {
-    // Iterate by arg so per-ArgType policy lives in one place.
     for (const auto& arg : definedArgs)
     {
-        // CLI wins over environment.
+        // Defensive: skip entries already populated so this can run either
+        // before or after CLI parsing without double-adding values.
         if (target.Contains(arg.Type()))
-        {
-            continue;
-        }
-
-        std::vector<std::wstring> values;
-        for (const auto& b : c_bindings)
-        {
-            if (b.Type != arg.Type())
-            {
-                continue;
-            }
-
-            auto v = ReadEnv(b.Name);
-            if (v.has_value())
-            {
-                values.push_back(std::move(*v));
-            }
-        }
-
-        if (values.empty())
         {
             continue;
         }
@@ -92,14 +78,33 @@ void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argumen
         {
         case Kind::Flag:
         {
-            // OR across all bindings: any truthy value sets the flag.
+            // OR across bindings: any matching env var sets the flag.
+            // Presence-only bindings ignore the value; truthy-gated bindings
+            // require IsTruthy() to accept the value.
             bool any = false;
-            for (const auto& v : values)
+            for (const auto& b : c_envBindings)
             {
-                if (IsTruthy(v))
+                if (b.Type != arg.Type())
                 {
-                    any = true;
-                    break;
+                    continue;
+                }
+
+                if (b.PresenceOnly)
+                {
+                    if (IsEnvPresent(b.Name))
+                    {
+                        any = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    auto v = ReadEnv(b.Name);
+                    if (v.has_value() && IsTruthy(*v))
+                    {
+                        any = true;
+                        break;
+                    }
                 }
             }
             if (any)
@@ -109,14 +114,41 @@ void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argumen
             break;
         }
         case Kind::Value:
-            // TODO: no defined policy for multiple value bindings; first wins for now.
-            target.Add(arg.Type(), std::move(values.front()));
+        {
+            // TODO: no defined policy for multiple value bindings; first wins.
+            // PresenceOnly is ignored for value kinds (it has no sensible meaning
+            // when the value is the payload).
+            for (const auto& b : c_envBindings)
+            {
+                if (b.Type != arg.Type())
+                {
+                    continue;
+                }
+
+                auto v = ReadEnv(b.Name);
+                if (v.has_value())
+                {
+                    target.Add(arg.Type(), std::move(*v));
+                    break;
+                }
+            }
             break;
+        }
         default:
-            // Programming error: these kinds are not supported for environment binding.
-            THROW_HR_MSG(E_UNEXPECTED, "ApplyEnvironmentOptions: ArgType %u is not supported.", static_cast<unsigned>(arg.Type()));
+            // Programming error (not user input): an env-bound Argument was
+            // declared with a Kind that cannot be sourced from the environment.
+            // Fail fast so the bad declaration is caught in development.
+            FAIL_FAST_HR_MSG(E_UNEXPECTED, "ApplyEnvironmentOptions: ArgType %u Kind is not supported.", static_cast<unsigned>(arg.Type()));
         }
     }
+}
+catch (...)
+{
+    // Hard contract: user input / environment must not produce a throw out of
+    // this function. Anything that lands here (e.g. OOM during Add) is logged
+    // and swallowed so the early color/debug setup cannot itself emit colored
+    // output via the parser's error path.
+    LOG_CAUGHT_EXCEPTION();
 }
 
 } // namespace wsl::windows::wslc

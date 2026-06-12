@@ -17,7 +17,8 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown) :
+ParseArgumentsStateMachine::ParseArgumentsStateMachine(
+    Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
     m_invocation(inv),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
@@ -25,7 +26,6 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& 
     m_optionsOnly(optionsOnly),
     m_stopOnUnknown(stopOnUnknown)
 {
-    // Create sublists by Kind for easier processing in the state machine.
     for (const auto& arg : m_arguments)
     {
         switch (arg.Kind())
@@ -46,6 +46,12 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& 
     }
 
     m_positionalSearchItr = m_positionalArgs.begin();
+
+    m_overridableDefaults.reserve(overridableDefaults.size());
+    for (const auto& arg : overridableDefaults)
+    {
+        m_overridableDefaults.push_back(arg.Type());
+    }
 }
 
 bool ParseArgumentsStateMachine::Step()
@@ -100,6 +106,38 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::BackUpAndStop()
     return {};
 }
 
+bool ParseArgumentsStateMachine::ConsumeOverrideIfPresent(ArgType type)
+{
+    auto it = std::find(m_overridableDefaults.begin(), m_overridableDefaults.end(), type);
+    if (it == m_overridableDefaults.end())
+    {
+        return false;
+    }
+
+    m_executionArgs.Remove(type);
+    m_overridableDefaults.erase(it);
+    return true;
+}
+
+void ParseArgumentsStateMachine::AddFlag(ArgType type)
+{
+    if (!ConsumeOverrideIfPresent(type) && m_executionArgs.Contains(type))
+    {
+        // Repeating the same flag on the CLI is a no-op, matching docker.
+        // TODO: revisit when --flag=value (explicit bool) lands so a mismatch
+        // between env-preload and CLI-explicit can warn or error.
+        return;
+    }
+
+    m_executionArgs.Add(type, true);
+}
+
+void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
+{
+    ConsumeOverrideIfPresent(type);
+    m_executionArgs.Add(type, std::move(value));
+}
+
 // Parse rules:
 //  1. Token starting with a single '-' is an alias (1-2 chars):
 //     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
@@ -116,7 +154,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     // Pending value from the previous token.
     if (m_state.Type())
     {
-        m_executionArgs.Add(m_state.Type().value(), std::wstring{currArg});
+        AddValue(m_state.Type().value(), std::wstring{currArg});
         return {};
     }
 
@@ -308,7 +346,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     // Boolean flag - add it and process any adjoined flags. Once we have added a
     // flag to m_executionArgs for this token, stopOnUnknown no longer applies for
     // mid-chain unknowns; the token has already been claimed.
-    m_executionArgs.Add(firstArg->Type(), true);
+    AddFlag(firstArg->Type());
 
     // Process remaining adjoined flags
     while (currentPos < currArg.length())
@@ -343,7 +381,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return {};
         }
 
-        m_executionArgs.Add(nextArg->Type(), true);
+        AddFlag(nextArg->Type());
         currentPos = nextPos;
     }
 
@@ -398,7 +436,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
                     return ArgumentException(Localization::WSLCCLI_FlagContainAdjoinedError(currArg));
                 }
 
-                m_executionArgs.Add(arg.Type(), true);
+                AddFlag(arg.Type());
                 return {};
             }
 
@@ -431,6 +469,6 @@ void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring
         value = value.substr(1, value.length() - 2);
     }
 
-    m_executionArgs.Add(type, std::wstring{value});
+    AddValue(type, std::wstring{value});
 }
 } // namespace wsl::windows::wslc

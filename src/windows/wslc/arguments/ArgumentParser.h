@@ -28,10 +28,24 @@ namespace wsl::windows::wslc {
 // and inspect the in-progress state of the word being completed.
 struct ParseArgumentsStateMachine
 {
-    // optionsOnly:   stop (without consuming) at the first positional token.
-    // stopOnUnknown: stop (without consuming) at the first unknown option
-    //                token instead of throwing.
-    ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly = false, bool stopOnUnknown = false);
+    // optionsOnly:          stop (without consuming) at the first positional token.
+    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    //                       token instead of throwing.
+    // overridableDefaults:  ArgTypes whose existing entries in execArgs are
+    //                       treated as preloaded defaults (e.g. from environment
+    //                       variables). The first CLI Add for one of these types
+    //                       clears the preexisting entry first, so a single-value
+    //                       arg can be overridden on the command line even though
+    //                       Limit() == 1. Subsequent Adds in the same parse run
+    //                       behave normally and still enforce Limit, so
+    //                       duplicates on the command line itself are caught.
+    ParseArgumentsStateMachine(
+        Invocation& inv,
+        ArgMap& execArgs,
+        std::vector<Argument> arguments,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        const std::vector<Argument>& overridableDefaults = {});
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -111,6 +125,20 @@ private:
     // Backs up one token and stops cleanly so Position() points at the unconsumed token.
     State BackUpAndStop();
 
+    // Routes a flag add through the override/idempotency rules:
+    //  - if type is in m_overridableDefaults, the preloaded value is replaced;
+    //  - else if the flag is already set, the add is a no-op (CLI duplicates
+    //    fold to a single entry, matching docker / kubectl / git style).
+    void AddFlag(ArgType type);
+
+    // Routes a value add through the override rule. CLI duplicates of value
+    // args still stack, so Validate() will catch exceeding Limit.
+    void AddValue(ArgType type, std::wstring value);
+
+    // If type is in m_overridableDefaults, removes any existing entry and
+    // consumes the override slot. Returns true if an override was consumed.
+    bool ConsumeOverrideIfPresent(ArgType type);
+
     Invocation& m_invocation;
     ArgMap& m_executionArgs;
     std::vector<Argument> m_arguments;
@@ -135,5 +163,10 @@ private:
 
     // Set when m_optionsOnly or m_stopOnUnknown stopped processing.
     bool m_stopped = false;
+
+    // ArgTypes whose preloaded value should be replaced by the first CLI add.
+    // Empties as overrides are consumed so a single preload can only be
+    // overridden once per parse.
+    std::vector<ArgType> m_overridableDefaults;
 };
 } // namespace wsl::windows::wslc

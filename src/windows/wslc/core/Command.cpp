@@ -311,14 +311,15 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
-void Command::ParseArguments(Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown) const
+void Command::ParseArguments(
+    Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown};
+    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults};
 
     while (stateMachine.Step())
     {
@@ -392,5 +393,26 @@ void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
 void Command::ValidateArgumentsInternal(const ArgMap&) const
 {
     // Commands may not need any extra validation; they'll override if they do.
+}
+
+std::vector<Argument> Command::GetGlobalsAndEnvArguments() const
+{
+    auto merged = GetGlobalArguments();
+    auto envOnly = GetEnvArguments();
+
+    // Globals listed first, so the loop below treats them as the winners.
+    merged.reserve(merged.size() + envOnly.size());
+    for (auto& arg : envOnly)
+    {
+        const auto type = arg.Type();
+        const bool alreadyPresent =
+            std::any_of(merged.begin(), merged.end(), [type](const Argument& existing) { return existing.Type() == type; });
+        if (!alreadyPresent)
+        {
+            merged.emplace_back(std::move(arg));
+        }
+    }
+
+    return merged;
 }
 } // namespace wsl::windows::wslc

@@ -443,5 +443,110 @@ class WSLCCLIParserUnitTests
             VERIFY_ARE_EQUAL(std::wstring(L"-"), *sm.Position());
         }
     }
+
+    // Preloaded env-style default can be replaced by a single CLI occurrence
+    // even though the arg's Limit is 1.
+    TEST_METHOD(OverridableDefaults_CliValueReplacesPreload)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Signal)};
+
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"15")); // pretend env preloaded SIGTERM
+
+        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
+        VERIFY_ARE_EQUAL(std::wstring(L"9"), args.Get<ArgType::Signal>());
+    }
+
+    // Overridable-default consumption is one-shot: a CLI duplicate after the
+    // override still stacks and would trip Limit during Validate().
+    TEST_METHOD(OverridableDefaults_OverrideIsConsumedOncePerType)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9 --signal 1");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Signal)};
+
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"15"));
+
+        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        // First CLI value replaced the env preload; second CLI value stacked.
+        VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Signal));
+    }
+
+    // Preloaded flag default plus CLI mention of the same flag stays a single
+    // entry (current flag value is always 'true').
+    TEST_METHOD(OverridableDefaults_FlagPreloadCoexistsWithCli)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
+
+        ArgMap args;
+        args.Add(ArgType::Verbose, true); // pretend env preloaded it
+
+        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
+        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+    }
+
+    // Duplicate flag on the CLI (no env preload) folds to one entry: docker-style.
+    TEST_METHOD(DuplicateFlagOnCli_IsIdempotent)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose --verbose");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
+
+        ArgMap args;
+        ParseArgumentsStateMachine sm{inv, args, defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
+        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+    }
+
+    // Duplicate value on the CLI (no override) still stacks so Validate can
+    // catch the Limit violation.
+    TEST_METHOD(DuplicateValueOnCli_StillStacks)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9 --signal 1");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Signal)};
+
+        ArgMap args;
+        ParseArgumentsStateMachine sm{inv, args, defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Signal));
+    }
 };
+
 } // namespace WSLCCLIParserUnitTests
