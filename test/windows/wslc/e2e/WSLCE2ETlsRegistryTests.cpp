@@ -192,80 +192,21 @@ namespace {
         wil::unique_cert_context m_added;
     };
 
-    // Starts a TLS-enabled registry container on the docker bridge (so dockerd reaches it at a
-    // non-loopback IP and performs real TLS verification). The certs in HostCertDir are mounted at
-    // /certs. Returns the running container and its "ip:port" address.
-    std::pair<RunningWSLCContainer, std::string> StartLocalRegistryTls(IWSLCSession& Session, const std::wstring& HostCertDir)
-    {
-        wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
-        THROW_IF_FAILED(Session.ListImages(nullptr, &images, images.size_address<ULONG>()));
-        const bool found = std::ranges::any_of(std::span{images.get(), images.size()}, [](const auto& e) {
-            return std::strcmp(e.Image, "wslc-registry:latest") == 0;
-        });
-        if (!found)
-        {
-            LoadTestImage(Session, "wslc-registry:latest");
-        }
-
-        const std::vector<std::string> env = {
-            std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", c_registryPort),
-            "REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt",
-            "REGISTRY_HTTP_TLS_KEY=/certs/server.key",
-        };
-
-        WSLCContainerLauncher launcher("wslc-registry:latest", "", {}, env, "bridge");
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddVolume(HostCertDir, "/certs", true);
-
-        auto container = launcher.Launch(Session, WSLCContainerStartFlagsNone);
-
-        // Resolve the container's bridge IP.
-        auto inspect = container.Inspect();
-        VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.empty());
-        const auto ip = inspect.NetworkSettings.Networks.begin()->second.IPAddress;
-
-        return {std::move(container), std::format("{}:{}", ip, c_registryPort)};
-    }
-
-    // Pushes via the CLI, retrying while the registry is still coming up (connection refused / no route),
-    // so the returned result reflects a real response (success or a TLS error) rather than a startup race.
-    WSLCExecutionResult PushWithRetry(const std::wstring& ImageRef, const std::wstring& SessionName)
-    {
-        WSLCExecutionResult result;
-        for (int attempt = 0; attempt < 30; ++attempt)
-        {
-            result = RunWslc(std::format(L"push {} --session {}", ImageRef, SessionName));
-            const auto& err = result.Stderr.value_or(L"");
-            // Only a connection-level error means "registry not up yet". Do NOT treat "EOF" as
-            // transient: an untrusted-CA rejection can surface as EOF, and retrying would mask the
-            // very failure Phase 1 asserts on.
-            const bool notReady =
-                err.find(L"connection refused") != std::wstring::npos || err.find(L"no route to host") != std::wstring::npos;
-            if (!notReady)
-            {
-                break;
-            }
-            Sleep(1000);
-        }
-        return result;
-    }
-
 } // namespace
 
 class WSLCE2ETlsRegistryTests
 {
     WSLC_TEST_CLASS(WSLCE2ETlsRegistryTests)
 
-    // Verifies private-registry SSL trust end to end: a push to a registry serving a private-CA cert
-    // fails with "unknown authority" until the CA is added to the machine Trusted Root store, after
-    // which a push from a freshly created session (which mirrors the host roots into the UVM) succeeds.
+    // Verifies registry SSL trust end to end: a push to a registry serving a private-CA cert fails
+    // with "unknown authority" and succeeds after the CA is added to the host Trusted Root store.
     WSLC_TEST_METHOD(WSLCE2E_Registry_PrivateCa_SslTrust)
     {
         const auto& image = AlpineTestImage();
         const auto registryImage =
             std::format(L"{}:{}/{}", wsl::shared::string::MultiByteToWide(c_registryIp), c_registryPort, image.NameAndTag());
 
-        // Generate the registry's CA/cert (SAN = the bridge IP) into a temp directory mounted into the container.
+        // Generate the registry's certs.
         const auto certDir = std::filesystem::temp_directory_path() / std::format(L"wslc-tls-registry-{}", GetCurrentProcessId());
         std::filesystem::create_directories(certDir);
         auto removeCertDir = wil::scope_exit([&] {
@@ -275,20 +216,21 @@ class WSLCE2ETlsRegistryTests
 
         auto caCert = GenerateRegistryTlsCertificate(c_registryIp, certDir);
 
-        // Phase 1: CA NOT trusted -> the push must fail because the cert chains to an untrusted root.
+        // CA NOT trusted: the push fails with unknown authority.
         {
-            // Defensively terminate any session left behind by a previously crashed run so this one
-            // creates a fresh session (and the registry reclaims the expected bridge IP).
-            EnsureSessionIsTerminated(L"wslc-tls-untrusted");
             auto session = TestSession::Create(L"wslc-tls-untrusted");
+
+            auto cleanup = wil::scope_exit([&] { EnsureSessionIsTerminated(L"wslc-tls-untrusted"); });
+
             EnsureImageIsLoaded(image, session.Name());
 
-            auto [registry, address] = StartLocalRegistryTls(session.Session(), certDir.wstring());
+            auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);
 
             RunWslcAndVerify(std::format(L"image tag {} {} --session {}", image.NameAndTag(), registryImage, session.Name()), {.ExitCode = 0});
 
-            auto result = PushWithRetry(registryImage, session.Name());
+            // StartLocalRegistry already waited for the registry to be ready, so a single push is enough.
+            auto result = RunWslc(std::format(L"push {} --session {}", registryImage, session.Name()));
             VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0), L"Push should fail while the CA is not trusted");
             VERIFY_IS_TRUE(result.Stderr.has_value());
             VERIFY_IS_TRUE(
@@ -296,22 +238,23 @@ class WSLCE2ETlsRegistryTests
                 L"Expected an untrusted-certificate error");
         }
 
-        // Trust the CA on the host. The session service mirrors LocalMachine\Root into the UVM at init.
-        // The RAII object removes the cert from the store when it goes out of scope at the end of the test.
-        TrustedRootCertificate trustedCa{*caCert.get()};
-
-        // Phase 2: CA trusted + a fresh session (so the mirror includes it) -> the push must succeed.
+        // CA trusted: push succeeds.
         {
-            EnsureSessionIsTerminated(L"wslc-tls-trusted");
+            // Trust the CA on the host.
+            TrustedRootCertificate trustedCa{*caCert.get()};
+
             auto session = TestSession::Create(L"wslc-tls-trusted");
+
+            auto cleanup = wil::scope_exit([&] { EnsureSessionIsTerminated(L"wslc-tls-trusted"); });
+
             EnsureImageIsLoaded(image, session.Name());
 
-            auto [registry, address] = StartLocalRegistryTls(session.Session(), certDir.wstring());
+            auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);
 
             RunWslcAndVerify(std::format(L"image tag {} {} --session {}", image.NameAndTag(), registryImage, session.Name()), {.ExitCode = 0});
 
-            auto result = PushWithRetry(registryImage, session.Name());
+            auto result = RunWslc(std::format(L"push {} --session {}", registryImage, session.Name()));
             VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1), L"Push should succeed once the CA is trusted");
         }
     }

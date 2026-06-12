@@ -493,7 +493,8 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
     return std::move(session);
 }
 
-std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
 {
     // Check if the registry image is already loaded on this session.
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -507,6 +508,8 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         LoadTestImage(session, "wslc-registry:latest");
     }
 
+    const bool useTls = !tlsCertDir.empty();
+
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 
     if (!username.empty())
@@ -515,19 +518,59 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         env.push_back(std::format("PASSWORD={}", password));
     }
 
-    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    if (useTls)
+    {
+        env.push_back("REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt");
+        env.push_back("REGISTRY_HTTP_TLS_KEY=/certs/server.key");
+    }
+
+    // TLS needs a non-loopback address for real verification, so use bridge networking and reach the
+    // container by its bridge IP. Plain HTTP uses host networking with a published loopback port.
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, useTls ? "bridge" : "host");
     launcher.SetEntrypoint({"/entrypoint.sh"});
-    launcher.AddPort(port, port, AF_INET);
+
+    if (useTls)
+    {
+        launcher.AddVolume(tlsCertDir, "/certs", true);
+    }
+    else
+    {
+        launcher.AddPort(port, port, AF_INET);
+    }
 
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
-    auto address = std::format("127.0.0.1:{}", port);
-    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+    if (useTls)
+    {
+        auto inspect = container.Inspect();
+        THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());
+        auto address = std::format("{}:{}", inspect.NetworkSettings.Networks.begin()->second.IPAddress, port);
 
-    int expectedCode = username.empty() ? 200 : 401;
-    ExpectHttpResponse(url.c_str(), expectedCode, true);
+        // Wait until the registry is serving by probing its own loopback from inside the container.
+        // (The bridge IP is not reachable from the test host, and the cert is untrusted)
+        const auto probeCommand =
+            std::format("wget -S -O /dev/null --no-check-certificate https://127.0.0.1:{}/v2/ 2>&1 | grep -q 'HTTP/'", port);
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wsl::windows::common::WSLCProcessLauncher probe("/bin/sh", {"/bin/sh", "-c", probeCommand});
+                auto process = probe.Launch(container.Get());
+                THROW_HR_IF(E_FAIL, process.Wait(5000) != 0);
+            },
+            std::chrono::milliseconds(500),
+            std::chrono::seconds(30));
 
-    return {std::move(container), std::move(address)};
+        return {std::move(container), std::move(address)};
+    }
+    else
+    {
+        auto address = std::format("127.0.0.1:{}", port);
+        auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+        int expectedCode = username.empty() ? 200 : 401;
+        ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+        return {std::move(container), std::move(address)};
+    }
 }
 
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)

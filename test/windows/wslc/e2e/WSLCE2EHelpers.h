@@ -199,10 +199,23 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
-// Starts a local registry container with host networking using the COM API.
-// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+// Starts a local registry container using the COM API and returns the running container (holds it
+// alive) plus the registry address.
+//
+// Plain HTTP (tlsCertDir empty): host networking + a published loopback port; address is
+// "127.0.0.1:PORT" and the registry is probed for readiness over HTTP.
+//
+// TLS (tlsCertDir set to a host directory containing server.crt / server.key): the registry serves
+// HTTPS with those certs on the docker bridge, so dockerd reaches it at a non-loopback IP and
+// performs real TLS verification; address is "<bridge-ip>:PORT". No readiness probe is done in this
+// mode (the bridge IP is not reachable from the test host and the cert is untrusted) -- callers
+// should poll via the push/pull itself.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+    IWSLCSession& session,
+    const std::string& username = "",
+    const std::string& password = "",
+    USHORT port = 5000,
+    const std::wstring& tlsCertDir = L"");
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
