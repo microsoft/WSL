@@ -377,8 +377,6 @@ AcceptHandle::AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::f
     AddressFamily = protocolInfo.iAddressFamily;
     SocketType = protocolInfo.iSocketType;
     Protocol = protocolInfo.iProtocol;
-
-    CreateAcceptSocket();
 }
 
 AcceptHandle::~AcceptHandle()
@@ -419,8 +417,6 @@ void AcceptHandle::OnComplete()
     }
     else
     {
-        // Prepare a fresh socket for the next accept and return to standby so the loop reschedules.
-        CreateAcceptSocket();
         State = IOHandleStatus::Standby;
     }
 }
@@ -428,6 +424,8 @@ void AcceptHandle::OnComplete()
 void AcceptHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+
+    CreateAcceptSocket();
 
     Event.ResetEvent();
 
