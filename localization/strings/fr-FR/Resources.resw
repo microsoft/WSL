@@ -2354,7 +2354,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
-    <value>Network alias cannot be empty.</value>
+    <value>L’alias réseau ne peut pas être vide.</value>
   </data>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Les alias réseau nécessitent un réseau défini par l’utilisateur. Utilisez --network pour en spécifier un.</value>
@@ -2832,7 +2832,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>la mise en réseau en mode hôte n’est pas prise en charge</value>
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
-    <value>Add a network-scoped alias for the container</value>
+    <value>Ajouter un alias étendu au réseau pour le conteneur</value>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : l’alias réseau ne peut pas être vide ou un espace blanc</value>
