@@ -23,6 +23,7 @@ Abstract:
 #include <sys/prctl.h>
 #include <ctype.h>
 #include <optional>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -3747,6 +3748,11 @@ constexpr long long c_cacheGrowthRearmBytes = 256ll * 1024 * 1024;
 constexpr long long c_floorBaseBytes = 128ll * 1024 * 1024;
 constexpr long long c_gradualHysteresisBytes = 128ll * 1024 * 1024;
 
+// Gradual: reclaim at most this much per interval so the cache bleeds down over several intervals
+// instead of being stripped to the floor in a single pass. This keeps reclaim gentle (a brief idle
+// pause does not evict a whole working set) and meaningfully distinct from the DropCache policy.
+constexpr long long c_gradualStepBytes = 256ll * 1024 * 1024;
+
 // Compaction runs once free memory grows by at least this much since the last compaction.
 constexpr long long c_compactFreeGrowthBytes = 256ll * 1024 * 1024;
 
@@ -3822,7 +3828,8 @@ Routine Description:
 
     Runs one interval of gentle reclaim (cold-first via cgroup memory.reclaim). Reclaim is gated on CPU
     idle and drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it
-    does not churn near the floor.
+    does not churn near the floor. At most c_gradualStepBytes is reclaimed per interval so the cache
+    bleeds down over several intervals rather than being stripped to the floor in a single pass.
 
 Return Value:
 
@@ -3850,8 +3857,11 @@ Return Value:
         return false;
     }
 
+    // Cap each interval to a step so the cache bleeds down gradually instead of cliffing to the floor.
+    const long long ToFree = (std::min)(Excess, c_gradualStepBytes);
+
     // Best-effort: RequestCgroupReclaim suppresses the expected EAGAIN and never throws.
-    return RequestCgroupReclaim(Excess);
+    return RequestCgroupReclaim(ToFree);
 }
 
 bool RunDropCacheTick(MemoryReclaimState& State, bool IntervalIdle)
