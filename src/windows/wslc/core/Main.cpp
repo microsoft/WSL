@@ -69,14 +69,11 @@ try
 
     std::unique_ptr<Command> command = std::make_unique<RootCommand>();
 
-    // Stable handle to the root command; `command` is moved during subcommand resolution.
-    const Command* const rootCommand = command.get();
-
     // Environment variable scanning.
     // The env-bound argument set is the only state needed before NO_COLOR is
     // applied; keep just this and the noexcept env apply outside the try so a
     // throw can't reroute through the colored-help error path.
-    auto envDefs = rootCommand->GetGlobalsAndEnvArguments();
+    auto envDefs = command->GetGlobalsAndEnvArguments();
     ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
     context.ApplyGlobalOptions();
 
@@ -96,15 +93,15 @@ try
         // the front of the invocation; anything else (subcommands, unknown
         // options, --help, --version, malformed tokens) is left in place for
         // the regular pipeline to parse and report against the right command.
-        auto cliGlobals = rootCommand->GetGlobalArguments();
-        rootCommand->ParseArguments(
+        auto cliGlobals = command->GetGlobalArguments();
+        command->ParseArguments(
             invocation,
             context.GlobalArgs,
             cliGlobals,
             /*optionsOnly*/ true,
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
-        rootCommand->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
+        command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
         context.ApplyGlobalOptions();
 
         // Past this point, global options are in effect.

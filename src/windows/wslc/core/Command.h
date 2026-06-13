@@ -106,7 +106,10 @@ struct Command
 
     // optionsOnly:          stop (without consuming) at the first positional token.
     // stopOnUnknown:        stop (without consuming) at the first unknown option
-    //                       token instead of throwing.
+    //                       token instead of throwing. Note: applies per-token; a
+    //                       bundled short chain (e.g. "-Dv") whose leading alias
+    //                       is recognized is treated as claimed, and an unknown
+    //                       alias later in the chain still throws.
     // overridableDefaults:  args whose preloaded entries in target are treated
     //                       as defaults (e.g. env-applied) and may be replaced
     //                       by the first CLI occurrence.
