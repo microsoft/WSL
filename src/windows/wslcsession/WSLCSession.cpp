@@ -583,8 +583,6 @@ try
         new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{pem.begin(), pem.end()}));
     std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
     extraHandles.emplace_back(std::move(writeStdin));
-    extraHandles.emplace_back(std::make_unique<io::EventHandle>(
-        SessionTerminatingEvent(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
 
     const auto result = process.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
