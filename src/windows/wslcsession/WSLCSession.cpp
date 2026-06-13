@@ -25,6 +25,8 @@ Abstract:
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
+using io::OverlappedIOHandle;
+using io::WriteHandle;
 using wsl::shared::Localization;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
@@ -572,21 +574,19 @@ try
     // dockerd and containerd read the certificates found in /etc/ssl/certs into
     // their default system certificate pool.
     constexpr auto c_certPath = "/etc/ssl/certs/wsl-windows-roots.pem";
-    const auto script = std::format("set -e; mkdir -p /etc/ssl/certs && cat > {}", c_certPath);
+    const auto script = std::format("cat > '{}'", c_certPath);
 
-    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", script}, {}, WSLCProcessFlagsStdin);
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
     auto process = launcher.Launch(*m_virtualMachine);
 
-    // Stream the PEM bundle.
-    {
-        auto io = CreateIOContext();
-        io.AddHandle(
-            std::make_unique<io::WriteHandle>(io::HandleWrapper{process.GetStdHandle(WSLCFDStdin)}, std::vector<char>{pem.begin(), pem.end()}),
-            MultiHandleWait::CancelOnCompleted);
-        io.Run(std::chrono::milliseconds(c_processTerminateTimeoutMs));
-    }
+    std::unique_ptr<OverlappedIOHandle> writeStdin(
+        new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{pem.begin(), pem.end()}));
+    std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+    extraHandles.emplace_back(std::move(writeStdin));
+    extraHandles.emplace_back(std::make_unique<io::EventHandle>(
+        SessionTerminatingEvent(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
 
-    const auto result = process.WaitAndCaptureOutput(c_processTerminateTimeoutMs);
+    const auto result = process.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
     WSL_LOG(
@@ -598,6 +598,7 @@ catch (...)
 {
     // Best-effort: failing to install the host's trusted roots must not prevent the session from starting.
     LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the VM");
+    EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed());
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)

@@ -46,19 +46,20 @@ std::optional<std::string> TryEncodeCertificateAsPem(const CERT_CONTEXT& Cert)
 }
 
 // Enumerates every certificate in the given "ROOT" system store and appends each
-// (deduplicated by cert thumbprint) to the output PEM bundle.
-void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string& Pem)
+// (deduplicated by cert thumbprint) to the output PEM bundle. Returns number of skipped certs.
+int AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string& Pem)
 {
     const wil::unique_hcertstore store{CertOpenStore(
         CERT_STORE_PROV_SYSTEM_W, 0, NULL, StoreFlags | CERT_STORE_READONLY_FLAG | CERT_STORE_OPEN_EXISTING_FLAG, L"ROOT")};
     if (!store)
     {
         LOG_LAST_ERROR_MSG("CertOpenStore failed for ROOT store (flags 0x%x)", StoreFlags);
-        return;
+        return 0;
     }
 
     // N.B. CertEnumCertificatesInStore frees the context passed to it and returns the next one,
     // so the loop must not free the context itself.
+    int skippedCount = 0;
     PCCERT_CONTEXT cert = nullptr;
     while ((cert = CertEnumCertificatesInStore(store.get(), cert)) != nullptr)
     {
@@ -73,6 +74,7 @@ void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string&
         if (!CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID, hash, &hashSize))
         {
             LOG_LAST_ERROR_MSG("CertGetCertificateContextProperty(CERT_SHA1_HASH_PROP_ID) failed; skipping a root certificate");
+            skippedCount++;
             continue;
         }
 
@@ -85,7 +87,13 @@ void AppendRootStore(DWORD StoreFlags, std::set<std::string>& Seen, std::string&
         {
             Pem += *pem;
         }
+        else
+        {
+            skippedCount++;
+        }
     }
+
+    return skippedCount;
 }
 
 } // namespace
@@ -97,8 +105,17 @@ std::string CollectTrustedRootCertificatesPem()
     std::set<std::string> seen;
     std::string pem;
 
-    AppendRootStore(CERT_SYSTEM_STORE_LOCAL_MACHINE, seen, pem);
-    AppendRootStore(CERT_SYSTEM_STORE_CURRENT_USER, seen, pem);
+    auto skippedCount = AppendRootStore(CERT_SYSTEM_STORE_LOCAL_MACHINE, seen, pem);
+    if (skippedCount > 0)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcImportCertsSkippedComputer(std::to_wstring(skippedCount)));
+    }
+
+    skippedCount = AppendRootStore(CERT_SYSTEM_STORE_CURRENT_USER, seen, pem);
+    if (skippedCount > 0)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcImportCertsSkippedUser(std::to_wstring(skippedCount)));
+    }
 
     return pem;
 }
