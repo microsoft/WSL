@@ -10,6 +10,11 @@
 
 inline const std::wstring c_defaultDeviceTag = L"default";
 
+// Use vcpus=1 so the device exposes a single virtio queue, bounding concurrent
+// guest-memory apertures to avoid hitting the host VID's 512-aperture quota.
+// TODO: revisit when the devicehost supports multiple shares per device.
+inline const std::wstring c_vcpusOption = L"vcpus=1";
+
 // These device types and class IDs are implemented by the external wsldevicehost vdev.
 DEFINE_GUID(VIRTIO_FS_DEVICE_ID, 0x872270E1, 0xA899, 0x4AF6, 0xB4, 0x54, 0x71, 0x93, 0x63, 0x44, 0x35, 0xAD); // {872270E1-A899-4AF6-B454-7193634435AD}
 DEFINE_GUID(VIRTIO_FS_ADMIN_CLASS_ID, 0x7E6AD219, 0xD1B3, 0x42D5, 0xB8, 0xEE, 0xD9, 0x63, 0x24, 0xE6, 0x4F, 0xF6); // {7E6AD219-D1B3-42D5-B8EE-D96324E64FF6}

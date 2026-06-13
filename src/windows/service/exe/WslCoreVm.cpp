@@ -2195,18 +2195,25 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
 
     sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
 
-    // Append the swiotlb token here so it covers fixed-drive, dynamic add, and remount paths.
-    // Duplicate swiotlb tokens are harmless: VirtioFsShare parses options into a map.
+    // Append swiotlb and vcpus here to cover the fixed-drive, dynamic add, and remount paths.
+    // Safe to duplicate: both tokens are constant per VM, and VirtioFsShare collapses repeats into one map entry.
     std::wstring effectiveOptions(Options);
-    if (!m_swiotlbOption.empty())
-    {
+    auto appendOption = [&effectiveOptions](const std::wstring& option) {
+        if (option.empty())
+        {
+            return;
+        }
+
         if (!effectiveOptions.empty())
         {
             effectiveOptions += L';';
         }
 
-        effectiveOptions += m_swiotlbOption;
-    }
+        effectiveOptions += option;
+    };
+
+    appendOption(m_swiotlbOption);
+    appendOption(c_vcpusOption);
 
     // Check if a matching share already exists.
     bool created = false;
