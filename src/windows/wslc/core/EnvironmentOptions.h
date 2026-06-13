@@ -19,38 +19,26 @@ Abstract:
 
 namespace wsl::windows::wslc {
 
+// An environment variable that maps onto an ArgType. Presence of the variable
+// in the process environment is what counts; the value is ignored for Flag
+// kinds and stored verbatim for Value kinds. To "turn off" an env-bound
+// option, unset the variable.
 struct EnvBinding
 {
     const wchar_t* Name;
     ArgType Type;
-    // When true, the env var follows a "presence implies truthy" contract
-    // (e.g. NO_COLOR per https://no-color.org): the variable being defined
-    // disables the feature regardless of value, including empty (NO_COLOR=)
-    // and explicit "0"/"false"/"no"/"off". Only meaningful for Flag kinds;
-    // ignored for Value kinds.
-    bool PresenceOnly = false;
 };
 
-// Many-to-one allowed: multiple env var names may bind to one ArgType
-// (e.g. NO_COLOR and WSLC_CLI_NO_COLOR both map to ArgType::NoColor).
-// The vendor-specific WSLC_CLI_NO_COLOR keeps truthy-gating so users can
-// explicitly opt back in with WSLC_CLI_NO_COLOR=0; the spec-defined
-// NO_COLOR is presence-only as required by https://no-color.org.
+// Many-to-one allowed: multiple env var names may bind to one ArgType.
 constexpr EnvBinding c_envBindings[] = {
     {L"WSLC_CLI_DEBUG", ArgType::Debug},
-    {L"WSLC_CLI_NO_COLOR", ArgType::NoColor},
-    {L"NO_COLOR", ArgType::NoColor, true},
+    {L"NO_COLOR", ArgType::NoColor},
 };
 
-// Populates target for any ArgType in definedArgs not already set. Flags use
-// a truthy check (or presence-only check when the binding opts in); values
-// store the env string.
+// Populates target for any ArgType in definedArgs not already set. Flags are
+// set by presence of the env var; values are stored verbatim.
 //
-// Contract: never throws on user input or environment state. The function
-// runs before NO_COLOR is applied, so a throw here could surface as colored
-// help/error output. The only path that fail-fasts is a programming-error
-// configuration (an ArgType whose Kind cannot be env-bound); that is *not*
-// reachable from user input.
+// Contract: never throws on user input or environment state.
 void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept;
 
 } // namespace wsl::windows::wslc

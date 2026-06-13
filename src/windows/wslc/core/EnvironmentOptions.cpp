@@ -13,54 +13,28 @@ Module Name:
 namespace wsl::windows::wslc {
 namespace {
 
-    // Noexcept: swallows allocation failure as "no value" rather than propagating.
-    // Note: distinguishes neither "missing" nor "empty" from caller's perspective;
-    // both yield nullopt. Use IsEnvPresent() when presence alone matters.
+    // Returns the env var value when defined (including empty), nullopt
+    // otherwise. Noexcept: swallows allocation failure as "no value".
+    //
+    // wil::GetEnvironmentVariableW returns a FAILED HRESULT when the variable
+    // is not present in the process environment (mapped from
+    // ERROR_ENVVAR_NOT_FOUND). A defined-but-empty variable returns S_OK and
+    // an empty string, which we surface as an engaged optional so the caller
+    // can honor presence-only contracts (e.g. NO_COLOR=).
     std::optional<std::wstring> ReadEnv(const wchar_t* name) noexcept
     try
     {
-        DWORD len = ::GetEnvironmentVariableW(name, nullptr, 0);
-        if (len == 0)
+        std::wstring value;
+        const HRESULT hr = wil::GetEnvironmentVariableW(name, value);
+        if (FAILED(hr))
         {
             return std::nullopt;
         }
-
-        std::wstring value(len - 1, L'\0');
-        DWORD got = ::GetEnvironmentVariableW(name, value.data(), len);
-        if (got == 0 || got >= len)
-        {
-            return std::nullopt;
-        }
-
-        // Race hardening: if the var shrank between the sizing and read calls, trim the trailing
-        value.resize(got);
         return value;
     }
     catch (...)
     {
         return std::nullopt;
-    }
-
-    // Presence-only check: returns true if the env var is defined in the
-    // process environment, regardless of value (including empty).
-    bool IsEnvPresent(const wchar_t* name) noexcept
-    {
-        ::SetLastError(ERROR_SUCCESS);
-        (void)::GetEnvironmentVariableW(name, nullptr, 0);
-        return ::GetLastError() != ERROR_ENVVAR_NOT_FOUND;
-    }
-
-    // Vendor-specific convention: any value is truthy except explicit opt-outs.
-    // NOT used for NO_COLOR — that binding is presence-only per spec.
-    bool IsTruthy(const std::wstring& v) noexcept
-    {
-        if (v.empty())
-        {
-            return false;
-        }
-
-        auto eq = [&](const wchar_t* s) { return _wcsicmp(v.c_str(), s) == 0; };
-        return !(eq(L"0") || eq(L"false") || eq(L"no") || eq(L"off"));
     }
 
 } // namespace
@@ -77,80 +51,39 @@ try
             continue;
         }
 
-        switch (arg.Kind())
+        for (const auto& binding : c_envBindings)
         {
-        case Kind::Flag:
-        {
-            // OR across bindings: any matching env var sets the flag.
-            // Presence-only bindings ignore the value; truthy-gated bindings
-            // require IsTruthy() to accept the value.
-            bool any = false;
-            for (const auto& b : c_envBindings)
+            if (binding.Type != arg.Type())
             {
-                if (b.Type != arg.Type())
-                {
-                    continue;
-                }
-
-                if (b.PresenceOnly)
-                {
-                    if (IsEnvPresent(b.Name))
-                    {
-                        any = true;
-                        break;
-                    }
-                }
-                else
-                {
-                    auto v = ReadEnv(b.Name);
-                    if (v.has_value() && IsTruthy(*v))
-                    {
-                        any = true;
-                        break;
-                    }
-                }
+                continue;
             }
-            if (any)
+
+            auto value = ReadEnv(binding.Name);
+            if (!value.has_value())
+            {
+                continue;
+            }
+
+            // Presence sets a flag; values are stored verbatim. Argument
+            // Kinds other than Flag/Value are not env-bindable today.
+            if (arg.Kind() == Kind::Flag)
             {
                 target.Add(arg.Type(), true);
             }
-            break;
-        }
-        case Kind::Value:
-        {
-            // TODO: no defined policy for multiple value bindings; first wins.
-            // PresenceOnly is ignored for value kinds (it has no sensible meaning
-            // when the value is the payload).
-            for (const auto& b : c_envBindings)
+            else if (arg.Kind() == Kind::Value)
             {
-                if (b.Type != arg.Type())
-                {
-                    continue;
-                }
-
-                auto v = ReadEnv(b.Name);
-                if (v.has_value())
-                {
-                    target.Add(arg.Type(), std::move(*v));
-                    break;
-                }
+                target.Add(arg.Type(), std::move(*value));
             }
+
             break;
-        }
-        default:
-            // Programming error (not user input): an env-bound Argument was
-            // declared with a Kind that cannot be sourced from the environment.
-            // Fail fast so the bad declaration is caught in development.
-            FAIL_FAST_HR_MSG(E_UNEXPECTED, "ApplyEnvironmentOptions: ArgType %u Kind is not supported.", static_cast<unsigned>(arg.Type()));
         }
     }
 }
 catch (...)
 {
-    // Hard contract: user input / environment must not produce a throw out of
-    // this function. Anything that lands here (e.g. OOM during Add) is logged
-    // and swallowed so the early color/debug setup cannot itself emit colored
-    // output via the parser's error path.
+    // Hard contract: must not throw out of this function. It runs before
+    // NO_COLOR is applied, so a throw could surface as colored help/error
+    // output from the parser's error path.
     LOG_CAUGHT_EXCEPTION();
 }
 

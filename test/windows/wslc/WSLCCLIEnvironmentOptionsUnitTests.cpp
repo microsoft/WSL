@@ -9,10 +9,12 @@ Module Name:
 Abstract:
 
     Unit tests for ApplyEnvironmentOptions, which preloads ArgMap entries from
-    the process environment before CLI parsing. These tests focus on the
-    binding semantics defined in EnvironmentOptions.h, including the
-    presence-only contract for NO_COLOR (https://no-color.org) and the
-    truthy-gated contract for the vendor-specific WSLC_CLI_* variables.
+    the process environment before CLI parsing. Every entry in c_envBindings
+    follows a presence-only contract: the variable being defined in the
+    environment sets the option regardless of value (including empty). To
+    "turn off" an env-bound option the user unsets the variable. NO_COLOR
+    follows https://no-color.org; the vendor-specific WSLC_CLI_* variables
+    use the same presence-only semantics for consistency.
 
 --*/
 
@@ -107,59 +109,9 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
-    // Vendor-specific WSLC_CLI_NO_COLOR is truthy-gated, so users can
-    // explicitly opt back in with WSLC_CLI_NO_COLOR=0 / false / off.
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliNoColorFalsyValue_DoesNotSetFlag)
-    {
-        for (const auto* value : {L"", L"0", L"false", L"no", L"off"})
-        {
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", value));
-
-            ArgMap target;
-            ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-            LogComment(std::wstring(L"WSLC_CLI_NO_COLOR=") + value);
-            VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
-
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", nullptr));
-        }
-    }
-
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliNoColorTruthyValue_SetsFlag)
-    {
-        for (const auto* value : {L"1", L"true", L"yes", L"on", L"anything"})
-        {
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", value));
-
-            ArgMap target;
-            ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-            LogComment(std::wstring(L"WSLC_CLI_NO_COLOR=") + value);
-            VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-            VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
-
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", nullptr));
-        }
-    }
-
-    // Both bindings cooperate: when the vendor-specific override says "off"
-    // but the spec-defined NO_COLOR is present, presence wins (NO_COLOR is
-    // an explicit user signal that color is unwanted regardless of value).
-    TEST_METHOD(ApplyEnvironmentOptions_NoColorPresentEvenWhenWslcCliFalsy_SetsFlag)
-    {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", L"0"));
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
-
-        ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-        VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-        VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
-    }
-
-    // WSLC_CLI_DEBUG is truthy-gated (it is NOT a NO_COLOR-style spec var);
-    // an empty or explicit-opt-out value must leave Debug unset.
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugTruthyValue_SetsFlag)
+    // WSLC_CLI_DEBUG is presence-only (same contract as NO_COLOR). A defined
+    // variable with any value sets the flag.
+    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugPresent_SetsFlag)
     {
         VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", L"1"));
 
@@ -170,20 +122,27 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_TRUE(target.Get<ArgType::Debug>());
     }
 
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugFalsyValue_DoesNotSetFlag)
+    // Presence-only contract: an empty value must still set the flag. This
+    // is the behavior change that came with collapsing PresenceOnly + IsTruthy
+    // into a single presence-only rule for every binding.
+    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugEmptyValue_SetsFlag)
     {
-        for (const auto* value : {L"", L"0", L"false", L"no", L"off"})
-        {
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", value));
+        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", L""));
 
-            ArgMap target;
-            ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+        ArgMap target;
+        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
 
-            LogComment(std::wstring(L"WSLC_CLI_DEBUG=") + value);
-            VERIFY_IS_FALSE(target.Contains(ArgType::Debug));
+        VERIFY_IS_TRUE(target.Contains(ArgType::Debug));
+        VERIFY_IS_TRUE(target.Get<ArgType::Debug>());
+    }
 
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", nullptr));
-        }
+    // Absence is the only way to opt out.
+    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugAbsent_DoesNotSetFlag)
+    {
+        ArgMap target;
+        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+
+        VERIFY_IS_FALSE(target.Contains(ArgType::Debug));
     }
 
     // Defensive contract: a target that already contains the ArgType must
@@ -221,21 +180,6 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
-    // Precedence: when NO_COLOR is unset, the vendor-specific WSLC_CLI_NO_COLOR
-    // alone must still set the flag (truthy gate applies). This guards against
-    // regressions where the spec-defined binding accidentally becomes required.
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliNoColorTruthyWhileNoColorUnset_SetsFlag)
-    {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", nullptr));
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", L"1"));
-
-        ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-        VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-        VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
-    }
-
 private:
     // Returns the canonical set of defined args used by these tests.
     static std::vector<Argument> NoColorAndDebugDefs()
@@ -251,7 +195,6 @@ private:
     static void ClearBoundEnvVars()
     {
         SetEnvironmentVariableW(L"NO_COLOR", nullptr);
-        SetEnvironmentVariableW(L"WSLC_CLI_NO_COLOR", nullptr);
         SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", nullptr);
     }
 };
