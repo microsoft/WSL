@@ -149,7 +149,6 @@ private:
                 << L"  -d,--driver    Specify volume driver name, e.g. 'guest' or 'vhd' (default: guest)\r\n" //
                 << L"  -o,--opt       Set driver specific options\r\n"                                        //
                 << L"  -l,--label     Set metadata on an object\r\n"                                          //
-                << L"  --session      Specify the session to use\r\n"                                         //
                 << L"  -?,--help      Shows help about the selected command\r\n"                              //
                 << L"\r\n";
         return options.str();

@@ -40,10 +40,10 @@ void AttachToSession(CLIExecutionContext& context)
 
 void CreateSession(CLIExecutionContext& context)
 {
-    if (context.Args.Contains(ArgType::Session))
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
         // User specified a session name — open only, don't create.
-        const auto& sessionName = context.Args.Get<ArgType::Session>();
+        const auto& sessionName = context.GlobalArgs.Get<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
         return;
     }

@@ -145,7 +145,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
+        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -379,7 +379,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
     }
 
     auto result = RunWslc(listCommand);
@@ -398,7 +398,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
     if (!sessionName.empty())
     {
-        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
     }
 
     auto loadResult = RunWslc(loadCommand);

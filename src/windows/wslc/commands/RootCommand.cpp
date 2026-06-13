@@ -80,6 +80,7 @@ std::vector<Argument> RootCommand::GetGlobalArguments() const
 {
     return {
         Argument::Create(ArgType::Debug),
+        Argument::Create(ArgType::Session),
     };
 }
 

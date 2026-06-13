@@ -27,7 +27,6 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerPruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Session),
     };
 }
 

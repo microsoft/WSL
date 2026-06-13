@@ -190,17 +190,6 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
 
-    // RootCommand currently exposes Debug as the only CLI global option.
-    TEST_METHOD(RootCommand_GlobalArguments_OnlyDebug)
-    {
-        auto root = RootCommand();
-        auto globals = root.GetGlobalArguments();
-
-        VERIFY_ARE_EQUAL(1u, globals.size());
-        VERIFY_ARE_EQUAL(ArgType::Debug, globals[0].Type());
-        VERIFY_ARE_EQUAL(Kind::Flag, globals[0].Kind());
-    }
-
     // RootCommand exposes Debug and NoColor as env-eligible. Debug being both
     // global and env-eligible is the canonical "both" case; NoColor is env-only.
     TEST_METHOD(RootCommand_EnvArguments_DebugAndNoColor)
