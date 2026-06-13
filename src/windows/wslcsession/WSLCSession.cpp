@@ -327,57 +327,6 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Validate storage path before creating VM resources (Terminate() would clobber the error).
-    if (Settings->StoragePath != nullptr)
-    {
-        std::filesystem::path storagePath{Settings->StoragePath};
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings->StoragePath), !storagePath.is_absolute());
-
-        // MSVC's std::filesystem sets ec to ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND
-        // for non-existent paths. Filter those out — only throw on real failures.
-        auto throwOnRealFsError = [](const std::error_code& ec, const std::filesystem::path& path, const char* op) {
-            if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
-            {
-                THROW_IF_WIN32_ERROR_MSG(ec.value(), "%hs failed for %ls", op, path.c_str());
-            }
-        };
-
-        std::error_code ec;
-        const auto vhdPath = storagePath / c_storageVhdFilename;
-        const bool vhdExists = std::filesystem::exists(vhdPath, ec);
-        throwOnRealFsError(ec, vhdPath, "exists");
-
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
-            Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath),
-            !vhdExists && WI_IsFlagSet(Settings->StorageFlags, WSLCSessionStorageFlagsNoCreate));
-
-        // Only check emptiness for new sessions. Existing sessions are identified by their VHD.
-        if (!vhdExists)
-        {
-            const bool isDir = std::filesystem::is_directory(storagePath, ec);
-            throwOnRealFsError(ec, storagePath, "is_directory");
-
-            if (isDir)
-            {
-                const bool empty = std::filesystem::is_empty(storagePath, ec);
-                THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
-
-                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
-            }
-            else
-            {
-                const bool pathExists = std::filesystem::exists(storagePath, ec);
-                throwOnRealFsError(ec, storagePath, "exists");
-
-                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageNotADirectory(storagePath.c_str()), pathExists);
-
-                std::filesystem::create_directories(storagePath, ec);
-                THROW_IF_WIN32_ERROR_MSG(ec.value(), "create_directories failed for %ls", storagePath.c_str());
-            }
-        }
-    }
-
     // Create the VM through the factory. The VM produces crash events; the session multiplexes
     // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
     wil::com_ptr<IWSLCVirtualMachine> vm;
@@ -454,11 +403,13 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     {
         // If no storage path is specified, use a tmpfs for convenience.
         m_virtualMachine->Mount("", c_containerdStorage, "tmpfs", "", 0);
+        m_storageMounted = true;
         return;
     }
 
-    // Storage path validation is done in Initialize() before any VM resources are created.
     std::filesystem::path storagePath{Settings.StoragePath};
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings.StoragePath), !storagePath.is_absolute());
+
     m_storageVhdPath = storagePath / c_storageVhdFilename;
 
     std::string diskDevice;
@@ -488,10 +439,30 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             "Failed to attach vhd: %ls",
             m_storageVhdPath.c_str());
 
+        // No existing VHD — this is a new session. Reject if the caller forbade creation.
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            Localization::MessageWslcSessionStorageNotFound(Settings.StoragePath),
+            WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
+
+        // Reject any non-empty existing path so we don't mix user files with session storage.
+        // is_empty's error_code distinguishes "directory doesn't exist yet" (OK, we'll create it)
+        // from "exists but unreadable / not a directory / other I/O error" (fail).
+        std::error_code ec;
+        const bool empty = std::filesystem::is_empty(storagePath, ec);
+        if (!ec)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
+        }
+        else if (ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+        {
+            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
+        }
+
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
-        std::filesystem::create_directories(storagePath);
 
+        std::filesystem::create_directories(storagePath);
         wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
         vhdCreated = true;
 
@@ -504,6 +475,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
     // Mount the device to /root.
     m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_storageMounted = true;
 
     // Configure swap on a separate ephemeral VHD.
     if (Settings.SwapSizeMb > 0)
@@ -2689,11 +2661,14 @@ try
             }
 
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-            try
+            if (m_storageMounted)
             {
-                m_virtualMachine->Unmount(c_containerdStorage);
+                try
+                {
+                    m_virtualMachine->Unmount(c_containerdStorage);
+                }
+                CATCH_LOG();
             }
-            CATCH_LOG();
         }
     }
 

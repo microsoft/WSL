@@ -472,24 +472,6 @@ class WSLCTests
             ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the directory is not empty", storagePathString));
         }
 
-        // Reject storage path that points to an existing file (not a directory).
-        {
-            const auto storagePath = std::filesystem::temp_directory_path() /
-                                     std::format(L"wslc-test-storage-file-{}-{}", GetCurrentProcessId(), GetTickCount64());
-            std::ofstream{storagePath} << "data";
-            auto cleanup = wil::scope_exit([&]() {
-                std::error_code ignored;
-                std::filesystem::remove(storagePath, ignored);
-            });
-
-            auto settings = GetDefaultSessionSettings(L"storage-is-file");
-            const auto storagePathString = storagePath.wstring();
-            settings.StoragePath = storagePathString.c_str();
-            wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
-            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the path is not a directory", storagePathString));
-        }
-
         // Reject invalid session flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-session-flags");

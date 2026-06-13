@@ -281,17 +281,16 @@ void WSLCSessionManagerImpl::CreateSession(
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
+        const auto factoryHr =
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+        if (FAILED(factoryHr))
         {
-            const auto factoryHr = factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
-            if (FAILED(factoryHr))
+            if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
             {
-                if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
-                {
-                    THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
-                }
-
-                THROW_IF_FAILED(factoryHr);
+                THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
             }
+
+            THROW_HR(factoryHr);
         }
 
         // Track the session via its service ref, along with metadata and security info.

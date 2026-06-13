@@ -19,7 +19,9 @@ Abstract:
 #include "WSLCSessionFactory.h"
 #include "WSLCSession.h"
 #include "WSLCSessionReference.h"
+#include "wslutil.h"
 
+namespace wslutil = wsl::windows::common::wslutil;
 namespace wslc = wsl::windows::service::wslc;
 
 void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& callback)
@@ -45,12 +47,14 @@ try
     // Create the session object.
     auto session = Microsoft::WRL::Make<wslc::WSLCSession>();
 
-    // Pass the destruction callback directly to the session.
+    // Initialize the session with the VM factory (VMs are created on demand).
+    // N.B. The destruction callback must not be installed until Initialize succeeds, otherwise
+    // ~WSLCSession on the failure path fires the exit callback and races with IErrorInfo marshaling.
+    RETURN_IF_FAILED(session->Initialize(Settings, VmFactory, PluginNotifier, WarningCallback));
+
+    // Pass the destruction callback to the now-initialized session.
     // One session per process, so when it's destroyed, exit.
     session->SetDestructionCallback(std::move(m_destructionCallback));
-
-    // Initialize the session with the VM factory (VMs are created on demand).
-    RETURN_IF_FAILED(session->Initialize(Settings, VmFactory, PluginNotifier, WarningCallback));
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());
