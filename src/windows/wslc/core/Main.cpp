@@ -43,8 +43,9 @@ try
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
 
-    // The execution context must be declared after COM is initialized because it stores internal
-    // COM references.
+    [[maybe_unused]] wsl::windows::common::vt::EnableVirtualTerminal vtModeOut{GetStdHandle(STD_OUTPUT_HANDLE)};
+    [[maybe_unused]] wsl::windows::common::vt::EnableVirtualTerminal vtModeErr{GetStdHandle(STD_ERROR_HANDLE)};
+
     CLIExecutionContext context;
 
     // Register a console control handler so Ctrl-C signals the cancel event.
@@ -105,16 +106,23 @@ try
     {
         LOG_CAUGHT_EXCEPTION();
 
-        // Using WSL shared utility to get the HRESULT from the caught exception.
-        // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
-        result = wil::ResultFromCaughtException();
-
         // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
         if (context.CancelEvent && context.CancelEvent.is_signaled())
         {
-            fwprintf(stderr, L"\nCancelled.\n");
+            // Cancel events are often considered warnings rather than errors, as the user
+            // intentionally triggered it.
+            context.Output.Warn() << std::endl << Localization::WSLCCLI_OperationCancelled() << std::endl;
+
+            // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
+            // for cancellation is exit code 130, which is used by Docker compose and most shells.
+            // TODO: Consider switching to 130 or differentiate the cancellation types when we have
+            // more than image cancellation supported.
             return 1;
         }
+
+        // Using WSL shared utility to get the HRESULT from the caught exception.
+        // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
+        result = wil::ResultFromCaughtException();
 
         if (FAILED(result))
         {
@@ -122,12 +130,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
+                context.Output.Error() << Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)) << std::endl;
             }
             else
             {
                 // Fallback for errors without context
-                wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
+                context.Output.Error() << Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)) << std::endl;
             }
         }
     }
