@@ -13,14 +13,7 @@ Module Name:
 namespace wsl::windows::wslc {
 namespace {
 
-    // Returns the env var value when defined (including empty), nullopt
-    // otherwise. Noexcept: swallows allocation failure as "no value".
-    //
-    // wil::GetEnvironmentVariableW returns a FAILED HRESULT when the variable
-    // is not present in the process environment (mapped from
-    // ERROR_ENVVAR_NOT_FOUND). A defined-but-empty variable returns S_OK and
-    // an empty string, which we surface as an engaged optional so the caller
-    // can honor presence-only contracts (e.g. NO_COLOR=).
+    // nullopt iff the variable is not defined; engaged (possibly empty) otherwise.
     std::optional<std::wstring> ReadEnv(const wchar_t* name) noexcept
     try
     {
@@ -44,8 +37,7 @@ try
 {
     for (const auto& arg : definedArgs)
     {
-        // Defensive: skip entries already populated so this can run either
-        // before or after CLI parsing without double-adding values.
+        // Lowest-precedence: skip args already set by the caller.
         if (target.Contains(arg.Type()))
         {
             continue;
@@ -64,8 +56,6 @@ try
                 continue;
             }
 
-            // Presence sets a flag; values are stored verbatim. Argument
-            // Kinds other than Flag/Value are not env-bindable today.
             if (arg.Kind() == Kind::Flag)
             {
                 target.Add(arg.Type(), true);
@@ -81,9 +71,8 @@ try
 }
 catch (...)
 {
-    // Hard contract: must not throw out of this function. It runs before
-    // NO_COLOR is applied, so a throw could surface as colored help/error
-    // output from the parser's error path.
+    // Must not throw: runs before NO_COLOR is applied, so a throw could
+    // surface as colored error output from the parser's error path.
     LOG_CAUGHT_EXCEPTION();
 }
 

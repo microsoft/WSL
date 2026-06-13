@@ -19,10 +19,9 @@ Abstract:
 
 namespace wsl::windows::wslc {
 
-// An environment variable that maps onto an ArgType. Presence of the variable
-// in the process environment is what counts; the value is ignored for Flag
-// kinds and stored verbatim for Value kinds. To "turn off" an env-bound
-// option, unset the variable.
+// Binding contract: presence of Name sets the option. The value is ignored
+// for Flag kinds and stored verbatim for Value kinds. To opt out, unset the
+// variable.
 struct EnvBinding
 {
     const wchar_t* Name;
@@ -35,10 +34,8 @@ constexpr EnvBinding c_envBindings[] = {
     {L"NO_COLOR", ArgType::NoColor},
 };
 
-// Populates target for any ArgType in definedArgs not already set. Flags are
-// set by presence of the env var; values are stored verbatim.
-//
-// Contract: never throws on user input or environment state.
+// Populates target for any ArgType in definedArgs not already set.
+// Never throws on user input or environment state.
 void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept;
 
 } // namespace wsl::windows::wslc
