@@ -596,7 +596,7 @@ catch (...)
 {
     // Best-effort: failing to install the host's trusted roots must not prevent the session from starting.
     LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the VM");
-    EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed());
+    EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
