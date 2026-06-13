@@ -13,14 +13,12 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "Reporter.h"
-#include <iostream>
 
 namespace wsl::windows::wslc {
 
 using namespace wsl::windows::common::vt;
 
 namespace {
-    // Caller must enable VT on the matching handle before constructing a Reporter.
     bool QueryVTEnabled(HANDLE handle)
     {
         DWORD mode = 0;
@@ -103,16 +101,10 @@ OutputWriter Reporter::GetOutputWriter(Level level)
 {
     if (WI_AreAllFlagsClear(m_enabledLevels, level))
     {
-        return OutputWriter(*m_out, false); // enabled=false suppresses all output
+        return OutputWriter(*m_out, false);
     }
 
-    // Only Info — the program's actual output — goes to stdout. Everything
-    // else (Debug, Warning, Error) is diagnostic chatter about the program
-    // running and goes to stderr, matching gcc/clang/git/cargo/kubectl/etc.
-    // This keeps `wslc cmd | jq` and `wslc cmd > out.txt` clean regardless of
-    // the active level mask. The target channel's VT capability still drives
-    // whether SGR sequences are emitted, so a redirected stderr stays plain
-    // even when stdout is a TTY.
+    // Info to stdout; diagnostics to stderr. Per-channel VT decides SGR emission.
     OutputChannel& target = (level == Level::Info) ? *m_out : *m_err;
     const bool vtEnabled = target.IsVTEnabled();
     const bool colorEnabled = vtEnabled && !m_noColor;

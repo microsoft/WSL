@@ -39,11 +39,14 @@ struct CapturePipe
         THROW_HR_IF(E_FAIL, writeFd < 0);
         w.release();
 
-        // Match what SetCrtEncoding(_O_U8TEXT) does in production so fwprintf works.
+        auto closeFd = wil::scope_exit([&] { _close(writeFd); });
+
         WI_VERIFY(_setmode(writeFd, _O_U8TEXT) != -1);
 
         m_file = _fdopen(writeFd, "w");
         THROW_HR_IF(E_FAIL, m_file == nullptr);
+
+        closeFd.release();
 
         m_reader = std::make_unique<PartialHandleRead>(r.release());
     }

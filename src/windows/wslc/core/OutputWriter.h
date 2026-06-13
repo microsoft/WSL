@@ -57,7 +57,7 @@ private:
     HANDLE m_consoleHandle = INVALID_HANDLE_VALUE; // valid on console path only
     FILE* m_file = nullptr;                        // non-null on FILE* path only
     std::atomic_bool m_enabled = true;
-    bool m_VTEnabled;
+    bool m_vtEnabled;
 };
 
 // Per-call writer returned by Reporter::Info(), Warn(), Error(), Debug().
@@ -70,7 +70,6 @@ struct OutputWriter
 
     NON_COPYABLE(OutputWriter);
 
-    // Move assignment is intentionally deleted.
     OutputWriter(OutputWriter&& other) noexcept;
     OutputWriter& operator=(OutputWriter&&) = delete;
 
@@ -86,7 +85,7 @@ struct OutputWriter
         {
             return *this;
         }
-        if (m_VTEnabled)
+        if (m_vtEnabled)
         {
             ApplyFormat();
         }
@@ -104,28 +103,14 @@ private:
     void ApplyFormat();
     void Flush();
 
-    // Records that new content has been appended to m_buffer.
     // Resets m_flushed so a subsequent Flush() (including the destructor's
-    // safety-net flush) will emit the post-flush content instead of skipping
-    // it as already-flushed.
+    // safety-net) emits post-flush content instead of skipping it.
     void MarkWritten()
     {
         m_written = true;
         m_flushed = false;
     }
 
-    // AppendToBuffer accepts only:
-    //   - types convertible to std::wstring_view (std::wstring, const wchar_t*, etc.)
-    //   - wchar_t
-    //   - bool (rendered as L"true"/L"false")
-    //   - integral and floating-point arithmetic types
-    //
-    // Narrow types (std::string, const char*, char) and arbitrary streamable types
-    // are rejected at compile time to avoid locale-dependent narrow-to-wide
-    // conversions. Callers must convert narrow text explicitly via
-    // wsl::shared::string::MultiByteToWide().
-    //
-    // To support a new type, extend the branches below.
     template <typename T>
     void AppendToBuffer(const T& t)
     {
@@ -139,8 +124,7 @@ private:
         }
         else if constexpr (std::is_same_v<T, char> || std::is_same_v<T, signed char> || std::is_same_v<T, unsigned char>)
         {
-            // Narrow character types satisfy std::is_integral_v and would otherwise
-            // render as their numeric code-point ("a" -> "97").
+            // Narrow chars would otherwise render via std::to_wstring ("a" -> "97").
             static_assert(!sizeof(T*), "OutputWriter does not accept narrow character types. Convert to wchar_t or wide text.");
         }
         else if constexpr (std::is_same_v<T, bool>)
@@ -160,14 +144,14 @@ private:
 
     OutputChannel& m_out;
     bool m_enabled;
-    bool m_VTEnabled;
+    bool m_vtEnabled;
     bool m_colorEnabled;
     bool m_written = false;
     bool m_flushed = false;
     bool m_colorWritten = false;
 
-    // m_formatDelay starts at 1 so the level format fires on the first text write.
-    // Set to 2 after a caller Sequence so the level format follows one write later.
+    // 1 = level format fires on first text write. Set to 2 after a caller
+    // Sequence so the level format follows one write later.
     size_t m_formatDelay = 1;
 
     ConstructedSequence m_format;

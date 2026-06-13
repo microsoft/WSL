@@ -8,25 +8,8 @@ Module Name:
 
 Abstract:
 
-    Central user-facing output facility for the WSLC CLI.
-    Provides level-filtered writers with optional VT color formatting.
-
-    Ownership:
-      Reporter owns two OutputChannel instances (stdout and stderr).
-      OutputChannel owns the write destination: WriteConsoleW on a real
-      console, or fwprintf on a redirected FILE*.
-
-    Per-call flow:
-      Info(), Warn(), Error(), Debug() each return a short-lived OutputWriter
-      that borrows a reference to the appropriate OutputChannel. The OutputWriter
-      accumulates the entire operator<< chain into a wstring buffer and flushes
-      it atomically on std::endl or std::flush, producing at most one
-      WriteConsoleW() or fwprintf() call per chain.
-
-    Routing:
-      Info goes to the out channel. Debug, Warning, and Error go to the err
-      channel. VT/color is decided per channel based on its destination, so
-      redirecting one stream does not affect formatting on the other.
+    Level-filtered user-facing output for the WSLC CLI.
+    Info goes to stdout; Debug/Warning/Error go to stderr.
 
 --*/
 #pragma once
@@ -49,23 +32,19 @@ struct Reporter
         All = Debug | Info | Warning | Error,
     };
 
-    // Default console reporter: Info → stdout, Debug/Warning/Error → stderr.
-    // VT/color is enabled per-handle based on the current console mode.
+    // Default: stdout/stderr, VT per handle.
     Reporter();
 
-    // Test constructor: both Info and diagnostics go to outFile (single-pipe capture).
-    // VT/color disabled.
+    // Single FILE* for all output.
     Reporter(FILE* outFile);
 
-    // Info writes to outFile; Debug/Warning/Error write to errFile.
-    // Each channel's VT/color state is derived independently from its FILE*,
-    // so a redirected errFile stays plain even when outFile is a TTY.
+    // Info to outFile, diagnostics to errFile.
     Reporter(FILE* outFile, FILE* errFile);
 
-    // Test constructor: outFile with explicit VT control.
+    // Single FILE* with explicit VT.
     Reporter(FILE* outFile, bool vtEnabled);
 
-    // Test constructor: independent FILE* and VT state per channel.
+    // Per-channel FILE* and VT.
     Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled);
 
     NON_COPYABLE(Reporter);
@@ -76,8 +55,6 @@ struct Reporter
     ~Reporter();
 
     bool IsColorEnabled() const;
-
-    // Suppresses SGR color and hyperlink sequences. Does not affect IsVTEnabled().
     void SetNoColor(bool noColor);
 
     OutputWriter Debug();
@@ -90,7 +67,6 @@ struct Reporter
     void CloseOutputWriter(bool forceDisable = false);
 
     bool IsLevelEnabled(Level level) const;
-
     void SetLevelMask(Level level, bool setEnabled);
 
 private:

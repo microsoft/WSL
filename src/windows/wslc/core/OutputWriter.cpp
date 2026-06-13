@@ -18,15 +18,13 @@ namespace wsl::windows::wslc {
 
 using namespace wsl::windows::common::vt;
 
-OutputChannel::OutputChannel(FILE* file, bool vtEnabled) : m_file(file), m_VTEnabled(vtEnabled)
+OutputChannel::OutputChannel(FILE* file, bool vtEnabled) : m_file(file), m_vtEnabled(vtEnabled)
 {
     WI_ASSERT(m_file);
 }
 
-OutputChannel::OutputChannel(HANDLE handle, FILE* fallbackFile, bool vtEnabled) : m_file(fallbackFile), m_VTEnabled(vtEnabled)
+OutputChannel::OutputChannel(HANDLE handle, FILE* fallbackFile, bool vtEnabled) : m_file(fallbackFile), m_vtEnabled(vtEnabled)
 {
-    // Switch to WriteConsoleW path only when the handle is a real console.
-    // Redirected handles (pipe, file) use fwprintf on m_file instead.
     DWORD mode = 0;
     if (handle != INVALID_HANDLE_VALUE && handle != nullptr && GetConsoleMode(handle, &mode))
     {
@@ -35,7 +33,6 @@ OutputChannel::OutputChannel(HANDLE handle, FILE* fallbackFile, bool vtEnabled) 
     }
     else
     {
-        // Non-console handle: we'll fall through to fwprintf on m_file.
         WI_ASSERT(m_file);
     }
 }
@@ -54,7 +51,6 @@ void OutputChannel::WriteString(std::wstring_view text)
     }
     else
     {
-        // No newline appended; the buffer already contains all desired formatting.
         if (fwprintf(m_file, L"%.*ls", static_cast<int>(text.size()), text.data()) < 0)
         {
             const int err = errno;
@@ -73,12 +69,12 @@ void OutputChannel::WriteString(std::wstring_view text)
 
 void OutputChannel::SetVTEnabled(bool enabled)
 {
-    m_VTEnabled = enabled;
+    m_vtEnabled = enabled;
 }
 
 bool OutputChannel::IsVTEnabled() const
 {
-    return m_VTEnabled;
+    return m_vtEnabled;
 }
 
 void OutputChannel::Disable()
@@ -87,14 +83,14 @@ void OutputChannel::Disable()
 }
 
 OutputWriter::OutputWriter(OutputChannel& out, bool enabled, bool vtEnabled, bool colorEnabled) :
-    m_out(out), m_enabled(enabled), m_VTEnabled(vtEnabled), m_colorEnabled(colorEnabled)
+    m_out(out), m_enabled(enabled), m_vtEnabled(vtEnabled), m_colorEnabled(colorEnabled)
 {
 }
 
 OutputWriter::OutputWriter(OutputWriter&& other) noexcept :
     m_out(other.m_out),
     m_enabled(other.m_enabled),
-    m_VTEnabled(other.m_VTEnabled),
+    m_vtEnabled(other.m_vtEnabled),
     m_colorEnabled(other.m_colorEnabled),
     m_written(other.m_written),
     m_flushed(other.m_flushed),
@@ -124,7 +120,7 @@ void OutputWriter::Flush()
     if (m_colorWritten)
     {
         // Insert reset before any trailing newline so SGR state is cleared
-        // before the cursor advances, matching normal terminal conventions.
+        // before the cursor advances.
         if (!m_buffer.empty() && m_buffer.back() == L'\n')
         {
             m_buffer.pop_back();
@@ -140,8 +136,6 @@ void OutputWriter::Flush()
     m_out.WriteString(m_buffer);
     m_buffer.clear();
     m_flushed = true;
-    // m_written is intentionally left set so MarkWritten() can distinguish a
-    // post-flush re-append (which must clear m_flushed) from a no-op flush.
     m_colorWritten = false;
     m_formatDelay = 1;
 }
@@ -197,7 +191,7 @@ OutputWriter& OutputWriter::operator<<(std::wostream&(__cdecl* f)(std::wostream&
 
 OutputWriter& OutputWriter::operator<<(const Sequence& sequence)
 {
-    if (!m_enabled || !m_VTEnabled)
+    if (!m_enabled || !m_vtEnabled)
     {
         return *this;
     }
@@ -221,7 +215,7 @@ OutputWriter& OutputWriter::operator<<(const Sequence& sequence)
 
 OutputWriter& OutputWriter::operator<<(const ConstructedSequence& sequence)
 {
-    if (!m_enabled || !m_VTEnabled)
+    if (!m_enabled || !m_vtEnabled)
     {
         return *this;
     }
@@ -249,7 +243,7 @@ OutputWriter& OutputWriter::operator<<(const std::filesystem::path& path)
     {
         return *this;
     }
-    if (m_VTEnabled)
+    if (m_vtEnabled)
     {
         ApplyFormat();
     }
