@@ -36,16 +36,22 @@ class WSLCCLIEnvironmentOptionsUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIEnvironmentOptionsUnitTests)
 
-    // Tests touch process-wide env state; setup/cleanup keep them hermetic.
+    // Tests touch process-wide env state. Capture pre-existing values in setup
+    // and restore them in cleanup so the suite is hermetic and doesn't clobber
+    // values the test host (or CI) may have set.
     TEST_METHOD_SETUP(TestMethodSetup)
     {
-        ClearBoundEnvVars();
+        m_savedNoColor = CaptureEnv(L"NO_COLOR");
+        m_savedWslcCliDebug = CaptureEnv(L"WSLC_CLI_DEBUG");
+        SetEnvironmentVariableW(L"NO_COLOR", nullptr);
+        SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", nullptr);
         return true;
     }
 
     TEST_METHOD_CLEANUP(TestMethodCleanup)
     {
-        ClearBoundEnvVars();
+        RestoreEnv(L"NO_COLOR", m_savedNoColor);
+        RestoreEnv(L"WSLC_CLI_DEBUG", m_savedWslcCliDebug);
         return true;
     }
 
@@ -158,6 +164,9 @@ class WSLCCLIEnvironmentOptionsUnitTests
     }
 
 private:
+    std::optional<std::wstring> m_savedNoColor;
+    std::optional<std::wstring> m_savedWslcCliDebug;
+
     static std::vector<Argument> NoColorAndDebugDefs()
     {
         std::vector<Argument> defs;
@@ -166,10 +175,21 @@ private:
         return defs;
     }
 
-    static void ClearBoundEnvVars()
+    // Snapshot a process env var. nullopt means the variable was not defined;
+    // an empty string means it was defined as "".
+    static std::optional<std::wstring> CaptureEnv(const wchar_t* name)
     {
-        SetEnvironmentVariableW(L"NO_COLOR", nullptr);
-        SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", nullptr);
+        std::wstring value;
+        if (FAILED(wil::GetEnvironmentVariableW(name, value)))
+        {
+            return std::nullopt;
+        }
+        return value;
+    }
+
+    static void RestoreEnv(const wchar_t* name, const std::optional<std::wstring>& saved)
+    {
+        SetEnvironmentVariableW(name, saved.has_value() ? saved->c_str() : nullptr);
     }
 };
 
