@@ -22,6 +22,7 @@ Abstract:
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -50,6 +51,12 @@ struct OutputChannel
     void SetVTEnabled(bool enabled);
     bool IsVTEnabled() const;
 
+    // Safe write width in columns of the underlying console, or std::nullopt when the
+    // destination is redirected (no console) or the screen-buffer query fails.
+    // One column is reserved as a guard against autowrap so callers can write the full
+    // returned width without risking an unwanted line break.
+    std::optional<int> GetConsoleWidth() const;
+
     // Silences all further writes. Called by Reporter::CloseOutputWriter(true).
     void Disable();
 
@@ -60,7 +67,7 @@ private:
     bool m_vtEnabled;
 };
 
-// Per-call writer returned by Reporter::Info(), Warn(), Error(), Debug().
+// Per-call writer returned by Reporter::Output(), Info(), Warn(), Error(), Debug().
 // Accumulates operator<< output into a wstring; flushes atomically on std::endl or std::flush.
 // Destructor flushes as a safety net if no explicit flush manipulator was used.
 struct OutputWriter

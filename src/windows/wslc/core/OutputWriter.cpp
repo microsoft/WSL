@@ -77,6 +77,24 @@ bool OutputChannel::IsVTEnabled() const
     return m_vtEnabled;
 }
 
+std::optional<int> OutputChannel::GetConsoleWidth() const
+{
+    if (m_consoleHandle == INVALID_HANDLE_VALUE)
+    {
+        return std::nullopt;
+    }
+
+    CONSOLE_SCREEN_BUFFER_INFO info{};
+    if (!GetConsoleScreenBufferInfo(m_consoleHandle, &info))
+    {
+        return std::nullopt;
+    }
+
+    // Visible width is (Right - Left + 1); reserve one column as an autowrap guard so
+    // callers can write the full returned width without risking an unwanted line break.
+    return std::max(0, static_cast<int>(info.srWindow.Right) - static_cast<int>(info.srWindow.Left));
+}
+
 void OutputChannel::Disable()
 {
     m_enabled = false;

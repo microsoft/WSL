@@ -111,7 +111,7 @@ try
         {
             // Cancel events are often considered warnings rather than errors, as the user
             // intentionally triggered it.
-            context.Output.Warn() << std::endl << Localization::WSLCCLI_OperationCancelled() << std::endl;
+            context.Reporter.Warn() << std::endl << Localization::WSLCCLI_OperationCancelled() << std::endl;
 
             // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
             // for cancellation is exit code 130, which is used by Docker compose and most shells.
@@ -130,12 +130,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Output.Error() << Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)) << std::endl;
+                context.Reporter.Error() << Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)) << std::endl;
             }
             else
             {
                 // Fallback for errors without context
-                context.Output.Error() << Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)) << std::endl;
+                context.Reporter.Error() << Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)) << std::endl;
             }
         }
     }

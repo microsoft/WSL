@@ -37,7 +37,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     DataMap Data;
 
     // Central output reporter for all user-facing status messages.
-    Reporter Output;
+    Reporter Reporter;
 
     // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
     // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.

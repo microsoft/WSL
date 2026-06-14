@@ -82,6 +82,11 @@ OutputWriter Reporter::Debug()
     return GetOutputWriter(Level::Debug);
 }
 
+OutputWriter Reporter::Output()
+{
+    return GetOutputWriter(Level::Output);
+}
+
 OutputWriter Reporter::Info()
 {
     return GetOutputWriter(Level::Info);
@@ -104,8 +109,8 @@ OutputWriter Reporter::GetOutputWriter(Level level)
         return OutputWriter(*m_out, false);
     }
 
-    // Info to stdout; diagnostics to stderr. Per-channel VT decides SGR emission.
-    OutputChannel& target = (level == Level::Info) ? *m_out : *m_err;
+    // Output to stdout; diagnostics to stderr. Per-channel VT decides SGR emission.
+    OutputChannel& target = (level == Level::Output) ? *m_out : *m_err;
     const bool vtEnabled = target.IsVTEnabled();
     const bool colorEnabled = vtEnabled && !m_noColor;
     OutputWriter result{target, true, vtEnabled, colorEnabled};
@@ -114,6 +119,9 @@ OutputWriter Reporter::GetOutputWriter(Level level)
     {
     case Level::Debug:
         result.AddFormat(Format::Dim);
+        break;
+    case Level::Output:
+        result.AddFormat(Format::Default);
         break;
     case Level::Info:
         result.AddFormat(Format::Default);
@@ -160,6 +168,16 @@ void Reporter::SetLevelMask(Level level, bool setEnabled)
     {
         WI_ClearAllFlags(m_enabledLevels, level);
     }
+}
+
+bool Reporter::IsVTEnabled(Level level) const
+{
+    return (level == Level::Output ? m_out : m_err)->IsVTEnabled();
+}
+
+std::optional<int> Reporter::GetConsoleWidth(Level level) const
+{
+    return (level == Level::Output ? m_out : m_err)->GetConsoleWidth();
 }
 
 } // namespace wsl::windows::wslc

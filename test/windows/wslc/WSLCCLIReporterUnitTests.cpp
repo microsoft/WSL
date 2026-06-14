@@ -392,10 +392,10 @@ class WSLCCLIReporterUnitTests
         }
         {
             CaptureReporter cap;
-            VERIFY_IS_TRUE(cap.reporter.IsLevelEnabled(Reporter::Level::Info));
+            VERIFY_IS_TRUE(cap.reporter.IsLevelEnabled(Reporter::Level::Output));
             VERIFY_IS_TRUE(cap.reporter.IsLevelEnabled(Reporter::Level::Error));
-            cap.reporter.SetLevelMask(Reporter::Level::Info, false);
-            VERIFY_IS_FALSE(cap.reporter.IsLevelEnabled(Reporter::Level::Info));
+            cap.reporter.SetLevelMask(Reporter::Level::Output, false);
+            VERIFY_IS_FALSE(cap.reporter.IsLevelEnabled(Reporter::Level::Output));
             VERIFY_IS_TRUE(cap.reporter.IsLevelEnabled(Reporter::Level::Error));
         }
     }
@@ -404,7 +404,7 @@ class WSLCCLIReporterUnitTests
     {
         CaptureReporter cap;
         cap.reporter.CloseOutputWriter(true);
-        cap.reporter.Info() << L"after close" << std::endl;
+        cap.reporter.Output() << L"after close" << std::endl;
         VERIFY_ARE_EQUAL(std::wstring{L""}, cap.captured());
     }
 
@@ -422,15 +422,16 @@ class WSLCCLIReporterUnitTests
 
     // Interactive-console view: stdout and stderr both render to the same
     // screen buffer in emission order. This test asserts what the user
-    // actually sees on their terminal across all four levels, including
+    // actually sees on their terminal across all five levels, including
     // proper SGR reset between adjacent diagnostics (no color bleed).
     TEST_METHOD(Reporter_InteractiveConsoleView)
     {
         CaptureReporter cap{true}; // single pipe, VT on — models a real TTY.
         cap.reporter.SetLevelMask(Reporter::Level::Debug, true);
 
-        cap.reporter.Info() << L"starting" << std::endl;
+        cap.reporter.Output() << L"starting" << std::endl;
         cap.reporter.Debug() << L"trace" << std::endl;
+        cap.reporter.Info() << L"pulling" << std::endl;
         cap.reporter.Warn() << L"careful" << std::endl;
         cap.reporter.Error() << L"failed" << std::endl;
 
@@ -440,26 +441,29 @@ class WSLCCLIReporterUnitTests
         const std::wstring red{Format::Fg::BrightRed.Get()};
         const std::wstring reset{Format::Default.Get()};
 
-        const auto expected = def + L"starting" + reset + L"\n" + dim + L"trace" + reset + L"\n" + yellow + L"careful" + reset +
-                              L"\n" + red + L"failed" + reset + L"\n";
+        // Info emits no SGR prefix and no trailing reset (color was never written),
+        // so it appears as plain text between the colored Debug and Warn lines.
+        const auto expected = def + L"starting" + reset + L"\n" + dim + L"trace" + reset + L"\n" + def + L"pulling" + reset +
+                              L"\n" + yellow + L"careful" + reset + L"\n" + red + L"failed" + reset + L"\n";
 
         VERIFY_ARE_EQUAL(expected, cap.captured());
     }
 
-    // Diagnostic levels (Debug, Warning, Error) route to stderr; non-diagnostic
-    // levels (Info) route to stdout. This mirrors gcc/clang/git/etc.
+    // Diagnostic levels (Debug, Info, Warning, Error) route to stderr; primary
+    // data output (Output) routes to stdout. This mirrors gcc/clang/git/docker/etc.
     TEST_METHOD(Reporter_RoutingByLevel)
     {
         SplitCaptureReporter cap;
         cap.reporter.SetLevelMask(Reporter::Level::Debug, true);
 
-        cap.reporter.Info() << L"info text" << std::endl;
+        cap.reporter.Output() << L"output text" << std::endl;
         cap.reporter.Debug() << L"debug text" << std::endl;
+        cap.reporter.Info() << L"info text" << std::endl;
         cap.reporter.Warn() << L"warn text" << std::endl;
         cap.reporter.Error() << L"error text" << std::endl;
 
-        VERIFY_ARE_EQUAL(std::wstring{L"info text\n"}, cap.outPipe.captured());
-        VERIFY_ARE_EQUAL(std::wstring{L"debug text\nwarn text\nerror text\n"}, cap.errPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"output text\n"}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"debug text\ninfo text\nwarn text\nerror text\n"}, cap.errPipe.captured());
     }
 
     // Per-level color verification: with VT enabled on both pipes, each level
@@ -471,8 +475,9 @@ class WSLCCLIReporterUnitTests
         SplitCaptureReporter cap{true};
         cap.reporter.SetLevelMask(Reporter::Level::Debug, true);
 
-        cap.reporter.Info() << L"info text" << std::endl;
+        cap.reporter.Output() << L"output text" << std::endl;
         cap.reporter.Debug() << L"debug text" << std::endl;
+        cap.reporter.Info() << L"info text" << std::endl;
         cap.reporter.Warn() << L"warn text" << std::endl;
         cap.reporter.Error() << L"error text" << std::endl;
 
@@ -482,13 +487,119 @@ class WSLCCLIReporterUnitTests
         const std::wstring red{Format::Fg::BrightRed.Get()};
         const std::wstring reset{Format::Default.Get()};
 
-        // Info is the only level that goes to stdout; its level format is Default.
-        VERIFY_ARE_EQUAL(def + L"info text" + reset + L"\n", cap.outPipe.captured());
+        // Output is the only level that goes to stdout; its level format is Default.
+        VERIFY_ARE_EQUAL(def + L"output text" + reset + L"\n", cap.outPipe.captured());
 
-        // Diagnostics on stderr, each with its own color, concatenated in emission order.
-        const auto expectedErr =
-            dim + L"debug text" + reset + L"\n" + yellow + L"warn text" + reset + L"\n" + red + L"error text" + reset + L"\n";
+        // Diagnostics on stderr in emission order. Info emits no SGR prefix
+        // (and no trailing reset since color was never written), so it appears
+        // as plain text between the colored Debug and Warn lines.
+        const auto expectedErr = dim + L"debug text" + reset + L"\n" + def + L"info text" + reset + L"\n" + yellow +
+                                 L"warn text" + reset + L"\n" + red + L"error text" + reset + L"\n";
         VERIFY_ARE_EQUAL(expectedErr, cap.errPipe.captured());
+    }
+
+    // Info is informational stderr (progress, "[detached]", "Created session",
+    // etc.). It must be enabled by default (so callers don't have to opt in)
+    // and respect SetLevelMask like any other level.
+    TEST_METHOD(Reporter_Info_EnabledByDefaultAndMaskable)
+    {
+        CaptureReporter cap;
+        VERIFY_IS_TRUE(cap.reporter.IsLevelEnabled(Reporter::Level::Info));
+
+        cap.reporter.Info() << L"first" << std::endl;
+        cap.reporter.SetLevelMask(Reporter::Level::Info, false);
+        VERIFY_IS_FALSE(cap.reporter.IsLevelEnabled(Reporter::Level::Info));
+        cap.reporter.Info() << L"suppressed" << std::endl;
+        cap.reporter.SetLevelMask(Reporter::Level::Info, true);
+        cap.reporter.Info() << L"third" << std::endl;
+
+        VERIFY_ARE_EQUAL(std::wstring{L"first\nthird\n"}, cap.captured());
+    }
+
+    // Reporter::IsVTEnabled(Level) must reflect the per-channel VT state.
+    // Output reads the out channel; Info/Warn/Error/Debug read the err channel.
+    TEST_METHOD(Reporter_IsVTEnabled_PerLevelRouting)
+    {
+        // Symmetric off / symmetric on.
+        {
+            SplitCaptureReporter cap{false};
+            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Output));
+            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Info));
+            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Warning));
+            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Error));
+            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Debug));
+        }
+        {
+            SplitCaptureReporter cap{true};
+            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Output));
+            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Info));
+            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Warning));
+            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Error));
+            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Debug));
+        }
+
+        // Asymmetric: out VT on, err VT off — the per-level dispatch must read
+        // from the correct channel. Models `wslc image pull 2>logfile` where
+        // stdout stays interactive but stderr is redirected.
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            Reporter reporter{outPipe.file(), true, errPipe.file(), false};
+
+            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
+            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Info));
+            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Warning));
+            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Error));
+            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Debug));
+        }
+
+        // Reverse asymmetry: err interactive, out redirected (e.g. `wslc image pull >out.tar`).
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            Reporter reporter{outPipe.file(), false, errPipe.file(), true};
+
+            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Output));
+            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Info));
+            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Warning));
+            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Error));
+            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Debug));
+        }
+    }
+
+    // GetConsoleWidth returns std::nullopt on any non-console destination,
+    // including FILE* (redirected) and explicit handle-based channels whose
+    // handle is not a console.
+    TEST_METHOD(OutputChannel_GetConsoleWidth_FileChannelReturnsNullopt)
+    {
+        CapturePipe pipe;
+        OutputChannel fileChannel{pipe.file(), false};
+        VERIFY_IS_FALSE(fileChannel.GetConsoleWidth().has_value());
+
+        // VT-enabled FILE* is still a FILE*, not a console: width must remain nullopt.
+        OutputChannel fileChannelVt{pipe.file(), true};
+        VERIFY_IS_FALSE(fileChannelVt.GetConsoleWidth().has_value());
+    }
+
+    TEST_METHOD(OutputChannel_GetConsoleWidth_HandleChannelWithoutConsoleReturnsNullopt)
+    {
+        // Handle-based ctor falls back to the FILE* when GetConsoleMode fails;
+        // GetConsoleWidth must report nullopt in that case (no console buffer to query).
+        CapturePipe pipe;
+        OutputChannel channel{INVALID_HANDLE_VALUE, pipe.file(), false};
+        VERIFY_IS_FALSE(channel.GetConsoleWidth().has_value());
+    }
+
+    // Reporter::GetConsoleWidth(Level) must delegate to the right per-level
+    // channel, and propagate nullopt when the destination is a FILE*.
+    TEST_METHOD(Reporter_GetConsoleWidth_PerLevelRoutingReturnsNulloptForFileChannels)
+    {
+        SplitCaptureReporter cap;
+        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Output).has_value());
+        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Info).has_value());
+        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Warning).has_value());
+        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Error).has_value());
+        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Debug).has_value());
     }
 };
 
