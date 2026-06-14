@@ -446,17 +446,22 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
 
         // Reject any non-empty existing path so we don't mix user files with session storage.
-        // is_empty's error_code distinguishes "directory doesn't exist yet" (OK, we'll create it)
-        // from "exists but unreadable / not a directory / other I/O error" (fail).
+        // status's error_code distinguishes "doesn't exist yet" (OK, we'll create it) from other I/O errors.
         std::error_code ec;
-        const bool empty = std::filesystem::is_empty(storagePath, ec);
-        if (!ec)
+        const auto status = std::filesystem::status(storagePath, ec);
+        if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
         {
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
+            THROW_IF_WIN32_ERROR_MSG(ec.value(), "status failed for %ls", storagePath.c_str());
         }
-        else if (ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+
+        if (std::filesystem::exists(status))
         {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeDirectory(storagePath.c_str()), !std::filesystem::is_directory(status));
+
+            const bool empty = std::filesystem::is_empty(storagePath, ec);
             THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
         }
 
         // If the VHD wasn't found, create it.
