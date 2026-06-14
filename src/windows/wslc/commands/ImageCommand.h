@@ -155,6 +155,7 @@ struct ImagePullCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<Argument> GetEnvArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -170,6 +171,7 @@ struct ImagePushCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<Argument> GetEnvArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

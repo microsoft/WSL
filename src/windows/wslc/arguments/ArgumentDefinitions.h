@@ -89,6 +89,7 @@ _(Output,         "output",              L"o",              Kind::Value,       L
 _(Password,       "password",            L"p",              Kind::Value,       Localization::WSLCCLI_LoginPasswordArgDescription()) \
 _(PasswordStdin,  "password-stdin",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_PathArgDescription()) \
+_(Platform,       "platform",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_PlatformArgDescription()) \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ProgressArgDescription())*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        Localization::WSLCCLI_PublishAllArgDescription()) \

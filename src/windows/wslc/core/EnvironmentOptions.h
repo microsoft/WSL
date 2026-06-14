@@ -32,6 +32,7 @@ struct EnvBinding
 constexpr EnvBinding c_envBindings[] = {
     {L"WSLC_CLI_DEBUG", ArgType::Debug},
     {L"NO_COLOR", ArgType::NoColor},
+    {L"CONTAINER_DEFAULT_PLATFORM", ArgType::Platform},
 };
 
 // Populates target for any ArgType in definedArgs not already set.

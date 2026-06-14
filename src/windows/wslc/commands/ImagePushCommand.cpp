@@ -28,7 +28,15 @@ std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::Platform),
         Argument::Create(ArgType::Session),
+    };
+}
+
+std::vector<Argument> ImagePushCommand::GetEnvArguments() const
+{
+    return {
+        Argument::Create(ArgType::Platform),
     };
 }
 

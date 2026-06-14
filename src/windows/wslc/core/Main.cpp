@@ -114,8 +114,21 @@ try
             subCommand = command->FindSubCommand(invocation);
         }
 
-        command->ParseArguments(invocation, context.Args);
-        command->ValidateArguments(context.Args);
+        // Apply env-var defaults declared by the resolved leaf (e.g.
+        // CONTAINER_DEFAULT_PLATFORM -> --platform). Pre-populating context.Args
+        // before parsing lets the matching CLI argument override the env value
+        // via overridableDefaults.
+        auto leafEnvDefs = command->GetEnvArguments();
+        ApplyEnvironmentOptions(context.Args, leafEnvDefs);
+
+        command->ParseArguments(
+            invocation,
+            context.Args,
+            command->GetArguments(),
+            /*optionsOnly*/ false,
+            /*stopOnUnknown*/ false,
+            /*overridableDefaults*/ leafEnvDefs);
+        command->ValidateArguments(context.Args, leafEnvDefs, /*runInternalHook*/ true);
         command->Execute(context);
     }
     catch (const CommandException& ce)

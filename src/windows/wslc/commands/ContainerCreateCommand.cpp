@@ -50,6 +50,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::Network, false, NO_LIMIT),
         // Argument::Create(ArgType::NoDNS),
+        Argument::Create(ArgType::Platform),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::PublishAll),
@@ -67,6 +68,13 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::WorkDir),
     };
     // clang-format on
+}
+
+std::vector<Argument> ContainerCreateCommand::GetEnvArguments() const
+{
+    return {
+        Argument::Create(ArgType::Platform),
+    };
 }
 
 std::wstring ContainerCreateCommand::ShortDescription() const
