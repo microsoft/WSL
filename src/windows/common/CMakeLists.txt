@@ -35,6 +35,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     VirtioNetworking.cpp
@@ -120,6 +121,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
     VirtioNetworking.h
