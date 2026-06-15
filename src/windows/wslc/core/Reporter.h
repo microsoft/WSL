@@ -64,7 +64,7 @@ struct Reporter
     OutputWriter Warn();
     OutputWriter Error();
 
-    OutputWriter GetOutputWriter(Level level);
+    OutputWriter GetWriter(Level level);
 
     void CloseOutputWriter(bool forceDisable = false);
 

@@ -79,30 +79,30 @@ void Reporter::SetNoColor(bool noColor)
 
 OutputWriter Reporter::Debug()
 {
-    return GetOutputWriter(Level::Debug);
+    return GetWriter(Level::Debug);
 }
 
 OutputWriter Reporter::Output()
 {
-    return GetOutputWriter(Level::Output);
+    return GetWriter(Level::Output);
 }
 
 OutputWriter Reporter::Info()
 {
-    return GetOutputWriter(Level::Info);
+    return GetWriter(Level::Info);
 }
 
 OutputWriter Reporter::Warn()
 {
-    return GetOutputWriter(Level::Warning);
+    return GetWriter(Level::Warning);
 }
 
 OutputWriter Reporter::Error()
 {
-    return GetOutputWriter(Level::Error);
+    return GetWriter(Level::Error);
 }
 
-OutputWriter Reporter::GetOutputWriter(Level level)
+OutputWriter Reporter::GetWriter(Level level)
 {
     if (WI_AreAllFlagsClear(m_enabledLevels, level))
     {
