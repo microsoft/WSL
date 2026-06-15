@@ -86,7 +86,10 @@ void CreateNetwork(CLIExecutionContext& context)
         options.Labels.push_back(validation::ParseLabel(label));
     }
 
-    options.Driver = context.Args.Contains(ArgType::Driver) ? WideToMultiByte(context.Args.Get<ArgType::Driver>()) : "bridge";
+    if (context.Args.Contains(ArgType::Driver))
+    {
+        options.Driver = WideToMultiByte(context.Args.Get<ArgType::Driver>());
+    }
 
     NetworkService::Create(context.Data.Get<Data::Session>(), options);
     PrintMessage(MultiByteToWide(options.Name));
