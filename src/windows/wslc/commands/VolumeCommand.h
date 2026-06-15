@@ -92,4 +92,19 @@ protected:
     void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
+
+// Prune Command
+struct VolumePruneCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"prune";
+    VolumePruneCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
 } // namespace wsl::windows::wslc

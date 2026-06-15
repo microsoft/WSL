@@ -252,6 +252,30 @@ void KillContainers(CLIExecutionContext& context)
     }
 }
 
+void ExportContainer(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        ContainerService::Export(session, containerId, output);
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ContainerExportStdoutIsTerminalError());
+        }
+
+        ContainerService::Export(session, containerId, stdoutHandle);
+    }
+}
+
 void ListContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Containers));
@@ -523,6 +547,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& value : networks)
         {
             options.Networks.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::NetworkAlias))
+    {
+        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        options.NetworkAliases.reserve(aliases.size());
+        for (const auto& value : aliases)
+        {
+            options.NetworkAliases.emplace_back(WideToMultiByte(value));
         }
     }
 

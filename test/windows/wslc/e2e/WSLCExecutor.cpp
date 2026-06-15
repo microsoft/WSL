@@ -391,7 +391,7 @@ void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 void WSLCInteractiveSession::ExpectCommandEcho(const std::string& command)
 {
     // TTY mode: expect command echo, then B_END and carriage return
-    ExpectStdout(std::format("{}\r\n{}\r", command, VT::B_END));
+    ExpectStdout(std::format("{}\r\n{}\r", command, wsl::shared::string::WideToMultiByte(std::wstring(VT::B_END.Get()))));
 }
 
 void WSLCInteractiveSession::IgnoreSequence(const std::string& sequence)

@@ -77,6 +77,7 @@ _(Latest,         "latest",              L"l",              Kind::Flag,        L
 _(Memory,         "memory",              L"m",              Kind::Value,       Localization::WSLCCLI_MemoryArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \
+_(NetworkAlias,   "network-alias",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
