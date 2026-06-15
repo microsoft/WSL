@@ -519,7 +519,11 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
     launcher.SetEntrypoint({"/entrypoint.sh"});
     launcher.AddPort(port, port, AF_INET);
 
-    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+    auto container = launcher.Launch(session);
+
+    // Wait for the registry to bind the port before continuing.
+    auto initProcess = container.GetInitProcess();
+    WaitForOutput(initProcess.GetStdHandle(2), std::format("listening on [::]:{}", port));
 
     auto address = std::format("127.0.0.1:{}", port);
     auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
