@@ -586,8 +586,7 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_With_Options)
     {
         auto result = RunWslc(std::format(
-            L"container create --name {} --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs "
-            L"' "
+            L"container create --name {} --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' "
             L"&& echo mounted\"",
             WslcContainerName,
             DebianImage.NameAndTag()));
@@ -600,8 +599,7 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_Multiple_With_Options)
     {
         auto result = RunWslc(std::format(
-            L"container create --name {} --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | "
-            L"grep -q "
+            L"container create --name {} --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q "
             L"' on /wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
             WslcContainerName,
             DebianImage.NameAndTag()));
