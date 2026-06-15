@@ -3107,21 +3107,21 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Elenca tutti i volumi nella sessione.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
-    <value>Remove unused local volumes.</value>
+    <value>Rimuovi i volumi locali non utilizzati.</value>
   </data>
   <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
-    <value>Removes all unused anonymous local volumes. If --all is specified, also removes unused named volumes. A volume is considered unused when it is not referenced by any container.</value>
+    <value>Rimuove tutti i volumi locali anonimi inutilizzati. Se --all è specificato, rimuove anche i volumi denominati inutilizzati. Un volume viene considerato inutilizzato quando nessun contenitore vi fa riferimento.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused volumes, not just anonymous ones.</value>
+    <value>Rimuovi tutti i volumi inutilizzati, non solo quelli anonimi.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Eliminato: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Spazio totale recuperato: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
@@ -3261,11 +3261,11 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
-    <value>Cannot start container because the following volumes are not available: {}</value>
+    <value>Non è possibile avviare il contenitore perché i volumi seguenti non sono disponibili: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
-    <value>Volume '{}' is not available: {}</value>
+    <value>Il volume '{}' non è disponibile: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
