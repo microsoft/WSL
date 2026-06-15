@@ -157,7 +157,7 @@ void VMPortMapping::Release()
 
 bool VMPortMapping::IsLocalhost() const
 {
-    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    if (BindAddress.si_family == AF_INET6)
     {
         return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
     }
