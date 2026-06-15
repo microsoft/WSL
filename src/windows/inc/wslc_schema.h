@@ -142,8 +142,7 @@ struct ImageConfig
     std::optional<std::map<std::string, EmptyObject>> Volumes;
     std::string WorkingDir;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        ImageConfig, Cmd, Entrypoint, Env, ExposedPorts, Labels, StopSignal, User, Volumes, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, ExposedPorts, Labels, StopSignal, User, Volumes, WorkingDir);
 };
 
 struct ImageRootFS
