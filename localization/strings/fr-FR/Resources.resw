@@ -2353,6 +2353,17 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Les paramètres de point de terminaison ne sont pas encore pris en charge (réseau « {} »).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>L’alias réseau ne peut pas être vide.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Les alias réseau nécessitent un réseau défini par l’utilisateur. Utilisez --network pour en spécifier un.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Impossible de spécifier des alias réseau lorsque plusieurs réseaux sont demandés. Utilisez un seul argument --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Désolé... Nous n’avons pas pu créer le volume « {} » : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2801,7 +2812,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Afficher le dernier conteneur créé (inclut tous les états)</value>
   </data>
   <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
-    <value>Memory limit (e.g. 512M, 1G)</value>
+    <value>Limite de mémoire (par exemple 512M, 1G)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
@@ -2811,14 +2822,21 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Nom du conteneur</value>
   </data>
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
-    <value>Connect a container to a network</value>
+    <value>Connectez un conteneur à un réseau</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
-    <value>host mode networking is not supported</value>
+    <value>la mise en réseau en mode hôte n’est pas prise en charge</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Ajouter un alias étendu au réseau pour le conteneur</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Valeur {} non valide : l’alias réseau ne peut pas être vide ou un espace blanc</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Ne pas utiliser le cache lors de la création de l’image</value>
@@ -3089,6 +3107,24 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Répertorie tous les volumes dans la session.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Supprimez les volumes locaux inutilisés.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Supprime tous les volumes locaux anonymes inutilisés. Si --all est spécifié, supprime également les volumes nommés inutilisés. Un volume est considéré comme inutilisé lorsqu’il n’est référencé par aucun conteneur.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Supprimez tous les volumes inutilisés, pas seulement les volumes anonymes.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Supprimé : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Espace total récupéré : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Nom de volume</value>
   </data>
@@ -3223,6 +3259,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
     <value>Échec de la récupération du volume '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Impossible de démarrer le conteneur, car les volumes suivants sont indisponibles : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Le volume « {} »n’est pas disponible : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">

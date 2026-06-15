@@ -526,6 +526,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::NetworkAlias))
+    {
+        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        options.NetworkAliases.reserve(aliases.size());
+        for (const auto& value : aliases)
+        {
+            options.NetworkAliases.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());

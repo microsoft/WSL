@@ -538,7 +538,11 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
         launcher.AddPort(port, port, AF_INET);
     }
 
-    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+    auto container = launcher.Launch(session);
+
+    // Wait for the registry to bind the port before continuing.
+    auto initProcess = container.GetInitProcess();
+    WaitForOutput(initProcess.GetStdHandle(2), std::format("listening on [::]:{}", port));
 
     if (useTls)
     {

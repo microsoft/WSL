@@ -264,13 +264,28 @@ struct EndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::optional<std::vector<std::string>> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
+
+struct EndpointConfig
+{
+    std::optional<std::vector<std::string>> Aliases;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointConfig& v)
+{
+    j = nlohmann::json::object();
+    if (v.Aliases.has_value() && !v.Aliases->empty())
+    {
+        j["Aliases"] = *v.Aliases;
+    }
+}
 
 struct NetworkingConfig
 {
-    std::map<std::string, EmptyObject> EndpointsConfig;
+    std::map<std::string, EndpointConfig> EndpointsConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(NetworkingConfig, EndpointsConfig);
 };

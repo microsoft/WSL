@@ -248,12 +248,14 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
     return *this;
 }
 
-WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent) :
+WSLCVirtualMachine::WSLCVirtualMachine(
+    _In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLCFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
+    m_onCrashDump(std::move(OnCrashDump)),
     m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
@@ -1249,6 +1251,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
 
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
     const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-crashes";
 
     while (!m_vmTerminatingEvent.is_signaled())
@@ -1275,10 +1279,14 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
             const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
+            const auto crashPid = message.Pid;
+            const auto crashSignal = message.Signal;
+            const auto crashTimestamp = message.Timestamp;
+
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
-            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, crashTimestamp, crashPid, process, crashSignal, dumpExtension);
 
             std::replace_if(
                 filename.begin(),
@@ -1291,8 +1299,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             WSL_LOG(
                 "WSLCLinuxCrash",
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
-                TraceLoggingValue(message.Pid, "Pid"),
-                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(crashPid, "Pid"),
+                TraceLoggingValue(crashSignal, "Signal"),
                 TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
@@ -1316,6 +1324,15 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            file.reset();
+
+            // Notify the session that a crash dump has been fully written. The session fans out
+            // to any registered ICrashDumpCallback subscribers. Failures are caller-handled.
+            if (m_onCrashDump)
+            {
+                m_onCrashDump(fullPath.wstring(), process, crashPid, crashSignal, crashTimestamp);
+            }
         }
         CATCH_LOG()
     }

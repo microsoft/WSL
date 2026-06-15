@@ -110,6 +110,21 @@ interface ITerminationCallback : IUnknown
 };
 
 [
+    uuid(8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801),
+    pointer_default(unique),
+    object
+]
+interface ICrashDumpCallback : IUnknown
+{
+    HRESULT OnCrashDump(
+        [in, string] LPCWSTR DumpPath,
+        [in, unique, string] LPCSTR ProcessName,
+        [in] ULONGLONG Pid,
+        [in] ULONG Signal,
+        [in] ULONGLONG Timestamp);
+};
+
+[
     uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
     pointer_default(unique),
     object
@@ -286,6 +301,11 @@ typedef struct _WSLCContainerNetwork
 
     [unique, size_is(NetworksCount)] const WSLCNetworkConnection* Networks;
     ULONG NetworksCount;
+
+    // Settings for the primary endpoint (the network identified by NetworkMode).
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
 } WSLCContainerNetwork;
 
 typedef enum _WSLCContainerFlags
@@ -516,6 +536,26 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+}
+
+//
+// IWSLCVirtualMachineFactory - Creates VMs on demand for a session.
+//
+// Held by the per-user session process and implemented by the SYSTEM service.
+// This lets the session create a fresh VM at any time (e.g. to recreate a VM that
+// was idle-terminated when it had no running containers), instead of the service
+// eagerly creating a single VM up front. Each successful call returns a new VM whose
+// lifetime is owned by the caller: releasing the IWSLCVirtualMachine tears it down.
+//
+[
+    uuid(2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B),
+    pointer_default(unique),
+    object
+]
+interface IWSLCVirtualMachineFactory : IUnknown
+{
+    // Creates a new VM using the settings captured at session creation time.
+    HRESULT CreateVirtualMachine([out] IWSLCVirtualMachine** Vm);
 }
 
 typedef enum _WSLCSessionStorageFlags
@@ -788,10 +828,10 @@ interface IWSLCSession : IUnknown
     // Returns a handle to this COM server process (used to add to job object).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Initializes the session with a pre-created VM.
+    // Initializes the session with a VM factory. VMs are created through the factory.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCVirtualMachineFactory* VmFactory,
         [in] IWSLCPluginNotifier* PluginNotifier,
         [in, unique] IWarningCallback* WarningCallback);
 
@@ -810,6 +850,8 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 }
 
 //
@@ -846,7 +888,7 @@ interface IWSLCSessionFactory : IUnknown
     // Creates a new session and returns both the session interface and a service reference.
     HRESULT CreateSession(
         [in] const WSLCSessionInitSettings* Settings,
-        [in] IWSLCVirtualMachine* Vm,
+        [in] IWSLCVirtualMachineFactory* VmFactory,
         [in] IWSLCPluginNotifier* PluginNotifier,
         [in, unique] IWarningCallback* WarningCallback,
         [out] IWSLCSession** Session,
@@ -906,3 +948,4 @@ cpp_quote("#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY
 cpp_quote("#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11) /* 0x8004060B */")
 cpp_quote("#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12) /* 0x8004060C */")
 cpp_quote("#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */")
+cpp_quote("#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14) /* 0x8004060E */")

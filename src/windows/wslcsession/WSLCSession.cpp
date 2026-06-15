@@ -163,6 +163,38 @@ std::string GenerateContainerName(int retry)
 
 namespace wsl::windows::service::wslc {
 
+// COM object returned by WSLCSession::RegisterCrashDumpCallback. Holds a strong reference to the
+// owning session so the session COM facade cannot be destroyed before all subscriptions are
+// released. When the last reference is dropped, the destructor removes the matching entry from
+// the session's callback list. Safe to release in any order with respect to the session pointer
+// that the client also holds.
+//
+// The subscription is returned to callers as a bare IUnknown -- the type is an opaque lifetime
+// handle with no methods of its own, so there is no need for a dedicated COM interface.
+class CrashDumpSubscription
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IUnknown, IFastRundown>
+{
+public:
+    HRESULT RuntimeClassInitialize(Microsoft::WRL::ComPtr<WSLCSession> Session, WSLCSession::CrashDumpCallbackList::iterator It)
+    {
+        m_session = std::move(Session);
+        m_iterator = It;
+        return S_OK;
+    }
+
+    ~CrashDumpSubscription()
+    {
+        if (m_session)
+        {
+            m_session->RemoveCrashDumpCallback(m_iterator);
+        }
+    }
+
+private:
+    Microsoft::WRL::ComPtr<WSLCSession> m_session;
+    WSLCSession::CrashDumpCallbackList::iterator m_iterator{};
+};
+
 UserHandle::UserHandle(WSLCSession& Session, HANDLE handle) : m_session(&Session), m_handle(handle)
 {
     WI_ASSERT(!!m_handle);
@@ -252,21 +284,21 @@ UserCOMCallback::~UserCOMCallback() noexcept
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
 {
-    RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
 
-    wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
-    THROW_LAST_ERROR_IF(!process);
-
-    *ProcessHandle = process.release();
+    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE);
     return S_OK;
 }
 CATCH_RETURN();
 
 HRESULT WSLCSession::Initialize(
-    _In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm, _In_ IWSLCPluginNotifier* PluginNotifier, _In_opt_ IWarningCallback* WarningCallback)
+    _In_ const WSLCSessionInitSettings* Settings,
+    _In_ IWSLCVirtualMachineFactory* VmFactory,
+    _In_ IWSLCPluginNotifier* PluginNotifier,
+    _In_opt_ IWarningCallback* WarningCallback)
 try
 {
-    RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
+    RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
     THROW_HR_IF_MSG(
@@ -297,8 +329,16 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Create the VM.
-    m_virtualMachine.emplace(Vm, Settings, m_sessionTerminatingEvent.get());
+    // Create the VM through the factory. The VM produces crash events; the session multiplexes
+    // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
+    wil::com_ptr<IWSLCVirtualMachine> vm;
+    THROW_IF_FAILED(VmFactory->CreateVirtualMachine(&vm));
+
+    m_virtualMachine.emplace(
+        vm.get(),
+        Settings,
+        m_sessionTerminatingEvent.get(),
+        std::bind(&WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
@@ -306,7 +346,7 @@ try
     m_virtualMachine->Initialize();
 
     // Get an event from the service that is signaled when the VM exits.
-    THROW_IF_FAILED(Vm->GetTerminationEvent(&m_vmExitedEvent));
+    THROW_IF_FAILED(vm->GetTerminationEvent(&m_vmExitedEvent));
 
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
@@ -1743,11 +1783,12 @@ try
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateContainer",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
@@ -1761,6 +1802,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
@@ -1810,6 +1852,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             m_virtualMachine.value(),
             m_pluginNotifier.get(),
             m_networks,
+            m_volumes.value(),
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -2668,6 +2711,61 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::RegisterCrashDumpCallback(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription)
+try
+{
+    RETURN_HR_IF(E_POINTER, Callback == nullptr || Subscription == nullptr);
+    *Subscription = nullptr;
+
+    CrashDumpCallbackList::iterator it;
+    {
+        auto lock = m_crashDumpLock.lock_exclusive();
+        it = m_crashDumpCallbacks.emplace(m_crashDumpCallbacks.end(), Callback);
+    }
+
+    // Roll back the registration if creating the subscription object fails so we don't leak it.
+    auto removeOnFailure = wil::scope_exit([&]() { RemoveCrashDumpCallback(it); });
+
+    // The subscription holds a strong reference to this session, which guarantees that
+    // RemoveCrashDumpCallback is safe to call from the subscription destructor regardless of the
+    // order in which the client releases its session and subscription pointers.
+    Microsoft::WRL::ComPtr<CrashDumpSubscription> subscription;
+    RETURN_IF_FAILED(Microsoft::WRL::MakeAndInitialize<CrashDumpSubscription>(&subscription, Microsoft::WRL::ComPtr<WSLCSession>{this}, it));
+
+    RETURN_IF_FAILED(subscription.CopyTo(Subscription));
+
+    removeOnFailure.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) noexcept
+{
+    auto lock = m_crashDumpLock.lock_exclusive();
+    m_crashDumpCallbacks.erase(It);
+}
+
+void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+try
+{
+    // Snapshot the callback list under the lock so that cross-process callback invocations don't
+    // hold m_crashDumpLock (and can't deadlock with Register/Remove on the same thread that the
+    // callback might in turn use).
+    std::vector<wil::com_ptr<ICrashDumpCallback>> snapshot;
+    {
+        auto lock = m_crashDumpLock.lock_shared();
+        snapshot.assign(m_crashDumpCallbacks.begin(), m_crashDumpCallbacks.end());
+    }
+
+    auto comCall = RegisterUserCOMCallback();
+
+    for (const auto& callback : snapshot)
+    {
+        LOG_IF_FAILED(callback->OnCrashDump(DumpPath.c_str(), ProcessName.c_str(), Pid, Signal, Timestamp));
+    }
+}
+CATCH_LOG();
+
 HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
 try
 {
@@ -2927,7 +3025,7 @@ void WSLCSession::RecoverExistingContainers()
                 *this,
                 m_virtualMachine.value(),
                 m_pluginNotifier.get(),
-                *m_volumes,
+                m_volumes.value(),
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
