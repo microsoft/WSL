@@ -21,10 +21,26 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
+namespace {
+    // The docker engine emits terminal pull/push results as global progress events
+    // whose `status` begins with "Status: " (e.g. "Status: Downloaded newer image for
+    // alpine:latest" or "Status: Image is up to date for alpine:latest"). The CLI
+    // forwards these verbatim to stdout so scripts can capture the authoritative
+    // outcome with `wslc image pull ... > result.txt`. All other progress chatter
+    // stays on stderr.
+    constexpr std::string_view c_finalStatusPrefix = "Status: ";
+
+    bool IsFinalStatus(LPCSTR status)
+    {
+        return status != nullptr && std::string_view{status}.substr(0, c_finalStatusPrefix.size()) == c_finalStatusPrefix;
+    }
+} // namespace
+
 void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
 {
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+    // Route through the Reporter's Info channel (stderr) so progress chatter doesn't
+    // pollute stdout for scripting, while preserving atomic per-call flushing.
+    m_output.Info() << content << std::flush;
 }
 
 auto ImageProgressCallback::MoveToLine(int line)
@@ -46,32 +62,81 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
-        if (!m_terminalMode.IsConsole())
+        if (!m_vtEnabled)
         {
+            // Plain (redirected) mode: emit Docker-style one-line transitions.
+            // For per-layer events, only print when the status text changes (e.g.
+            // "Pulling fs layer" -> "Downloading" -> "Download complete") so we
+            // don't spam the log with every byte update.
+            if (status == nullptr || *status == '\0')
+            {
+                return S_OK;
+            }
+
+            if (id == nullptr || *id == '\0')
+            {
+                // Final "Status: ..." lines from the daemon go to stdout; all other
+                // global progress text stays on stderr.
+                if (IsFinalStatus(status))
+                {
+                    // Clear the progress line so the final status doesn't get mixed in with it. This
+                    // is especially important when output is redirected, since the final status is
+                    // the only thing that goes to stdout and we don't want it to be preceded by
+                    // a bunch of backspace characters.
+                    WriteTerminal(Erase::LineEntirely.Get());
+                    m_output.Output() << wsl::shared::string::MultiByteToWide(status) << std::endl;
+                }
+                else
+                {
+                    WriteTerminal(std::format(L"{}\n", status));
+                }
+            }
+            else
+            {
+                std::string statusStr{status};
+                auto& last = m_plainStatuses[id];
+                if (last != statusStr)
+                {
+                    last = statusStr;
+                    m_output.Info() << wsl::shared::string::MultiByteToWide(id) << L": "
+                                    << wsl::shared::string::MultiByteToWide(statusStr) << std::endl;
+                }
+            }
+
             return S_OK;
         }
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            WriteTerminal(std::format(L"{}\n", status));
+            if (IsFinalStatus(status))
+            {
+                // Final outcome from the daemon: route to stdout so callers can capture
+                // the authoritative "Status: Downloaded ..." / "Status: Image is up to
+                // date ..." line without parsing progress chatter.
+                m_output.Output() << wsl::shared::string::MultiByteToWide(status) << std::endl;
+            }
+            else
+            {
+                WriteTerminal(std::format(L"{}\n", status));
+            }
             m_currentLine++;
             return S_OK;
         }
 
-        auto info = Info();
+        const auto visibleWidth = m_output.GetConsoleWidth(Reporter::Level::Info);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
         }
 
         return S_OK;
@@ -79,14 +144,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
     CATCH_RETURN();
 }
 
-CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
-{
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    return info;
-}
-
-std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth)
 {
     std::wstring line;
     if (total != 0)
@@ -132,24 +190,25 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         line = std::format(L"{}: {}", id, status);
     }
 
-    // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left + 1);
-
     // Truncate to console width to prevent wrapping that would break cursor repositioning.
-    if (line.size() > static_cast<size_t>(visibleWidth))
+    // When visibleWidth is unknown (redirected) write the line as-is.
+    if (visibleWidth)
     {
-        line.resize(visibleWidth);
-
-        // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
-        // drop it so we don't emit an invalid UTF-16 sequence.
-        if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+        if (line.size() > static_cast<size_t>(*visibleWidth))
         {
-            line.pop_back();
-        }
-    }
+            line.resize(*visibleWidth);
 
-    // Erase any previously written char on that line.
-    line.resize(visibleWidth, L' ');
+            // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
+            // drop it so we don't emit an invalid UTF-16 sequence.
+            if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+            {
+                line.pop_back();
+            }
+        }
+
+        // Erase any previously written char on that line.
+        line.resize(*visibleWidth, L' ');
+    }
 
     return line;
 }

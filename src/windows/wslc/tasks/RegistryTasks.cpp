@@ -46,7 +46,7 @@ void Login(CLIExecutionContext& context)
     auto [credUsername, credSecret] = RegistryService::Authenticate(session, serverAddress, username, password);
     RegistryService::Store(serverAddress, credUsername, credSecret);
 
-    PrintMessage(Localization::WSLCCLI_LoginSucceeded());
+    context.Reporter.Output() << Localization::WSLCCLI_LoginSucceeded() << std::endl;
 }
 
 void Logout(CLIExecutionContext& context)
@@ -60,7 +60,7 @@ void Logout(CLIExecutionContext& context)
 
     RegistryService::Erase(serverAddress);
 
-    PrintMessage(Localization::WSLCCLI_LogoutSucceeded(MultiByteToWide(serverAddress)));
+    context.Reporter.Output() << Localization::WSLCCLI_LogoutSucceeded(MultiByteToWide(serverAddress)) << std::endl;
 }
 
 } // namespace wsl::windows::wslc::task

@@ -27,14 +27,13 @@ std::wstring VersionCommand::LongDescription() const
     return Localization::WSLCCLI_VersionLongDesc();
 }
 
-void VersionCommand::PrintVersion()
+void VersionCommand::PrintVersion(Reporter& output)
 {
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
+    output.Output() << std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION) << std::endl;
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    UNREFERENCED_PARAMETER(context);
-    PrintVersion();
+    PrintVersion(context.Reporter);
 }
 } // namespace wsl::windows::wslc

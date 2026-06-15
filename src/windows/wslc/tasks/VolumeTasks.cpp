@@ -30,7 +30,7 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectVolume(Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
+static bool TryInspectVolume(Reporter& output, Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
 {
     try
     {
@@ -41,7 +41,7 @@ static bool TryInspectVolume(Session& session, const std::string& volumeName, st
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
+            output.Error() << Localization::MessageWslcVolumeNotFound(volumeName.c_str()) << std::endl;
             return false;
         }
 
@@ -49,7 +49,7 @@ static bool TryInspectVolume(Session& session, const std::string& volumeName, st
     }
 }
 
-static bool TryDeleteVolume(Session& session, const std::string& volumeName)
+static bool TryDeleteVolume(Reporter& output, Session& session, const std::string& volumeName)
 {
     try
     {
@@ -60,7 +60,7 @@ static bool TryDeleteVolume(Session& session, const std::string& volumeName)
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
+            output.Error() << Localization::MessageWslcVolumeNotFound(volumeName.c_str()) << std::endl;
             return false;
         }
 
@@ -96,7 +96,7 @@ void CreateVolume(CLIExecutionContext& context)
     }
 
     auto result = VolumeService::Create(context.Data.Get<Data::Session>(), options);
-    PrintMessage(MultiByteToWide(result.Name));
+    context.Reporter.Output() << MultiByteToWide(result.Name) << std::endl;
 }
 
 void DeleteVolumes(CLIExecutionContext& context)
@@ -106,9 +106,9 @@ void DeleteVolumes(CLIExecutionContext& context)
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
     for (const auto& name : volumeNames)
     {
-        if (TryDeleteVolume(session, WideToMultiByte(name)))
+        if (TryDeleteVolume(context.Reporter, session, WideToMultiByte(name)))
         {
-            PrintMessage(name);
+            context.Reporter.Output() << name << std::endl;
         }
         else
         {
@@ -133,7 +133,7 @@ void InspectVolumes(CLIExecutionContext& context)
     for (const auto& name : volumeNames)
     {
         std::optional<wslc_schema::InspectVolume> inspectData;
-        if (TryInspectVolume(session, WideToMultiByte(name), inspectData))
+        if (TryInspectVolume(context.Reporter, session, WideToMultiByte(name), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -144,7 +144,7 @@ void InspectVolumes(CLIExecutionContext& context)
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
-    PrintMessage(MultiByteToWide(json));
+    context.Reporter.Output() << MultiByteToWide(json) << std::endl;
 }
 
 void ListVolumes(CLIExecutionContext& context)
@@ -156,7 +156,7 @@ void ListVolumes(CLIExecutionContext& context)
     {
         for (const auto& volume : volumes)
         {
-            PrintMessage(MultiByteToWide(volume.Name));
+            context.Reporter.Output() << MultiByteToWide(volume.Name) << std::endl;
         }
 
         return;
@@ -173,7 +173,7 @@ void ListVolumes(CLIExecutionContext& context)
     case FormatType::Json:
     {
         auto json = ToJson(volumes, c_jsonPrettyPrintIndent);
-        PrintMessage(MultiByteToWide(json));
+        context.Reporter.Output() << MultiByteToWide(json) << std::endl;
         break;
     }
     case FormatType::Table:
@@ -212,10 +212,11 @@ void PruneVolumes(CLIExecutionContext& context)
 
     for (const auto& volumeName : result.PrunedVolumes)
     {
-        PrintMessage(Localization::WSLCCLI_VolumePruneDeleted(MultiByteToWide(volumeName)));
+        context.Reporter.Output() << Localization::WSLCCLI_VolumePruneDeleted(MultiByteToWide(volumeName)) << std::endl;
     }
 
-    PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_VolumePruneSpaceReclaimed(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    context.Reporter.Output() << std::endl;
+    context.Reporter.Output() << Localization::WSLCCLI_VolumePruneSpaceReclaimed(wsl::shared::string::FormatBytes(result.SpaceReclaimed))
+                              << std::endl;
 }
 } // namespace wsl::windows::wslc::task

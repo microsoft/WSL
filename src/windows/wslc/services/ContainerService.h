@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #pragma once
+#include "Reporter.h"
 #include "SessionModel.h"
 #include "ContainerModel.h"
 #include <docker_schema.h>
@@ -23,17 +24,17 @@ struct ContainerService
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
-    static int Attach(models::Session& session, const std::string& id);
-    static int Run(models::Session& session, const std::string& image, models::ContainerOptions options);
-    static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options);
-    static int Start(models::Session& session, const std::string& id, bool attach = false);
+    static int Attach(Reporter& output, models::Session& session, const std::string& id);
+    static int Run(Reporter& output, models::Session& session, const std::string& image, models::ContainerOptions options);
+    static models::CreateContainerResult Create(Reporter& output, models::Session& session, const std::string& image, models::ContainerOptions options);
+    static int Start(Reporter& output, models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force);
     static std::vector<models::ContainerInformation> List(
         models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
 
-    static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
+    static int Exec(Reporter& output, models::Session& session, const std::string& id, models::ContainerOptions options);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);

@@ -107,12 +107,12 @@ void Inspect(CLIExecutionContext& context)
         }
         else
         {
-            PrintMessage(Localization::WSLCCLI_ObjectNotFoundError(objectId), stderr);
+            context.Reporter.Error() << Localization::WSLCCLI_ObjectNotFoundError(objectId) << std::endl;
             context.ExitCode = 1;
         }
     }
 
     // Always print the array, even if it's empty or an error was encountered
-    PrintMessage(MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
+    context.Reporter.Output() << MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)) << std::endl;
 }
 } // namespace wsl::windows::wslc::task

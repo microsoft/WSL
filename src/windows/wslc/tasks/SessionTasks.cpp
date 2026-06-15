@@ -35,7 +35,7 @@ void AttachToSession(CLIExecutionContext& context)
         sessionId = context.Args.Get<ArgType::SessionId>();
     }
 
-    context.ExitCode = SessionService::Attach(sessionId);
+    context.ExitCode = SessionService::Attach(context.Reporter, sessionId);
 }
 
 void CreateSession(CLIExecutionContext& context)
@@ -58,7 +58,7 @@ void ListSessions(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Verbose))
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
+        context.Reporter.Info() << std::format(L"[wslc] Found {} session{}", sessions.size(), plural) << std::endl;
     }
 
     TableOutput<3> table(
@@ -84,7 +84,7 @@ void TerminateSession(CLIExecutionContext& context)
         sessionId = context.Args.Get<ArgType::SessionId>();
     }
 
-    context.ExitCode = SessionService::TerminateSession(sessionId);
+    context.ExitCode = SessionService::TerminateSession(context.Reporter, sessionId);
 }
 
 void EnterSession(CLIExecutionContext& context)
@@ -103,7 +103,7 @@ void EnterSession(CLIExecutionContext& context)
         sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
     }
 
-    context.ExitCode = SessionService::Enter(storagePath.wstring(), sessionName);
+    context.ExitCode = SessionService::Enter(context.Reporter, storagePath.wstring(), sessionName);
 }
 
 } // namespace wsl::windows::wslc::task

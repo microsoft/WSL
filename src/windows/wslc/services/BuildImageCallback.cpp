@@ -46,8 +46,7 @@ CATCH_LOG()
 
 void BuildImageCallback::WriteTerminal(std::wstring_view content) const
 {
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+    m_output.Info() << content << std::flush;
 }
 
 bool BuildImageCallback::IsCancelled() const
@@ -103,7 +102,7 @@ try
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            wprintf(L"%hs", status);
+            m_output.Info() << MultiByteToWide(status) << std::flush;
         }
         return S_OK;
     }
@@ -184,9 +183,7 @@ CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    const int consoleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left);
+    const auto consoleWidth = m_output.GetConsoleWidth(Reporter::Level::Info);
 
     const bool showPending = !m_pendingLine.empty();
     const int pullCount = static_cast<int>(m_pullLines.size());
@@ -220,9 +217,20 @@ void BuildImageCallback::Redraw()
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (wline.size() > static_cast<size_t>(consoleWidth))
+        if (consoleWidth.has_value())
         {
-            wline.resize(static_cast<size_t>(consoleWidth));
+            const auto maxWidth = static_cast<size_t>(*consoleWidth);
+            if (wline.size() > maxWidth)
+            {
+                wline.resize(maxWidth);
+
+                // Avoid splitting a surrogate pair — if the last code unit is a high
+                // surrogate, drop it so we don't emit an invalid UTF-16 sequence.
+                if (!wline.empty() && IS_HIGH_SURROGATE(wline.back()))
+                {
+                    wline.pop_back();
+                }
+            }
         }
         m_frameBuffer += std::move(wline);
         m_frameBuffer += Erase::LineForward;

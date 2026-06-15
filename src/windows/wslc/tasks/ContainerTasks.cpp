@@ -135,7 +135,7 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectContainer(Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+static bool TryInspectContainer(Reporter& output, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
     try
     {
@@ -146,7 +146,7 @@ static bool TryInspectContainer(Session& session, const std::string& containerId
     {
         if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcContainerNotFound(containerId.c_str()), stderr);
+            output.Error() << Localization::MessageWslcContainerNotFound(containerId.c_str()) << std::endl;
             return false;
         }
 
@@ -157,7 +157,7 @@ static bool TryInspectContainer(Session& session, const std::string& containerId
 void AttachContainer::operator()(CLIExecutionContext& context) const
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    context.ExitCode = ContainerService::Attach(context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
+    context.ExitCode = ContainerService::Attach(context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
 }
 
 void CreateContainer(CLIExecutionContext& context)
@@ -166,8 +166,11 @@ void CreateContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     auto result = ContainerService::Create(
-        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
-    PrintMessage(MultiByteToWide(result.Id));
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        context.Data.Get<Data::ContainerOptions>());
+    context.Reporter.Output() << MultiByteToWide(result.Id) << std::endl;
 }
 
 void ExecContainer(CLIExecutionContext& context)
@@ -176,7 +179,10 @@ void ExecContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Exec(
-        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ContainerId>()), context.Data.Get<Data::ContainerOptions>());
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ContainerId>()),
+        context.Data.Get<Data::ContainerOptions>());
 }
 
 void GetContainers(CLIExecutionContext& context)
@@ -221,7 +227,7 @@ void InspectContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         std::optional<wslc_schema::InspectContainer> inspectData;
-        if (TryInspectContainer(session, WideToMultiByte(id), inspectData))
+        if (TryInspectContainer(context.Reporter, session, WideToMultiByte(id), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -232,7 +238,7 @@ void InspectContainers(CLIExecutionContext& context)
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
-    PrintMessage(MultiByteToWide(json));
+    context.Reporter.Output() << MultiByteToWide(json) << std::endl;
 }
 
 void KillContainers(CLIExecutionContext& context)
@@ -265,7 +271,7 @@ void ListContainers(CLIExecutionContext& context)
         // Print only the container ids
         for (const auto& container : containers)
         {
-            PrintMessage(MultiByteToWide(container.Id));
+            context.Reporter.Output() << MultiByteToWide(container.Id) << std::endl;
         }
 
         return;
@@ -282,7 +288,7 @@ void ListContainers(CLIExecutionContext& context)
     case FormatType::Json:
     {
         auto json = ToJson(containers, c_jsonPrettyPrintIndent);
-        PrintMessage(MultiByteToWide(json));
+        context.Reporter.Output() << MultiByteToWide(json) << std::endl;
         break;
     }
     case FormatType::Table:
@@ -345,7 +351,10 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Run(
-        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        context.Data.Get<Data::ContainerOptions>());
 }
 
 void SetContainerOptionsFromArgs(CLIExecutionContext& context)
@@ -649,7 +658,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        PrintMessage(MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)));
+        context.Reporter.Output() << MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)) << std::endl;
         break;
     }
     case FormatType::Table:
@@ -704,7 +713,8 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    context.ExitCode =
+        ContainerService::Start(context.Reporter, context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
 }
 
 void StopContainers(CLIExecutionContext& context)
@@ -767,10 +777,11 @@ void PruneContainers(CLIExecutionContext& context)
 
     for (const auto& containerId : result.PrunedContainers)
     {
-        PrintMessage(MultiByteToWide(containerId));
+        context.Reporter.Output() << MultiByteToWide(containerId) << std::endl;
     }
 
-    PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    context.Reporter.Output() << std::endl;
+    context.Reporter.Output() << Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB)
+                              << std::endl;
 }
 } // namespace wsl::windows::wslc::task

@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 
+#include "Reporter.h"
 #include <wslc.h>
 #include <WSLCContainerLauncher.h>
 #include <ConsoleState.h>
@@ -22,7 +23,7 @@ class ConsoleService
 {
 public:
     static int AttachToCurrentConsole(
-        wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh = false);
+        Reporter& output, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh = false);
     static bool RelayInteractiveTty(
         wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess& process, HANDLE tty, bool triggerRefresh = false);
     static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr);

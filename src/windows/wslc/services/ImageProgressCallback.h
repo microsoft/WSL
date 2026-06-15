@@ -12,8 +12,8 @@ Abstract:
 
 --*/
 #pragma once
+#include "Reporter.h"
 #include "SessionService.h"
-#include "VTSupport.h"
 #include <map>
 #include <string>
 
@@ -24,17 +24,21 @@ class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallbac
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
+    explicit ImageProgressCallback(Reporter& output) : m_output(output)
+    {
+    }
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
 private:
     auto MoveToLine(int line);
-    static CONSOLE_SCREEN_BUFFER_INFO Info();
     void WriteTerminal(std::wstring_view content) const;
-    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
+    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth);
+    Reporter& m_output;
     std::map<std::string, int> m_statuses;
     int m_currentLine = 0;
-    HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
-    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{m_console};
-    wsl::windows::common::vt::ChangeTerminalMode m_terminalMode{m_console, false};
+    bool m_vtEnabled = m_output.IsVTEnabled(Reporter::Level::Info);
+    // Tracks which entries already had a status logged in plain mode so we only emit
+    // transitions (e.g. "Pulling fs layer" -> "Download complete") instead of every byte update.
+    std::map<std::string, std::string> m_plainStatuses;
 };
 } // namespace wsl::windows::wslc::services

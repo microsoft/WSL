@@ -21,7 +21,7 @@ struct VersionCommand final : public Command
     VersionCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
-    static void PrintVersion();
+    static void PrintVersion(Reporter& output);
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
