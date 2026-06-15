@@ -8,9 +8,7 @@ Module Name:
 
 Abstract:
 
-    Unit tests for ApplyEnvironmentOptions. Every binding in c_envBindings is
-    presence-only: defining the variable sets the option regardless of value;
-    unsetting it is the only opt-out. NO_COLOR follows https://no-color.org.
+    Unit tests for Environment Options.
 
 --*/
 
