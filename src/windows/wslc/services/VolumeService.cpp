@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "VolumeService.h"
+#include "WarningCallback.h"
 #include <wslutil.h>
 #include <wslc.h>
 
@@ -80,5 +81,43 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(session.Get()->InspectVolume(name.c_str(), &output));
     return FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+}
+
+models::PruneVolumesResult VolumeService::Prune(models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
+{
+    const bool hasExplicitAll = std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "all"; });
+
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size() + ((all && !hasExplicitAll) ? 1 : 0));
+    if (all && !hasExplicitAll)
+    {
+        filterEntries.push_back({.Key = "all", .Value = "true"});
+    }
+
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    wil::unique_cotaskmem_array_ptr<WSLCVolumeName> volumes;
+    ULONGLONG spaceReclaimed = 0;
+    THROW_IF_FAILED(session.Get()->PruneVolumes(
+        filterEntries.empty() ? nullptr : filterEntries.data(),
+        static_cast<ULONG>(filterEntries.size()),
+        warningCallback.Get(),
+        &volumes,
+        volumes.size_address<ULONG>(),
+        &spaceReclaimed));
+
+    models::PruneVolumesResult result;
+    result.SpaceReclaimed = spaceReclaimed;
+    result.PrunedVolumes.reserve(volumes.size());
+    for (auto ptr = volumes.get(), end = volumes.get() + volumes.size(); ptr != end; ++ptr)
+    {
+        result.PrunedVolumes.emplace_back(*ptr);
+    }
+
+    return result;
 }
 } // namespace wsl::windows::wslc::services

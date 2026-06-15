@@ -19,18 +19,25 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::windows::common::vt;
 
-auto ImageProgressCallback::MoveToLine(SHORT line)
+void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
+{
+    DWORD written;
+    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+}
+
+auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        wprintf(L"\033[%iA", line);
+        WriteTerminal(Cursor::Up(line).Get());
     }
 
-    return wil::scope_exit([line = line]() {
+    return wil::scope_exit([line = line, this]() {
         if (line > 1)
         {
-            wprintf(L"\033[%iB", line - 1);
+            WriteTerminal(Cursor::Down(line - 1).Get());
         }
     });
 }
@@ -46,7 +53,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            wprintf(L"%hs\n", status);
+            WriteTerminal(std::format(L"{}\n", status));
             m_currentLine++;
             return S_OK;
         }
@@ -58,13 +65,13 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
         }
 
         return S_OK;
@@ -126,7 +133,7 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
     }
 
     // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left + 1);
+    const auto visibleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left + 1);
 
     // Truncate to console width to prevent wrapping that would break cursor repositioning.
     if (line.size() > static_cast<size_t>(visibleWidth))
