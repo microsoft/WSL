@@ -4883,6 +4883,123 @@ class WSLCTests
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
     }
 
+    void CreateNamedNetwork(const std::string& Name, const std::vector<WSLCLabel>& Labels = {})
+    {
+        WSLCNetworkOptions options{};
+        options.Name = Name.c_str();
+        options.Driver = "bridge";
+        options.Labels = Labels.empty() ? nullptr : Labels.data();
+        options.LabelsCount = static_cast<ULONG>(Labels.size());
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+    }
+
+    WSLC_TEST_METHOD(PruneNetworksTest)
+    {
+        auto expectPrune = [&](const std::vector<std::string>& expected,
+                               const std::vector<WSLCFilter>& filters = {},
+                               const std::source_location& source = std::source_location::current()) {
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(filtersPtr, filtersCount, deleted.addressof(), deleted.size_address<ULONG>()));
+
+            std::vector<std::string> names;
+            for (const auto& n : deleted)
+            {
+                names.emplace_back(n);
+            }
+
+            VerifyAreEqualUnordered(expected, names, source);
+        };
+
+        // Prune with no managed networks present returns empty.
+        expectPrune({});
+
+        // Prune removes unused managed networks.
+        {
+            const std::string a = "wslc-prune-net-a";
+            const std::string b = "wslc-prune-net-b";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(a.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(b.c_str()));
+            });
+
+            CreateNamedNetwork(a);
+            CreateNamedNetwork(b);
+
+            expectPrune({a, b});
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+            for (const auto& n : networks)
+            {
+                VERIFY_ARE_NOT_EQUAL(a, std::string(n.Name));
+                VERIFY_ARE_NOT_EQUAL(b, std::string(n.Name));
+            }
+
+            cleanup.release();
+        }
+
+        // Label filter (key=value).
+        {
+            const std::string labeled = "wslc-prune-net-labeled";
+            const std::string unlabeled = "wslc-prune-net-unlabeled";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(labeled.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            });
+
+            CreateNamedNetwork(labeled, {{"wslc-prune-net-test", "yes"}});
+            CreateNamedNetwork(unlabeled);
+
+            expectPrune({labeled}, {{"label", "wslc-prune-net-test=yes"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            cleanup.release();
+        }
+
+        // Label filter (negation).
+        {
+            const std::string keep = "wslc-prune-net-keep";
+            const std::string drop = "wslc-prune-net-drop";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(drop.c_str()));
+            });
+
+            CreateNamedNetwork(keep, {{"wslc-prune-net-keep", "yes"}});
+            CreateNamedNetwork(drop);
+
+            expectPrune({drop}, {{"label!", "wslc-prune-net-keep"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+            cleanup.release();
+        }
+
+        // Filter with null Key rejected.
+        {
+            WSLCFilter filters[] = {{nullptr, "true"}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
+
+        // Filter with null Value rejected.
+        {
+            WSLCFilter filters[] = {{"label", nullptr}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
+    }
+
     WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)
     {
         const std::string networkName = "subnet-test-net";

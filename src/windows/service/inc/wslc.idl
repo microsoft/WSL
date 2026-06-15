@@ -716,6 +716,8 @@ typedef struct _WSLCNetworkOptions
     ULONG LabelsCount;
 } WSLCNetworkOptions;
 
+typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
+
 typedef struct _WSLCNetworkInformation
 {
     char Name[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
@@ -852,6 +854,7 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+    HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 }

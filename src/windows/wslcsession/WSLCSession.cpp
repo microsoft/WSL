@@ -2516,6 +2516,79 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PruneNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkName** Networks, ULONG* NetworksCount)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Networks);
+    RETURN_HR_IF_NULL(E_POINTER, NetworksCount);
+    *Networks = nullptr;
+    *NetworksCount = 0;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    // Scope the prune to WSLC-managed networks.
+    filters["label"].push_back(WSLCNetworkManagedLabel);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+
+    docker_schema::PruneNetworkResult pruneResult;
+    try
+    {
+        pruneResult = m_dockerClient->PruneNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
+
+    if (!pruneResult.NetworksDeleted.has_value() || pruneResult.NetworksDeleted->empty())
+    {
+        return S_OK;
+    }
+
+    std::vector<std::string> deleted;
+    deleted.reserve(pruneResult.NetworksDeleted->size());
+    for (const auto& name : *pruneResult.NetworksDeleted)
+    {
+        // Only report networks that we manage.
+        if (!m_networks.contains(name))
+        {
+            WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
+            continue;
+        }
+        deleted.push_back(name);
+    }
+
+    if (deleted.empty())
+    {
+        return S_OK;
+    }
+
+    // Erase before marshalling: docker has already pruned these, so m_networks must stay in sync.
+    for (const auto& name : deleted)
+    {
+        m_networks.erase(name);
+    }
+
+    WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
+
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkName[]>(deleted.size());
+    for (size_t i = 0; i < deleted.size(); ++i)
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, strcpy_s(output[i], deleted[i].c_str()) != 0, "Unexpected network name length: %hs", deleted[i].c_str());
+    }
+
+    *Networks = output.release();
+    *NetworksCount = static_cast<ULONG>(deleted.size());
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const
 {
     const HANDLE waitHandles[] = {Event, m_sessionTerminatingEvent.get()};
