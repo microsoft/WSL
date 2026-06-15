@@ -1210,12 +1210,13 @@ std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, i
 {
     std::lock_guard lock{m_lock};
 
-    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
+    for (uint32_t i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
-        if (!m_allocatedPorts.contains(i))
+        uint16_t port = static_cast<uint16_t>(i);
+        if (!m_allocatedPorts.contains(port))
         {
-            WI_VERIFY(m_allocatedPorts.insert(i).second);
-            return std::make_shared<VmPortAllocation>(i, Family, Protocol, *this);
+            WI_VERIFY(m_allocatedPorts.insert(port).second);
+            return std::make_shared<VmPortAllocation>(port, Family, Protocol, *this);
         }
     }
 
