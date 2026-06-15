@@ -93,10 +93,7 @@ models::PruneNetworksResult NetworkService::Prune(models::Session& session, cons
 
     wil::unique_cotaskmem_array_ptr<WSLCNetworkName> networks;
     THROW_IF_FAILED(session.Get()->PruneNetworks(
-        filterEntries.empty() ? nullptr : filterEntries.data(),
-        static_cast<ULONG>(filterEntries.size()),
-        &networks,
-        networks.size_address<ULONG>()));
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &networks, networks.size_address<ULONG>()));
 
     models::PruneNetworksResult result;
     result.PrunedNetworks.reserve(networks.size());

@@ -148,8 +148,7 @@ class WSLCE2ENetworkPruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_LabelFilter_MatchingValueIsDeleted)
     {
-        RunWslc(std::format(L"network create --driver bridge --label wslc.test.prune=keep {}", TestNetworkName))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"network create --driver bridge --label wslc.test.prune=keep {}", TestNetworkName)).Verify({.Stderr = L"", .ExitCode = 0});
         RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName2)).Verify({.Stderr = L"", .ExitCode = 0});
         VerifyNetworkIsListed(TestNetworkName);
         VerifyNetworkIsListed(TestNetworkName2);
@@ -173,8 +172,7 @@ class WSLCE2ENetworkPruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_NegatedLabelFilter_PreservesLabeledNetwork)
     {
-        RunWslc(std::format(L"network create --driver bridge --label wslc.test.keep=yes {}", TestNetworkName))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"network create --driver bridge --label wslc.test.keep=yes {}", TestNetworkName)).Verify({.Stderr = L"", .ExitCode = 0});
         RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName2)).Verify({.Stderr = L"", .ExitCode = 0});
         VerifyNetworkIsListed(TestNetworkName);
         VerifyNetworkIsListed(TestNetworkName2);
