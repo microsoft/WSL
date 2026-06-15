@@ -156,6 +156,13 @@ COMMAND_LINE_TEST_CASE(L"container stats cont1", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats cont1 cont2", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats --no-trunc cont1", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats --all", L"stats", true)
+// Export command tests
+COMMAND_LINE_TEST_CASE(L"export cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export --output foo cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export -o foo cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
