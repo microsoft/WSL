@@ -26,7 +26,7 @@ Abstract:
 #include <wslutil.h>
 #include "windows/Common.h"
 #include "Invocation.h"
-#include "OutputWriter.h"
+#include "OutputChannel.h"
 #include "Reporter.h"
 #include "TableOutput.h"
 

@@ -43,9 +43,6 @@ try
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
 
-    [[maybe_unused]] wsl::windows::common::vt::EnableVirtualTerminal vtModeOut{GetStdHandle(STD_OUTPUT_HANDLE)};
-    [[maybe_unused]] wsl::windows::common::vt::EnableVirtualTerminal vtModeErr{GetStdHandle(STD_ERROR_HANDLE)};
-
     CLIExecutionContext context;
 
     // Register a console control handler so Ctrl-C signals the cancel event.
@@ -111,7 +108,7 @@ try
         {
             // Cancel events are often considered warnings rather than errors, as the user
             // intentionally triggered it.
-            context.Reporter.Warn() << std::endl << Localization::WSLCCLI_OperationCancelled() << std::endl;
+            context.Reporter.Warn(L"\n{}", Localization::WSLCCLI_OperationCancelled());
 
             // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
             // for cancellation is exit code 130, which is used by Docker compose and most shells.
@@ -130,12 +127,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Reporter.Error() << Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)) << std::endl;
+                context.Reporter.Error(L"{}", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
             }
             else
             {
                 // Fallback for errors without context
-                context.Reporter.Error() << Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)) << std::endl;
+                context.Reporter.Error(L"{}", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
             }
         }
     }

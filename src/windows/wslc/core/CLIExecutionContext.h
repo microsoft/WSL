@@ -28,8 +28,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     ~CLIExecutionContext() override = default;
 
     NON_COPYABLE(CLIExecutionContext);
-    CLIExecutionContext(CLIExecutionContext&&) = default;
-    CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
+    NON_MOVABLE(CLIExecutionContext);
 
     argument::ArgMap Args;
 

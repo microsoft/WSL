@@ -19,148 +19,102 @@ namespace wsl::windows::wslc {
 using namespace wsl::windows::common::vt;
 
 namespace {
-    bool QueryVTEnabled(HANDLE handle)
+
+    // Per-level SGR prefix. The reset (Format::Default) is always appended by
+    // Emit() when VT is enabled, so each level only declares its colorant.
+    const Sequence& LevelPrefix(Reporter::Level level)
     {
-        DWORD mode = 0;
-        return handle != INVALID_HANDLE_VALUE && handle != nullptr && GetConsoleMode(handle, &mode) &&
-               WI_IsFlagSet(mode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        switch (level)
+        {
+        case Reporter::Level::Debug:
+            return Format::Dim;
+        case Reporter::Level::Warning:
+            return Format::Fg::BrightYellow;
+        case Reporter::Level::Error:
+            return Format::Fg::BrightRed;
+        case Reporter::Level::Output:
+        case Reporter::Level::Info:
+        default:
+            return Format::Default;
+        }
     }
+
 } // namespace
 
-Reporter::Reporter() :
-    Reporter(
-        std::make_shared<OutputChannel>(GetStdHandle(STD_OUTPUT_HANDLE), stdout, QueryVTEnabled(GetStdHandle(STD_OUTPUT_HANDLE))),
-        std::make_shared<OutputChannel>(GetStdHandle(STD_ERROR_HANDLE), stderr, QueryVTEnabled(GetStdHandle(STD_ERROR_HANDLE))))
+Reporter::Reporter() : m_out(GetStdHandle(STD_OUTPUT_HANDLE), stdout), m_err(GetStdHandle(STD_ERROR_HANDLE), stderr)
 {
 }
 
-Reporter::Reporter(FILE* outFile) :
-    Reporter(std::make_shared<OutputChannel>(outFile, false), std::make_shared<OutputChannel>(outFile, false))
+Reporter::Reporter(FILE* outFile) : m_out(outFile, false), m_err(outFile, false)
 {
 }
 
-Reporter::Reporter(FILE* outFile, FILE* errFile) :
-    Reporter(std::make_shared<OutputChannel>(outFile, false), std::make_shared<OutputChannel>(errFile, false))
+Reporter::Reporter(FILE* outFile, FILE* errFile) : m_out(outFile, false), m_err(errFile, false)
 {
 }
 
-Reporter::Reporter(FILE* outFile, bool vtEnabled) :
-    Reporter(std::make_shared<OutputChannel>(outFile, vtEnabled), std::make_shared<OutputChannel>(outFile, vtEnabled))
+Reporter::Reporter(FILE* outFile, bool vtEnabled) : m_out(outFile, vtEnabled), m_err(outFile, vtEnabled)
 {
 }
 
 Reporter::Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled) :
-    Reporter(std::make_shared<OutputChannel>(outFile, outVtEnabled), std::make_shared<OutputChannel>(errFile, errVtEnabled))
+    m_out(outFile, outVtEnabled), m_err(errFile, errVtEnabled)
 {
 }
 
-Reporter::Reporter(std::shared_ptr<OutputChannel> outChannel, std::shared_ptr<OutputChannel> errChannel) :
-    m_out(std::move(outChannel)), m_err(std::move(errChannel))
+void Reporter::Emit(const OutputChannel& channel, Level level, std::wstring_view body, bool appendNewline) const
 {
-}
-
-Reporter::~Reporter()
-{
-    if (m_out)
-    {
-        CloseOutputWriter();
-    }
-}
-
-bool Reporter::IsColorEnabled() const
-{
-    return !m_noColor;
-}
-
-void Reporter::SetNoColor(bool noColor)
-{
-    m_noColor = noColor;
-}
-
-OutputWriter Reporter::Debug()
-{
-    return GetWriter(Level::Debug);
-}
-
-OutputWriter Reporter::Output()
-{
-    return GetWriter(Level::Output);
-}
-
-OutputWriter Reporter::Info()
-{
-    return GetWriter(Level::Info);
-}
-
-OutputWriter Reporter::Warn()
-{
-    return GetWriter(Level::Warning);
-}
-
-OutputWriter Reporter::Error()
-{
-    return GetWriter(Level::Error);
-}
-
-OutputWriter Reporter::GetWriter(Level level)
-{
-    if (WI_AreAllFlagsClear(m_enabledLevels, level))
-    {
-        return OutputWriter(*m_out, false);
-    }
-
-    // Output to stdout; diagnostics to stderr. Per-channel VT decides SGR emission.
-    OutputChannel& target = (level == Level::Output) ? *m_out : *m_err;
-    const bool vtEnabled = target.IsVTEnabled();
+    const bool vtEnabled = channel.IsVTEnabled();
     const bool colorEnabled = vtEnabled && !m_noColor;
-    OutputWriter result{target, true, vtEnabled, colorEnabled};
 
-    switch (level)
+    // Avoid an allocation when there is nothing to wrap: VT off, no newline,
+    // and the body is already a complete string. WriteString is a no-op for
+    // empty input, so the empty-body path also short-circuits here.
+    if (!vtEnabled && !appendNewline)
     {
-    case Level::Debug:
-        result.AddFormat(Format::Dim);
-        break;
-    case Level::Output:
-        result.AddFormat(Format::Default);
-        break;
-    case Level::Info:
-        result.AddFormat(Format::Default);
-        break;
-    case Level::Warning:
-        result.AddFormat(Format::Fg::BrightYellow);
-        break;
-    case Level::Error:
-        result.AddFormat(Format::Fg::BrightRed);
-        break;
-    default:
-        THROW_HR(E_UNEXPECTED);
-    }
-
-    return result;
-}
-
-void Reporter::CloseOutputWriter(bool forceDisable)
-{
-    if (!m_out)
-    {
+        channel.WriteString(body);
         return;
     }
 
-    if (forceDisable)
+    std::wstring out;
+    const std::wstring_view prefix = colorEnabled ? LevelPrefix(level).Get() : std::wstring_view{};
+    const std::wstring_view reset = colorEnabled ? Format::Default.Get() : std::wstring_view{};
+
+    out.reserve(prefix.size() + body.size() + reset.size() + (appendNewline ? 1 : 0));
+    out.append(prefix);
+    out.append(body);
+    out.append(reset);
+    if (appendNewline)
     {
-        m_out->Disable();
-        m_err->Disable();
+        out.push_back(L'\n');
     }
+
+    channel.WriteString(out);
 }
 
-bool Reporter::IsLevelEnabled(Level level) const
+bool Reporter::IsVTEnabled(Level level) const noexcept
+{
+    return ChannelFor(level).IsVTEnabled();
+}
+
+bool Reporter::IsColorEnabled(Level level) const noexcept
+{
+    return ChannelFor(level).IsVTEnabled() && !m_noColor;
+}
+
+std::optional<int> Reporter::GetConsoleWidth(Level level) const
+{
+    return ChannelFor(level).GetConsoleWidth();
+}
+
+bool Reporter::IsLevelEnabled(Level level) const noexcept
 {
     return WI_AreAllFlagsSet(m_enabledLevels, level);
 }
 
-void Reporter::SetLevelMask(Level level, bool setEnabled)
+void Reporter::SetLevelMask(Level level, bool enabled) noexcept
 {
-    if (setEnabled)
+    if (enabled)
     {
         WI_SetAllFlags(m_enabledLevels, level);
     }
@@ -170,14 +124,9 @@ void Reporter::SetLevelMask(Level level, bool setEnabled)
     }
 }
 
-bool Reporter::IsVTEnabled(Level level) const
+void Reporter::Disable() noexcept
 {
-    return (level == Level::Output ? m_out : m_err)->IsVTEnabled();
-}
-
-std::optional<int> Reporter::GetConsoleWidth(Level level) const
-{
-    return (level == Level::Output ? m_out : m_err)->GetConsoleWidth();
+    m_enabled.store(false, std::memory_order_relaxed);
 }
 
 } // namespace wsl::windows::wslc
