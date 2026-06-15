@@ -42,7 +42,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         m_savedNoColor = CaptureEnv(L"NO_COLOR");
-        SetEnvironmentVariableW(L"NO_COLOR", nullptr);
+        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", nullptr));
         return true;
     }
 
@@ -155,7 +155,7 @@ private:
 
     static void RestoreEnv(const wchar_t* name, const std::optional<std::wstring>& saved)
     {
-        SetEnvironmentVariableW(name, saved.has_value() ? saved->c_str() : nullptr);
+        VERIFY_IS_TRUE(SetEnvironmentVariableW(name, saved.has_value() ? saved->c_str() : nullptr));
     }
 };
 
