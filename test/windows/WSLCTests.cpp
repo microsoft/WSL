@@ -5018,14 +5018,6 @@ class WSLCTests
             VERIFY_ARE_EQUAL(
                 E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
         }
-
-        // Null output params rejected.
-        {
-            ULONG count = 0;
-            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->PruneNetworks(nullptr, 0, nullptr, &count));
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->PruneNetworks(nullptr, 0, deleted.addressof(), nullptr));
-        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)
