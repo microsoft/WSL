@@ -496,16 +496,12 @@ class WSLCE2EGlobalTests
     {
         {
             auto result = RunWslc(L"system session run echo OK");
-            result.Dump();
             result.Verify({.Stdout = L"OK\n", .Stderr = L"", .ExitCode = 0});
         }
 
         {
             auto result = RunWslc(L"system session run not-found");
-            result.Dump();
-
             result.Verify({.Stdout = L"", .Stderr = L"Failed to launch command not-found. Errno = 2\r\nError code: E_FAIL\r\n", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.Stderr->find(L"Error code:") != std::wstring::npos);
         }
     }
 
