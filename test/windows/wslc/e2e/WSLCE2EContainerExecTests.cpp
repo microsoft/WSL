@@ -484,7 +484,6 @@ private:
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"

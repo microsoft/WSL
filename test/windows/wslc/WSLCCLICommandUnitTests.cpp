@@ -190,34 +190,27 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
 
-    // RootCommand currently exposes Debug as the only CLI global option.
-    TEST_METHOD(RootCommand_GlobalArguments_OnlyDebug)
+    // RootCommand exposes Session as the sole CLI global option. The override
+    // is the entry point for future globals; the test pins the current shape.
+    TEST_METHOD(RootCommand_GlobalArguments_OnlySession)
     {
         auto root = RootCommand();
         auto globals = root.GetGlobalArguments();
 
         VERIFY_ARE_EQUAL(1u, globals.size());
-        VERIFY_ARE_EQUAL(ArgType::Debug, globals[0].Type());
-        VERIFY_ARE_EQUAL(Kind::Flag, globals[0].Kind());
+        VERIFY_ARE_EQUAL(ArgType::Session, globals[0].Type());
+        VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
     }
 
-    // RootCommand exposes Debug and NoColor as env-eligible. Debug being both
-    // global and env-eligible is the canonical "both" case; NoColor is env-only.
-    TEST_METHOD(RootCommand_EnvArguments_DebugAndNoColor)
+    // RootCommand exposes NoColor as the sole env-eligible global option.
+    TEST_METHOD(RootCommand_EnvArguments_OnlyNoColor)
     {
         auto root = RootCommand();
         auto envArgs = root.GetEnvArguments();
 
-        VERIFY_ARE_EQUAL(2u, envArgs.size());
-
-        std::unordered_set<size_t> types;
-        for (const auto& a : envArgs)
-        {
-            types.insert(static_cast<size_t>(a.Type()));
-        }
-
-        VERIFY_IS_TRUE(types.count(static_cast<size_t>(ArgType::Debug)) == 1);
-        VERIFY_IS_TRUE(types.count(static_cast<size_t>(ArgType::NoColor)) == 1);
+        VERIFY_ARE_EQUAL(1u, envArgs.size());
+        VERIFY_ARE_EQUAL(ArgType::NoColor, envArgs[0].Type());
+        VERIFY_ARE_EQUAL(Kind::Flag, envArgs[0].Kind());
     }
 
     // Every ArgType advertised by GetEnvArguments() must have at least one entry

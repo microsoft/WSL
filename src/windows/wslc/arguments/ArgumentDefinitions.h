@@ -43,7 +43,6 @@ _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,           "cpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ForceArgDescription()) \
-_(Debug,          "debug",               L"D",              Kind::Flag,        Localization::WSLCCLI_DebugArgDescription()) \
 _(Detach,         "detach",              L"d",              Kind::Flag,        Localization::WSLCCLI_DetachArgDescription()) \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSDomainArgDescription())*/ \
@@ -98,7 +97,7 @@ _(Quiet,          "quiet",               L"q",              Kind::Flag,        L
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
-_(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
+_(Session,        "session",             L"s",              Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
 _(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \

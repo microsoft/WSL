@@ -149,14 +149,22 @@ class WSLCCLIParserUnitTests
                     VERIFY_ARE_NOT_EQUAL(publishArgs[0], publishArgs[1]); // Both publish args should be different
                 }
 
-                // Globals-specific spot checks: --debug / -D must have been consumed
-                // by the global parser when present, and the stop position must point
-                // at the first non-global token (or end()).
+                // Globals-specific spot checks: the synthetic global flag
+                // (--quiet / -q) and value (--session, see GetArgumentsForSet)
+                // must have been consumed by the global parser when present,
+                // and the stop position must point at the first non-global
+                // token (or end()).
                 if (testCase.argumentSet == ArgumentSet::Globals)
                 {
-                    if (testCase.commandLine.find(L"--debug") != std::wstring::npos || testCase.commandLine.find(L"-D") != std::wstring::npos)
+                    if (testCase.commandLine.find(L"--quiet") != std::wstring::npos || testCase.commandLine.find(L"-q") != std::wstring::npos)
                     {
-                        VERIFY_IS_TRUE(args.Contains(ArgType::Debug));
+                        VERIFY_IS_TRUE(args.Contains(ArgType::Quiet));
+                    }
+
+                    if (testCase.commandLine.find(L"--session") != std::wstring::npos)
+                    {
+                        VERIFY_IS_TRUE(args.Contains(ArgType::Session));
+                        VERIFY_ARE_EQUAL(std::wstring(L"foo"), args.Get<ArgType::Session>());
                     }
                 }
             }

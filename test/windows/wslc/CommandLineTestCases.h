@@ -28,16 +28,12 @@ COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 // Global options (RootCommand::GetGlobalArguments). These must be accepted by
 // the root-level options-only pass before any subcommand is resolved. A
 // non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.
-COMMAND_LINE_TEST_CASE(L"--debug", L"root", true)
-COMMAND_LINE_TEST_CASE(L"-D", L"root", true)
-COMMAND_LINE_TEST_CASE(L"--debug system session list", L"list", true)
-COMMAND_LINE_TEST_CASE(L"-D container list", L"list", true)
-COMMAND_LINE_TEST_CASE(L"--debug run ubuntu", L"run", true)
-COMMAND_LINE_TEST_CASE(L"--debug image list --verbose", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--session foo image list --verbose", L"list", true)
+COMMAND_LINE_TEST_CASE(L"-s foo image list --verbose", L"list", true)
 // Cases that fail because the unknown/misplaced option falls through to a
 // command that doesn't accept it:
-COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false) // Unknown option falls through to root, which rejects it
-COMMAND_LINE_TEST_CASE(L"system --debug list", L"system", false)    // --debug must come before the subcommand
+COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false)     // Unknown option falls through to root, which rejects it
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --session is global; must come before the subcommand
 
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
@@ -65,13 +61,13 @@ COMMAND_LINE_TEST_CASE(L"list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --no-trunc", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"container prune", L"prune", true)
-COMMAND_LINE_TEST_CASE(L"container prune --session foo", L"prune", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container prune", L"prune", true)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)

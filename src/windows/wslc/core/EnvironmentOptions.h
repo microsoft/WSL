@@ -30,7 +30,6 @@ struct EnvBinding
 
 // Many-to-one allowed: multiple env var names may bind to one ArgType.
 constexpr EnvBinding c_envBindings[] = {
-    {L"WSLC_CLI_DEBUG", ArgType::Debug},
     {L"NO_COLOR", ArgType::NoColor},
 };
 

@@ -42,16 +42,13 @@ class WSLCCLIEnvironmentOptionsUnitTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         m_savedNoColor = CaptureEnv(L"NO_COLOR");
-        m_savedWslcCliDebug = CaptureEnv(L"WSLC_CLI_DEBUG");
         SetEnvironmentVariableW(L"NO_COLOR", nullptr);
-        SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", nullptr);
         return true;
     }
 
     TEST_METHOD_CLEANUP(TestMethodCleanup)
     {
         RestoreEnv(L"NO_COLOR", m_savedNoColor);
-        RestoreEnv(L"WSLC_CLI_DEBUG", m_savedWslcCliDebug);
         return true;
     }
 
@@ -60,7 +57,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
 
         ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+        ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
         VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
@@ -74,7 +71,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
             VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", value));
 
             ArgMap target;
-            ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+            ApplyEnvironmentOptions(target, NoColorDefs());
 
             LogComment(std::wstring(L"NO_COLOR=") + value);
             VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
@@ -89,7 +86,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L"1"));
 
         ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+        ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
         VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
@@ -98,39 +95,9 @@ class WSLCCLIEnvironmentOptionsUnitTests
     TEST_METHOD(ApplyEnvironmentOptions_NoColorAbsent_DoesNotSetFlag)
     {
         ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+        ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
-    }
-
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugPresent_SetsFlag)
-    {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", L"1"));
-
-        ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-        VERIFY_IS_TRUE(target.Contains(ArgType::Debug));
-        VERIFY_IS_TRUE(target.Get<ArgType::Debug>());
-    }
-
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugEmptyValue_SetsFlag)
-    {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", L""));
-
-        ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-        VERIFY_IS_TRUE(target.Contains(ArgType::Debug));
-        VERIFY_IS_TRUE(target.Get<ArgType::Debug>());
-    }
-
-    TEST_METHOD(ApplyEnvironmentOptions_WslcCliDebugAbsent_DoesNotSetFlag)
-    {
-        ArgMap target;
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
-
-        VERIFY_IS_FALSE(target.Contains(ArgType::Debug));
     }
 
     // Env-derived defaults are lowest precedence and must not overwrite.
@@ -141,37 +108,36 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ArgMap target;
         target.Add<ArgType::NoColor>(false);
 
-        ApplyEnvironmentOptions(target, NoColorAndDebugDefs());
+        ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_ARE_EQUAL(1U, target.Count(ArgType::NoColor));
         VERIFY_IS_FALSE(target.Get<ArgType::NoColor>());
     }
 
     // Bindings outside definedArgs are ignored even if the env var is set.
+    // Verbose isn't bound to any env var and isn't NoColor, so it stays a
+    // valid "declared but unrelated" stand-in: declaring it alone must not
+    // cause NO_COLOR to leak into target.
     TEST_METHOD(ApplyEnvironmentOptions_UndeclaredArg_IsIgnored)
     {
         VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"WSLC_CLI_DEBUG", L"1"));
 
         std::vector<Argument> defs;
-        defs.push_back(Argument::Create(ArgType::Debug));
+        defs.push_back(Argument::Create(ArgType::Verbose));
 
         ArgMap target;
         ApplyEnvironmentOptions(target, defs);
 
-        VERIFY_IS_TRUE(target.Contains(ArgType::Debug));
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
 private:
     std::optional<std::wstring> m_savedNoColor;
-    std::optional<std::wstring> m_savedWslcCliDebug;
 
-    static std::vector<Argument> NoColorAndDebugDefs()
+    static std::vector<Argument> NoColorDefs()
     {
         std::vector<Argument> defs;
         defs.push_back(Argument::Create(ArgType::NoColor));
-        defs.push_back(Argument::Create(ArgType::Debug));
         return defs;
     }
 

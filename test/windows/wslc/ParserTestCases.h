@@ -16,7 +16,6 @@ Abstract:
 
 #include "Argument.h"
 #include "ArgumentTypes.h"
-#include "RootCommand.h"
 #include <string>
 #include <vector>
 
@@ -75,10 +74,16 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
         };
 
     case ArgumentSet::Globals:
-        // Pulled directly from RootCommand so the test moves in lockstep with
-        // the production definition. Mirrors what Main.cpp passes as cliGlobals
-        // to the first (optionsOnly) parse pass.
-        return wsl::windows::wslc::RootCommand().GetGlobalArguments();
+        // Synthetic stand-in for what Main.cpp passes as cliGlobals to the
+        // first (optionsOnly) parse pass. Decoupled from RootCommand so the
+        // parser tests stay stable as the production global set evolves.
+        // Quiet (Flag with alias) and Session (Value, no alias) are convenient
+        // existing ArgTypes that together exercise both kinds in the global
+        // parsing path; the cases below treat them as "the global options".
+        return {
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::Session),
+        };
 
     default:
         return {};
@@ -165,16 +170,28 @@ WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 cont2 --invalidarg)") \
 /* Root-level globals: strict optionsOnly parsing. Stops cleanly at the first \
  * non-option token; recognized globals before that are consumed. Production \
  * uses an additional stopOnUnknown bool that is covered separately by       \
- * OptionsOnly_StopOnUnknown_LeavesTokenForCaller.                           */ \
+ * OptionsOnly_StopOnUnknown_LeavesTokenForCaller. The Globals set is a      \
+ * synthetic mix of Quiet (Flag) and Session (Value) — see GetArgumentsForSet \
+ * — so these cases test the parser, not RootCommand's current global set.   */ \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug image1)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D image1)") \
+/* Flag-kind global: long, short, and stops at positional/subcommand.        */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q image1)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc image1)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug system list)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet system list)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc system --verbose)") \
+/* Value-kind global: separated and adjoined value forms, then positional.   */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session=foo)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session=foo image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo system list)") \
+/* Mixed Flag + Value globals before the first positional.                   */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --session foo image1)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo -q image1)") \
 /* Docker-style idempotency: duplicate global flags collapse to a single entry. */ \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --debug --debug)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -D -D system list)")
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --quiet)") \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)")
 // clang-format on

@@ -74,20 +74,19 @@ std::vector<Argument> RootCommand::GetArguments() const
 }
 
 // Global options apply to the overall invocation and may appear before any
-// subcommand (e.g. `wslc --debug image list`). They are defined here using the
-// same Argument::Create factory backed by ArgumentDefinitions.h so help text,
-// aliases, validation, and parsing are identical to subcommand arguments.
+// subcommand (e.g. `wslc --session foo image list`). Define them here using
+// the Argument::Create factory backed by ArgumentDefinitions.h so help text,
+// aliases, validation, and parsing match subcommand arguments.
 std::vector<Argument> RootCommand::GetGlobalArguments() const
 {
     return {
-        Argument::Create(ArgType::Debug),
+        Argument::Create(ArgType::Session),
     };
 }
 
 std::vector<Argument> RootCommand::GetEnvArguments() const
 {
     return {
-        Argument::Create(ArgType::Debug),
         Argument::Create(ArgType::NoColor),
     };
 }

@@ -31,7 +31,6 @@ std::vector<Argument> ImageRemoveCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true, NO_LIMIT),
         Argument::Create(ArgType::ImageForce),
         Argument::Create(ArgType::NoPrune),
-        Argument::Create(ArgType::Session),
     };
 }
 

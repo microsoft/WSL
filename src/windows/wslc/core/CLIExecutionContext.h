@@ -33,7 +33,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     argument::ArgMap Args;
 
     // Global options parsed from tokens that appear before any subcommand
-    // (e.g. `wslc --debug image list`). Populated early in CoreMain.
+    // (e.g. `wslc <global-option> image list`). Populated early in CoreMain.
     argument::ArgMap GlobalArgs;
 
     // Map of data stored in the context.

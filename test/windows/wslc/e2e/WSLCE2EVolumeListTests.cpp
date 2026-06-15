@@ -127,7 +127,6 @@ private:
         options << L"The following options are available:\r\n" //
                 << L"  --format    Output formatting (json or table) (Default: table)\r\n"
                 << L"  -q,--quiet  Outputs the volume names only\r\n"         //
-                << L"  --session   Specify the session to use\r\n"            //
                 << L"  -?,--help   Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
