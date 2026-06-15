@@ -550,19 +550,6 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
         THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());
         auto address = std::format("{}:{}", inspect.NetworkSettings.Networks.begin()->second.IPAddress, port);
 
-        // Wait until the registry is serving by probing its own loopback from inside the container.
-        // (The bridge IP is not reachable from the test host, and the cert is untrusted)
-        const auto probeCommand =
-            std::format("wget -S -O /dev/null --no-check-certificate https://127.0.0.1:{}/v2/ 2>&1 | grep -q 'HTTP/'", port);
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                wsl::windows::common::WSLCProcessLauncher probe("/bin/sh", {"/bin/sh", "-c", probeCommand});
-                auto process = probe.Launch(container.Get());
-                THROW_HR_IF(E_FAIL, process.Wait(5000) != 0);
-            },
-            std::chrono::milliseconds(500),
-            std::chrono::seconds(30));
-
         return {std::move(container), std::move(address)};
     }
     else
