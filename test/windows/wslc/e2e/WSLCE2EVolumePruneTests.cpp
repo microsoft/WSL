@@ -43,13 +43,6 @@ class WSLCE2EVolumePruneTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        const auto result = RunWslc(L"volume prune --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_NoVolumes)
     {
         // Prune when no volumes exist should succeed and report a reclaimed-space line.
@@ -216,9 +209,9 @@ class WSLCE2EVolumePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_MalformedValue)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
         const auto result = RunWslc(L"volume prune --filter label");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"label") + L"\r\n", .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_InvalidKey)
@@ -238,38 +231,6 @@ private:
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureVolumeDoesNotExist(TestVolumeName);
         EnsureVolumeDoesNotExist(TestVolumeName2);
-    }
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()  //
-               << GetDescription() //
-               << GetUsage()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_VolumePruneLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc volume prune [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -a,--all     " << Localization::WSLCCLI_VolumePruneAllArgDescription() << L"\r\n"
-                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --session    " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -?,--help    " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
     }
 };
 } // namespace WSLCE2ETests

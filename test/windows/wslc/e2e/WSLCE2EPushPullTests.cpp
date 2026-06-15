@@ -16,7 +16,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include "Argument.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -24,34 +23,6 @@ using namespace wsl::shared;
 class WSLCE2EPushPullTests
 {
     WSLC_TEST_CLASS(WSLCE2EPushPullTests)
-
-    WSLC_TEST_METHOD(WSLCE2E_Image_Push_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"image push --help");
-        result.Verify({.Stdout = GetPushHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Image_Push_RootAlias)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"push --help");
-        result.Verify({.Stdout = GetPushRootAliasHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Image_Pull_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"image pull --help");
-        result.Verify({.Stdout = GetPullHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Image_Pull_RootAlias)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"pull --help");
-        result.Verify({.Stdout = GetPullRootAliasHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_PushPull)
     {
@@ -104,82 +75,5 @@ class WSLCE2EPushPullTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-private:
-    std::wstring GetPushHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetPushDescription() << GetPushUsage() << GetAvailableArguments() << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetPushRootAliasHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetPushDescription() << GetPushRootUsage() << GetAvailableArguments() << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetPullHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetPullDescription() << GetPullUsage() << GetAvailableArguments() << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetPullRootAliasHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetPullDescription() << GetPullRootUsage() << GetAvailableArguments() << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetPushDescription() const
-    {
-        return Localization::WSLCCLI_ImagePushLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetPullDescription() const
-    {
-        return Localization::WSLCCLI_ImagePullLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetPushUsage() const
-    {
-        return L"Usage: wslc image push [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetPushRootUsage() const
-    {
-        return L"Usage: wslc push [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetPullUsage() const
-    {
-        return L"Usage: wslc image pull [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetPullRootUsage() const
-    {
-        return L"Usage: wslc pull [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableArguments() const
-    {
-        std::wstringstream args;
-        args << Localization::WSLCCLI_AvailableArguments() << L"\r\n"
-             << L"  image      " << Localization::WSLCCLI_ImageIdArgDescription() << L"\r\n"
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

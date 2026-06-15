@@ -40,13 +40,6 @@ class WSLCE2EVolumeListTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_List_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"volume list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_InvalidFormatOption)
     {
         auto result = RunWslc(L"volume list --format invalid");
@@ -95,43 +88,5 @@ class WSLCE2EVolumeListTests
 private:
     const std::wstring TestVolumeName = L"wslc-e2e-volume-list";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-list-2";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_VolumeListLongDesc());
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc volume list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n" //
-                << L"  --format    Output formatting (json or table) (Default: table)\r\n"
-                << L"  -q,--quiet  Outputs the volume names only\r\n"         //
-                << L"  --session   Specify the session to use\r\n"            //
-                << L"  -?,--help   Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

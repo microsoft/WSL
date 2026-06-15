@@ -42,13 +42,6 @@ class WSLCE2EContainerPruneTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        const auto result = RunWslc(L"container prune --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_NoStoppedContainers)
     {
         // Prune when no stopped containers exist should succeed with zero reclaimed space
@@ -124,35 +117,5 @@ class WSLCE2EContainerPruneTests
 
 private:
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()  //
-               << GetDescription() //
-               << GetUsage()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerPruneLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container prune [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

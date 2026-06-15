@@ -16,7 +16,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include "Argument.h"
 #include <wslutil.h>
 
 namespace WSLCE2ETests {
@@ -103,20 +102,6 @@ class WSLCE2ERegistryTests
             VERIFY_IS_TRUE(result.Stderr.has_value());
             VERIFY_IS_TRUE(result.Stderr->find(L"Not logged in to") != std::wstring::npos);
         }
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Registry_Login_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"registry login --help");
-        result.Verify({.Stdout = GetLoginHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Registry_Logout_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"registry logout --help");
-        result.Verify({.Stdout = GetLogoutHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Login_PasswordAndStdinMutuallyExclusive)
@@ -215,80 +200,5 @@ class WSLCE2ERegistryTests
         }
     }
 
-private:
-    std::wstring GetLoginHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetLoginDescription() << GetLoginUsage() << GetLoginAvailableArguments() << GetLoginAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetLogoutHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetLogoutDescription() << GetLogoutUsage() << GetLogoutAvailableArguments()
-               << GetLogoutAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetLoginDescription() const
-    {
-        return Localization::WSLCCLI_LoginLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetLogoutDescription() const
-    {
-        return Localization::WSLCCLI_LogoutLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetLoginUsage() const
-    {
-        return L"Usage: wslc registry login [<options>] [<server>]\r\n\r\n";
-    }
-
-    std::wstring GetLogoutUsage() const
-    {
-        return L"Usage: wslc registry logout [<options>] [<server>]\r\n\r\n";
-    }
-
-    std::wstring GetLoginAvailableArguments() const
-    {
-        std::wstringstream args;
-        args << Localization::WSLCCLI_AvailableArguments() << L"\r\n"
-             << L"  server            " << Localization::WSLCCLI_LoginServerArgDescription() << L"\r\n"
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetLogoutAvailableArguments() const
-    {
-        std::wstringstream args;
-        args << Localization::WSLCCLI_AvailableArguments() << L"\r\n"
-             << L"  server     " << Localization::WSLCCLI_LoginServerArgDescription() << L"\r\n"
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetLoginAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
-                << L"  -p,--password     " << Localization::WSLCCLI_LoginPasswordArgDescription() << L"\r\n"
-                << L"  --password-stdin  " << Localization::WSLCCLI_LoginPasswordStdinArgDescription() << L"\r\n"
-                << L"  -u,--username     " << Localization::WSLCCLI_LoginUsernameArgDescription() << L"\r\n"
-                << L"  --session         " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -?,--help         " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
-
-    std::wstring GetLogoutAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

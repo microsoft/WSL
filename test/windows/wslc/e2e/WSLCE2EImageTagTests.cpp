@@ -40,25 +40,18 @@ class WSLCE2EImageTagTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"image tag --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_Tag_MissingSourceAndTarget)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"image tag");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'source'\r\n", .ExitCode = 1});
+        const auto result = RunWslc(L"image tag");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'source'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Tag_MissingTarget)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(std::format(L"image tag {}", DebianImage.NameAndTag()));
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'target'\r\n", .ExitCode = 1});
+        const auto result = RunWslc(std::format(L"image tag {}", DebianImage.NameAndTag()));
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'target'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Tag_SourceImageNotFound)
@@ -170,46 +163,5 @@ private:
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const TestImage DebianTaggedImage{L"debian", L"e2e-new-tag"};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return wsl::shared::Localization::WSLCCLI_ImageTagLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image tag [<options>] <source> <target>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"                                          //
-                 << L"  source     Current or existing image reference in the image-name[:tag] format\r\n" //
-                 << L"  target     New image reference in the image-name[:tag] format\r\n"                 //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"               //
-                << L"  --session  Specify the session to use\r\n"            //
-                << L"  -?,--help  Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

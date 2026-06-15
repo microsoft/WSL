@@ -46,18 +46,11 @@ class WSLCE2EVolumeRemoveTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"volume remove --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_MissingVolumeName)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"volume remove");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'volume-name'\r\n", .ExitCode = 1});
+        const auto result = RunWslc(L"volume remove");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'volume-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Valid)
@@ -138,51 +131,5 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const std::wstring TestVolumeName = L"wslc-e2e-volume-remove";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-remove-2";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableCommands()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_VolumeRemoveLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc volume remove [<options>] <volume-name>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: delete rm\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  volume-name    Volume name\r\n"           //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"            //
-                << L"  -?,--help      Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

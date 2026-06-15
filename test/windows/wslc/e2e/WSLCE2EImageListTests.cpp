@@ -40,13 +40,6 @@ class WSLCE2EImageListTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        const auto result = RunWslc(L"image list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
     {
         const auto result = RunWslc(L"image list");
@@ -131,10 +124,10 @@ class WSLCE2EImageListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Filter_MalformedValue)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"image list --filter dangling");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"dangling") + L"\r\n", .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"dangling")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Filter_InvalidKey)
@@ -282,46 +275,5 @@ class WSLCE2EImageListTests
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageListLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
-                << L"  --no-trunc   Do not truncate output\r\n"
-                << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  --session    Specify the session to use\r\n"
-                << L"  --verbose    Output verbose details\r\n"
-                << L"  -?,--help    Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

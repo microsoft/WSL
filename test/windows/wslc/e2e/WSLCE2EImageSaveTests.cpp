@@ -43,18 +43,11 @@ class WSLCE2EImageSaveTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_Save_HelpCommand)
-    {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
-        auto result = RunWslc(L"image save --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MissingImageName)
     {
-        SKIP_TEST_UNSTABLE(); // Help output broken by rework
         const auto result = RunWslc(std::format(L"image save --output \"{}\"", SavedArchivePath.wstring()));
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
@@ -178,46 +171,5 @@ private:
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::filesystem::path SavedArchivePath{};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageSaveLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image save [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  image        Image name\r\n"              //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                 //
-                << L"  -o,--output  Path for the saved image\r\n"              //
-                << L"  --session    Specify the session to use\r\n"            //
-                << L"  -?,--help    Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

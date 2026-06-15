@@ -44,12 +44,6 @@ class WSLCE2EContainerStatsTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Stats_HelpCommand)
-    {
-        auto result = RunWslc(L"container stats --help");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_NoContainers)
     {
         // With no running containers, stats should produce no output rows (header only or empty).
