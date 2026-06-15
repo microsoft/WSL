@@ -33,6 +33,7 @@ class WSLCE2EContainerRemoveTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -41,6 +42,7 @@ class WSLCE2EContainerRemoveTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
         return true;
     }
 
@@ -156,9 +158,61 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName2);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_WithVolumes)
+    {
+        // Create a named volume and a container that uses it
+        RunWslc(std::format(L"volume create --name {}", WslcVolumeName)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            EnsureVolumeDoesNotExist(WslcVolumeName);
+        });
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} -v {}:/data {}", WslcContainerName, WslcVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        VerifyContainerIsListed(containerId, L"created");
+        VerifyVolumeIsListed(WslcVolumeName);
+
+        // Remove with --volumes should remove the container and its volumes
+        result = RunWslc(std::format(L"container remove --volumes {}", containerId));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(containerId);
+        VerifyVolumeIsNotListed(WslcVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_WithoutVolumesFlag_KeepsVolumes)
+    {
+        // Create a named volume and a container that uses it
+        RunWslc(std::format(L"volume create --name {}", WslcVolumeName)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            EnsureVolumeDoesNotExist(WslcVolumeName);
+        });
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} -v {}:/data {}", WslcContainerName, WslcVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Remove without --volumes should keep the volume
+        result = RunWslc(std::format(L"container remove {}", containerId));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(containerId);
+        VerifyVolumeIsListed(WslcVolumeName);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
+    const std::wstring WslcVolumeName = L"wslc-test-rm-volume";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
@@ -200,6 +254,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
                 << L"  -f,--force      Delete containers even if they are running\r\n"
+                << L"  -v,--volumes    " << Localization::WSLCCLI_RemoveVolumesArgDescription() << L"\r\n"
                 << L"  --session       Specify the session to use\r\n"
                 << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
