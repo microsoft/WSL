@@ -771,6 +771,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task
