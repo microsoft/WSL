@@ -2456,8 +2456,8 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Usuwa wszystkie zatrzymane kontenery.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Łączna ilość odzyskanego miejsca: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Łączna ilość odzyskanego miejsca: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Usuń kontenery.</value>
@@ -2549,8 +2549,8 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Łączna ilość odzyskanego miejsca: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Łączna ilość odzyskanego miejsca: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Bez tagu: {}</value>

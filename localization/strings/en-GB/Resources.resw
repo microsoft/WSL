@@ -2456,8 +2456,8 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Removes all stopped containers.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Remove containers.</value>
@@ -2549,8 +2549,8 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Untagged: {}</value>
