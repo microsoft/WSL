@@ -162,20 +162,50 @@ struct CaptureReporter
     }
 };
 
-// Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
+// Helper: captures all rows emitted by a TableOutput by routing the table through a
+// CaptureReporter wired to a temp pipe. lines() drains the pipe (one-shot) and splits
+// on '\n'; call exactly once per test after table.Complete().
 template <size_t N>
 struct TableOutputCapture
 {
-    std::vector<std::wstring> lines;
+    CaptureReporter capture;
     wsl::windows::wslc::TableOutput<N> table;
 
     // Forwards constructor arguments straight to TableOutput.
     template <typename... Args>
-    explicit TableOutputCapture(Args&&... args) : table(std::forward<Args>(args)...)
+    explicit TableOutputCapture(Args&&... args) : table(capture.reporter, std::forward<Args>(args)...)
     {
-        table.SetOutputFunction([this](const std::wstring& line) { lines.push_back(line); });
         // Pin the console width so shrinking tests are deterministic.
         table.SetConsoleWidthOverride(120);
     }
+
+    // One-shot pipe drain. Subsequent calls return the cached vector.
+    const std::vector<std::wstring>& lines()
+    {
+        if (!m_loaded)
+        {
+            const std::wstring all = capture.captured();
+            size_t start = 0;
+            for (size_t i = 0; i < all.size(); ++i)
+            {
+                if (all[i] == L'\n')
+                {
+                    m_lines.emplace_back(all.substr(start, i - start));
+                    start = i + 1;
+                }
+            }
+            // Trailing characters after the last '\n' (defensive — table rows always end in \n).
+            if (start < all.size())
+            {
+                m_lines.emplace_back(all.substr(start));
+            }
+            m_loaded = true;
+        }
+        return m_lines;
+    }
+
+private:
+    std::vector<std::wstring> m_lines;
+    bool m_loaded = false;
 };
 } // namespace WSLCTestHelpers

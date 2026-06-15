@@ -98,7 +98,7 @@ try
     {
         // A command exception means there was an input failure. Display the help
         // along with the error message to help the user correct their input.
-        command->OutputHelp(&ce);
+        command->OutputHelp(context.Reporter, &ce);
         return 1;
     }
     // Any other type of error unrelated to the command parsing.

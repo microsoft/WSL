@@ -90,6 +90,6 @@ void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
         return;
     }
 
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

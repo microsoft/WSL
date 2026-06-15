@@ -2188,6 +2188,22 @@ Usage:
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>The following arguments are available:</value>
   </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Commands:</value>
+    <comment>Section heading in help output listing available commands or subcommands. Translate as the natural noun form in your locale (e.g. "Commands:" or equivalent heading label).</comment>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Options:</value>
+    <comment>Section heading in help output listing available options/flags. Translate as the natural noun form in your locale.</comment>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliases:</value>
+    <comment>Section heading in help output listing command aliases. Translate as the natural noun form in your locale.</comment>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Arguments:</value>
+    <comment>Section heading in help output listing positional arguments. Translate as the natural noun form in your locale.</comment>
+  </data>
   <data name="WSLCCLI_OperationCancelled" xml:space="preserve">
     <value>Operation cancelled.</value>
   </data>

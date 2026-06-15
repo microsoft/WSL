@@ -148,13 +148,12 @@ void ListImages(CLIExecutionContext& context)
 
         // Create table — only IMAGE ID uses fixed width; other columns auto-size.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
-        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
-                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"IMAGE ID", {12, 12, false}},
-                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
-                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        auto table =
+            trunc
+                ? wsl::windows::wslc::TableOutput<5>(
+                      context.Reporter,
+                      {{{L"REPOSITORY", {}}, {L"TAG", {}}, {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12}}, {L"CREATED", {}}, {L"SIZE", {}}}})
+                : wsl::windows::wslc::TableOutput<5>(context.Reporter, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
         {
