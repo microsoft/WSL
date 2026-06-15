@@ -2621,9 +2621,20 @@ try
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
+
+        // The VM exited on its own, so it recorded the cause.
+        if (m_virtualMachine)
+        {
+            wil::unique_cotaskmem_string details;
+            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
+            m_terminationDetails = details ? details.get() : L"";
+        }
     }
     else
     {
+        // The VM is still alive, so this is a graceful shutdown initiated by us.
+        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+
         if (m_virtualMachine)
         {
             m_virtualMachine->OnSessionTerminated();
@@ -2662,7 +2673,8 @@ try
         m_swapVhdPath.clear();
     }
 
-    m_terminated = true;
+    m_sessionTerminatedEvent.SetEvent();
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -2960,9 +2972,42 @@ HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
     RETURN_HR_IF_NULL(E_POINTER, State);
 
-    *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
+    *State = m_sessionTerminatedEvent.is_signaled() ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }
+
+HRESULT WSLCSession::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    RETURN_HR_IF(E_POINTER, Event == nullptr);
+
+    *Event = nullptr;
+
+    // Duplicate the "terminated" event. The caller owns the returned handle, which stays valid even after the session is released.
+    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get(), SYNCHRONIZE);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once before m_sessionTerminatedEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 void WSLCSession::RecoverExistingContainers()
 {

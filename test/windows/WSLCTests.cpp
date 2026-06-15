@@ -2876,46 +2876,26 @@ class WSLCTests
         }
     }
 
-    WSLC_TEST_METHOD(TerminationCallback)
+    WSLC_TEST_METHOD(TerminationEvent)
     {
-        class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
-        {
+        auto session = CreateSession(GetDefaultSessionSettings(L"termination-event-test"));
 
-        public:
-            CallbackInstance(std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)>&& callback) :
-                m_callback(std::move(callback))
-            {
-            }
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_IS_NOT_NULL(terminationEvent.get());
 
-            HRESULT OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details) override
-            {
-                m_callback(Reason, Details);
-                return S_OK;
-            }
+        // The reason is unavailable until the session has terminated.
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_ARE_EQUAL(session->GetTerminationReason(&reason, &details), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
-        private:
-            std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)> m_callback;
-        };
+        // Terminating the session should signal the event and record a graceful shutdown reason.
+        VERIFY_SUCCEEDED(session->Terminate());
 
-        std::promise<std::pair<WSLCVirtualMachineTerminationReason, std::wstring>> promise;
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
 
-        CallbackInstance callback{[&](WSLCVirtualMachineTerminationReason reason, LPCWSTR details) {
-            promise.set_value(std::make_pair(reason, details));
-        }};
-
-        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
-        sessionSettings.TerminationCallback = &callback;
-
-        auto session = CreateSession(sessionSettings);
-
-        session.reset();
-        auto future = promise.get_future();
-        auto result = future.wait_for(std::chrono::seconds(30));
-        VERIFY_ARE_EQUAL(result, std::future_status::ready);
-        auto [reason, details] = future.get();
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
-        VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
     WSLC_TEST_METHOD(CrashDumpCallback)
