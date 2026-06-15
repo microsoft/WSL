@@ -73,6 +73,69 @@ inline void UnregisterWait(HANDLE waitHandle) noexcept
 
 using unique_registered_wait = wil::unique_any_handle_null<decltype(&UnregisterWait), &UnregisterWait>;
 
+#define TTY_ALT_NUMPAD_VK_MENU (0x12)
+#define TTY_ESCAPE_CHARACTER (L'\x1b')
+#define TTY_INPUT_EVENT_BUFFER_SIZE (16)
+#define TTY_UTF8_TRANSLATION_BUFFER_SIZE (4 * TTY_INPUT_EVENT_BUFFER_SIZE)
+
+BOOL IsActionableKey(_In_ PKEY_EVENT_RECORD KeyEvent)
+{
+    //
+    // This is a bit complicated to discern.
+    //
+    // 1. Our first check is that we only want structures that
+    //    represent at least one key press. If we have 0, then we don't
+    //    need to bother. If we have >1, we'll send the key through
+    //    that many times into the pipe.
+    // 2. Our second check is where it gets confusing.
+    //    a. Characters that are non-null get an automatic pass. Copy
+    //       them through to the pipe.
+    //    b. Null characters need further scrutiny. We generally do not
+    //       pass nulls through EXCEPT if they're sourced from the
+    //       virtual terminal engine (or another application living
+    //       above our layer). If they're sourced by a non-keyboard
+    //       source, they'll have no scan code (since they didn't come
+    //       from a keyboard). But that rule has an exception too:
+    //       "Enhanced keys" from above the standard range of scan
+    //       codes will return 0 also with a special flag set that says
+    //       they're an enhanced key. That means the desired behavior
+    //       is:
+    //           Scan Code = 0, ENHANCED_KEY = 0
+    //               -> This came from the VT engine or another app
+    //                  above our layer.
+    //           Scan Code = 0, ENHANCED_KEY = 1
+    //               -> This came from the keyboard, but is a special
+    //                  key like 'Volume Up' that wasn't generally a
+    //                  part of historic (pre-1990s) keyboards.
+    //           Scan Code = <anything else>
+    //               -> This came from a keyboard directly.
+    //
+
+    if ((KeyEvent->wRepeatCount == 0) || ((KeyEvent->uChar.UnicodeChar == UNICODE_NULL) &&
+                                          ((KeyEvent->wVirtualScanCode != 0) || (WI_IsFlagSet(KeyEvent->dwControlKeyState, ENHANCED_KEY)))))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter)
+{
+    BOOL IsNextCharacterValid = FALSE;
+    if (InputRecord->EventType == KEY_EVENT)
+    {
+        const auto KeyEvent = &InputRecord->Event.KeyEvent;
+        if ((IsActionableKey(KeyEvent) != FALSE) && ((KeyEvent->bKeyDown != FALSE) || (KeyEvent->wVirtualKeyCode == TTY_ALT_NUMPAD_VK_MENU)))
+        {
+            *NextCharacter = KeyEvent->uChar.UnicodeChar;
+            IsNextCharacterValid = TRUE;
+        }
+    }
+
+    return IsNextCharacterValid;
+}
+
 } // namespace
 
 // HandleWrapper
@@ -771,6 +834,320 @@ void ReadSocketMessageHandle::Collect()
 HANDLE ReadSocketMessageHandle::GetHandle() const
 {
     return Event.get();
+}
+
+// ReadConsoleHandle
+
+wsl::windows::common::io::ReadConsoleHandle::ReadConsoleHandle(
+    HandleWrapper&& Console,
+    std::function<void(const gsl::span<char>& Buffer)>&& OnRead,
+    std::function<void()>&& UpdateTerminalSize,
+    std::vector<char> DetachSequence,
+    std::function<void()>&& OnDetach) :
+    Console(std::move(Console)),
+    OnRead(std::move(OnRead)),
+    UpdateTerminalSize(std::move(UpdateTerminalSize)),
+    DetachSequence(std::move(DetachSequence)),
+    OnDetach(std::move(OnDetach))
+{
+}
+
+void wsl::windows::common::io::ReadConsoleHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    //
+    // Use the console handle as the signal event.
+    // N.B. This behavior is documented here: https://learn.microsoft.com/en-us/windows/console/readconsoleinput
+    //
+
+    State = IOHandleStatus::Pending;
+}
+
+HANDLE wsl::windows::common::io::ReadConsoleHandle::GetHandle() const
+{
+    return Console.Get();
+}
+
+void wsl::windows::common::io::ReadConsoleHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    //
+    // Re-arm by default; a detected detach sequence overrides this to Completed below.
+    //
+
+    State = IOHandleStatus::Standby;
+
+    //
+    // N.B. ReadConsoleInputEx has no associated import library.
+    //
+
+    static LxssDynamicFunction<decltype(ReadConsoleInputExW)> readConsoleInput(L"Kernel32.dll", "ReadConsoleInputExW");
+
+    INPUT_RECORD InputRecordBuffer[TTY_INPUT_EVENT_BUFFER_SIZE];
+    INPUT_RECORD* InputRecordPeek = &(InputRecordBuffer[1]);
+    KEY_EVENT_RECORD* KeyEvent;
+    DWORD RecordsRead;
+
+    //
+    // The console handle stays signaled while input is available, so drain all currently available
+    // input here and return to Standby once none remains (the handle is waited on again by the IO loop).
+    //
+
+    for (;;)
+    {
+        // Detach if the escape sequence was detected.
+        // N.B. This needs to be done at the beginning of the loop so the escape sequence is also delivered.
+        if (!CurrentSequence.empty() && std::ranges::equal(CurrentSequence, DetachSequence))
+        {
+            OnDetach();
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        //
+        // Because some input events generated by the console are encoded with
+        // more than one input event, we have to be smart about reading the
+        // events.
+        //
+        // First, we peek at the next input event.
+        // If it's an escape (wch == L'\x1b') event, then the characters that
+        //      follow are part of an input sequence. We can't know for sure
+        //      how long that sequence is, but we can assume it's all sent to
+        //      the input queue at once, and it's less that 16 events.
+        //      Furthermore, we can assume that if there's an Escape in those
+        //      16 events, that the escape marks the start of a new sequence.
+        //      So, we'll peek at another 15 events looking for escapes.
+        //      If we see an escape, then we'll read one less than that,
+        //      such that the escape remains the next event in the input.
+        //      From those read events, we'll aggregate chars into a single
+        //      string to send to the subsystem.
+        // If it's not an escape, send the event through one at a time.
+        //
+
+        //
+        // Read one input event without blocking. If none is available, all input has been drained.
+        //
+
+        THROW_IF_WIN32_BOOL_FALSE(readConsoleInput(Console.Get(), InputRecordBuffer, 1, &RecordsRead, CONSOLE_READ_NOWAIT));
+        if (RecordsRead == 0)
+        {
+            return;
+        }
+
+        //
+        // Don't read additional records if the first entry is a window size
+        // event, or a repeated character. Handle those events on their own.
+        //
+
+        DWORD RecordsPeeked = 0;
+        if ((InputRecordBuffer[0].EventType != WINDOW_BUFFER_SIZE_EVENT) &&
+            ((InputRecordBuffer[0].EventType != KEY_EVENT) || (InputRecordBuffer[0].Event.KeyEvent.wRepeatCount < 2)))
+        {
+            //
+            // Read additional input records into the buffer if available.
+            //
+
+            THROW_IF_WIN32_BOOL_FALSE(PeekConsoleInputW(Console.Get(), InputRecordPeek, (RTL_NUMBER_OF(InputRecordBuffer) - 1), &RecordsPeeked));
+        }
+
+        //
+        // Iterate over peeked records [1, RecordsPeeked].
+        //
+
+        DWORD AdditionalRecordsToRead = 0;
+        WCHAR NextCharacter;
+        for (DWORD RecordIndex = 1; RecordIndex <= RecordsPeeked; RecordIndex++)
+        {
+            if (GetNextCharacter(&InputRecordBuffer[RecordIndex], &NextCharacter) != FALSE)
+            {
+                KeyEvent = &InputRecordBuffer[RecordIndex].Event.KeyEvent;
+                if (NextCharacter == TTY_ESCAPE_CHARACTER)
+                {
+                    //
+                    // CurrentRecord is an escape event. We will start here
+                    // on the next input loop.
+                    //
+
+                    break;
+                }
+                else if (KeyEvent->wRepeatCount > 1)
+                {
+                    //
+                    // Repeated keys are handled on their own. Start with this
+                    // key on the next input loop.
+                    //
+
+                    break;
+                }
+                else if (IS_HIGH_SURROGATE(NextCharacter) && (RecordIndex >= (RecordsPeeked - 1)))
+                {
+                    //
+                    // If there is not enough room for the second character of
+                    // a surrogate pair, start with this character on the next
+                    // input loop.
+                    //
+                    // N.B. The test is for at least two remaining records
+                    //      because typically a surrogate pair will be entered
+                    //      via copy/paste, which will appear as an input
+                    //      record with alt-down, alt-up and character. So to
+                    //      include the next character of the surrogate pair it
+                    //      is likely that the alt-up record will need to be
+                    //      read first.
+                    //
+
+                    break;
+                }
+            }
+            else if (InputRecordBuffer[RecordIndex].EventType == WINDOW_BUFFER_SIZE_EVENT)
+            {
+                //
+                // A window size event is handled on its own.
+                //
+
+                break;
+            }
+
+            //
+            // Process the additional input record.
+            //
+
+            AdditionalRecordsToRead += 1;
+        }
+
+        if (AdditionalRecordsToRead > 0)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(readConsoleInput(Console.Get(), InputRecordPeek, AdditionalRecordsToRead, &RecordsRead, CONSOLE_READ_NOWAIT));
+
+            if (RecordsRead == 0)
+            {
+                //
+                // This would be an unexpected case. We've already peeked to see
+                // that there are AdditionalRecordsToRead # of records in the
+                // input that need reading, yet we didn't get them when we read.
+                // In this case, stop draining and wait to be signaled again.
+                //
+
+                return;
+            }
+
+            //
+            // We already had one input record in the buffer before reading
+            // additional, So account for that one too
+            //
+
+            RecordsRead += 1;
+        }
+
+        //
+        // Process each input event. Keydowns will get aggregated into
+        // Utf8String before getting injected into the subsystem.
+        //
+
+        WCHAR Utf16String[TTY_INPUT_EVENT_BUFFER_SIZE];
+        ULONG Utf16StringSize = 0;
+        for (DWORD RecordIndex = 0; RecordIndex < RecordsRead; RecordIndex++)
+        {
+            INPUT_RECORD* CurrentInputRecord = &(InputRecordBuffer[RecordIndex]);
+            switch (CurrentInputRecord->EventType)
+            {
+            case KEY_EVENT:
+
+                KeyEvent = &CurrentInputRecord->Event.KeyEvent;
+
+                if (KeyEvent->bKeyDown && IsActionableKey(KeyEvent) && !DetachSequence.empty())
+                {
+                    if (CurrentSequence.size() >= DetachSequence.size())
+                    {
+                        CurrentSequence.pop_front();
+                    }
+
+                    CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.AsciiChar);
+                }
+
+                //
+                // Filter out key up events unless they are from an <Alt> key.
+                // Key up with an <Alt> key could contain a Unicode character
+                // pasted from the clipboard and converted to an <Alt>+<Numpad> sequence.
+                //
+
+                if ((KeyEvent->bKeyDown == FALSE) && (KeyEvent->wVirtualKeyCode != TTY_ALT_NUMPAD_VK_MENU))
+                {
+                    break;
+                }
+
+                //
+                // Filter out key presses that are not actionable, such as just
+                // pressing <Ctrl>, <Alt>, <Shift> etc. These key presses return
+                // the character of null but will have a valid scan code off the
+                // keyboard. Certain other key sequences such as Ctrl+A,
+                // Ctrl+<space>, and Ctrl+@ will also return the character null
+                // but have no scan code.
+                // <Alt> + <NumPad> sequences will show an <Alt> but will have
+                // a scancode and character specified, so they should be actionable.
+                //
+
+                if (IsActionableKey(KeyEvent) == FALSE)
+                {
+                    break;
+                }
+
+                Utf16String[Utf16StringSize] = KeyEvent->uChar.UnicodeChar;
+                Utf16StringSize += 1;
+                break;
+
+            case WINDOW_BUFFER_SIZE_EVENT:
+
+                //
+                // Query the window size and send an update message via the
+                // control channel.
+                //
+
+                UpdateTerminalSize();
+                break;
+            }
+        }
+
+        CHAR Utf8String[TTY_UTF8_TRANSLATION_BUFFER_SIZE];
+        DWORD Utf8StringSize = 0;
+        if (Utf16StringSize > 0)
+        {
+            //
+            // Windows uses UTF-16LE encoding, Linux uses UTF-8 by default.
+            // Convert each UTF-16LE character into the proper UTF-8 byte
+            // sequence equivalent.
+            //
+
+            THROW_LAST_ERROR_IF(
+                (Utf8StringSize = WideCharToMultiByte(
+                     CP_UTF8, 0, Utf16String, Utf16StringSize, Utf8String, sizeof(Utf8String), nullptr, nullptr)) == 0);
+        }
+
+        //
+        // Deliver the translated input bytes.
+        //
+
+        const auto Utf8Span = gsl::make_span(Utf8String, static_cast<size_t>(Utf8StringSize));
+        if ((RecordsRead == 1) && (InputRecordBuffer[0].EventType == KEY_EVENT) && (InputRecordBuffer[0].Event.KeyEvent.wRepeatCount > 1))
+        {
+            WI_ASSERT(Utf16StringSize == 1);
+
+            //
+            // Handle repeated characters. They aren't part of an input
+            // sequence, so there's only one event that's generating characters.
+            //
+
+            for (WORD RepeatIndex = 0; RepeatIndex < InputRecordBuffer[0].Event.KeyEvent.wRepeatCount; RepeatIndex += 1)
+            {
+                OnRead(Utf8Span);
+            }
+        }
+        else if (Utf8StringSize > 0)
+        {
+            OnRead(Utf8Span);
+        }
+    }
 }
 
 // WriteHandle
