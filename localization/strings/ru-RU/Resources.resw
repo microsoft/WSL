@@ -2398,6 +2398,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Выполняется сохранение.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Выполняется экспорт.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC — это инструмент интерфейса командной строки для контейнеров подсистемы Windows для Linux.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2430,6 +2433,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Выполняет команду в запущенном контейнере.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Экспортировать файловую систему контейнера в виде tar-архива.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Экспортирует файловую систему контейнера в виде tar-архива.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Записывать в файл вместо STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Проверить контейнер.</value>
@@ -3141,6 +3154,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Невозможно записать образ в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Не удалось экспортировать контейнер в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
+  </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Ожидаемый формат: host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
@@ -3289,6 +3305,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Не удалось освободить ресурсы узла для тома "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Skipped importing {} certificates from Local Machine Trusted Root store due to certificate encoding failures</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Skipped importing {} certificates from Current User Trusted Root store due to certificate encoding failures</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Не удалось установить доверенные корневые сертификаты узла на виртуальной машине: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

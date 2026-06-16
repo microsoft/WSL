@@ -2391,6 +2391,9 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Opslaan in voortgang.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Exporteren wordt uitgevoerd.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC is het Windows-subsysteem voor Linux Container CCLI-hulpprogramma.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2423,6 +2426,16 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Voert een opdracht uit in een draaiende container.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exporteer het bestandssysteem van een container als een tar-archief.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exporteert het bestandssysteem van een container als een tar-archief.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Schrijf naar een bestand, in plaats van STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Een container inspecteren.</value>
@@ -3134,6 +3147,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Kan de installatiekopieën niet naar de terminal schrijven. Gebruik de -o-vlag of omleidings-stdout.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-vlag of omleidings-stdout.</value>
+  </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>
     <comment>Usage string for volume mount specification.</comment>
@@ -3282,6 +3298,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Kan de hostresources voor volume '{}' niet vrijgeven</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Het importeren van {} certificaten uit de Trusted Root-opslag van de lokale computer is overgeslagen vanwege fouten bij de codering van certificaten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Het importeren van {} certificaten uit de Trusted Root-opslag van de huidige gebruiker is overgeslagen vanwege fouten bij de codering van certificaten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

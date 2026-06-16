@@ -2391,6 +2391,9 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Spara pågår.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Exporten pågår.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC är Windows-undersystem för Linux Container CLI-verktyget.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2423,6 +2426,16 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Kör ett kommando i en igångvarande container.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exportera en containers filsystem som ett tar-arkiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exporterar en containers filsystem som ett tar-arkiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Skriv till en fil i stället för STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspektera en container.</value>
@@ -3134,6 +3147,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Det går inte att skriva bilden till terminalen. Använd -o-flaggan eller omdirigera stdout.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Det går inte att exportera containern till terminalen. Använd -o-flaggan eller omdirigera stdout.</value>
+  </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Förväntat format: &lt;host path | named volume&gt;:&lt;container path&gt;[:läge]</value>
     <comment>Usage string for volume mount specification.</comment>
@@ -3282,6 +3298,18 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Det gick inte att frigöra värdresurser för volymen {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Ignorerade import av {} certifikat från den lokala datorns betrodda rotarkiv på grund av certifikatkodningsfel</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Ignorerade import av {} certifikat från aktuell användares betrodda rotarkiv på grund av certifikatkodningsfel</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Det gick inte att installera värdens betrodda rotcertifikat på den virtuella datorn: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
