@@ -560,13 +560,11 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::io::LineBasedReadHandle>(
-            process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
+        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::io::LineBasedReadHandle>(
-            process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
+        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -884,9 +882,8 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(
-        std::make_unique<io::RelayHandle<io::ReadHandle>>(
-            buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
@@ -1055,9 +1052,8 @@ try
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(std::make_unique<io::ReadHandle>(buildProcess.GetStdHandle(1), [&](const auto& content) {
-        allOutput.append(content.begin(), content.end());
-    }));
+    io.AddHandle(std::make_unique<io::ReadHandle>(
+        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -1254,10 +1250,8 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(
-        std::make_unique<io::RelayHandle<io::ReadHandle>>(
-            common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
-            common::io::HandleWrapper{Request.stream.native_handle()}));
+    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+        common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, common::io::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)));
 
@@ -1348,9 +1342,8 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
-                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
+        io.AddHandle(std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+            common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     io.Run({});
