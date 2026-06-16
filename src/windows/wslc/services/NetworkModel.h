@@ -27,4 +27,9 @@ struct CreateNetworkOptions
     std::vector<std::pair<std::string, std::string>> Labels{};
 };
 
+struct PruneNetworksResult
+{
+    std::vector<std::string> PrunedNetworks;
+};
+
 } // namespace wsl::windows::wslc::models

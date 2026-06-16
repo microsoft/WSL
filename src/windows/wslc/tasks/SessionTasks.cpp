@@ -87,6 +87,27 @@ void TerminateSession(CLIExecutionContext& context)
     context.ExitCode = SessionService::TerminateSession(sessionId);
 }
 
+void RunInSession(CLIExecutionContext& context)
+{
+    std::wstring sessionName;
+    if (context.Args.Contains(ArgType::Session))
+    {
+        sessionName = context.Args.Get<ArgType::Session>();
+    }
+
+    std::vector<std::string> arguments;
+    arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
+    if (context.Args.Contains(ArgType::ForwardArgs))
+    {
+        for (const auto& arg : context.Args.Get<ArgType::ForwardArgs>())
+        {
+            arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(arg));
+        }
+    }
+
+    context.ExitCode = SessionService::Run(sessionName, arguments);
+}
+
 void EnterSession(CLIExecutionContext& context)
 {
     auto storagePath = std::filesystem::absolute(context.Args.Get<ArgType::StoragePath>());
