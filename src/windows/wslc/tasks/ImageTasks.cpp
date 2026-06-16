@@ -200,13 +200,14 @@ void PushImage(CLIExecutionContext& context)
 void DeleteImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
-
+    const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
     bool force = context.Args.Contains(ArgType::ImageForce);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
-    services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
+    for (const auto& id : imageIds)
+    {
+        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+    }
 }
 
 void LoadImage(CLIExecutionContext& context)
@@ -271,12 +272,19 @@ void SaveImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto imageIds = context.Args.GetAll<ArgType::ImageId>();
+
+    std::vector<std::string> images;
+    images.reserve(imageIds.size());
+    for (const auto& id : imageIds)
+    {
+        images.push_back(WideToMultiByte(id));
+    }
 
     if (context.Args.Contains(ArgType::Output))
     {
         auto& output = context.Args.Get<ArgType::Output>();
-        services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+        services::ImageService::Save(session, images, output, context.CreateCancelEvent());
     }
     else
     {
@@ -286,7 +294,7 @@ void SaveImage(CLIExecutionContext& context)
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageSaveStdoutIsTerminalError());
         }
 
-        services::ImageService::Save(session, WideToMultiByte(imageId), stdoutHandle, context.CreateCancelEvent());
+        services::ImageService::Save(session, images, stdoutHandle, context.CreateCancelEvent());
     }
 }
 

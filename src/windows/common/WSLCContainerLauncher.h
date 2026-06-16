@@ -54,7 +54,7 @@ public:
         const std::string& Name = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},
-        WSLCContainerNetworkType containerNetworkType = WSLCContainerNetworkTypeHost,
+        std::string networkMode = "host",
         WSLCProcessFlags Flags = WSLCProcessFlagsNone);
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
@@ -63,19 +63,20 @@ public:
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddPrimaryNetworkAlias(const std::string& Alias);
 
-    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session);
-    RunningWSLCContainer Create(IWSLCSession& Session);
+    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
+    RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
 
-    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach);
-    std::pair<HRESULT, std::optional<RunningWSLCContainer>> LaunchNoThrow(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach);
+    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
+    std::pair<HRESULT, std::optional<RunningWSLCContainer>> LaunchNoThrow(
+        IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
 
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetShmSize(int64_t ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
-    void SetContainerNetworkName(std::string&& Name);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
     void SetDnsServers(std::vector<std::string>&& DnsServers);
@@ -86,6 +87,7 @@ public:
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
+    using WSLCProcessLauncher::SetTtySize;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 
@@ -98,8 +100,7 @@ private:
     std::deque<std::wstring> m_hostPaths;
     std::deque<std::string> m_volumeNames;
     std::deque<std::string> m_containerPaths;
-    WSLCContainerNetworkType m_containerNetworkType;
-    std::string m_containerNetworkName;
+    std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     int64_t m_shmSize = 0;
@@ -110,6 +111,7 @@ private:
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
     std::vector<std::string> m_additionalNetworks;
+    std::vector<std::string> m_primaryNetworkAliases;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;

@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
-#include "VolumeModel.h"
+#include "ArgumentValidation.h"
 
 using namespace wsl::windows::wslc;
 
@@ -37,7 +37,7 @@ class WSLCCLIOptionsParserUnitTests
 
         for (const auto& [input, expectedKey, expectedValue] : validOptions)
         {
-            auto result = models::DriverOption::Parse(input);
+            auto result = validation::ParseDriverOption(input);
             VERIFY_ARE_EQUAL(expectedKey, result.first);
             VERIFY_ARE_EQUAL(expectedValue, result.second);
         }

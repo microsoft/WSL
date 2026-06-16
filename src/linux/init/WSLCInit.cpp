@@ -652,8 +652,19 @@ void HandleMessageImpl(
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
-        THROW_LAST_ERROR_IF(
-            UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        auto type = readField(Message.TypeIndex);
+        THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+
+        // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
+        // TODO: Remove once fixed upstream.
+        if (wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE))
+        {
+            struct stat targetStat{};
+            if (stat(target, &targetStat) < 0)
+            {
+                LOG_ERROR("stat({}) after virtiofs mount failed {}", target, errno);
+            }
+        }
 
         std::optional<std::string> overlayTarget;
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs))

@@ -35,6 +35,15 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct ImageLoadResult
+{
+    std::optional<std::string> stream;
+    std::optional<std::string> status;
+    std::optional<ErrorResponse> errorDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, status, errorDetail);
+};
+
 struct EmptyRequest
 {
     using TResponse = void;
@@ -153,6 +162,14 @@ struct Network
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
+struct ContainerNetworkRequest
+{
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
+};
+
 struct EmptyObject
 {
 };
@@ -247,13 +264,28 @@ struct EndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::optional<std::vector<std::string>> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
+
+struct EndpointConfig
+{
+    std::optional<std::vector<std::string>> Aliases;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointConfig& v)
+{
+    j = nlohmann::json::object();
+    if (v.Aliases.has_value() && !v.Aliases->empty())
+    {
+        j["Aliases"] = *v.Aliases;
+    }
+}
 
 struct NetworkingConfig
 {
-    std::map<std::string, EmptyObject> EndpointsConfig;
+    std::map<std::string, EndpointConfig> EndpointsConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(NetworkingConfig, EndpointsConfig);
 };

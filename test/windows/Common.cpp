@@ -1390,6 +1390,48 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+HostFileChange::HostFileChange(const std::filesystem::path& Path, const std::string& NewContent) : m_path(Path)
+{
+    if (std::filesystem::exists(m_path))
+    {
+        std::ifstream file(m_path, std::ios::binary);
+        THROW_HR_IF(E_FAIL, !file.is_open());
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        m_originalContent = buffer.str();
+    }
+
+    Update(NewContent);
+}
+
+HostFileChange::~HostFileChange()
+try
+{
+    if (m_originalContent.has_value())
+    {
+        std::filesystem::create_directories(m_path.parent_path());
+        std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        if (file.is_open())
+        {
+            file.write(m_originalContent->data(), static_cast<std::streamsize>(m_originalContent->size()));
+        }
+    }
+    else
+    {
+        std::filesystem::remove(m_path);
+    }
+}
+CATCH_LOG()
+
+void HostFileChange::Update(const std::string& NewContent) const
+{
+    std::filesystem::create_directories(m_path.parent_path());
+    std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+    THROW_HR_IF(E_FAIL, !file.is_open());
+    file.write(NewContent.data(), static_cast<std::streamsize>(NewContent.size()));
+    THROW_HR_IF(E_FAIL, !file.good());
+}
+
 std::wstring ReadFileContent(const std::string& Path)
 {
     std::ifstream configRead(Path);
@@ -1496,11 +1538,12 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
         L"debugConsoleLogFile=" +
-        EscapePath(kernelLogs) +
+        EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
-        L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
+        boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
     {
@@ -2914,7 +2957,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)

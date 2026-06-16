@@ -217,7 +217,7 @@ public:
     bool CanCollectUserErrorMessage() override;
 };
 
-void EnableContextualizedErrors(bool service, bool useComErrors = false);
+void EnableContextualizedErrors(bool service, bool useComErrors = false, bool enableNotifications = false);
 
 void SetErrorMessage(std::wstring&& message, const std::source_location& source = std::source_location::current());
 void SetErrorMessage(std::string&& message, const std::source_location& source = std::source_location::current());

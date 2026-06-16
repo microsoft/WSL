@@ -53,7 +53,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 104
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -125,6 +125,21 @@ typedef enum WslcSessionTerminationReason
 
 typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
+typedef struct WslcSessionCrashDumpInfo
+{
+    _Field_z_ PCWSTR dumpPath;
+    _Field_z_ PCSTR processName;
+    uint64_t pid;
+    uint32_t signal;
+    uint64_t timestamp;
+} WslcSessionCrashDumpInfo;
+
+typedef __callback void(CALLBACK* WslcSessionCrashDumpCallback)(_In_ const WslcSessionCrashDumpInfo* info, _In_opt_ PVOID context);
+
+// Opaque handle returned by WslcRegisterSessionCrashDumpCallback. Holding it keeps the crash dump
+// registration alive; pass it to WslcReleaseCrashDumpSubscription to unsubscribe.
+DECLARE_HANDLE(WslcCrashDumpSubscription);
+
 STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -144,6 +159,19 @@ STDAPI WslcSetSessionSettingsTerminationCallback(
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);
+
+// Registers a callback invoked when a Linux process crash dump is written for the session.
+// Works for any caller holding a live session. The returned subscription keeps the registration
+// alive; release it with WslcReleaseCrashDumpSubscription to unsubscribe. Multiple subscriptions
+// can be registered against the same session.
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription);
 
 // CONTAINER DEFINITIONS
 

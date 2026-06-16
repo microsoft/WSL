@@ -14,9 +14,11 @@ using wsl::windows::common::io::LineBasedReadHandle;
 using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::ReadNamedPipe;
 using wsl::windows::common::io::ReadSocketMessageHandle;
 using wsl::windows::common::io::SingleAcceptHandle;
 using wsl::windows::common::io::WriteHandle;
+using wsl::windows::common::io::WriteNamedPipe;
 
 namespace {
 
@@ -302,6 +304,60 @@ void ReadHandle::Collect()
 HANDLE ReadHandle::GetHandle() const
 {
     return Event.get();
+}
+
+// ReadNamedPipe
+
+ReadNamedPipe::ReadNamedPipe(HandleWrapper&& Pipe, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+    ReadHandle(std::move(Pipe), std::move(OnRead))
+{
+}
+
+void ReadNamedPipe::Schedule()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        if (!ConnectNamedPipe(Handle.Get(), &Overlapped))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                State = IOHandleStatus::Pending;
+                return;
+            }
+
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+    }
+
+    ReadHandle::Schedule();
+}
+
+void ReadNamedPipe::Collect()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        DWORD bytes{};
+        if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytes, FALSE))
+        {
+            const auto error = GetLastError();
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+
+        // Transition back to standby so the IO loop schedules the first read.
+        State = IOHandleStatus::Standby;
+        return;
+    }
+
+    ReadHandle::Collect();
 }
 
 // SingleAcceptHandle
@@ -656,7 +712,7 @@ bool ReadSocketMessageHandle::ProcessChunk()
     if (ReadingHeader)
     {
         THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER), "Unexpected message size: %u", messageSize);
-        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024, "Message size too large: %u", messageSize);
+        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 16 * 1024 * 1024, "Message size too large: %u", messageSize);
 
         if (Buffer.size() < messageSize)
         {
@@ -719,11 +775,20 @@ HANDLE ReadSocketMessageHandle::GetHandle() const
 
 // WriteHandle
 
-WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source) :
-    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source, bool CompleteOnDrained) :
+    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get())), CompleteOnDrained(CompleteOnDrained)
 {
-    std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    if (!Source.empty())
+    {
+        std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    }
+
     Overlapped.hEvent = Event.get();
+
+    if (!CompleteOnDrained && Buffer.Size() == 0)
+    {
+        State = IOHandleStatus::Idle;
+    }
 }
 
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, gsl::span<gsl::byte> Source) :
@@ -740,9 +805,36 @@ WriteHandle::~WriteHandle()
     }
 }
 
+void WriteHandle::SetCompleteOnDrained(bool Value)
+{
+    CompleteOnDrained = Value;
+}
+
+IOHandleStatus WriteHandle::DrainedState() const
+{
+    if (CompleteOnDrained)
+    {
+        return IOHandleStatus::Completed;
+    }
+
+    return Pending.empty() ? IOHandleStatus::Idle : IOHandleStatus::Standby;
+}
+
 void WriteHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+
+    if (!Pending.empty())
+    {
+        Buffer.Append(gsl::make_span(Pending));
+        Pending.clear();
+    }
+
+    if (Buffer.Size() == 0)
+    {
+        State = DrainedState();
+        return;
+    }
 
     Event.ResetEvent();
 
@@ -759,7 +851,7 @@ void WriteHandle::Schedule()
         Buffer.Consume(bytesWritten);
         if (Buffer.Size() == 0)
         {
-            State = IOHandleStatus::Completed;
+            State = DrainedState();
         }
     }
     else
@@ -787,20 +879,26 @@ void WriteHandle::Collect()
     Buffer.Consume(bytesWritten);
     if (Buffer.Size() == 0)
     {
-        State = IOHandleStatus::Completed;
+        State = DrainedState();
     }
 }
 
 void WriteHandle::Push(const gsl::span<char>& Content)
 {
-    // Don't write if a WriteFile() is pending, since that could cause the buffer to reallocate.
-    WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
     WI_ASSERT(!Content.empty());
 
-    // Resize() throws E_UNEXPECTED if Buffer does not own its storage.
-    Buffer.Append(Content);
+    // Put any pending output to a different buffer, since the active buffer could be in the middle of a write.
+    Pending.insert(Pending.end(), Content.begin(), Content.end());
 
-    State = IOHandleStatus::Standby;
+    if (State == IOHandleStatus::Idle)
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+size_t WriteHandle::PendingBytes() const
+{
+    return Pending.size() + Buffer.Size();
 }
 
 HANDLE WriteHandle::GetHandle() const
@@ -808,10 +906,138 @@ HANDLE WriteHandle::GetHandle() const
     return Event.get();
 }
 
+WriteNamedPipe::WriteNamedPipe(HandleWrapper&& MovedPipe, bool Reconnect, bool Connected) :
+    Pipe(std::move(MovedPipe)), ReconnectOnFailure(Reconnect), NeedConnect(!Connected)
+{
+    ConnectOverlapped.hEvent = ConnectEvent.get();
+
+    Write.emplace(HandleWrapper{Pipe.Get()}, std::vector<char>{}, false);
+
+    State = IOHandleStatus::Idle;
+}
+
+WriteNamedPipe::~WriteNamedPipe()
+{
+    if (Connecting)
+    {
+        CancelPendingIo(Pipe.Get(), ConnectOverlapped);
+    }
+}
+
+void WriteNamedPipe::Reconnect()
+{
+    // Drop the disconnected client so a new one can connect, and retry the buffered data once reconnected.
+    LOG_IF_WIN32_BOOL_FALSE(DisconnectNamedPipe(Pipe.Get()));
+
+    NeedConnect = true;
+    State = IOHandleStatus::Standby;
+}
+
+void WriteNamedPipe::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    if (NeedConnect)
+    {
+        ConnectEvent.ResetEvent();
+        ConnectOverlapped.Offset = 0;
+        ConnectOverlapped.OffsetHigh = 0;
+
+        if (!ConnectNamedPipe(Pipe.Get(), &ConnectOverlapped))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                Connecting = true;
+                State = IOHandleStatus::Pending;
+                return;
+            }
+
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Pipe.Get());
+        }
+
+        NeedConnect = false;
+    }
+
+    try
+    {
+        Write->Schedule();
+        State = Write->GetState();
+    }
+    catch (...)
+    {
+        if (!ReconnectOnFailure)
+        {
+            throw;
+        }
+
+        LOG_CAUGHT_EXCEPTION();
+        Reconnect();
+    }
+}
+
+void WriteNamedPipe::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Complete a pending connection, then let the loop schedule the first write.
+    if (Connecting)
+    {
+        Connecting = false;
+
+        DWORD bytes{};
+        if (!GetOverlappedResult(Pipe.Get(), &ConnectOverlapped, &bytes, FALSE))
+        {
+            const auto error = GetLastError();
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Pipe.Get());
+        }
+
+        NeedConnect = false;
+        State = IOHandleStatus::Standby;
+        return;
+    }
+
+    try
+    {
+        Write->Collect();
+        State = Write->GetState();
+    }
+    catch (...)
+    {
+        if (!ReconnectOnFailure)
+        {
+            throw;
+        }
+
+        LOG_CAUGHT_EXCEPTION();
+        Reconnect();
+    }
+}
+
+HANDLE WriteNamedPipe::GetHandle() const
+{
+    return Connecting ? ConnectEvent.get() : Write->GetHandle();
+}
+
+void WriteNamedPipe::Push(const gsl::span<char>& Content)
+{
+    Write->Push(Content);
+
+    if (State == IOHandleStatus::Idle)
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+size_t WriteNamedPipe::PendingBytes() const
+{
+    return Write ? Write->PendingBytes() : 0;
+}
+
 // DockerIORelayHandle
 
 DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :
-    WriteStdout(std::move(Stdout)), WriteStderr(std::move(Stderr))
+    WriteStdout(std::move(Stdout), {}, false), WriteStderr(std::move(Stderr), {}, false)
 {
     if (ReadFormat == Format::HttpChunked)
     {
@@ -850,7 +1076,7 @@ void DockerIORelayHandle::Schedule()
         {
             State = IOHandleStatus::Pending;
         }
-        else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        else if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
         {
             if (RemainingBytes == 0)
             {
@@ -893,9 +1119,11 @@ void DockerIORelayHandle::Collect()
         // If the write is completed, switch back to reading.
         if (RemainingBytes == 0)
         {
-            if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+            if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
             {
                 ActiveHandle = nullptr;
+
+                ProcessNextHeader();
             }
         }
 
@@ -1093,6 +1321,13 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 }
 
                 it = m_handles.erase(it);
+                continue;
+            }
+
+            // N.B. An Idle handle cannot be waited for since it's not doing any IO.
+            if (entry.Handle->GetState() == IOHandleStatus::Idle)
+            {
+                ++it;
                 continue;
             }
 
