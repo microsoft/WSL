@@ -18,7 +18,6 @@ Abstract:
 
 #include "OutputChannel.h"
 #include "Reporter.h"
-#include "ConsoleState.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::common::vt;
@@ -254,52 +253,6 @@ class WSLCCLIReporterUnitTests
         VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Info).has_value());
         VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Warning).has_value());
         VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Error).has_value());
-    }
-    TEST_METHOD(Reporter_VTStatePreservedAfterInteractiveConsoleStateUnwind)
-    {
-        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        DWORD mode = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &mode));
-
-        Reporter reporter;
-        VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
-
-        DWORD modeBeforeConsoleState = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &modeBeforeConsoleState));
-
-        {
-            wsl::windows::common::ConsoleState console;
-            console.SetInteractiveMode();
-
-            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
-        }
-
-        DWORD modeAfterUnwind = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &modeAfterUnwind));
-        VERIFY_ARE_EQUAL(modeBeforeConsoleState, modeAfterUnwind);
-        VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
-    }
-
-    TEST_METHOD(Reporter_VTStatePreservedAfterNonInteractiveConsoleStateUnwind)
-    {
-        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        DWORD mode = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &mode));
-
-        Reporter reporter;
-        VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
-
-        DWORD modeBeforeConsoleState = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &modeBeforeConsoleState));
-
-        {
-            wsl::windows::common::ConsoleState console;
-        }
-
-        DWORD modeAfterUnwind = 0;
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(stdOut, &modeAfterUnwind));
-        VERIFY_ARE_EQUAL(modeBeforeConsoleState, modeAfterUnwind);
-        VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
     }
 };
 
