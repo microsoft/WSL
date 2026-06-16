@@ -42,9 +42,11 @@ class WSLCE2EWarningTests
         return true;
     }
 
-    static std::string RunDockerInSession(IWSLCSession& session, std::vector<std::string>&& args)
+    static std::string RunPodmanInSession(IWSLCSession& session, std::vector<std::string>&& args)
     {
-        wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/docker", args);
+        // Use podman directly: the backend's /usr/bin/docker shim targets a non-existent dockerd
+        // socket in the podman-based system distro, so it always fails.
+        wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/podman", args);
         auto result = launcher.Launch(session).WaitAndCaptureOutput();
         VERIFY_ARE_EQUAL(0, result.Code);
 
@@ -66,7 +68,7 @@ class WSLCE2EWarningTests
         THROW_IF_FAILED(sessionManager->OpenSessionByName(nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-        wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/docker", {"/usr/bin/docker", "rm", "-f", containerId});
+        wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/podman", {"/usr/bin/podman", "rm", "-f", containerId});
         launcher.Launch(*session).WaitAndCaptureOutput();
     }
     CATCH_LOG()
@@ -82,9 +84,9 @@ class WSLCE2EWarningTests
         // will fail to parse it the next time the session is created.
         {
             auto session = OpenDefaultElevatedSession();
-            corruptContainerId = RunDockerInSession(
+            corruptContainerId = RunPodmanInSession(
                 *session,
-                {"/usr/bin/docker",
+                {"/usr/bin/podman",
                  "create",
                  "--label",
                  "wslc.container.metadata=INVALID_JSON",
