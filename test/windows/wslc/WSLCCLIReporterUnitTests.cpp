@@ -169,8 +169,7 @@ class WSLCCLIReporterUnitTests
         const std::wstring yellow{Format::Fg::BrightYellow.Get()};
         const std::wstring red{Format::Fg::BrightRed.Get()};
 
-        const auto expected =
-            def + L"starting\n" + def + def + L"pulling\n" + def + yellow + L"careful\n" + def + red + L"failed\n" + def;
+        const auto expected = std::wstring{L"starting\npulling\n"} + yellow + L"careful\n" + def + red + L"failed\n" + def;
 
         VERIFY_ARE_EQUAL(expected, cap.captured());
     }

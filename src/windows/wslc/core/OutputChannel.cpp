@@ -15,6 +15,7 @@ Abstract:
 #include "OutputChannel.h"
 
 #include <algorithm>
+#include <cerrno>
 
 namespace wsl::windows::wslc {
 

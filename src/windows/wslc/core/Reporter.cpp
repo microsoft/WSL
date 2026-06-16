@@ -41,7 +41,7 @@ std::wstring_view Reporter::LevelPrefix(Level level) const noexcept
     case Level::Error:
         return Format::Fg::BrightRed.Get();
     default:
-        return Format::Default.Get();
+        return {};
     }
 }
 
