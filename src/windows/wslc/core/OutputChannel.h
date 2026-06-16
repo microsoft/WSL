@@ -33,8 +33,8 @@ public:
     // Console path: probes handle, enables VT; falls back to fallbackFile when redirected.
     OutputChannel(HANDLE consoleHandle, FILE* fallbackFile);
 
-    // FILE* path with explicit VT flag (for tests).
-    OutputChannel(FILE* file, bool vtEnabled);
+    // FILE* path with explicit VT override (for tests).
+    OutputChannel(FILE* file, bool vtOverride);
 
     void WriteString(std::wstring_view text) const;
 
@@ -46,7 +46,7 @@ public:
 private:
     HANDLE m_consoleHandle = nullptr;
     FILE* m_file = nullptr;
-    bool m_vtEnabled = false; // cached for FILE* path (no handle to query)
+    bool m_vtOverride = false;
     std::optional<wsl::windows::common::vt::EnableVirtualTerminal> m_vtMode;
 };
 

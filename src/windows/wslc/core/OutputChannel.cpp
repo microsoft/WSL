@@ -26,7 +26,6 @@ OutputChannel::OutputChannel(HANDLE consoleHandle, FILE* fallbackFile)
     {
         m_consoleHandle = consoleHandle;
         m_vtMode.emplace(consoleHandle);
-        m_vtEnabled = m_vtMode->IsVTEnabled();
     }
     else
     {
@@ -35,7 +34,7 @@ OutputChannel::OutputChannel(HANDLE consoleHandle, FILE* fallbackFile)
     }
 }
 
-OutputChannel::OutputChannel(FILE* file, bool vtEnabled) : m_file(file), m_vtEnabled(vtEnabled)
+OutputChannel::OutputChannel(FILE* file, bool vtOverride) : m_file(file), m_vtOverride(vtOverride)
 {
     WI_ASSERT(file != nullptr);
 }
@@ -86,7 +85,7 @@ bool OutputChannel::IsVTEnabled() const noexcept
         return GetConsoleMode(m_consoleHandle, &mode) && WI_IsFlagSet(mode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     }
 
-    return m_vtEnabled;
+    return m_vtOverride;
 }
 
 } // namespace wsl::windows::wslc
