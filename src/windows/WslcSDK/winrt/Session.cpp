@@ -52,12 +52,16 @@ void Session::Start()
         throw winrt::hresult_illegal_method_call(L"Session has already been started");
     }
 
-    winrt::check_hresult(WslcSetSessionSettingsTerminationCallback(GetStructPointer(m_settings), TerminatedCallback, /* context */ this));
-
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateSession(GetStructPointer(m_settings), m_session.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
     m_settings = nullptr;
+
+    winrt::check_hresult(WslcGetSessionTerminationEvent(m_session.get(), m_terminationEvent.put()));
+
+    m_terminationWait.reset(CreateThreadpoolWait(&Session::OnTerminated, this, nullptr));
+    THROW_LAST_ERROR_IF_NULL(m_terminationWait);
+    SetThreadpoolWait(m_terminationWait.get(), m_terminationEvent.get(), nullptr);
 }
 
 void Session::EnsureStarted() const
@@ -300,11 +304,15 @@ WslcSession Session::ToHandle()
     return m_session.get();
 }
 
-void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept
+void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID context, PTP_WAIT /* wait */, TP_WAIT_RESULT /* waitResult */) noexcept
 {
     try
     {
         auto session = static_cast<Session*>(context);
+
+        WslcSessionTerminationReason reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
+        LOG_IF_FAILED(WslcGetSessionTerminationReason(session->m_session.get(), &reason));
+
         session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
     }
     CATCH_LOG();

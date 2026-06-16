@@ -3101,21 +3101,21 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Lister alle volumer i økten.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
-    <value>Remove unused local volumes.</value>
+    <value>Fjern ubrukte lokale volumer.</value>
   </data>
   <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
-    <value>Removes all unused anonymous local volumes. If --all is specified, also removes unused named volumes. A volume is considered unused when it is not referenced by any container.</value>
+    <value>Fjerner alle ubrukte anonyme lokale volumer. Hvis --all er angitt, fjernes også ubrukte navngitte volumer. Et volum anses som ubrukt når det ikke refereres til av en beholder.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused volumes, not just anonymous ones.</value>
+    <value>Fjern alle ubrukte volumer, ikke bare anonyme volumer.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Slettet: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt gjenvunnet plass: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
@@ -3255,11 +3255,11 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
-    <value>Cannot start container because the following volumes are not available: {}</value>
+    <value>Kan ikke starte beholderen fordi følgende volumer ikke er tilgjengelige: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
-    <value>Volume '{}' is not available: {}</value>
+    <value>Volumet {} er ikke tilgjengelig: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">

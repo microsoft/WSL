@@ -3101,21 +3101,21 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Viser alle diskenheder i sessionen.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
-    <value>Remove unused local volumes.</value>
+    <value>Fjern ubenyttede lokale diskenheder.</value>
   </data>
   <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
-    <value>Removes all unused anonymous local volumes. If --all is specified, also removes unused named volumes. A volume is considered unused when it is not referenced by any container.</value>
+    <value>Fjerner alle ubenyttede anonyme lokale diskenheder. Hvis --all er angivet, fjernes også ubrugte navngivne diskenheder. En diskenhed anses for at være ubrugt, når ingen beholder refererer til den.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused volumes, not just anonymous ones.</value>
+    <value>Fjern alle ubrugte diskenheder, ikke kun anonyme diskenheder.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Slettet: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Samlet frigjort plads: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">

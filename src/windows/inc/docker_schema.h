@@ -427,6 +427,13 @@ struct PruneVolumeResult
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
 };
 
+struct PruneNetworkResult
+{
+    std::optional<std::vector<std::string>> NetworksDeleted;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneNetworkResult, NetworksDeleted);
+};
+
 struct ImportStatus
 {
     std::string status;

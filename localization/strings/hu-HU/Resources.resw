@@ -3101,21 +3101,21 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Kilistázza a munkamenetben szereplő összes kötetet.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
-    <value>Remove unused local volumes.</value>
+    <value>Távolítsa el a nem használt helyi köteteket.</value>
   </data>
   <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
-    <value>Removes all unused anonymous local volumes. If --all is specified, also removes unused named volumes. A volume is considered unused when it is not referenced by any container.</value>
+    <value>Eltávolítja az összes nem használt névtelen helyi kötetet. Ha az --all paraméter meg van adva, akkor a nem használt elnevezett köteteket is eltávolítja. Egy kötet akkor tekinthető nem használtnak, ha egyetlen konténer sem hivatkozik rá.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused volumes, not just anonymous ones.</value>
+    <value>Távolítsa el az összes nem használt kötetet, ne csak a névteleneket.</value>
   </data>
   <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Törölve: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Teljes felszabadított terület: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
@@ -3255,11 +3255,11 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
-    <value>Cannot start container because the following volumes are not available: {}</value>
+    <value>A tároló nem indítható el, mert a következő kötetek nem érhetők el: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
-    <value>Volume '{}' is not available: {}</value>
+    <value>A(z) „{}” kötet nem érhető el: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
