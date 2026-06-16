@@ -203,14 +203,14 @@ class WSLCCLIReporterUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"info text\nwarn text\nerror text\n"}, cap.errPipe.captured());
     }
 
-    TEST_METHOD(Reporter_SetNoColorTogglesIsColorEnabled)
+    TEST_METHOD(Reporter_SetNoColorTogglesIsNoColor)
     {
         CaptureReporter cap;
-        VERIFY_IS_TRUE(cap.reporter.IsColorEnabled());
+        VERIFY_IS_FALSE(cap.reporter.IsNoColor());
         cap.reporter.SetNoColor(true);
-        VERIFY_IS_FALSE(cap.reporter.IsColorEnabled());
+        VERIFY_IS_TRUE(cap.reporter.IsNoColor());
         cap.reporter.SetNoColor(false);
-        VERIFY_IS_TRUE(cap.reporter.IsColorEnabled());
+        VERIFY_IS_FALSE(cap.reporter.IsNoColor());
     }
 
     TEST_METHOD(Reporter_IsVTEnabledReflectsPerChannelState)

@@ -94,7 +94,10 @@ struct CapturePipe
 
         closeFd.release();
 
-        auto closeFile = wil::scope_exit([&] { fclose(m_file); m_file = nullptr; });
+        auto closeFile = wil::scope_exit([&] {
+            fclose(m_file);
+            m_file = nullptr;
+        });
 
         m_readPipe = std::move(r);
         m_reader = std::make_unique<PartialHandleRead>(m_readPipe.get());

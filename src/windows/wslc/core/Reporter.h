@@ -106,9 +106,9 @@ struct Reporter
 
     bool IsColorEnabled(Level level) const noexcept;
 
-    bool IsColorEnabled() const noexcept
+    bool IsNoColor() const noexcept
     {
-        return !m_noColor;
+        return m_noColor;
     }
 
     void SetNoColor(bool noColor) noexcept
