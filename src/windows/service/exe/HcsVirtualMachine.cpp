@@ -165,7 +165,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         if constexpr (!wsl::shared::Arm64)
         {
             kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
-        }   
+        }
         else
         {
             kernelCmdLine += L" earlycon=pl011,0xeffec000,115200";
