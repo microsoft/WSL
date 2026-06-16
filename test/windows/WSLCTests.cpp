@@ -2690,7 +2690,7 @@ class WSLCTests
             WSLCStringArray array = BuildStringArray(names);
             VERIFY_FAILED(m_defaultSession->SaveImages(ToCOMInputHandle(imageTarFileHandle.get()), &array, nullptr, nullptr));
 
-            ValidateCOMErrorMessage(L"No such image: not-found");
+            ValidateCOMErrorMessage(L"docker.io/library/not-found: image not known");
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(0ull, static_cast<ULONGLONG>(fileSize.QuadPart));

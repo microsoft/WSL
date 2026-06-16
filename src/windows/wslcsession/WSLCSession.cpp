@@ -1038,10 +1038,14 @@ try
         }
     };
 
-    // Podman writes the final image ID to stdout on success and leaves stdout empty on failure. We don't surface this to
-    // the client, but draining the handle is what signals build completion (EOF on stdout cancels the IO loop).
+    // podman emits its human-readable build output (STEP/RUN-step logs/COMMIT/image id) on stdout in
+    // this configuration - NOT stderr - so capture stdout and surface it to the progress callback;
+    // otherwise the per-step RUN output is silently dropped. EOF on stdout still signals build
+    // completion (CancelOnCompleted). stderr is captured too so output is surfaced regardless of which
+    // stream a given podman version writes to (e.g. the final "Error: ..." line on failure).
     io.AddHandle(
-        std::make_unique<io::ReadHandle>(buildProcess.GetStdHandle(1), [](const auto&) {}), io::MultiHandleWait::CancelOnCompleted);
+        std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(1), captureOutput, false),
+        io::MultiHandleWait::CancelOnCompleted);
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
