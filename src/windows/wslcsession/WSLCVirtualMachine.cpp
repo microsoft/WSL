@@ -1259,7 +1259,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     {
         try
         {
-            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
             if (!socket)
             {
                 // VM is exiting.

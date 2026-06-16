@@ -285,12 +285,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
 
-    // Configure termination callback
-    if (Settings->TerminationCallback)
-    {
-        m_terminationCallback = Settings->TerminationCallback;
-    }
-
     hcs::RegisterCallback(m_computeSystem.get(), &HcsVirtualMachine::OnVmExitCallback, this);
 
     // Create a listening socket for mini_init to connect to once the VM is running.
@@ -387,7 +381,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Socket);
 
-    auto socket = wsl::windows::common::hvsocket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+    auto socket = socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
     *Socket = reinterpret_cast<HANDLE>(socket->release());
@@ -692,8 +686,6 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    m_vmExitEvent.SetEvent();
-
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
     auto reason = WSLCVirtualMachineTerminationReasonUnknown;
@@ -715,11 +707,33 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
         }
     }
 
-    if (m_terminationCallback)
-    {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
-    }
+    // Cache the termination reason and details before signaling the exit event. These fields are
+    // written once here (OnExit fires once and m_vmExitEvent is never reset) and published to readers
+    // by the SetEvent below; GetTerminationReason only reads them after observing the signaled event.
+    m_terminationReason = reason;
+    m_terminationDetails = Event->EventData;
+
+    m_vmExitEvent.SetEvent();
 }
+
+HRESULT HcsVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once in OnExit before m_vmExitEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vmExitEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 {
@@ -863,7 +877,6 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
         m_dmesgOutput.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
-    m_terminationCallback = Settings->TerminationCallback;
     m_maximumStorageSizeMb = Settings->MaximumStorageSizeMb;
     m_cpuCount = Settings->CpuCount;
     m_memoryMb = Settings->MemoryMb;
@@ -883,7 +896,6 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.MemoryMb = m_memoryMb;
     settings.BootTimeoutMs = m_bootTimeoutMs;
     settings.NetworkingMode = m_networkingMode;
-    settings.TerminationCallback = m_terminationCallback.get();
     settings.FeatureFlags = m_featureFlags;
     settings.StorageFlags = m_storageFlags;
     settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;

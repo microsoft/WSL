@@ -72,6 +72,7 @@ private:
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
+            {L"export", Localization::WSLCCLI_ContainerExportDesc()},
             {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
             {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
             {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},

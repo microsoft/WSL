@@ -17,7 +17,6 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "Defaults.h"
 #include "ProgressCallback.h"
-#include "TerminationCallback.h"
 #include "CrashDumpCallback.h"
 #include "Localization.h"
 #include "WslInstall.h"
@@ -435,12 +434,6 @@ try
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
     runtimeSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
-    auto terminationCallback = TerminationCallback::CreateIf(internalType);
-    if (terminationCallback)
-    {
-        result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
-        runtimeSettings.TerminationCallback = terminationCallback.get();
-    }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
@@ -587,15 +580,39 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent)
 try
 {
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-    RETURN_HR_IF(E_INVALIDARG, terminationCallback == nullptr && terminationContext != nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, terminationEvent);
+    *terminationEvent = nullptr;
 
-    internalType->terminationCallback = terminationCallback;
-    internalType->terminationCallbackContext = terminationContext;
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+
+    RETURN_HR(internalType->session->GetTerminationEvent(terminationEvent));
+}
+CATCH_RETURN();
+
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason)
+try
+{
+    static_assert(
+        WSLC_SESSION_TERMINATION_REASON_UNKNOWN == WSLCVirtualMachineTerminationReasonUnknown &&
+            WSLC_SESSION_TERMINATION_REASON_SHUTDOWN == WSLCVirtualMachineTerminationReasonShutdown &&
+            WSLC_SESSION_TERMINATION_REASON_CRASHED == WSLCVirtualMachineTerminationReasonCrashed,
+        "Termination reason enum values mismatch.");
+
+    RETURN_HR_IF_NULL(E_POINTER, reason);
+    *reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+
+    WSLCVirtualMachineTerminationReason runtimeReason = WSLCVirtualMachineTerminationReasonUnknown;
+    wil::unique_cotaskmem_string details;
+    RETURN_IF_FAILED(internalType->session->GetTerminationReason(&runtimeReason, &details));
+
+    *reason = static_cast<WslcSessionTerminationReason>(runtimeReason);
 
     return S_OK;
 }
@@ -649,10 +666,7 @@ try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    // Drop the session before the termination callback, in case session destruction triggers
-    // the termination callback.
     internalType->session.reset();
-    internalType->terminationCallback.reset();
 
     return S_OK;
 }

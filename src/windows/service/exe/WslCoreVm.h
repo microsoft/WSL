@@ -251,6 +251,8 @@ private:
 
     void VirtioFsWorker(_In_ const wil::unique_socket& socket);
 
+    std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
+
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
 
     static LX_INIT_DRVFS_MOUNT s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken);
