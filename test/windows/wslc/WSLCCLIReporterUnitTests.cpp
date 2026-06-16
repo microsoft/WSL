@@ -28,8 +28,7 @@ using namespace WEX::TestExecution;
 
 namespace WSLCCLIReporterUnitTests {
 
-// Reporter wired to two separate capture pipes so stdout and stderr can be
-// asserted independently. VT defaults to off to model a redirected pipe.
+// Dual-pipe Reporter so stdout and stderr can be asserted independently.
 struct SplitCaptureReporter
 {
     CapturePipe outPipe;

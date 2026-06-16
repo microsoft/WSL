@@ -53,11 +53,6 @@ void OutputChannel::WriteString(std::wstring_view text) const
         return;
     }
 
-    if (m_file == nullptr)
-    {
-        return;
-    }
-
     if (fwprintf(m_file, L"%.*ls", static_cast<int>(text.size()), text.data()) < 0)
     {
         const int err = errno;
@@ -78,9 +73,7 @@ std::optional<int> OutputChannel::GetConsoleWidth() const
         return std::nullopt;
     }
 
-    // Visible width is (Right - Left + 1); reserve one column as an autowrap
-    // guard so callers can write the full returned width without risking an
-    // unwanted line break.
+    // (Right - Left + 1) is the visible width; subtract one more as an autowrap guard.
     return std::max(0, static_cast<int>(info.srWindow.Right) - static_cast<int>(info.srWindow.Left));
 }
 
