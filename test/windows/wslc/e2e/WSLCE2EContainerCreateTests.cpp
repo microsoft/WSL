@@ -86,11 +86,16 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
+        auto session = OpenDefaultElevatedSession();
+
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 5000);
+        auto reference = std::format(L"{}/invalid-image:latest", registryAddress);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
+
         std::wstringstream expectedError;
-        expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
-                      << L"manifest for " << InvalidImage.NameAndTag()
-                      << L" not found: manifest unknown: manifest tagged by \"latest\" is not found\r\n"
+        expectedError << L"Image '" << reference << L"' not found, pulling\r\n"
+                      << L"manifest for " << reference << L" not found: manifest unknown: manifest unknown\r\n"
                       << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
