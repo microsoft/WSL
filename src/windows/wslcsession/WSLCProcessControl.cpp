@@ -118,11 +118,7 @@ DockerExecProcessControl::DockerExecProcessControl(
 
 DockerExecProcessControl::~DockerExecProcessControl()
 {
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
-    }
+    // The container holds only a weak reference to this control.
 }
 
 int DockerExecProcessControl::GetPid() const

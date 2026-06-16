@@ -119,8 +119,6 @@ public:
 
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
-    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
-
     const std::string& ID() const noexcept;
 
     // Returns the container flags used to decide whether to
@@ -186,7 +184,7 @@ private:
     WSLCProcessFlags m_initProcessFlags{};
     WSLCContainerFlags m_containerFlags{};
     mutable std::mutex m_processesLock;
-    __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
+    __guarded_by(m_processesLock) std::vector<std::weak_ptr<DockerExecProcessControl>> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
