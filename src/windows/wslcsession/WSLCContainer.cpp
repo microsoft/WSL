@@ -327,8 +327,9 @@ void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& p
             else
             {
                 LOG_HR(result);
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
-                    volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
+                EMIT_USER_WARNING(
+                    wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
+                        volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
             }
         }
     }
@@ -717,8 +718,9 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     handles.emplace_back(
         std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
 
-    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    handles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(handles));
 
@@ -849,8 +851,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(
-                wsl::shared::string::MultiByteToWide(m_id)));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(wsl::shared::string::MultiByteToWide(m_id)));
         }
 
         if (comError.has_value() && comError->Message)
@@ -1108,8 +1110,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     else
     {
         io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
@@ -1891,8 +1892,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
-            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+        EMIT_USER_WARNING(
+            wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+                wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
     }
 
     return container;
@@ -2013,8 +2015,9 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStdout, TypedHandle{wil::unique_handle{stdoutRead.release()}, WSLCHandleTypePipe});
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
-    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
+    ioHandles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 
