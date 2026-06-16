@@ -43,6 +43,15 @@ COMMAND_LINE_TEST_CASE(L"system session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"system session list extraarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"system session shell session1", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session shell", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"system session run ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run echo foo", L"run", true) // Command with trailing arguments
+COMMAND_LINE_TEST_CASE(L"system session run ls -la", L"run", true)   // Flags after the command are forwarded
+COMMAND_LINE_TEST_CASE(L"system session run --session session1 ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run --session session1 echo foo", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run \"ls -la /tmp\"", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run", L"run", false)                    // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"system session run --session session1", L"run", false) // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"system session run --notanarg ls", L"run", false)      // Invalid flag before command
 COMMAND_LINE_TEST_CASE(L"system session terminate session1", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage", L"enter", true)

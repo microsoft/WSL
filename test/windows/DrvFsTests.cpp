@@ -409,6 +409,59 @@ public:
         VERIFY_IS_TRUE(out.find(L"test-file.txt") != std::wstring::npos);
     }
 
+    void DrvfsMountManyVirtioFsShares(DrvFsMode Mode)
+    {
+        if (Mode != DrvFsMode::VirtioFs)
+        {
+            LogSkipped("This test is only applicable to VirtioFs");
+            return;
+        }
+
+        WINDOWS_11_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        constexpr auto c_iterations = 15;
+        auto testDir = std::filesystem::current_path() / "virtiofs-loop-test";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"umount /tmp/virtiofs-loop-test-*");
+
+            std::error_code ec;
+            std::filesystem::remove_all(testDir, ec);
+        });
+
+        for (int i = 0; i < c_iterations; ++i)
+        {
+            const auto sourceDir = testDir / std::to_string(i);
+            std::filesystem::create_directories(sourceDir);
+
+            const auto expected = std::format("virtiofs share {}", i);
+            {
+                std::ofstream markerFile(std::filesystem::path(sourceDir) / L"marker");
+                markerFile << expected;
+            }
+
+            const auto mountPoint = std::format(L"/tmp/virtiofs-loop-test-{}", i);
+
+            // Mount the share.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs '{}' '{}'", sourceDir.string(), mountPoint)), 0);
+
+            // Validate that it can be accessed.
+            {
+                auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", mountPoint));
+                VERIFY_ARE_EQUAL(out, wsl::shared::string::MultiByteToWide(expected));
+            }
+
+            // Validate the mount options.
+            {
+                auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}'", mountPoint));
+
+                VerifyPatternMatch(wsl::shared::string::WideToMultiByte(out.c_str()), std::format("{} * virtiofs rw,relatime\n", mountPoint));
+            }
+        }
+    }
+
     // DrvFsTests Private Methods
 private:
     static VOID CreateDrvFsTestFiles(bool Metadata)
@@ -1302,6 +1355,11 @@ class WSL1 : public DrvFsTests
         WSL2_TEST_METHOD(DrvFsMountUnicodePath) \
         { \
             DrvFsTests::DrvFsMountUnicodePath(DrvFsMode::##_mode##); \
+        } \
+\
+        WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
+        { \
+            DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##); \
         } \
     }
 

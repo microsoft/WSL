@@ -139,25 +139,32 @@ private:
     bool m_connected = false;
 };
 
-class SingleAcceptHandle : public OverlappedIOHandle
+class AcceptHandle : public OverlappedIOHandle
 {
 public:
-    NON_COPYABLE(SingleAcceptHandle)
-    NON_MOVABLE(SingleAcceptHandle)
+    NON_COPYABLE(AcceptHandle)
+    NON_MOVABLE(AcceptHandle)
 
-    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
-    ~SingleAcceptHandle();
+    AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::function<void(wil::unique_socket&&)>&& OnAccepted);
+    ~AcceptHandle();
 
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    void CreateAcceptSocket();
+    void OnComplete();
+
     HandleWrapper ListenSocket;
-    HandleWrapper AcceptedSocket;
+    wil::unique_socket AcceptedSocket;
+    int AddressFamily{};
+    int SocketType{};
+    int Protocol{};
+    bool AcceptOnce{};
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::function<void()> OnAccepted;
+    std::function<void(wil::unique_socket&&)> OnAccepted;
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
 };
 
