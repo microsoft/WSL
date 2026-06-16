@@ -78,4 +78,15 @@ std::optional<int> OutputChannel::GetConsoleWidth() const
     return std::max(0, static_cast<int>(info.srWindow.Right) - static_cast<int>(info.srWindow.Left));
 }
 
+bool OutputChannel::IsVTEnabled() const noexcept
+{
+    if (m_consoleHandle != nullptr)
+    {
+        DWORD mode = 0;
+        return GetConsoleMode(m_consoleHandle, &mode) && WI_IsFlagSet(mode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+
+    return m_vtEnabled;
+}
+
 } // namespace wsl::windows::wslc

@@ -41,15 +41,12 @@ public:
     // Console write width minus one (autowrap guard), or nullopt when redirected.
     std::optional<int> GetConsoleWidth() const;
 
-    bool IsVTEnabled() const noexcept
-    {
-        return m_vtEnabled;
-    }
+    bool IsVTEnabled() const noexcept;
 
 private:
     HANDLE m_consoleHandle = nullptr;
     FILE* m_file = nullptr;
-    bool m_vtEnabled = false;
+    bool m_vtEnabled = false; // cached for FILE* path (no handle to query)
     std::optional<wsl::windows::common::vt::EnableVirtualTerminal> m_vtMode;
 };
 
