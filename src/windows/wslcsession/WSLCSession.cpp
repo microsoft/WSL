@@ -3003,23 +3003,22 @@ try
 
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> imagesImpl;
 
-    ULONG count = 0;
     if (Options == nullptr)
     {
-        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &imagesImpl, &count));
+        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &imagesImpl, imagesImpl.size_address<ULONG>()));
     }
     else
     {
         const auto options = apicompat::Convert(*Options);
-        RETURN_IF_FAILED(ListImages(options.Get(), &imagesImpl, &count));
+        RETURN_IF_FAILED(ListImages(options.Get(), &imagesImpl, imagesImpl.size_address<ULONG>()));
     }
 
-    if (count > 0)
+    if (imagesImpl.size() > 0)
     {
-        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatImageInformation[]>(count);
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatImageInformation[]>(imagesImpl.size());
         RETURN_IF_NULL_ALLOC(converted);
 
-        for (ULONG index = 0; index < count; index++)
+        for (size_t index = 0; index < imagesImpl.size(); index++)
         {
             converted[index] = apicompat::Convert(imagesImpl[index]);
         }
@@ -3027,7 +3026,7 @@ try
         *Images = converted.release();
     }
 
-    *Count = count;
+    *Count = static_cast<ULONG>(imagesImpl.size());
     return S_OK;
 }
 CATCH_RETURN();
@@ -3046,15 +3045,14 @@ try
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> imagesImpl;
 
-    ULONG count = 0;
-    RETURN_IF_FAILED(DeleteImage(&options, &imagesImpl, &count));
+    RETURN_IF_FAILED(DeleteImage(&options, &imagesImpl, imagesImpl.size_address<ULONG>()));
 
-    if (count > 0)
+    if (imagesImpl.size() > 0)
     {
-        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatDeletedImageInformation[]>(count);
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatDeletedImageInformation[]>(imagesImpl.size());
         RETURN_IF_NULL_ALLOC(converted);
 
-        for (ULONG index = 0; index < count; index++)
+        for (size_t index = 0; index < imagesImpl.size(); index++)
         {
             converted[index] = apicompat::Convert(imagesImpl[index]);
         }
@@ -3062,7 +3060,7 @@ try
         *DeletedImages = converted.release();
     }
 
-    *Count = count;
+    *Count = static_cast<ULONG>(imagesImpl.size());
     return S_OK;
 }
 CATCH_RETURN();
