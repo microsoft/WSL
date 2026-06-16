@@ -504,7 +504,7 @@ class WSLCE2EGlobalTests
             result.Verify({.Stdout = L"OK\n", .Stderr = L"", .ExitCode = 0});
         }
 
-                {
+        {
             auto result = RunWslc(L"system session run --session not-found echo OK");
             result.Verify({.Stdout = L"", .Stderr = L"Session not found: 'not-found'\r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
         }
