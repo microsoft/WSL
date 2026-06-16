@@ -3093,6 +3093,16 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Outputs the network names only</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Remove all unused networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Deleted: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Manage volumes.</value>
   </data>
