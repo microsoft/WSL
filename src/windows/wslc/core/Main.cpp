@@ -108,7 +108,8 @@ try
         {
             // Cancel events are often considered warnings rather than errors, as the user
             // intentionally triggered it.
-            context.Reporter.Warn(L"\n{}\n", Localization::WSLCCLI_OperationCancelled());
+            const auto errorCode = HRESULT_FROM_WIN32(ERROR_CANCELLED);
+            context.Reporter.Warn(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(errorCode)));
 
             // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
             // for cancellation is exit code 130, which is used by Docker compose and most shells.

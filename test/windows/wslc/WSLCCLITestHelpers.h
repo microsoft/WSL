@@ -94,11 +94,12 @@ struct CapturePipe
 
         closeFd.release();
 
-        // CapturePipe owns the read pipe; PartialHandleRead borrows it via .get().
-        // m_readPipe is declared before m_reader so destruction order tears the reader
-        // down first (joining its thread) and only then closes the handle it was reading.
+        auto closeFile = wil::scope_exit([&] { fclose(m_file); m_file = nullptr; });
+
         m_readPipe = std::move(r);
         m_reader = std::make_unique<PartialHandleRead>(m_readPipe.get());
+
+        closeFile.release();
     }
 
     ~CapturePipe()
