@@ -94,6 +94,10 @@ struct CapturePipe
 
         closeFd.release();
 
+        // Disable CRT buffering so each fwprintf is a single write. Prevents
+        // _O_U8TEXT from splitting VT escape sequences across buffer flushes.
+        setvbuf(m_file, nullptr, _IONBF, 0);
+
         auto closeFile = wil::scope_exit([&] {
             fclose(m_file);
             m_file = nullptr;
