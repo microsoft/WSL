@@ -4987,7 +4987,7 @@ class WSLCTests
         options.DriverOpts = nullptr;
         options.DriverOptsCount = 0;
 
-        for (const char* driver : {"overlay", "Bridge"})
+        for (const char* driver : {"overlay", "Bridge", ""})
         {
             options.Driver = driver;
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
