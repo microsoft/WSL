@@ -182,6 +182,15 @@ COMMAND_LINE_TEST_CASE(L"container logs --until 1700000000 cont1", L"logs", true
 COMMAND_LINE_TEST_CASE(L"container logs --since 1700000000 --until 1700001000 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --since abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --until abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --until 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+05:30 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.123456789Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-13-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T25:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Zextra cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1960-01-15T10:30:00Z cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --follow --timestamps --since 100 --tail 5 cont1", L"logs", true)
 
 // Image command

@@ -697,13 +697,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
-        since = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Since>());
+        since = validation::GetTimestampFromString(context.Args.Get<ArgType::Since>());
     }
 
     ULONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
-        until = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Until>());
+        until = validation::GetTimestampFromString(context.Args.Get<ArgType::Until>());
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);

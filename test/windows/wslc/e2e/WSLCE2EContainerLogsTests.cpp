@@ -111,6 +111,28 @@ class WSLCE2EContainerLogsTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_SinceRfc3339)
+    {
+        // Run a container that outputs a line
+        auto result =
+            RunWslc(std::format(L"container run --name {} {} sh -c \"echo rfc3339test\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Using --since with an RFC3339 timestamp in the past should return all logs
+        result = RunWslc(std::format(L"container logs --since 2000-01-01T00:00:00Z {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"rfc3339test"));
+
+        // Using --since with an RFC3339 timestamp far in the future should return no logs
+        result = RunWslc(std::format(L"container logs --since 2099-12-31T23:59:59Z {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Using --since with an RFC3339 timestamp with timezone offset
+        result = RunWslc(std::format(L"container logs --since 2000-01-01T00:00:00+00:00 {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"rfc3339test"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Until)
     {
         // Run a container that outputs a line

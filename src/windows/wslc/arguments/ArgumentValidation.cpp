@@ -19,6 +19,7 @@ Abstract:
 #include "Localization.h"
 #include <charconv>
 #include <format>
+#include <optional>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -58,11 +59,11 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Since:
-        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Since>(), m_name);
+        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Since>(), m_name);
         break;
 
     case ArgType::Until:
-        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Until>(), m_name);
+        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Until>(), m_name);
         break;
 
     case ArgType::Last:
@@ -189,6 +190,193 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
     }
 
     return static_cast<WSLCSignal>(signalValue);
+}
+
+// Parses an RFC3339 timestamp (e.g. "2024-01-15T10:30:00Z" or "2024-01-15T10:30:00+05:30")
+// or a plain Unix epoch integer (seconds) into a ULONGLONG epoch value.
+static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
+{
+    // Minimum RFC3339: "YYYY-MM-DDTHH:MM:SSZ" = 20 chars
+    if (input.size() < 20)
+    {
+        return std::nullopt;
+    }
+
+    // Basic structural checks
+    if (input[4] != '-' || input[7] != '-' || (input[10] != 'T' && input[10] != 't') || input[13] != ':' || input[16] != ':')
+    {
+        return std::nullopt;
+    }
+
+    auto parseDigits = [&](size_t offset, size_t count) -> std::optional<int> {
+        int value = 0;
+        for (size_t i = 0; i < count; ++i)
+        {
+            char c = input[offset + i];
+            if (c < '0' || c > '9')
+            {
+                return std::nullopt;
+            }
+            value = value * 10 + (c - '0');
+        }
+        return value;
+    };
+
+    auto year = parseDigits(0, 4);
+    auto month = parseDigits(5, 2);
+    auto day = parseDigits(8, 2);
+    auto hour = parseDigits(11, 2);
+    auto minute = parseDigits(14, 2);
+    auto second = parseDigits(17, 2);
+
+    if (!year || !month || !day || !hour || !minute || !second)
+    {
+        return std::nullopt;
+    }
+
+    if (*month < 1 || *month > 12 || *day < 1 || *day > 31 || *hour > 23 || *minute > 59 || *second > 60)
+    {
+        return std::nullopt;
+    }
+
+    // Parse timezone offset (after seconds and optional fractional seconds)
+    size_t pos = 19;
+
+    // Skip fractional seconds (e.g. ".123456789")
+    if (pos < input.size() && input[pos] == '.')
+    {
+        ++pos;
+        while (pos < input.size() && input[pos] >= '0' && input[pos] <= '9')
+        {
+            ++pos;
+        }
+    }
+
+    int offsetSeconds = 0;
+    if (pos >= input.size())
+    {
+        return std::nullopt; // No timezone info
+    }
+
+    char tzChar = input[pos];
+    size_t expectedEnd = pos + 1;
+    if (tzChar == 'Z' || tzChar == 'z')
+    {
+        offsetSeconds = 0;
+    }
+    else if (tzChar == '+' || tzChar == '-')
+    {
+        if (pos + 5 > input.size())
+        {
+            return std::nullopt;
+        }
+
+        // Accept both HH:MM and HHMM
+        size_t tzHourOffset = pos + 1;
+        size_t tzMinOffset;
+        if (pos + 6 <= input.size() && input[pos + 3] == ':')
+        {
+            tzMinOffset = pos + 4;
+            expectedEnd = pos + 6;
+        }
+        else
+        {
+            tzMinOffset = pos + 3;
+            expectedEnd = pos + 5;
+        }
+
+        auto tzHour = parseDigits(tzHourOffset, 2);
+        auto tzMin = parseDigits(tzMinOffset, 2);
+        if (!tzHour || !tzMin || *tzHour > 23 || *tzMin > 59)
+        {
+            return std::nullopt;
+        }
+
+        offsetSeconds = (*tzHour * 3600 + *tzMin * 60);
+        if (tzChar == '-')
+        {
+            offsetSeconds = -offsetSeconds;
+        }
+    }
+    else
+    {
+        return std::nullopt;
+    }
+
+    // Reject trailing characters after the timezone designator
+    if (expectedEnd != input.size())
+    {
+        return std::nullopt;
+    }
+
+    // Reject pre-epoch dates
+    if (*year < 1970)
+    {
+        return std::nullopt;
+    }
+
+    // Convert to Unix epoch using a simplified calculation
+    // Days from year 1970 to the given year
+    auto isLeapYear = [](int y) { return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0); };
+
+    constexpr int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    long long days = 0;
+    for (int y = 1970; y < *year; ++y)
+    {
+        days += isLeapYear(y) ? 366 : 365;
+    }
+    for (int m = 1; m < *month; ++m)
+    {
+        days += daysInMonth[m];
+        if (m == 2 && isLeapYear(*year))
+        {
+            days += 1;
+        }
+    }
+    days += *day - 1;
+
+    long long epochSeconds = days * 86400LL + *hour * 3600LL + *minute * 60LL + *second;
+    epochSeconds -= offsetSeconds;
+
+    if (epochSeconds < 0)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<ULONGLONG>(epochSeconds);
+}
+
+void ValidateTimestamp(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetTimestampFromString(value, argName);
+    }
+}
+
+ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName)
+{
+    std::string narrowValue = wsl::windows::common::string::WideToMultiByte(value);
+
+    // Try integer (Unix epoch seconds) first
+    ULONGLONG intValue{};
+    const char* begin = narrowValue.c_str();
+    const char* end = begin + narrowValue.size();
+    auto result = std::from_chars(begin, end, intValue);
+    if (result.ec == std::errc() && result.ptr == end)
+    {
+        return intValue;
+    }
+
+    // Try RFC3339 timestamp
+    auto rfc3339Value = TryParseRfc3339(narrowValue);
+    if (rfc3339Value.has_value())
+    {
+        return rfc3339Value.value();
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidTimestampArgumentError(argName, value));
 }
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
