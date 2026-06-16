@@ -90,9 +90,9 @@ void TerminateSession(CLIExecutionContext& context)
 void RunInSession(CLIExecutionContext& context)
 {
     std::wstring sessionName;
-    if (context.Args.Contains(ArgType::Session))
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        sessionName = context.Args.Get<ArgType::Session>();
+        sessionName = context.GlobalArgs.Get<ArgType::Session>();
     }
 
     std::vector<std::string> arguments;

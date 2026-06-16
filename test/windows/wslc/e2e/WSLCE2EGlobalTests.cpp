@@ -500,12 +500,12 @@ class WSLCE2EGlobalTests
         }
 
         {
-            auto result = RunWslc(std::format(L"system session run --session {} echo OK", GetExpectedDefaultSessionName(true)));
+            auto result = RunWslc(std::format(L"--session {} system session run echo OK", GetExpectedDefaultSessionName(true)));
             result.Verify({.Stdout = L"OK\n", .Stderr = L"", .ExitCode = 0});
         }
 
         {
-            auto result = RunWslc(L"system session run --session not-found echo OK");
+            auto result = RunWslc(L"--session not-found system session run echo OK");
             result.Verify({.Stdout = L"", .Stderr = L"Session not found: 'not-found'\r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
         }
 
