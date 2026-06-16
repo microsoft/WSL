@@ -765,7 +765,7 @@ void HandleMessageImpl(
     auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
     auto EnvironmentPointers = wsl::shared::string::StringPointersFromArray(EnvironmentArray, true);
 
-    execve(Executable, (char* const*)(ArgumentPointers.data()), (char* const*)(EnvironmentPointers.data()));
+    execvpe(Executable, (char* const*)(ArgumentPointers.data()), (char* const*)(EnvironmentPointers.data()));
 
     // Only reached if exec() fails
     Transaction.SendResultMessage<int32_t>(errno);
