@@ -360,6 +360,7 @@ void RemoveContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
+        PrintMessage(id);
     }
 }
 
@@ -750,6 +751,7 @@ void StopContainers(CLIExecutionContext& context)
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
+        PrintMessage(id);
     }
 }
 

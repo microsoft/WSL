@@ -75,7 +75,7 @@ class WSLCE2EContainerRemoveTests
 
         // Delete the container
         result = RunWslc(std::format(L"container remove {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer listed
         VerifyContainerIsNotListed(WslcContainerName);
@@ -93,7 +93,7 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsListed(containerId, L"created");
 
         result = RunWslc(std::format(L"container remove {}", containerId));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId);
         VerifyContainerIsNotListed(WslcContainerName);
@@ -123,7 +123,7 @@ class WSLCE2EContainerRemoveTests
 
         // Removing with force should succeed
         result = RunWslc(std::format(L"container remove --force {}", containerId));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId);
         VerifyContainerIsNotListed(WslcContainerName);
@@ -148,7 +148,7 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsListed(containerId2, L"created");
 
         result = RunWslc(std::format(L"container remove {} {}", containerId1, containerId2));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n{}\r\n", containerId1, containerId2), .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId1);
         VerifyContainerIsNotListed(containerId2);
