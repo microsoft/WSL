@@ -2398,6 +2398,9 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Enregistrement en cours.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Exportation en cours.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC est l’outil du sous-système Windows pour Linux Container CLI.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2430,6 +2433,16 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Exécute une commande dans un conteneur en cours d’exécution.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exporter le système de fichiers d’un conteneur sous forme d’archive tar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exporte le système de fichiers d'un conteneur sous forme d'archive tar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Écrire dans un fichier, au lieu de STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspecter un conteneur.</value>
@@ -3141,6 +3154,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Impossible d’écrire l’image dans le terminal. Utilisez l’option -o ou redirigez stdout.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Impossible d’exporter le conteneur vers le terminal. Utilisez l’option -o ou redirigez stdout.</value>
+  </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Format attendu : &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
@@ -3289,6 +3305,18 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Échec de la libération des ressources hôtes pour le volume « {} »</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>L'importation des certificats {} depuis le magasin de certificats racines de confiance de l'ordinateur local a été ignorée en raison d'erreurs d'encodage des certificats</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>L'importation des certificats {} depuis le magasin de certificats racine de confiance de l'utilisateur actuel a été ignorée en raison d'erreurs d'encodage des certificats</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Échec de l’installation des certificats racines approuvés de l’hôte dans la machine virtuelle : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

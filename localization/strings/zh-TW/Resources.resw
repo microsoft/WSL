@@ -2397,6 +2397,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>正在進行儲存。</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>匯出進行中。</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC 是 Windows 子系統 Linux 版容器 CLI 工具。</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2429,6 +2432,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>在正在執行的容器中執行命令。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>將容器的檔案系統匯出為 tar 封存檔。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>將容器的檔案系統匯出為 tar 封存檔。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>寫入檔案，而不是 STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>檢查容器。</value>
@@ -3140,6 +3153,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>無法將影像寫入終端機。使用 -o 旗標或重新導向 stdout。</value>
   </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>無法將容器匯出至終端機。使用 -o 旗標或重新導向 stdout。</value>
+  </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>預期的格式: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
@@ -3288,6 +3304,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>無法釋放磁碟區 '{}' 的主機資源</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>由於憑證編碼失敗，已略過從本機電腦受信任的根存放區匯入 {} 憑證</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>由於憑證編碼失敗，已略過從目前使用者受信任的根存放區匯入 {} 憑證</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>無法將主機信任的根憑證安裝到 VM： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
