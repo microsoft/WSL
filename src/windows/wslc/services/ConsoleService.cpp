@@ -24,12 +24,12 @@ using wsl::windows::common::io::ReadConsoleHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 
-bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Console, ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
+bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Console, ClientRunningWSLCProcess& Process, HANDLE Tty, bool TriggerRefresh)
 {
     // Configure the console for interactive usage.
     Console.SetInteractiveMode();
 
-    if (triggerRefresh)
+    if (TriggerRefresh)
     {
         // In the case of an Attach, force a terminal resize to force the tty to refresh its display.
         // The docker client uses the same trick.

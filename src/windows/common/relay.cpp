@@ -419,8 +419,7 @@ bool wsl::windows::common::relay::StandardInputRelay(HANDLE ConsoleHandle, HANDL
 
         MultiHandleWait io;
 
-        io.AddHandle(std::make_unique<io::RelayHandle<io::ReadConsoleHandle>>(
-            io::HandleWrapper{ConsoleHandle}, io::HandleWrapper{OutputHandle}, std::move(UpdateTerminalSize)));
+        io.AddHandle(std::make_unique<io::RelayHandle<io::ReadConsoleHandle>>(ConsoleHandle, OutputHandle, std::move(UpdateTerminalSize)));
 
         io.AddHandle(std::make_unique<io::EventHandle>(ExitEvent), MultiHandleWait::CancelOnCompleted | MultiHandleWait::NeedNotComplete);
         io.Run({});
