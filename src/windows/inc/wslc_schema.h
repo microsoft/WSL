@@ -85,8 +85,9 @@ struct InspectEndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::vector<std::string> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
 
 struct InspectNetworkSettings

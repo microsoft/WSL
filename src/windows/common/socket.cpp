@@ -26,30 +26,41 @@ void wsl::windows::common::socket::SetAcceptContext(_In_ SOCKET AcceptedSocket, 
         std::format("{}", Location).c_str());
 }
 
-bool wsl::windows::common::socket::CancellableAccept(
-    _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
+std::optional<wil::unique_socket> wsl::windows::common::socket::CancellableAccept(
+    _In_ SOCKET ListenSocket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
     io::MultiHandleWait io;
 
-    bool accepted = false;
+    std::optional<wil::unique_socket> accepted;
 
-    io.AddHandle(std::make_unique<io::SingleAcceptHandle>(ListenSocket, Socket, [&]() { accepted = true; }), io::MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(
+        std::make_unique<io::AcceptHandle>(
+            ListenSocket, true, [&accepted](wil::unique_socket&& socket) { accepted = std::move(socket); }),
+        io::MultiHandleWait::CancelOnCompleted);
 
     if (ExitHandle != nullptr)
     {
         io.AddHandle(std::make_unique<io::EventHandle>(ExitHandle), io::MultiHandleWait::CancelOnCompleted);
     }
 
-    io.Run(std::chrono::milliseconds(Timeout));
-
-    if (!accepted)
+    std::optional<std::chrono::milliseconds> timeout;
+    if (Timeout != INFINITE)
     {
-        return false; // Accept was cancelled by the exit event.
+        timeout = std::chrono::milliseconds(Timeout);
     }
 
-    SetAcceptContext(Socket, ListenSocket, Location);
+    try
+    {
 
-    return true;
+        io.Run(timeout);
+    }
+    catch (...)
+    {
+        auto hr = wil::ResultFromCaughtException();
+        THROW_HR_MSG(hr, "Failed to accept socket. From: %hs", std::format("{}", Location).c_str());
+    }
+
+    return accepted;
 }
 
 std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(

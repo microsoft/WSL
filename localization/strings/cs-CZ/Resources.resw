@@ -2346,6 +2346,17 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Nastavení koncového bodu zatím není podporováno (síť '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Network alias nemůže být prázdný.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Network aliases require a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nepodařilo se vytvořit svazek '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2380,6 +2391,9 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Probíhá ukládání.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Probíhá export.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC je nástroj příkazového řádku pro kontejnery Windows Subsystem pro Linux.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2412,6 +2426,16 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Spustí příkaz v běžícím kontejneru.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exportujte souborový systém kontejneru jako archiv tar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exportuje systém souborů kontejneru jako archiv tar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Zápis do souboru místo STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Zkontrolovat kontejner.</value>
@@ -2813,6 +2837,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Síť v hostitelském režimu není podporována</value>
   </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Přidání aliasu v oboru sítě pro kontejner</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Neplatná hodnota {}: alias sítě nemůže být prázdný ani obsahovat jen prázdné znaky.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Nepoužívejte mezipaměť při sestavování image</value>
   </data>
@@ -3082,6 +3113,24 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Vypíše všechny svazky v relaci.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Odeberte nepoužívané místní svazky.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Removes all unused anonymous local volumes. If --all is specified, also removes unused named volumes. A volume is considered unused when it is not referenced by any container.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Odeberte všechny nepoužívané svazky, nejen ty anonymní.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Odstraněno: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Celkové uvolněné místo: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Název svazku</value>
   </data>
@@ -3097,6 +3146,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Nelze zapsat obrázek do terminálu. Použijte příznak -o nebo přesměrujte stdout.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Kontejner nelze exportovat do terminálu. Použijte příznak -o nebo přesměrujte stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Očekávaný formát: &lt;cesta k hostiteli | pojmenovaný svazek&gt;:&lt;cesta ke kontejneru&gt;[:mode]</value>
@@ -3218,6 +3270,14 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Nepodařilo se obnovit svazek '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Kontejner nejde spustit, protože nejsou k dispozici následující svazky: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Svazek {} není k dispozici: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Inicializace prohození se nezdařila</value>
   </data>
@@ -3238,6 +3298,18 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Nepodařilo se uvolnit prostředky hostitele pro svazek '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Import certifikátů {} z důvěryhodného kořenového úložiště místního počítače se vynechal kvůli chybám kódování certifikátu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Import certifikátů {} z důvěryhodného kořenového úložiště aktuálního uživatele byl přeskočen z důvodu selhání kódování certifikátu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Nepovedlo se nainstalovat důvěryhodné kořenové certifikáty hostitele do virtuálního počítače: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

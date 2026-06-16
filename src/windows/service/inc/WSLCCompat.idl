@@ -88,16 +88,6 @@ typedef enum _WSLCCompatSignal
 } WSLCCompatSignal;
 
 [
-    uuid(86A807EA-F2A1-4382-93E5-09FB5F2F4A31),
-    pointer_default(unique),
-    object
-]
-interface IWSLCCompatTerminationCallback : IUnknown
-{
-    HRESULT OnTermination(WSLCCompatVirtualMachineTerminationReason Reason, LPCWSTR Details);
-};
-
-[
     uuid(EAA15E20-7FCC-485B-B798-ED4095DBACA5),
     pointer_default(unique),
     object
@@ -394,7 +384,6 @@ typedef struct _WSLCCompatSessionSettings {
     ULONG MemoryMb;
     ULONG BootTimeoutMs;
     WSLCCompatNetworkingMode NetworkingMode;
-    [unique] IWSLCCompatTerminationCallback* TerminationCallback;
     WSLCCompatFeatureFlags FeatureFlags;
     WSLCCompatHandle DmesgOutput;
     WSLCCompatSessionStorageFlags StorageFlags;
@@ -502,6 +491,15 @@ interface IWSLCCompatSession : IUnknown
 
     // Terminate the VM and containers.
     HRESULT Terminate();
+
+    // Returns a one-off event that is signaled when the session terminates, whether due to an
+    // explicit Terminate() call or an unexpected VM exit. The returned handle is owned by the
+    // caller and remains valid (and observes the signaled state) even after the session is released.
+    HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    // Returns the cached termination reason and details. These are only available after the
+    // termination event has been signaled; before that the call fails.
+    HRESULT GetTerminationReason([out] WSLCCompatVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCCompatVolumeOptions* Options, [out] WSLCCompatVolumeInformation* VolumeInfo);

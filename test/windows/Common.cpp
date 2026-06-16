@@ -1538,11 +1538,12 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
         L"debugConsoleLogFile=" +
-        EscapePath(kernelLogs) +
+        EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
-        L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
+        boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
     {

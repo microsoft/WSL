@@ -40,9 +40,10 @@ EXTERN_C_START
 #define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
 #define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
 #define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 88
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -123,8 +124,6 @@ typedef enum WslcSessionTerminationReason
     WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
 } WslcSessionTerminationReason;
 
-typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
-
 typedef struct WslcSessionCrashDumpInfo
 {
     _Field_z_ PCWSTR dumpPath;
@@ -153,9 +152,8 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
-// Pass in Null for callback to clear the termination callback
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext);
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);

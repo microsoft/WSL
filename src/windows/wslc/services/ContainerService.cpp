@@ -19,6 +19,7 @@ Abstract:
 #include "ImageProgressCallback.h"
 #include "WarningCallback.h"
 #include <wslutil.h>
+#include <HandleConsoleProgressBar.h>
 #include <WSLCProcessLauncher.h>
 #include <ConsoleState.h>
 #include <CommandLine.h>
@@ -60,6 +61,24 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     for (size_t i = 1; i < options.Networks.size(); ++i)
     {
         containerLauncher.AddAdditionalNetwork(options.Networks[i]);
+    }
+
+    if (!options.NetworkAliases.empty())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
+
+        for (const auto& alias : options.NetworkAliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
     }
 
     // Set port options if provided
@@ -562,6 +581,26 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
+}
+
+void ContainerService::Export(Session& session, const std::string& id, const std::wstring& outputPath)
+{
+    wil::unique_hfile outputFile{
+        CreateFileW(outputPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!outputFile);
+
+    Export(session, id, outputFile.get());
+}
+
+void ContainerService::Export(Session& session, const std::string& id, HANDLE outputHandle)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    wsl::windows::common::HandleConsoleProgressBar progressBar(
+        outputHandle, Localization::MessageWslcExportInProgress(), wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+
+    THROW_IF_FAILED(container->Export(ToCOMInputHandle(outputHandle)));
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)

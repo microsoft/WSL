@@ -19,12 +19,15 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
+#include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
+using io::OverlappedIOHandle;
+using io::WriteHandle;
 using wsl::shared::Localization;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
@@ -349,6 +352,9 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
+    // Mirror the host's trusted root CAs into the VM before dockerd starts.
+    InstallTrustedRootCertificates();
+
     // Launch containerd first
     StartContainerd();
 
@@ -594,6 +600,44 @@ void WSLCSession::StartDockerd()
 
     m_dockerdProcess = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
     WSL_LOG("DockerdStarted");
+}
+
+void WSLCSession::InstallTrustedRootCertificates()
+try
+{
+    const auto pem = CollectTrustedRootCertificatesPem();
+    if (pem.empty())
+    {
+        WSL_LOG("InstallTrustedRootCertificatesSkipped");
+        return;
+    }
+
+    // dockerd and containerd read the certificates found in /etc/ssl/certs into
+    // their default system certificate pool.
+    constexpr auto c_certPath = "/etc/ssl/certs/wsl-windows-roots.pem";
+    const auto script = std::format("cat > '{}'", c_certPath);
+
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    std::unique_ptr<OverlappedIOHandle> writeStdin(
+        new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{pem.begin(), pem.end()}));
+    std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+    extraHandles.emplace_back(std::move(writeStdin));
+
+    const auto result = process.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    WSL_LOG(
+        "InstalledTrustedRootCertificates",
+        TraceLoggingValue(c_certPath, "Path"),
+        TraceLoggingValue(static_cast<uint64_t>(pem.size()), "BundleBytes"));
+}
+catch (...)
+{
+    // Best-effort: failing to install the host's trusted roots must not prevent the session from starting.
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the VM");
+    EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
@@ -1759,6 +1803,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
@@ -1808,6 +1853,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             m_virtualMachine.value(),
             m_pluginNotifier.get(),
             m_networks,
+            m_volumes.value(),
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -2515,6 +2561,79 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PruneNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkName** Networks, ULONG* NetworksCount)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Networks);
+    RETURN_HR_IF_NULL(E_POINTER, NetworksCount);
+    *Networks = nullptr;
+    *NetworksCount = 0;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    // Scope the prune to WSLC-managed networks.
+    filters["label"].push_back(WSLCNetworkManagedLabel);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+
+    docker_schema::PruneNetworkResult pruneResult;
+    try
+    {
+        pruneResult = m_dockerClient->PruneNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
+
+    if (!pruneResult.NetworksDeleted.has_value() || pruneResult.NetworksDeleted->empty())
+    {
+        return S_OK;
+    }
+
+    std::vector<std::string> deleted;
+    deleted.reserve(pruneResult.NetworksDeleted->size());
+    for (const auto& name : *pruneResult.NetworksDeleted)
+    {
+        // Only report networks that we manage.
+        if (!m_networks.contains(name))
+        {
+            WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
+            continue;
+        }
+        deleted.push_back(name);
+    }
+
+    if (deleted.empty())
+    {
+        return S_OK;
+    }
+
+    // Erase before marshalling: docker has already pruned these, so m_networks must stay in sync.
+    for (const auto& name : deleted)
+    {
+        m_networks.erase(name);
+    }
+
+    WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
+
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkName[]>(deleted.size());
+    for (size_t i = 0; i < deleted.size(); ++i)
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, strcpy_s(output[i], deleted[i].c_str()) != 0, "Unexpected network name length: %hs", deleted[i].c_str());
+    }
+
+    *Networks = output.release();
+    *NetworksCount = static_cast<ULONG>(deleted.size());
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const
 {
     const HANDLE waitHandles[] = {Event, m_sessionTerminatingEvent.get()};
@@ -2620,9 +2739,20 @@ try
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
+
+        // The VM exited on its own, so it recorded the cause.
+        if (m_virtualMachine)
+        {
+            wil::unique_cotaskmem_string details;
+            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
+            m_terminationDetails = details ? details.get() : L"";
+        }
     }
     else
     {
+        // The VM is still alive, so this is a graceful shutdown initiated by us.
+        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+
         if (m_virtualMachine)
         {
             m_virtualMachine->OnSessionTerminated();
@@ -2661,7 +2791,8 @@ try
         m_swapVhdPath.clear();
     }
 
-    m_terminated = true;
+    m_sessionTerminatedEvent.SetEvent();
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -2999,6 +3130,23 @@ HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Cal
     return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
+HRESULT WSLCSession::GetTerminationReason(WSLCCompatVirtualMachineTerminationReason* Reason, LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCCompatVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    WSLCVirtualMachineTerminationReason reason = WSLCVirtualMachineTerminationReasonUnknown;
+    RETURN_IF_FAILED(GetTerminationReason(&reason, Details));
+
+    *Reason = apicompat::Convert(reason);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {
     io::MultiHandleWait io;
@@ -3124,9 +3272,42 @@ HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
     RETURN_HR_IF_NULL(E_POINTER, State);
 
-    *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
+    *State = m_sessionTerminatedEvent.is_signaled() ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }
+
+HRESULT WSLCSession::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    RETURN_HR_IF(E_POINTER, Event == nullptr);
+
+    *Event = nullptr;
+
+    // Duplicate the "terminated" event. The caller owns the returned handle, which stays valid even after the session is released.
+    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get(), SYNCHRONIZE);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once before m_sessionTerminatedEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 void WSLCSession::RecoverExistingContainers()
 {
@@ -3145,7 +3326,7 @@ void WSLCSession::RecoverExistingContainers()
                 *this,
                 m_virtualMachine.value(),
                 m_pluginNotifier.get(),
-                *m_volumes,
+                m_volumes.value(),
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

@@ -33,8 +33,6 @@ typedef struct WslcSessionOptionsInternal
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
-    WslcSessionTerminationCallback terminationCallback;
-    PVOID terminationCallbackContext;
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
@@ -107,7 +105,6 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 struct WslcSessionImpl
 {
     wil::com_ptr<IWSLCCompatSession> session;
-    wil::com_ptr<IWSLCCompatTerminationCallback> terminationCallback;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);

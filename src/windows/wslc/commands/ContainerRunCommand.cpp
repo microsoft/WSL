@@ -49,6 +49,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Memory),
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::Network, false, NO_LIMIT),
+        Argument::Create(ArgType::NetworkAlias, false, NO_LIMIT),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),

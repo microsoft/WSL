@@ -2352,6 +2352,17 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <value>Le impostazioni dell'endpoint non sono ancora supportate (rete '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>L'alias della rete non può essere vuoto.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Gli alias di rete richiedono una rete definita dall'utente. Utilizzare --network per specificarne uno.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Impossibile specificare alias di rete quando sono richieste più reti. Utilizza un singolo argomento --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>La creazione del volume '{}': {} non è riuscita</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2397,9 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Salvataggio in corso.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Export in progress.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC è lo strumento CLI dei contenitori del sottosistema Windows per Linux.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2418,6 +2432,16 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Esegue un comando in un contenitore in esecuzione.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Export a container's filesystem as a tar archive.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exports a container's filesystem as a tar archive.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Write to a file, instead of STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Ispeziona un contenitore.</value>
@@ -2819,6 +2843,13 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>la rete in modalità host non è supportata</value>
   </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Aggiungi un alias con ambito di rete per il contenitore</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Valore {} non valido: l'alias di rete non può essere vuoto o contenere spazi vuoti</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Non usare la cache durante la compilazione dell'immagine</value>
   </data>
@@ -3088,6 +3119,24 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Elenca tutti i volumi nella sessione.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Rimuovi i volumi locali non utilizzati.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Rimuove tutti i volumi locali anonimi inutilizzati. Se --all è specificato, rimuove anche i volumi denominati inutilizzati. Un volume viene considerato inutilizzato quando nessun contenitore vi fa riferimento.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Rimuovi tutti i volumi inutilizzati, non solo quelli anonimi.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Eliminato: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Spazio totale recuperato: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Nome volume</value>
   </data>
@@ -3103,6 +3152,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Non è possibile scrivere l'immagine nel terminale. Usa il flag -o o reindirizza stdout.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Impossibile esportare il contenitore nel terminale. Usa il flag -o o reindirizza stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Formato previsto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
@@ -3224,6 +3276,14 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Non è possibile recuperare il volume '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Non è possibile avviare il contenitore perché i volumi seguenti non sono disponibili: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Il volume '{}' non è disponibile: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Non è possibile inizializzare lo scambio</value>
   </data>
@@ -3244,6 +3304,18 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Non è stato possibile rilasciare le risorse host per il volume '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Skipped importing {} certificates from Local Machine Trusted Root store due to certificate encoding failures</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Skipped importing {} certificates from Current User Trusted Root store due to certificate encoding failures</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Non è stato possibile installare i certificati radice trusted dell'host nella macchina virtuale: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

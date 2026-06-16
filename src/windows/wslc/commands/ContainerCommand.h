@@ -77,6 +77,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Export Command
+struct ContainerExportCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"export";
+    ContainerExportCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Inspect Command
 struct ContainerInspectCommand final : public Command
 {

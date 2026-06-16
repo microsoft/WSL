@@ -41,23 +41,6 @@ namespace {
         return result;
     }
 
-    class TerminationCallbackAdapter
-        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback>
-    {
-    public:
-        TerminationCallbackAdapter(IWSLCCompatTerminationCallback* Inner) : m_inner(Inner)
-        {
-        }
-
-        IFACEMETHOD(OnTermination)(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details) override
-        {
-            return m_inner->OnTermination(Convert(Reason), Details);
-        }
-
-    private:
-        Microsoft::WRL::ComPtr<IWSLCCompatTerminationCallback> m_inner;
-    };
-
     class CrashDumpCallbackAdapter
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ICrashDumpCallback>
     {
@@ -709,9 +692,6 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.BootTimeoutMs = Settings.BootTimeoutMs;
     m_value.NetworkingMode = Convert(Settings.NetworkingMode);
 
-    m_terminationCallback = Convert(Settings.TerminationCallback);
-    m_value.TerminationCallback = m_terminationCallback.Get();
-
     m_value.FeatureFlags = Convert(Settings.FeatureFlags);
     m_value.DmesgOutput = Convert(Settings.DmesgOutput);
     m_value.StorageFlags = Convert(Settings.StorageFlags);
@@ -722,17 +702,6 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
 //
 // Callback conversions.
 //
-
-Microsoft::WRL::ComPtr<ITerminationCallback> Convert(IWSLCCompatTerminationCallback* Callback)
-{
-    Microsoft::WRL::ComPtr<ITerminationCallback> result;
-    if (Callback != nullptr)
-    {
-        result = Microsoft::WRL::Make<TerminationCallbackAdapter>(Callback);
-    }
-
-    return result;
-}
 
 Microsoft::WRL::ComPtr<ICrashDumpCallback> Convert(IWSLCCompatCrashDumpCallback* Callback)
 {

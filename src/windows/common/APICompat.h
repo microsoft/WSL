@@ -149,7 +149,6 @@ public:
 
 private:
     WSLCSessionSettings m_value{};
-    Microsoft::WRL::ComPtr<ITerminationCallback> m_terminationCallback;
 };
 
 inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
@@ -176,7 +175,6 @@ inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settin
 // Callback conversions.
 //
 
-Microsoft::WRL::ComPtr<ITerminationCallback> Convert(IWSLCCompatTerminationCallback* Callback);
 Microsoft::WRL::ComPtr<ICrashDumpCallback> Convert(IWSLCCompatCrashDumpCallback* Callback);
 Microsoft::WRL::ComPtr<IProgressCallback> Convert(IWSLCCompatProgressCallback* Callback);
 Microsoft::WRL::ComPtr<IWarningCallback> Convert(IWSLCCompatWarningCallback* Callback);
