@@ -3411,7 +3411,10 @@ class WSLCTests
         // subsequent stat reports uid=0/gid=0 because ownership is not persisted.
         auto result = ExpectCommandResult(
             session.get(),
-            {"/bin/sh", "-c", "touch /virtiofs-ownership-test/owned.txt && chown 1000:100 /virtiofs-ownership-test/owned.txt && stat -c '%u %g' /virtiofs-ownership-test/owned.txt"},
+            {"/bin/sh",
+             "-c",
+             "touch /virtiofs-ownership-test/owned.txt && chown 1000:100 /virtiofs-ownership-test/owned.txt"
+             " && stat -c '%u %g' /virtiofs-ownership-test/owned.txt"},
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("1000 100\n"));
@@ -3419,7 +3422,11 @@ class WSLCTests
         // Verify that a file created by a non-root user retains the creator's ownership.
         result = ExpectCommandResult(
             session.get(),
-            {"/bin/sh", "-c", "rm -f /virtiofs-ownership-test/nonroot.txt && su -s /bin/sh nobody -c 'touch /virtiofs-ownership-test/nonroot.txt' && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
+            {"/bin/sh",
+             "-c",
+             "rm -f /virtiofs-ownership-test/nonroot.txt"
+             " && su -s /bin/sh nobody -c 'touch /virtiofs-ownership-test/nonroot.txt'"
+             " && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
