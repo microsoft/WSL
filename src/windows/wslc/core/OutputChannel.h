@@ -11,9 +11,9 @@ Abstract:
     OutputChannel is the byte sink used by Reporter.
 
     Each WriteString call is exactly one underlying WriteConsoleW (when the
-    handle is a console) or one fwprintf + one optional fflush (when the
-    destination is a FILE*). Both paths are atomic at the kernel/CRT layer, so
-    concurrent threads cannot interleave bytes mid-call.
+    handle is a console) or one fwprintf (when the destination is a FILE*).
+    Both paths are atomic at the kernel/CRT layer, so concurrent threads
+    cannot interleave bytes mid-call.
 
     For console destinations the channel also owns the VT enablement on that
     handle (RAII; original console mode is restored on destruction).
@@ -36,9 +36,6 @@ class OutputChannel
 public:
     NON_COPYABLE(OutputChannel);
     NON_MOVABLE(OutputChannel);
-
-    // No destination; WriteString is a no-op.
-    OutputChannel() = default;
 
     // Console-handle path: enables VT processing on the handle (restored on
     // destruction); falls back to fwprintf on fallbackFile when the handle

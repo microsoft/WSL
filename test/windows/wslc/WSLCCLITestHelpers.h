@@ -152,7 +152,7 @@ struct CaptureReporter
     CapturePipe pipe;
     wsl::windows::wslc::Reporter reporter;
 
-    explicit CaptureReporter(bool vtEnabled = false) : reporter(pipe.file(), vtEnabled)
+    explicit CaptureReporter(bool vtEnabled = false) : reporter(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
     {
     }
 

@@ -63,13 +63,6 @@ void OutputChannel::WriteString(std::wstring_view text) const
         const int err = errno;
         LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), "fwprintf to redirected output failed (errno=%d)", err);
     }
-
-    // Windows CRT defaults stderr to _IONBF, so skip the no-op fflush for it.
-    if (m_file != stderr && fflush(m_file) != 0)
-    {
-        const int err = errno;
-        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), "fflush of redirected output failed (errno=%d)", err);
-    }
 }
 
 std::optional<int> OutputChannel::GetConsoleWidth() const

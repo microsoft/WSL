@@ -10,8 +10,8 @@ Abstract:
 
     Level-filtered user-facing output for the WSLC CLI.
 
-    Each WriteLine/Write call is a single underlying WriteConsoleW or
-    fwprintf+fflush, so concurrent calls cannot interleave mid-message.
+    Each Write call is a single underlying WriteConsoleW or fwprintf,
+    so concurrent calls cannot interleave mid-message.
 
     Reporter exposes a std::format-style API. Sequence / ConstructedSequence
     arguments are inspected per call: when the destination has VT disabled,
@@ -25,8 +25,6 @@ Abstract:
 #include "OutputChannel.h"
 #include "VTSupport.h"
 
-#include <atomic>
-#include <cstdint>
 #include <cstdio>
 #include <format>
 #include <optional>
@@ -35,7 +33,6 @@ Abstract:
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <Windows.h>
 
 namespace wsl::windows::wslc {
 
@@ -43,19 +40,20 @@ namespace reporter_detail {
 
     // Pass-through for any non-Sequence argument: preserves value category so
     // the caller's lvalues stay as references inside the materialized tuple and
-    // rvalues are moved in.
-    template <typename T>
+    // rvalues are moved in. SFINAE excludes Sequence-derived types so the
+    // Sequence overload below is selected for them.
+    template <typename T, typename = std::enable_if_t<!std::is_base_of_v<wsl::windows::common::vt::Sequence, std::remove_cvref_t<T>>>>
     constexpr T&& StripIfDisabled(T&& value, bool /*vtEnabled*/, bool /*colorEnabled*/) noexcept
     {
         return std::forward<T>(value);
     }
 
-    // Sequence and ConstructedSequence both expose Get() and IsColor() through
-    // the Sequence base. We return a Sequence by value that either borrows the
-    // caller's bytes (when VT/color permits) or is empty (when stripped).
-    // The borrow is safe because the caller's argument outlives the WriteLine
-    // call (full-expression lifetime extension applies to temporaries).
-    inline wsl::windows::common::vt::Sequence StripIfDisabled(const wsl::windows::common::vt::Sequence& sequence, bool vtEnabled, bool colorEnabled)
+    // Handles both Sequence and ConstructedSequence (which derives from
+    // Sequence). Returns the VT bytes as a string_view when permitted, or
+    // empty when stripped. The borrow is safe because the caller's argument
+    // outlives the Write call (full-expression lifetime extension applies
+    // to temporaries).
+    inline std::wstring_view StripIfDisabled(const wsl::windows::common::vt::Sequence& sequence, bool vtEnabled, bool colorEnabled)
     {
         if (!vtEnabled)
         {
@@ -65,51 +63,25 @@ namespace reporter_detail {
         {
             return {};
         }
-        return wsl::windows::common::vt::Sequence{sequence.Get()};
-    }
-
-    inline wsl::windows::common::vt::Sequence StripIfDisabled(const wsl::windows::common::vt::ConstructedSequence& sequence, bool vtEnabled, bool colorEnabled)
-    {
-        if (!vtEnabled)
-        {
-            return {};
-        }
-        if (!colorEnabled && sequence.IsColor())
-        {
-            return {};
-        }
-        return wsl::windows::common::vt::Sequence{sequence.Get()};
+        return sequence.Get();
     }
 
 } // namespace reporter_detail
 
 struct Reporter
 {
-    enum class Level : uint32_t
+    enum class Level
     {
-        None = 0x0,
-        Debug = 0x1,   // verbose diagnostics; routes to stderr
-        Output = 0x2,  // primary data output; routes to stdout
-        Info = 0x4,    // diagnostic info; routes to stderr
-        Warning = 0x8, // warnings; routes to stderr
-        Error = 0x10,  // errors; routes to stderr
-        Standard = Output | Info | Warning | Error,
-        All = Debug | Output | Info | Warning | Error,
+        Output,  // primary data output; routes to stdout
+        Info,    // diagnostic info; routes to stderr
+        Warning, // warnings; routes to stderr
+        Error,   // errors; routes to stderr
     };
 
     // Default: stdout/stderr, per-handle VT.
     Reporter();
 
-    // Single FILE* for all output (no VT).
-    explicit Reporter(FILE* outFile);
-
-    // Output to outFile, diagnostics to errFile.
-    Reporter(FILE* outFile, FILE* errFile);
-
-    // Single FILE* with explicit VT.
-    Reporter(FILE* outFile, bool vtEnabled);
-
-    // Per-channel FILE* with explicit per-channel VT.
+    // Per-channel FILE* with explicit per-channel VT (for tests).
     Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled);
 
     NON_COPYABLE(Reporter);
@@ -117,47 +89,36 @@ struct Reporter
 
     ~Reporter() = default;
 
-    // std::format-style write APIs. Each call emits exactly one underlying
-    // WriteConsoleW or fwprintf+fflush. WriteLine appends a trailing newline;
-    // Write does not. Sequence / ConstructedSequence arguments are stripped
-    // when VT is disabled (or --no-color is set, for color-bearing sequences).
-    template <typename... Args>
-    void WriteLine(Level level, std::wformat_string<Args...> fmt, Args&&... args)
-    {
-        EmitFormatted(level, /*appendNewline*/ true, std::move(fmt), std::forward<Args>(args)...);
-    }
-
+    // std::format-style write API. Each call emits exactly one underlying
+    // WriteConsoleW or fwprintf+fflush. Sequence / ConstructedSequence
+    // arguments are stripped when VT is disabled (or no-color is set, for
+    // color-bearing sequences).
     template <typename... Args>
     void Write(Level level, std::wformat_string<Args...> fmt, Args&&... args)
     {
-        EmitFormatted(level, /*appendNewline*/ false, std::move(fmt), std::forward<Args>(args)...);
+        EmitFormatted(level, std::move(fmt), std::forward<Args>(args)...);
     }
 
-    // Per-level convenience wrappers; each appends a trailing newline.
+    // Per-level convenience wrappers.
     template <typename... Args>
     void Output(std::wformat_string<Args...> fmt, Args&&... args)
     {
-        WriteLine(Level::Output, std::move(fmt), std::forward<Args>(args)...);
+        EmitFormatted(Level::Output, std::move(fmt), std::forward<Args>(args)...);
     }
     template <typename... Args>
     void Info(std::wformat_string<Args...> fmt, Args&&... args)
     {
-        WriteLine(Level::Info, std::move(fmt), std::forward<Args>(args)...);
+        EmitFormatted(Level::Info, std::move(fmt), std::forward<Args>(args)...);
     }
     template <typename... Args>
     void Warn(std::wformat_string<Args...> fmt, Args&&... args)
     {
-        WriteLine(Level::Warning, std::move(fmt), std::forward<Args>(args)...);
+        EmitFormatted(Level::Warning, std::move(fmt), std::forward<Args>(args)...);
     }
     template <typename... Args>
     void Error(std::wformat_string<Args...> fmt, Args&&... args)
     {
-        WriteLine(Level::Error, std::move(fmt), std::forward<Args>(args)...);
-    }
-    template <typename... Args>
-    void Debug(std::wformat_string<Args...> fmt, Args&&... args)
-    {
-        WriteLine(Level::Debug, std::move(fmt), std::forward<Args>(args)...);
+        EmitFormatted(Level::Error, std::move(fmt), std::forward<Args>(args)...);
     }
 
     // True when the destination for this level honors VT escape sequences
@@ -186,30 +147,18 @@ struct Reporter
     // redirected or the screen-buffer query fails.
     std::optional<int> GetConsoleWidth(Level level) const;
 
-    bool IsLevelEnabled(Level level) const noexcept;
-    void SetLevelMask(Level level, bool enabled) noexcept;
-
-    // Silences all further writes. Idempotent; safe to call from any thread.
-    void Disable() noexcept;
-
 private:
     const OutputChannel& ChannelFor(Level level) const noexcept
     {
         return (level == Level::Output) ? m_out : m_err;
     }
 
-    // Sandwiches body with the level's SGR prefix + reset (when VT permits),
-    // optionally appends '\n', and dispatches a single WriteString call.
-    void Emit(const OutputChannel& channel, Level level, std::wstring_view body, bool appendNewline) const;
+    // Per-level SGR colorant (empty when color is off).
+    std::wstring_view LevelPrefix(Level level) const noexcept;
 
     template <typename... Args>
-    void EmitFormatted(Level level, bool appendNewline, std::wformat_string<Args...> fmt, Args&&... args)
+    void EmitFormatted(Level level, std::wformat_string<Args...> fmt, Args&&... args)
     {
-        if (!m_enabled.load(std::memory_order_relaxed) || !IsLevelEnabled(level))
-        {
-            return;
-        }
-
         const OutputChannel& channel = ChannelFor(level);
         const bool vtEnabled = channel.IsVTEnabled();
         const bool colorEnabled = vtEnabled && !m_noColor;
@@ -221,16 +170,25 @@ private:
         std::wstring body = std::apply(
             [&fmt](auto&... values) { return std::vformat(std::wstring_view{fmt.get()}, std::make_wformat_args(values...)); }, stripped);
 
-        Emit(channel, level, body, appendNewline);
+        const auto prefix = LevelPrefix(level);
+        if (prefix.empty())
+        {
+            channel.WriteString(body);
+            return;
+        }
+
+        const auto reset = wsl::windows::common::vt::Format::Default.Get();
+        std::wstring out;
+        out.reserve(prefix.size() + body.size() + reset.size());
+        out.append(prefix);
+        out.append(body);
+        out.append(reset);
+        channel.WriteString(out);
     }
 
     OutputChannel m_out;
     OutputChannel m_err;
-    std::atomic_bool m_enabled{true};
     bool m_noColor = false;
-    Level m_enabledLevels = Level::Standard;
 };
-
-DEFINE_ENUM_FLAG_OPERATORS(Reporter::Level);
 
 } // namespace wsl::windows::wslc
