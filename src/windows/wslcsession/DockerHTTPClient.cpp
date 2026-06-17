@@ -399,7 +399,8 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(
+    const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength)
 {
     auto url = URL::Create("/containers/{}/archive", ContainerID);
     url.SetParameter("path", Path);
