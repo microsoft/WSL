@@ -65,6 +65,56 @@ using WslcInspectContainer = wsl::windows::common::wslc_schema::InspectContainer
 
 namespace {
 
+// Unlike dockerd, podman's compat container-attach API falls back to its Engine.DetachKeys -- which is
+// empty at runtime -- when the attach request carries no detachKeys, so the docker-default ctrl-p,ctrl-q
+// never detaches. Always send an explicit value, defaulting to ctrl-p,ctrl-q when the caller does not
+// specify one, so detaching works regardless of the backend's configured default.
+constexpr LPCSTR c_defaultDetachKeys = "ctrl-p,ctrl-q";
+
+// Whether a single detach-key token is valid per the moby/term format podman parses: a single
+// character, "DEL", or "ctrl-<X>" where X is one of @ a-z [ \ ] ^ _.
+bool IsValidDetachToken(std::string_view Token)
+{
+    if (Token.size() == 1 || Token == "DEL")
+    {
+        return true;
+    }
+
+    if (Token.size() == 6 && Token.starts_with("ctrl-"))
+    {
+        const char c = Token[5];
+        return c == '@' || (c >= 'a' && c <= 'z') || (c >= '[' && c <= '_');
+    }
+
+    return false;
+}
+
+std::optional<std::string> ResolveDetachKeys(LPCSTR DetachKeys)
+{
+    std::string keys = DetachKeys != nullptr ? DetachKeys : c_defaultDetachKeys;
+
+    // Validate up front so invalid keys fail with E_INVALIDARG. podman returns HTTP 500 (not 400) for
+    // invalid detach keys, which would otherwise surface as a generic E_FAIL. An empty string is valid
+    // and disables detach (matching podman); otherwise every comma-separated token must be valid.
+    if (!keys.empty())
+    {
+        for (size_t start = 0;;)
+        {
+            const auto comma = keys.find(',', start);
+            const auto token =
+                std::string_view(keys).substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            THROW_HR_IF(E_INVALIDARG, !IsValidDetachToken(token));
+            if (comma == std::string::npos)
+            {
+                break;
+            }
+            start = comma + 1;
+        }
+    }
+
+    return std::optional<std::string>(std::move(keys));
+}
+
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
 {
     if (array.Count == 0)
@@ -710,7 +760,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     try
     {
-        ioHandle = m_dockerClient.AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
+        ioHandle = m_dockerClient.AttachContainer(m_id, ResolveDetachKeys(DetachKeys));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
@@ -768,7 +818,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
 
     if (StartOptions != nullptr)
     {
-        detachKeys = StartOptions->DetachKeys != nullptr ? std::optional<std::string>(StartOptions->DetachKeys) : std::nullopt;
+        detachKeys = ResolveDetachKeys(StartOptions->DetachKeys);
 
         THROW_HR_IF_MSG(
             E_INVALIDARG,
@@ -1254,10 +1304,8 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
         request.AttachStdin = true;
     }
 
-    if (StartOptions != nullptr && StartOptions->DetachKeys != nullptr)
-    {
-        request.DetachKeys = StartOptions->DetachKeys;
-    }
+    // Always send explicit detach keys so detaching does not depend on the backend's configured default.
+    request.DetachKeys = ResolveDetachKeys(StartOptions != nullptr ? StartOptions->DetachKeys : nullptr);
 
     try
     {
