@@ -2442,7 +2442,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
-    <value>Copy files/folders between a container and the local filesystem.</value>
+    <value>Copy a tar archive from stdin into a container.</value>
   </data>
   <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
     <value>Copy a tar archive from stdin into a container. Use '-' as the source to read from stdin.

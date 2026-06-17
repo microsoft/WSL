@@ -399,15 +399,15 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(const std::string& ContainerID, const std::string& Path, uint64_t ContentLength)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength)
 {
     auto url = URL::Create("/containers/{}/archive", ContainerID);
     url.SetParameter("path", Path);
 
     std::map<std::string, std::string> headers = {{"Content-Type", "application/x-tar"}};
-    if (ContentLength > 0)
+    if (ContentLength.has_value())
     {
-        headers["Content-Length"] = std::to_string(ContentLength);
+        headers["Content-Length"] = std::to_string(ContentLength.value());
     }
 
     return SendRequestImpl(verb::put, url, {}, headers);

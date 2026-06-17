@@ -1132,7 +1132,13 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
 {
     auto lock = m_lock.lock_shared();
 
-    auto requestContext = m_dockerClient.PutArchive(m_id, DestPath, ContentSize);
+    std::optional<uint64_t> contentLength;
+    if (ContentSize > 0)
+    {
+        contentLength = ContentSize;
+    }
+
+    auto requestContext = m_dockerClient.PutArchive(m_id, DestPath, contentLength);
 
     auto userHandle = m_wslcSession.OpenUserHandle(TarHandle);
 
