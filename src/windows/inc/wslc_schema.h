@@ -18,21 +18,7 @@ Abstract:
 
 namespace wsl::windows::common::wslc_schema {
 
-struct EmptyObject
-{
-};
-
-inline void to_json(nlohmann::json& j, const EmptyObject& obj)
-{
-    UNREFERENCED_PARAMETER(obj);
-    j = nlohmann::json::object();
-}
-
-inline void from_json(const nlohmann::json& j, EmptyObject& obj)
-{
-    UNREFERENCED_PARAMETER(j);
-    UNREFERENCED_PARAMETER(obj);
-}
+using wsl::shared::EmptyObject;
 
 struct InspectPortBinding
 {
