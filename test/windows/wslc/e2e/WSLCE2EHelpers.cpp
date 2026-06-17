@@ -145,7 +145,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
+        command = std::format(L"--session \"{}\" container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
