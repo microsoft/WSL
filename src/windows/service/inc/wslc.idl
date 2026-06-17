@@ -627,6 +627,7 @@ interface IWSLCContainer : IUnknown
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
 }
 
 typedef enum _WSLCDeletedImageType

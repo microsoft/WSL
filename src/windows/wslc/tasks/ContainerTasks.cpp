@@ -277,6 +277,42 @@ void ExportContainer(CLIExecutionContext& context)
     }
 }
 
+void CopyToContainer(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::Source));
+    WI_ASSERT(context.Args.Contains(ArgType::Target));
+
+    auto& session = context.Data.Get<Data::Session>();
+    auto source = WideToMultiByte(context.Args.Get<ArgType::Source>());
+    auto target = WideToMultiByte(context.Args.Get<ArgType::Target>());
+
+    // Parse CONTAINER:PATH from the target
+    auto colonPos = target.find(':');
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), colonPos == std::string::npos || colonPos == 0);
+
+    auto containerId = target.substr(0, colonPos);
+    auto destPath = target.substr(colonPos + 1);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), destPath.empty());
+
+    // Source must be "-" for stdin
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpStdinOnlyError(), source != "-");
+
+    auto stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(stdinHandle));
+
+    // Try to get file size if stdin is redirected from a file
+    LARGE_INTEGER fileSize{};
+    ULONGLONG contentSize = 0;
+    if (GetFileSizeEx(stdinHandle, &fileSize))
+    {
+        contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
+    }
+
+    ContainerService::CopyToContainer(session, containerId, destPath, stdinHandle, contentSize);
+}
+
 void ListContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Containers));
