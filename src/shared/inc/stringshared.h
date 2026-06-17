@@ -392,9 +392,15 @@ inline std::optional<uint64_t> ParseMemorySize(const T* String)
         std::make_pair(Gigabytes, 1ULL << 30),
         std::make_pair(Terabytes, 1ULL << 40)};
 
+    // Case-insensitive suffix matching to align with Docker CLI behavior (accepts both 512m and 512M).
     for (const auto& [Suffix, Factor] : Units)
     {
-        if ((Remainder == Suffix.substr(0, 1)) || (Remainder == Suffix))
+        if (Remainder.size() == 1 && IsEqual(Remainder, Suffix.substr(0, 1), true))
+        {
+            return Value * Factor;
+        }
+
+        if (IsEqual(Remainder, Suffix, true))
         {
             return Value * Factor;
         }

@@ -85,7 +85,23 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, cancelEvent);
+
+    int64_t shmSize = 0;
+    if (context.Args.Contains(ArgType::ShmSize))
+    {
+        shmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
+    }
+
+    std::vector<std::tuple<std::string, int64_t, int64_t>> ulimits;
+    if (context.Args.Contains(ArgType::Ulimit))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::Ulimit>())
+        {
+            ulimits.emplace_back(validation::ParseUlimit(value));
+        }
+    }
+
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, shmSize, ulimits, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

@@ -123,6 +123,8 @@ void ImageService::Build(
     const std::wstring& target,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
+    int64_t shmSize,
+    const std::vector<std::tuple<std::string, int64_t, int64_t>>& ulimits,
     HANDLE cancelEvent)
 {
     auto absolutePath = std::filesystem::absolute(contextPath);
@@ -170,6 +172,14 @@ void ImageService::Build(
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
     auto contextPathStr = absolutePath.wstring();
+
+    std::vector<WSLCUlimit> ulimitEntries;
+    ulimitEntries.reserve(ulimits.size());
+    for (const auto& [name, soft, hard] : ulimits)
+    {
+        ulimitEntries.push_back({name.c_str(), soft, hard});
+    }
+
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
@@ -177,6 +187,9 @@ void ImageService::Build(
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
+        .ShmSize = shmSize,
+        .Ulimits = ulimitEntries.empty() ? nullptr : ulimitEntries.data(),
+        .UlimitsCount = static_cast<ULONG>(ulimitEntries.size()),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));

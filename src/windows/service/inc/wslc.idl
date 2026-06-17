@@ -679,6 +679,9 @@ typedef struct _WSLCBuildImageOptions
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
+    LONGLONG ShmSize;          // Shared memory size in bytes passed as --shm-size to docker. 0 = default.
+    [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
+    ULONG UlimitsCount;
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions

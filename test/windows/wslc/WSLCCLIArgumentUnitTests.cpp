@@ -151,6 +151,46 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::ValidateGpus({L"0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L"gpu0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L""}, L"gpusArg"), ArgumentException);
+
+        // Verify memory size parsing (case-insensitive, matching Docker CLI behavior)
+        auto memoryBytes = validation::GetMemorySizeFromString(L"512m");
+        VERIFY_ARE_EQUAL(memoryBytes, 512LL * 1024 * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"512M");
+        VERIFY_ARE_EQUAL(memoryBytes, 512LL * 1024 * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"1g");
+        VERIFY_ARE_EQUAL(memoryBytes, 1LL * 1024 * 1024 * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"1G");
+        VERIFY_ARE_EQUAL(memoryBytes, 1LL * 1024 * 1024 * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"256k");
+        VERIFY_ARE_EQUAL(memoryBytes, 256LL * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"256K");
+        VERIFY_ARE_EQUAL(memoryBytes, 256LL * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"1024");
+        VERIFY_ARE_EQUAL(memoryBytes, 1024LL);
+        memoryBytes = validation::GetMemorySizeFromString(L"512mb");
+        VERIFY_ARE_EQUAL(memoryBytes, 512LL * 1024 * 1024);
+        memoryBytes = validation::GetMemorySizeFromString(L"512MB");
+        VERIFY_ARE_EQUAL(memoryBytes, 512LL * 1024 * 1024);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"invalidsize"), ArgumentException);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L""), ArgumentException);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"abc123"), ArgumentException);
+        VERIFY_NO_THROW(validation::ValidateMemorySize({L"512m", L"1G", L"256K"}, L"memoryArg"));
+        VERIFY_THROWS(validation::ValidateMemorySize({L"512m", L"notvalid"}, L"memoryArg"), ArgumentException);
+
+        // Verify CPU (nano-cpus) parsing
+        auto nanoCpus = validation::GetNanoCpusFromString(L"2.0");
+        VERIFY_ARE_EQUAL(nanoCpus, 2'000'000'000LL);
+        nanoCpus = validation::GetNanoCpusFromString(L"0.5");
+        VERIFY_ARE_EQUAL(nanoCpus, 500'000'000LL);
+        nanoCpus = validation::GetNanoCpusFromString(L"1");
+        VERIFY_ARE_EQUAL(nanoCpus, 1'000'000'000LL);
+        nanoCpus = validation::GetNanoCpusFromString(L"1.5");
+        VERIFY_ARE_EQUAL(nanoCpus, 1'500'000'000LL);
+        VERIFY_THROWS(validation::GetNanoCpusFromString(L"notanumber"), ArgumentException);
+        VERIFY_THROWS(validation::GetNanoCpusFromString(L""), ArgumentException);
+        VERIFY_THROWS(validation::GetNanoCpusFromString(L"-1.0"), ArgumentException);
+        VERIFY_NO_THROW(validation::ValidateNanoCpus({L"1.0", L"2.5", L"0.25"}, L"cpusArg"));
+        VERIFY_THROWS(validation::ValidateNanoCpus({L"1.0", L"abc"}, L"cpusArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.
