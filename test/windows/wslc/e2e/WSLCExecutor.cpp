@@ -231,6 +231,36 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
     return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
 }
 
+WSLCExecutionResult RunWslcWithStdinFile(const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType)
+{
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+
+    wil::unique_handle nonElevatedToken;
+    if (elevationType == ElevationType::NonElevated)
+    {
+        nonElevatedToken = GetNonElevatedPrimaryToken();
+        process.SetToken(nonElevatedToken.get());
+    }
+
+    SECURITY_ATTRIBUTES securityAttributes{};
+    securityAttributes.nLength = sizeof(securityAttributes);
+    securityAttributes.bInheritHandle = TRUE;
+
+    wil::unique_hfile stdinFile(CreateFileW(
+        stdinFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, &securityAttributes, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    THROW_LAST_ERROR_IF(!stdinFile);
+
+    process.SetStdHandles(stdinFile.get(), nullptr, nullptr);
+
+    const auto output = process.RunAndCaptureOutput();
+    return {
+        .CommandLine = std::format(L"{} < \"{}\"", commandLine, stdinFilePath.wstring()),
+        .Stdout = output.Stdout,
+        .Stderr = output.Stderr,
+        .ExitCode = output.ExitCode};
+}
+
 std::wstring GetWslcHeader()
 {
     std::wstringstream header;

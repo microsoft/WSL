@@ -185,9 +185,14 @@ COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
 // Cp command tests
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path/to/deep/dir", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp somefile cont1:/path", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp -", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp - ", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --unknown - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --help", L"cp", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
