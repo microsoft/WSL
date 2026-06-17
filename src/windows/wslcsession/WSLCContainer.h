@@ -22,6 +22,7 @@ Abstract:
 #include "IORelay.h"
 #include "COMImplClass.h"
 #include "wslc_schema.h"
+#include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
@@ -222,7 +223,7 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IFastRundown, ISupportErrorInfo>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl>
 {
 
@@ -246,6 +247,11 @@ public:
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
     IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+
+    // IWSLCCompatContainer.
+    IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
+    IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
+    IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
