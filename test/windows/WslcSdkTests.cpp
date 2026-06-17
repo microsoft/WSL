@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -267,60 +268,53 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcCreateSession(nullptr, &session2, nullptr), E_POINTER);
     }
 
-    WSLC_TEST_METHOD(TerminationCallbackViaTerminate)
+    WSLC_TEST_METHOD(TerminationEventViaTerminate)
     {
-        std::promise<WslcSessionTerminationReason> promise;
-
-        auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
-            auto* p = static_cast<std::promise<WslcSessionTerminationReason>*>(context);
-            p->set_value(reason);
-        };
-
-        std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-term-storage";
+        std::filesystem::path extraStorage = m_storagePath / "wslc-termevt-term-storage";
 
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termcb-term-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termevt-term-test", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsTerminationCallback(&sessionSettings, callback, &promise));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
 
-        // Terminating the session should trigger a graceful shutdown and fire the callback.
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(WslcGetSessionTerminationEvent(session.get(), &terminationEvent));
+        VERIFY_IS_NOT_NULL(terminationEvent.get());
+
+        // Terminating the session should trigger a graceful shutdown and signal the event.
         VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
 
-        auto future = promise.get_future();
-        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(30)), std::future_status::ready);
-        VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        WslcSessionTerminationReason reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
+        VERIFY_SUCCEEDED(WslcGetSessionTerminationReason(session.get(), &reason));
+        VERIFY_ARE_EQUAL(reason, WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
     }
 
-    WSLC_TEST_METHOD(TerminationCallbackViaRelease)
+    WSLC_TEST_METHOD(TerminationEventViaRelease)
     {
-        std::promise<WslcSessionTerminationReason> promise;
-
-        auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
-            auto* p = static_cast<std::promise<WslcSessionTerminationReason>*>(context);
-            p->set_value(reason);
-        };
-
-        std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-release-storage";
+        std::filesystem::path extraStorage = m_storagePath / "wslc-termevt-release-storage";
 
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termcb-release-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termevt-release-test", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsTerminationCallback(&sessionSettings, callback, &promise));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
 
-        // Releasing the session should trigger a graceful shutdown and fire the callback.
+        // The termination event is owned by the caller and stays valid even after the session is released.
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(WslcGetSessionTerminationEvent(session.get(), &terminationEvent));
+        VERIFY_IS_NOT_NULL(terminationEvent.get());
+
+        // Releasing the session should trigger a graceful shutdown and signal the event.
         VERIFY_SUCCEEDED(WslcReleaseSession(session.get()));
-        // Calling WslcSessionRelease will destroy the session
+        // Calling WslcReleaseSession will destroy the session.
         session.release();
 
-        auto future = promise.get_future();
-        VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(30)), std::future_status::ready);
-        VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
     }
 
     WSLC_TEST_METHOD(CrashDumpCallback)
@@ -2225,30 +2219,9 @@ class WslcSdkTests
     std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
-        VERIFY_IS_TRUE(HasImage("wslc-registry:latest"));
-
-        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-        if (!username.empty())
-        {
-            env.push_back(std::format("USERNAME={}", username));
-            env.push_back(std::format("PASSWORD={}", password));
-        }
-
-        wsl::windows::common::WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
-        launcher.SetEntrypoint({"/entrypoint.sh"});
-        launcher.AddPort(port, port, AF_INET);
-
-        // Get the IWSLCSession COM object from the SDK session handle.
+        // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
         auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
-
-        auto registryAddress = std::format("127.0.0.1:{}", port);
-
-        // Wait for the registry to be ready by probing from the host.
-        auto hostUrl = std::format(L"http://{}", registryAddress);
-        ExpectHttpResponse(hostUrl.c_str(), 200, true);
-
-        return {std::move(container), registryAddress};
+        return WSLCE2ETests::StartLocalRegistry(session, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.

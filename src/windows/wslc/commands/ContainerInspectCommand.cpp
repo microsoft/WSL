@@ -28,7 +28,6 @@ std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

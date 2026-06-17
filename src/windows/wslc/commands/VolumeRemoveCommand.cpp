@@ -28,7 +28,6 @@ std::vector<Argument> VolumeRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::VolumeName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

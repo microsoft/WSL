@@ -588,7 +588,10 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
     for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
 
     m_containerEvents.Reset();
@@ -601,16 +604,6 @@ WSLCContainerImpl::~WSLCContainerImpl()
         auto lock = m_lock.lock_exclusive();
         wrapper = ReleaseResources();
     }
-}
-
-void WSLCContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
-{
-    std::lock_guard processesLock{m_processesLock};
-
-    auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
-    WI_ASSERT(remove.size() == 1);
-
-    m_processes.erase(remove.begin(), remove.end());
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1225,13 +1218,15 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
             io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
-        auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
+        auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
 
         {
             std::lock_guard processesLock{m_processesLock};
 
-            // Store a non owning reference to the process.
-            m_processes.push_back(control.get());
+            // Drop entries for execs that have since been released, then store a non-owning weak
+            // reference. The owning shared_ptr is moved into the COM WSLCProcess returned below.
+            std::erase_if(m_processes, [](const auto& weak) { return weak.expired(); });
+            m_processes.push_back(control);
         }
 
         // Poll for the exec'd process to either be running, or failed.
@@ -2094,16 +2089,22 @@ void WSLCContainerImpl::UnmapPorts()
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
 {
-    std::lock_guard processesLock{m_processesLock};
+    // Snapshot under the lock, then notify outside it, pinning each control via lock() first
+    decltype(m_processes) processes;
+    {
+        std::lock_guard processesLock{m_processesLock};
+        processes = std::exchange(m_processes, {});
+    }
 
     // Notify all processes that the container has exited.
     // The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-    for (auto& process : m_processes)
+    for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
-
-    m_processes.clear();
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()

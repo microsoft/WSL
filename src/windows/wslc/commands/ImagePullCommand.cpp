@@ -30,7 +30,6 @@ std::vector<Argument> ImagePullCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true),
         // Argument::Create(ArgType::Scheme),
         // Argument::Create(ArgType::Progress),
-        Argument::Create(ArgType::Session),
     };
 }
 

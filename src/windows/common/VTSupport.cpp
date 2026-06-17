@@ -441,6 +441,13 @@ namespace Format {
                << WSL_WINDOWS_VT_ESCAPE << L"\\";
         return ConstructedSequence{std::move(result).str()};
     }
+
+    ConstructedSequence LinkOpen(const std::wstring& url)
+    {
+        return ConstructedSequence{std::format(WSL_WINDOWS_VT_OSC L"8;;{}" WSL_WINDOWS_VT_ESCAPE L"\\", url)};
+    }
+
+    const Sequence LinkClose{WSL_WINDOWS_VT_OSC L"8;;" WSL_WINDOWS_VT_ESCAPE L"\\"};
 } // namespace Format
 
 namespace Erase {
