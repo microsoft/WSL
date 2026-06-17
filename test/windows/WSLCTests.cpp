@@ -5084,7 +5084,7 @@ class WSLCTests
         options.DriverOpts = nullptr;
         options.DriverOptsCount = 0;
 
-        for (const char* driver : {"overlay", "Bridge"})
+        for (const char* driver : {"overlay", "Bridge", ""})
         {
             options.Driver = driver;
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
@@ -5096,26 +5096,23 @@ class WSLCTests
     {
         const std::string networkName = "default-driver-net";
 
-        for (const char* driver : {static_cast<const char*>(nullptr), ""})
-        {
-            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
-            WSLCNetworkOptions options{};
-            options.Name = networkName.c_str();
-            options.Driver = driver;
-            options.DriverOpts = nullptr;
-            options.DriverOptsCount = 0;
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
 
-            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
-            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
-            VERIFY_ARE_EQUAL(1u, networks.size());
-            VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
-            VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
-        }
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)

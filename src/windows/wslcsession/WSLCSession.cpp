@@ -2333,7 +2333,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
     std::string name = Options->Name;
-    std::string driver = (Options->Driver != nullptr && Options->Driver[0] != '\0') ? Options->Driver : WSLCBridgeNetworkDriver;
+    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
