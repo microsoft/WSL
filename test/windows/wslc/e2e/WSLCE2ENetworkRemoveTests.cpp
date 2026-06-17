@@ -172,9 +172,9 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                          //
+        options << L"The following options are available:\r\n"                         //
                 << L"  -f,--force      Do not error if the network does not exist\r\n" //
-                << L"  -?,--help       Shows help about the selected command\r\n"       //
+                << L"  -?,--help       Shows help about the selected command\r\n"      //
                 << L"\r\n";
         return options.str();
     }
