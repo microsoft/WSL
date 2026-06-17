@@ -29,7 +29,7 @@ namespace {
 
 } // namespace
 
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs)
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept
 try
 {
     for (const auto& arg : definedArgs)

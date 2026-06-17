@@ -2520,10 +2520,12 @@ void Trim(std::wstring& string)
 static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
 {
     std::wstring value;
-    if (FAILED(wil::GetEnvironmentVariableW(Name.c_str(), value)))
+    HRESULT hr = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
     {
         return std::nullopt;
     }
+    THROW_IF_FAILED(hr);
     return value;
 }
 
