@@ -4117,14 +4117,16 @@ class WSLCTests
 
         // Every thread's iteration ends with a Delete, so the globally-last operation across
         // all threads is guaranteed to be a Delete. The volume must therefore not exist in
-        // either our cache or docker -- if either disagrees, our state is desynced from docker.
+        // either our cache or the backend -- if either disagrees, our state is desynced.
 
         // Our cache view: InspectVolume must report not-found.
         wil::unique_cotaskmem_ansistring inspectOutput;
         VERIFY_ARE_EQUAL(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput), WSLC_E_VOLUME_NOT_FOUND);
 
-        // Docker's view: `docker volume inspect` must also report not-found (non-zero exit).
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "inspect", volumeName}, 1);
+        // The backend's view: `podman volume inspect` must also report not-found. podman exits with
+        // 125 (command failed) for a missing volume. The /usr/bin/docker shim targets a non-existent
+        // dockerd socket in the podman-based system distro, so query podman directly.
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/podman", "volume", "inspect", volumeName}, 125);
     }
 
     // Verifies that a container using a named volume survives a session restart and the volume's data is preserved.
@@ -10748,23 +10750,25 @@ class WSLCTests
             std::filesystem::remove_all(storagePath, ec);
         });
 
-        // Phase 1: Create a session and inject a container with a corrupt WSLC metadata label via docker CLI.
+        // Phase 1: Create a session and inject a container with a corrupt WSLC metadata label via the podman CLI.
         {
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
             settings.StoragePath = storagePath.c_str();
             auto session = CreateSession(settings);
 
-            // Load a base image so docker create works.
+            // Load a base image so podman create works.
             LoadTestImage(*session, "hello-world:latest");
 
             // Create a container with an invalid WSLC metadata label.
             // RecoverExistingContainers will fail to parse this on the next session.
+            // The backend's /usr/bin/docker shim targets a non-existent dockerd socket in the
+            // podman-based system distro, so inject via podman directly.
             auto result = ExpectCommandResult(
                 session.get(),
-                {"/usr/bin/docker", "create", "--label", "wslc.container.metadata=INVALID_JSON", "hello-world:latest"},
+                {"/usr/bin/podman", "create", "--label", "wslc.container.metadata=INVALID_JSON", "hello-world:latest"},
                 0);
 
-            // Capture the container ID from docker create output (stdout, trimmed).
+            // Capture the container ID from podman create output (stdout, trimmed).
             auto containerId = result.Output[1];
             containerId.erase(containerId.find_last_not_of(" \n\r") + 1);
 
