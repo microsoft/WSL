@@ -2066,6 +2066,10 @@ Usage:
     <value>OpenSessionByName('{}') failed</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Failed to launch command {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Nem találhatók WSLC-munkamenetek.</value>
   </data>
@@ -2079,9 +2083,6 @@ Usage:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Az alapértelmezett munkamenet nem található</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Nem sikerült megnyitni az alapértelmezett munkamenetet</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Az alapértelmezett munkamenet lezárása nem sikerült</value>
@@ -2187,6 +2188,9 @@ Usage:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>A következő argumentumok használhatók:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó argumentumát.</value>
@@ -2392,7 +2396,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Mentés folyamatban.</value>
   </data>
   <data name="MessageWslcExportInProgress" xml:space="preserve">
-    <value>Export in progress.</value>
+    <value>Exportálás folyamatban.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>A WSLC a Linuxos Windows-alrendszer tároló CLI eszköze.</value>
@@ -2428,13 +2432,13 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Végrehajt egy parancsot egy futó tárolóban.</value>
   </data>
   <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
-    <value>Export a container's filesystem as a tar archive.</value>
+    <value>Exportálhatja egy tároló fájlrendszerét tar archívumként.</value>
   </data>
   <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
-    <value>Exports a container's filesystem as a tar archive.</value>
+    <value>Exportálja egy tároló fájlrendszerét tar archívumként.</value>
   </data>
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
-    <value>Write to a file, instead of STDOUT</value>
+    <value>Írás fájlba ahelyett, hogy a STDOUT-ra írna</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
@@ -2468,9 +2472,9 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Eltávolítja az összes leállított tárolót.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Teljes felszabadított terület: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Teljes felszabadított terület: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Tárolók eltávolítása.</value>
@@ -2561,9 +2565,9 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Eltávolítja az összes értékhiányos lemezképet. Ha az --all paraméter meg van adva, eltávolítja a tárolók által nem használt összes lemezképet.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Teljes felszabadított terület: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Teljes felszabadított terület: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Címkézetlen: {}</value>
@@ -2683,6 +2687,16 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Aktív munkamenethez csatlakozik. Ha nincs megadva munkamenet-azonosító, a rendszer a wslc alapértelmezett munkamenetet használja.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Run a command in a session.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Runs a command in an active session without a TTY. The command and its arguments are forwarded directly to the session. If no session is specified, the wslc default session will be used.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Arguments to pass to the command being run</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Munkamenet leállítása.</value>
@@ -3082,6 +3096,16 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Csak a hálózatneveket adja ki</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Remove all unused networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Deleted: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Kötetek kezelése.</value>
   </data>
@@ -3148,7 +3172,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A rendszerkép nem írható a terminálba. Használja az -o jelzőt vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot export container to terminal. Use the -o flag or redirect stdout.</value>
+    <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o jelzőt vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Várt formátum: &lt;gazdaelérési út | elnevezett kötet&gt;:&lt;tároló elérési útja&gt;[:mód]</value>
@@ -3301,15 +3325,15 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
-    <value>Skipped importing {} certificates from Local Machine Trusted Root store due to certificate encoding failures</value>
+    <value>A rendszer kihagyta a(z) {} tanúsítvány importálását a helyi számítógép megbízható főtanúsítvány-tárolójából tanúsítványkódolási hibák miatt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
-    <value>Skipped importing {} certificates from Current User Trusted Root store due to certificate encoding failures</value>
+    <value>A rendszer kihagyta a(z) {} tanúsítvány importálását az aktuális felhasználó megbízható legfelső szintű tárolójából tanúsítványkódolási hibák miatt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
-    <value>Failed to install host trusted root certificates into the VM: {}</value>
+    <value>Nem sikerült telepíteni a gazdagép megbízható főtanúsítványait a virtuális gépre: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

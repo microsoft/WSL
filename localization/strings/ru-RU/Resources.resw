@@ -2073,6 +2073,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Сбой OpenSessionByName("{}")</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Failed to launch command {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Сеансы WSLC не найдены.</value>
   </data>
@@ -2086,9 +2090,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Стандартный сеанс не найден</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Не удалось открыть стандартный сеанс</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Сбой завершения стандартного сеанса</value>
@@ -2194,6 +2195,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Доступны следующие аргументы:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Для более подробной информации о конкретной команде передайте ей аргумент справки.</value>
@@ -2399,7 +2403,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Выполняется сохранение.</value>
   </data>
   <data name="MessageWslcExportInProgress" xml:space="preserve">
-    <value>Export in progress.</value>
+    <value>Выполняется экспорт.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC — это инструмент интерфейса командной строки для контейнеров подсистемы Windows для Linux.</value>
@@ -2435,13 +2439,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Выполняет команду в запущенном контейнере.</value>
   </data>
   <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
-    <value>Export a container's filesystem as a tar archive.</value>
+    <value>Экспортировать файловую систему контейнера в виде tar-архива.</value>
   </data>
   <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
-    <value>Exports a container's filesystem as a tar archive.</value>
+    <value>Экспортирует файловую систему контейнера в виде tar-архива.</value>
   </data>
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
-    <value>Write to a file, instead of STDOUT</value>
+    <value>Записывать в файл вместо STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
@@ -2475,9 +2479,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Удаляет все остановленные контейнеры.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Объем освобожденной памяти: {:.2f} МБ</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Удалить контейнеры.</value>
@@ -2568,9 +2572,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Удаляет все непривязанные образы. Если аргумент --all указан, все образы, не используемые ни одним контейнером, будут удалены.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Объем освобожденной памяти: {:.2f} МБ</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Без тега: {}</value>
@@ -2690,6 +2694,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Подключается к активному сеансу. Если идентификатор сеанса не указан, используется сеанс по умолчанию wslc.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Run a command in a session.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Runs a command in an active session without a TTY. The command and its arguments are forwarded directly to the session. If no session is specified, the wslc default session will be used.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Аргументы для передачи в выполняемую команду</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Завершить сеанс.</value>
@@ -3089,6 +3103,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Выводит только сетевые имена</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Удалите все неиспользуемые сети.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Удаляет все неиспользуемые сети. Сеть считается неиспользуемой, если на нее не ссылается какой-либо контейнер.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Удалено: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Управление томами.</value>
   </data>
@@ -3155,7 +3179,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Невозможно записать образ в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot export container to terminal. Use the -o flag or redirect stdout.</value>
+    <value>Не удалось экспортировать контейнер в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Ожидаемый формат: host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
