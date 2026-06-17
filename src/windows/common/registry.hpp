@@ -58,8 +58,8 @@ void QueryInfo(
     _In_opt_ DWORD* MaxSubKeySize = nullptr,
     _In_opt_ DWORD* MaxValueNameSize = nullptr,
     _In_opt_ DWORD* MaxValueDataSize = nullptr,
-    _In_opt_ DWORD* SubKeyCount = nullptr,
-    _In_opt_ DWORD* ValueCount = nullptr);
+    _Out_opt_ DWORD* SubKeyCount = nullptr,
+    _Out_opt_ DWORD* ValueCount = nullptr);
 
 DWORD
 ReadDword(_In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWSTR ValueName, _In_ DWORD DefaultValue);

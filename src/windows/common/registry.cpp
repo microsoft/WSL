@@ -321,7 +321,13 @@ wil::unique_hkey wsl::windows::common::registry::OpenOrCreateLxssDiskMountsKey(_
     return CreateKey(HKEY_LOCAL_MACHINE, path.c_str(), KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
 }
 
-void wsl::windows::common::registry::QueryInfo(_In_ HKEY Key, _In_opt_ DWORD* MaxSubKeySize, _In_opt_ DWORD* MaxValueNameSize, _In_opt_ DWORD* MaxValueDataSize, _In_opt_ DWORD* SubKeyCount, _In_opt_ DWORD* ValueCount)
+void wsl::windows::common::registry::QueryInfo(
+    _In_ HKEY Key,
+    _In_opt_ DWORD* MaxSubKeySize,
+    _In_opt_ DWORD* MaxValueNameSize,
+    _In_opt_ DWORD* MaxValueDataSize,
+    _Out_opt_ DWORD* SubKeyCount,
+    _Out_opt_ DWORD* ValueCount)
 {
     const auto error = (RegQueryInfoKeyW(
         Key, nullptr, nullptr, nullptr, SubKeyCount, MaxSubKeySize, nullptr, ValueCount, MaxValueNameSize, MaxValueDataSize, nullptr, nullptr));
