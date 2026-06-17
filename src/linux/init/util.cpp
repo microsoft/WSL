@@ -3506,41 +3506,35 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
 #define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
 
-static bool ReadProcFile(const char* Path, char* Buffer, size_t Size, bool LogErrors = true)
+static std::optional<std::string> ReadProcFile(const char* Path, bool LogErrors = true)
 
 /*++
 
 Routine Description:
 
-    This routine reads the full contents of a procfs file into a caller-supplied
-    NUL-terminated buffer. Because procfs content is generated on read and a
-    single read() may return only a partial snapshot, this loops until EOF (or
-    the buffer fills), which keeps later-appearing fields (for example the
-    workingset counters deep in /proc/vmstat) from being truncated away.
+    This routine reads the full contents of a procfs file into a string. Because
+    procfs content is generated on read and a single read() may return only a
+    partial snapshot, this loops until EOF, growing the buffer as needed. Reading
+    into a dynamically-sized string (rather than a fixed buffer) keeps
+    later-appearing fields (for example the workingset counters deep in
+    /proc/vmstat, or the file-backed counters in a large /proc/meminfo) from
+    being silently truncated away.
 
 Arguments:
 
     Path - Supplies the procfs path to read.
-
-    Buffer - Supplies the buffer to fill; always NUL-terminated on success.
-
-    Size - Supplies the size of Buffer in bytes (must be at least 1).
 
     LogErrors - Supplies whether open/read failures are logged. Callers for
         which absence is normal (for example PSI) pass false.
 
 Return Value:
 
-    true on success (Buffer holds the content), false on failure.
+    The full file contents on success, or std::nullopt on failure (including an
+    empty file).
 
 --*/
 
 {
-    if (Size == 0)
-    {
-        return false;
-    }
-
     wil::unique_fd Fd{open(Path, O_RDONLY | O_CLOEXEC)};
     if (!Fd)
     {
@@ -3549,13 +3543,14 @@ Return Value:
             LOG_ERROR("open({}) failed {}", Path, errno);
         }
 
-        return false;
+        return std::nullopt;
     }
 
-    size_t Total = 0;
-    while (Total < (Size - 1))
+    std::string Content;
+    char Chunk[4096];
+    for (;;)
     {
-        const ssize_t Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer + Total, (Size - 1) - Total));
+        const ssize_t Result = TEMP_FAILURE_RETRY(read(Fd.get(), Chunk, sizeof(Chunk)));
         if (Result < 0)
         {
             if (LogErrors)
@@ -3563,7 +3558,7 @@ Return Value:
                 LOG_ERROR("read({}) failed {}", Path, errno);
             }
 
-            return false;
+            return std::nullopt;
         }
 
         if (Result == 0)
@@ -3571,11 +3566,15 @@ Return Value:
             break;
         }
 
-        Total += static_cast<size_t>(Result);
+        Content.append(Chunk, static_cast<size_t>(Result));
     }
 
-    Buffer[Total] = '\0';
-    return Total > 0;
+    if (Content.empty())
+    {
+        return std::nullopt;
+    }
+
+    return Content;
 }
 
 static bool ReadAggregateCpuTimes(unsigned long long& Busy, unsigned long long& Idle)
@@ -3605,8 +3604,8 @@ Return Value:
 --*/
 
 {
-    char Buffer[256];
-    if (!ReadProcFile("/proc/stat", Buffer, sizeof(Buffer)))
+    const auto Content = ReadProcFile("/proc/stat");
+    if (!Content)
     {
         return false;
     }
@@ -3618,7 +3617,16 @@ Return Value:
 
     unsigned long long Fields[8] = {};
     const int Parsed = sscanf(
-        Buffer, "cpu %llu %llu %llu %llu %llu %llu %llu %llu", &Fields[0], &Fields[1], &Fields[2], &Fields[3], &Fields[4], &Fields[5], &Fields[6], &Fields[7]);
+        Content->c_str(),
+        "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
+        &Fields[0],
+        &Fields[1],
+        &Fields[2],
+        &Fields[3],
+        &Fields[4],
+        &Fields[5],
+        &Fields[6],
+        &Fields[7]);
 
     if (Parsed < 5)
     {
@@ -3665,8 +3673,8 @@ Return Value:
 --*/
 
 {
-    char Buffer[4096];
-    if (!ReadProcFile("/proc/meminfo", Buffer, sizeof(Buffer)))
+    auto Content = ReadProcFile("/proc/meminfo");
+    if (!Content)
     {
         return -1;
     }
@@ -3674,7 +3682,7 @@ Return Value:
     // /proc/meminfo values are in kB.
     long long TotalKb = 0;
     char* Save = nullptr;
-    for (char* Line = strtok_r(Buffer, "\n", &Save); Line != nullptr; Line = strtok_r(nullptr, "\n", &Save))
+    for (char* Line = strtok_r(Content->data(), "\n", &Save); Line != nullptr; Line = strtok_r(nullptr, "\n", &Save))
     {
         const char* Value = nullptr;
         if (strncmp(Line, "Active(file):", 13) == 0)
@@ -3828,8 +3836,10 @@ bool RunGradualTick(MemoryReclaimState& State, bool IntervalIdle)
 Routine Description:
 
     Runs one interval of gentle reclaim (cold-first via cgroup memory.reclaim). Reclaim is gated on CPU
-    idle and drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it
-    does not churn near the floor. At most c_gradualStepBytes is reclaimed per interval so the cache
+    idle (evaluated per interval, with no sustained-idle streak requirement) and drains reclaimable page
+    cache down toward a fixed floor. Reclaim only triggers once the cache exceeds the floor by more than
+    c_gradualHysteresisBytes; this is a trigger threshold (not a retained margin) that keeps reclaim from
+    churning near the floor. At most c_gradualStepBytes is reclaimed per interval so the cache
     bleeds down over several intervals rather than being stripped to the floor in a single pass.
 
 Return Value:
@@ -3961,9 +3971,9 @@ Routine Description:
 
     The policy is:
 
-        1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is gated on sustained CPU idle and
-           drains reclaimable page cache down toward a fixed floor, leaving a hysteresis margin so it does
-           not churn near the floor.
+        1. Gradual mode (gentle, cold-first via cgroup memory.reclaim) is gated on per-interval CPU idle
+           and drains reclaimable page cache down toward a fixed floor. It triggers only once the cache
+           exceeds the floor by a hysteresis threshold, so it does not churn near the floor.
 
         2. DropCache mode (the indiscriminate sledgehammer: drop_caches evicts the entire page cache,
            hot and cold alike) cannot run safely under load, so it stays gated on sustained CPU idle. It
