@@ -249,6 +249,7 @@ void KillContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Kill(session, WideToMultiByte(id), signal);
+        PrintMessage(id);
     }
 }
 
@@ -728,8 +729,14 @@ void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-    const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    const auto& containerId = context.Args.Get<ArgType::ContainerId>();
+    const bool attach = context.Args.Contains(ArgType::Attach);
+    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
+
+    if (!attach)
+    {
+        PrintMessage(containerId);
+    }
 }
 
 void StopContainers(CLIExecutionContext& context)
