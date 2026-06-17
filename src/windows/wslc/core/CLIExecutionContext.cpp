@@ -4,6 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 --*/
 #include "precomp.h"
+#include "Argument.h"
 #include "CLIExecutionContext.h"
 
 namespace wsl::windows::wslc::execution {
@@ -18,7 +19,10 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
 // This method should be idempotent.
 void CLIExecutionContext::ApplyGlobalOptions()
 {
-    // TODO: Add per-global side effects here as features land.
+    if (GlobalArgs.Contains(ArgType::NoColor))
+    {
+        Reporter.SetNoColor(true);
+    }
 }
 
 } // namespace wsl::windows::wslc::execution
