@@ -34,25 +34,24 @@ class WSLCCLIEnvironmentOptionsUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIEnvironmentOptionsUnitTests)
 
-    // Tests touch process-wide env state. Capture pre-existing values in setup
-    // and restore them in cleanup so the suite is hermetic and doesn't clobber
-    // values the test host (or CI) may have set.
+    // Tests touch process-wide env state. ScopedEnvVariable captures any
+    // pre-existing value in setup, clears it, and restores it in cleanup so
+    // the suite is hermetic.
     TEST_METHOD_SETUP(TestMethodSetup)
     {
-        m_savedNoColor = CaptureEnv(L"NO_COLOR");
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", nullptr));
+        m_noColor = std::make_unique<ScopedEnvVariable>(L"NO_COLOR");
         return true;
     }
 
     TEST_METHOD_CLEANUP(TestMethodCleanup)
     {
-        RestoreEnv(L"NO_COLOR", m_savedNoColor);
+        m_noColor.reset();
         return true;
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_NoColorEmptyValue_SetsFlag)
     {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
+        m_noColor->Set(L"");
 
         ArgMap target;
         ApplyEnvironmentOptions(target, NoColorDefs());
@@ -66,7 +65,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
     {
         for (const auto* value : {L"0", L"false", L"FALSE", L"no", L"off"})
         {
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", value));
+            m_noColor->Set(value);
 
             ArgMap target;
             ApplyEnvironmentOptions(target, NoColorDefs());
@@ -75,13 +74,13 @@ class WSLCCLIEnvironmentOptionsUnitTests
             VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
             VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
 
-            VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", nullptr));
+            m_noColor->Clear();
         }
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_NoColorArbitraryValue_SetsFlag)
     {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L"1"));
+        m_noColor->Set(L"1");
 
         ArgMap target;
         ApplyEnvironmentOptions(target, NoColorDefs());
@@ -101,7 +100,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
     // Env-derived defaults are lowest precedence and must not overwrite.
     TEST_METHOD(ApplyEnvironmentOptions_TargetAlreadyContainsArg_LeavesItUntouched)
     {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
+        m_noColor->Set(L"");
 
         ArgMap target;
         target.Add<ArgType::NoColor>(false);
@@ -118,7 +117,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
     // cause NO_COLOR to leak into target.
     TEST_METHOD(ApplyEnvironmentOptions_UndeclaredArg_IsIgnored)
     {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(L"NO_COLOR", L""));
+        m_noColor->Set(L"");
 
         std::vector<Argument> defs;
         defs.push_back(Argument::Create(ArgType::Verbose));
@@ -130,30 +129,13 @@ class WSLCCLIEnvironmentOptionsUnitTests
     }
 
 private:
-    std::optional<std::wstring> m_savedNoColor;
+    std::unique_ptr<ScopedEnvVariable> m_noColor;
 
     static std::vector<Argument> NoColorDefs()
     {
         std::vector<Argument> defs;
         defs.push_back(Argument::Create(ArgType::NoColor));
         return defs;
-    }
-
-    // Snapshot a process env var. nullopt means the variable was not defined;
-    // an empty string means it was defined as "".
-    static std::optional<std::wstring> CaptureEnv(const wchar_t* name)
-    {
-        std::wstring value;
-        if (FAILED(wil::GetEnvironmentVariableW(name, value)))
-        {
-            return std::nullopt;
-        }
-        return value;
-    }
-
-    static void RestoreEnv(const wchar_t* name, const std::optional<std::wstring>& saved)
-    {
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(name, saved.has_value() ? saved->c_str() : nullptr));
     }
 };
 
