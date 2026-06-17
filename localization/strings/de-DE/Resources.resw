@@ -2832,15 +2832,6 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Anzahl der Zeilen, die vom Ende der Protokolle angezeigt werden sollen</value>
   </data>
-  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
-  </data>
-  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
-  </data>
-  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
-  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Neue Bildreferenz im Format image-name[:tag]</value>
   </data>

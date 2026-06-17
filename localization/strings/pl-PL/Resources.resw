@@ -2826,15 +2826,6 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Liczba wierszy do wyświetlenia od końca dzienników</value>
   </data>
-  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
-  </data>
-  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
-  </data>
-  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
-  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nowe odwołanie do obrazu w formacie nazwa_obrazu[:tag]</value>
   </data>

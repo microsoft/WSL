@@ -2833,15 +2833,6 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Número de linhas a serem mostradas a partir do final dos logs</value>
   </data>
-  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
-    <value>Show timestamps in log output</value>
-  </data>
-  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Show logs since timestamp (e.g. unix epoch seconds)</value>
-  </data>
-  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Show logs before timestamp (e.g. unix epoch seconds)</value>
-  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nova referência de imagem no formato image-name[:tag]</value>
   </data>

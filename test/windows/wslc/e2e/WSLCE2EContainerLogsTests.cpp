@@ -73,8 +73,13 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"hello"));
         auto lines = result.GetStdoutLines();
         VERIFY_IS_TRUE(!lines.empty());
-        // A timestamp line should have at least a 'T' character (ISO 8601 separator)
-        VERIFY_IS_TRUE(lines[0].find(L'T') != std::wstring::npos);
+        // Validate RFC3339 structure: YYYY-MM-DDTHH:MM:SS at the start of the line
+        VERIFY_IS_TRUE(lines[0].size() >= 20);
+        VERIFY_ARE_EQUAL(lines[0][4], L'-');
+        VERIFY_ARE_EQUAL(lines[0][7], L'-');
+        VERIFY_ARE_EQUAL(lines[0][10], L'T');
+        VERIFY_ARE_EQUAL(lines[0][13], L':');
+        VERIFY_ARE_EQUAL(lines[0][16], L':');
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_TimestampsShortFlag)
@@ -91,7 +96,12 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"world"));
         auto lines = result.GetStdoutLines();
         VERIFY_IS_TRUE(!lines.empty());
-        VERIFY_IS_TRUE(lines[0].find(L'T') != std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].size() >= 20);
+        VERIFY_ARE_EQUAL(lines[0][4], L'-');
+        VERIFY_ARE_EQUAL(lines[0][7], L'-');
+        VERIFY_ARE_EQUAL(lines[0][10], L'T');
+        VERIFY_ARE_EQUAL(lines[0][13], L':');
+        VERIFY_ARE_EQUAL(lines[0][16], L':');
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Since)

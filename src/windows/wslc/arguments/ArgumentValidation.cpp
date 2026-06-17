@@ -18,8 +18,9 @@ Abstract:
 #include "Exceptions.h"
 #include "Localization.h"
 #include <charconv>
+#include <chrono>
 #include <format>
-#include <optional>
+#include <sstream>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -193,152 +194,72 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
 }
 
 // Parses an RFC3339 timestamp (e.g. "2024-01-15T10:30:00Z" or "2024-01-15T10:30:00+05:30")
-// or a plain Unix epoch integer (seconds) into a ULONGLONG epoch value.
+// into a ULONGLONG Unix epoch value using std::chrono::parse.
 static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
 {
-    // Minimum RFC3339: "YYYY-MM-DDTHH:MM:SSZ" = 20 chars
-    if (input.size() < 20)
+    // Strip fractional seconds (e.g. ".123456789") before parsing, since we only need
+    // second-level precision and std::chrono::parse into sys_seconds doesn't consume them.
+    std::string normalized = input;
+    auto dotPos = normalized.find('.');
+    if (dotPos != std::string::npos)
     {
-        return std::nullopt;
-    }
-
-    // Basic structural checks
-    if (input[4] != '-' || input[7] != '-' || (input[10] != 'T' && input[10] != 't') || input[13] != ':' || input[16] != ':')
-    {
-        return std::nullopt;
-    }
-
-    auto parseDigits = [&](size_t offset, size_t count) -> std::optional<int> {
-        int value = 0;
-        for (size_t i = 0; i < count; ++i)
+        auto endOfFrac = dotPos + 1;
+        if (endOfFrac >= normalized.size() || normalized[endOfFrac] < '0' || normalized[endOfFrac] > '9')
         {
-            char c = input[offset + i];
-            if (c < '0' || c > '9')
+            return std::nullopt; // '.' with no digits is invalid per RFC3339
+        }
+
+        while (endOfFrac < normalized.size() && normalized[endOfFrac] >= '0' && normalized[endOfFrac] <= '9')
+        {
+            ++endOfFrac;
+        }
+
+        normalized.erase(dotPos, endOfFrac - dotPos);
+    }
+
+    // Normalize trailing 'Z'/'z' to '+00:00' so %Ez can parse it uniformly.
+    // This avoids %Z greedily consuming trailing characters as a timezone abbreviation.
+    if (!normalized.empty() && (normalized.back() == 'Z' || normalized.back() == 'z'))
+    {
+        normalized.pop_back();
+        normalized += "+00:00";
+    }
+
+    // Validate the date components from the input before parsing the full timestamp.
+    // std::chrono::parse normalizes invalid dates (e.g. Feb 31 → March) instead of rejecting them,
+    // so we pre-validate the year-month-day from the input string.
+    if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
+    {
+        int year{}, month{}, day{};
+        auto r1 = std::from_chars(normalized.data(), normalized.data() + 4, year);
+        auto r2 = std::from_chars(normalized.data() + 5, normalized.data() + 7, month);
+        auto r3 = std::from_chars(normalized.data() + 8, normalized.data() + 10, day);
+        if (r1.ec == std::errc() && r2.ec == std::errc() && r3.ec == std::errc())
+        {
+            std::chrono::year_month_day ymd{
+                std::chrono::year{year}, std::chrono::month{static_cast<unsigned>(month)}, std::chrono::day{static_cast<unsigned>(day)}};
+            if (!ymd.ok())
             {
                 return std::nullopt;
             }
-            value = value * 10 + (c - '0');
         }
-        return value;
-    };
+    }
 
-    auto year = parseDigits(0, 4);
-    auto month = parseDigits(5, 2);
-    auto day = parseDigits(8, 2);
-    auto hour = parseDigits(11, 2);
-    auto minute = parseDigits(14, 2);
-    auto second = parseDigits(17, 2);
-
-    if (!year || !month || !day || !hour || !minute || !second)
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(normalized);
+    stream >> std::chrono::parse("%FT%T%Ez", utcSeconds);
+    if (stream.fail())
     {
         return std::nullopt;
     }
 
-    if (*month < 1 || *month > 12 || *day < 1 || *day > 31 || *hour > 23 || *minute > 59 || *second > 60)
+    // Reject if there are trailing characters after the parsed timestamp
+    if (stream.peek() != std::istringstream::traits_type::eof())
     {
         return std::nullopt;
     }
 
-    // Parse timezone offset (after seconds and optional fractional seconds)
-    size_t pos = 19;
-
-    // Skip fractional seconds (e.g. ".123456789")
-    if (pos < input.size() && input[pos] == '.')
-    {
-        ++pos;
-        while (pos < input.size() && input[pos] >= '0' && input[pos] <= '9')
-        {
-            ++pos;
-        }
-    }
-
-    int offsetSeconds = 0;
-    if (pos >= input.size())
-    {
-        return std::nullopt; // No timezone info
-    }
-
-    char tzChar = input[pos];
-    size_t expectedEnd = pos + 1;
-    if (tzChar == 'Z' || tzChar == 'z')
-    {
-        offsetSeconds = 0;
-    }
-    else if (tzChar == '+' || tzChar == '-')
-    {
-        if (pos + 5 > input.size())
-        {
-            return std::nullopt;
-        }
-
-        // Accept both HH:MM and HHMM
-        size_t tzHourOffset = pos + 1;
-        size_t tzMinOffset;
-        if (pos + 6 <= input.size() && input[pos + 3] == ':')
-        {
-            tzMinOffset = pos + 4;
-            expectedEnd = pos + 6;
-        }
-        else
-        {
-            tzMinOffset = pos + 3;
-            expectedEnd = pos + 5;
-        }
-
-        auto tzHour = parseDigits(tzHourOffset, 2);
-        auto tzMin = parseDigits(tzMinOffset, 2);
-        if (!tzHour || !tzMin || *tzHour > 23 || *tzMin > 59)
-        {
-            return std::nullopt;
-        }
-
-        offsetSeconds = (*tzHour * 3600 + *tzMin * 60);
-        if (tzChar == '-')
-        {
-            offsetSeconds = -offsetSeconds;
-        }
-    }
-    else
-    {
-        return std::nullopt;
-    }
-
-    // Reject trailing characters after the timezone designator
-    if (expectedEnd != input.size())
-    {
-        return std::nullopt;
-    }
-
-    // Reject pre-epoch dates
-    if (*year < 1970)
-    {
-        return std::nullopt;
-    }
-
-    // Convert to Unix epoch using a simplified calculation
-    // Days from year 1970 to the given year
-    auto isLeapYear = [](int y) { return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0); };
-
-    constexpr int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-    long long days = 0;
-    for (int y = 1970; y < *year; ++y)
-    {
-        days += isLeapYear(y) ? 366 : 365;
-    }
-    for (int m = 1; m < *month; ++m)
-    {
-        days += daysInMonth[m];
-        if (m == 2 && isLeapYear(*year))
-        {
-            days += 1;
-        }
-    }
-    days += *day - 1;
-
-    long long epochSeconds = days * 86400LL + *hour * 3600LL + *minute * 60LL + *second;
-    epochSeconds -= offsetSeconds;
-
+    auto epochSeconds = utcSeconds.time_since_epoch().count();
     if (epochSeconds < 0)
     {
         return std::nullopt;
