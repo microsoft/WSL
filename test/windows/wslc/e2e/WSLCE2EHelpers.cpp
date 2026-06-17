@@ -351,7 +351,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
             auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
