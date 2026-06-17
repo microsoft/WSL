@@ -2439,7 +2439,7 @@ class WslcSdkTests
             opts.registryAuth = emptyRegistryAuth.c_str();
 
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
             VERIFY_IS_NOT_NULL(errorMsg.get());
         }
 
