@@ -178,7 +178,6 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --session       Specify the session to use\r\n"
                 << L"  -s,--signal     Signal to send\r\n"
                 << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";

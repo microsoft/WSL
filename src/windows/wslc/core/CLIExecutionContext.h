@@ -17,8 +17,7 @@ Abstract:
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
-// The context within which all commands execute.
-// Contains arguments via Args.
+
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
@@ -30,25 +29,27 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     CLIExecutionContext(CLIExecutionContext&&) = default;
     CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
 
+    // Per-subcommand arguments parsed by the resolved leaf Command.
     argument::ArgMap Args;
+
+    // Global options parsed from tokens that appear before any subcommand
+    // (e.g. `wslc <global-option> image list`). Populated early in CoreMain.
+    argument::ArgMap GlobalArgs;
 
     // Map of data stored in the context.
     DataMap Data;
 
-    // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
-    // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
+    // Process exit code set by tasks like Run/Exec.
     std::optional<int> ExitCode;
 
-    // Event signaled when the user presses Ctrl-C. Starts null; long-running operations
-    // that support cancellation create it via CreateCancelEvent() before passing it to
-    // COM APIs that accept a CancelEvent handle.
+    // Event signaled when the user presses Ctrl-C.
     wil::unique_event CancelEvent;
 
-    HANDLE CreateCancelEvent()
-    {
-        WI_ASSERT(!CancelEvent);
-        CancelEvent.create(wil::EventOptions::ManualReset);
-        return CancelEvent.get();
-    }
+    HANDLE CreateCancelEvent();
+
+    // Single chokepoint that turns parsed GlobalArgs into process-wide effects
+    // (debug logging, VT color, ...). Idempotent.
+    void ApplyGlobalOptions();
 };
+
 } // namespace wsl::windows::wslc::execution

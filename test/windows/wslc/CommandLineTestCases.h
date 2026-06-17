@@ -25,6 +25,15 @@ COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
+// Global options (RootCommand::GetGlobalArguments). These must be accepted by
+// the root-level options-only pass before any subcommand is resolved. A
+// non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.
+COMMAND_LINE_TEST_CASE(L"--session foo image list --verbose", L"list", true)
+// Cases that fail because the unknown/misplaced option falls through to a
+// command that doesn't accept it:
+COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false)     // Unknown option falls through to root, which rejects it
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --session is global; must come before the subcommand
+
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)
@@ -37,11 +46,11 @@ COMMAND_LINE_TEST_CASE(L"system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session run ls", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run echo foo", L"run", true) // Command with trailing arguments
 COMMAND_LINE_TEST_CASE(L"system session run ls -la", L"run", true)   // Flags after the command are forwarded
-COMMAND_LINE_TEST_CASE(L"system session run --session session1 ls", L"run", true)
-COMMAND_LINE_TEST_CASE(L"system session run --session session1 echo foo", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run echo foo", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run \"ls -la /tmp\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run", L"run", false)                    // Missing required command positional
-COMMAND_LINE_TEST_CASE(L"system session run --session session1", L"run", false) // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run", L"run", false) // Missing required command positional
 COMMAND_LINE_TEST_CASE(L"system session run --notanarg ls", L"run", false)      // Invalid flag before command
 COMMAND_LINE_TEST_CASE(L"system session terminate session1", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session terminate", L"terminate", true)
@@ -60,13 +69,13 @@ COMMAND_LINE_TEST_CASE(L"list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --no-trunc", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"container prune", L"prune", true)
-COMMAND_LINE_TEST_CASE(L"container prune --session foo", L"prune", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container prune", L"prune", true)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)

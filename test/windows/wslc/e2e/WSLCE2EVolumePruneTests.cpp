@@ -264,7 +264,6 @@ private:
         options << L"The following options are available:\r\n"
                 << L"  -a,--all     " << Localization::WSLCCLI_VolumePruneAllArgDescription() << L"\r\n"
                 << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --session    " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
                 << L"  -?,--help    " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
                 << L"\r\n";
         return options.str();
