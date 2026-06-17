@@ -986,7 +986,20 @@ try
         while (true)
         {
             DWORD bytesRead = 0;
-            THROW_LAST_ERROR_IF(!::ReadFile(buildFileHandle.Get(), buf, sizeof(buf), &bytesRead, nullptr));
+            if (!::ReadFile(buildFileHandle.Get(), buf, sizeof(buf), &bytesRead, nullptr))
+            {
+                // An anonymous pipe (the common case for a piped Dockerfile) signals EOF by failing the
+                // read with ERROR_BROKEN_PIPE once the write end is closed and all buffered data has been
+                // consumed, rather than returning a zero-byte read. Treat that as a clean end of file.
+                const DWORD error = ::GetLastError();
+                if (error == ERROR_BROKEN_PIPE)
+                {
+                    break;
+                }
+
+                THROW_WIN32(error);
+            }
+
             if (bytesRead == 0)
             {
                 break; // EOF on user handle — Dockerfile fully copied.
