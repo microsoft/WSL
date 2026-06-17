@@ -3128,23 +3128,6 @@ HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Cal
     return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
-HRESULT WSLCSession::GetTerminationReason(WSLCCompatVirtualMachineTerminationReason* Reason, LPWSTR* Details)
-try
-{
-    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
-
-    *Reason = WSLCCompatVirtualMachineTerminationReasonUnknown;
-    *Details = nullptr;
-
-    WSLCVirtualMachineTerminationReason reason = WSLCVirtualMachineTerminationReasonUnknown;
-    RETURN_IF_FAILED(GetTerminationReason(&reason, Details));
-
-    *Reason = apicompat::Convert(reason);
-
-    return S_OK;
-}
-CATCH_RETURN();
-
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {
     io::MultiHandleWait io;

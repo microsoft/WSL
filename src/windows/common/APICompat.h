@@ -22,30 +22,11 @@ Abstract:
 namespace wsl::windows::common::apicompat {
 
 //
-// Enum conversions.
+// Struct conversions.
 //
-
-// Forward (WSLCCompat -> wslc.idl).
-WSLCFD Convert(WSLCCompatFD Fd);
-WSLCSignal Convert(WSLCCompatSignal Signal);
-WSLCProcessFlags Convert(WSLCCompatProcessFlags Flags);
-WSLCContainerFlags Convert(WSLCCompatContainerFlags Flags);
-WSLCContainerStartFlags Convert(WSLCCompatContainerStartFlags Flags);
-WSLCDeleteFlags Convert(WSLCCompatDeleteFlags Flags);
-WSLCNetworkingMode Convert(WSLCCompatNetworkingMode Mode);
-WSLCFeatureFlags Convert(WSLCCompatFeatureFlags Flags);
-WSLCSessionStorageFlags Convert(WSLCCompatSessionStorageFlags Flags);
-WSLCSessionFlags Convert(WSLCCompatSessionFlags Flags);
-WSLCListImagesFlags Convert(WSLCCompatListImagesFlags Flags);
-WSLCDeleteImageFlags Convert(WSLCCompatDeleteImageFlags Flags);
-WSLCHandleType Convert(WSLCCompatHandleType Type);
-
-// Reverse (wslc.idl -> WSLCCompat).
-WSLCCompatProcessState Convert(WSLCProcessState State);
-WSLCCompatContainerState Convert(WSLCContainerState State);
-WSLCCompatVirtualMachineTerminationReason Convert(WSLCVirtualMachineTerminationReason Reason);
-WSLCCompatHandleType Convert(WSLCHandleType Type);
-WSLCCompatDeletedImageType Convert(WSLCDeletedImageType Type);
+// Enums and flags are shared between wslc.idl and WSLCCompat.idl (see WSLCShared.idl),
+// so they require no conversion.
+//
 
 // Forward (WSLCCompat -> wslc.idl).
 WSLCVersion Convert(const WSLCCompatVersion& Version);

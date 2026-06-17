@@ -16,6 +16,9 @@ Abstract:
 import "unknwn.idl";
 import "wtypes.idl";
 
+// Enums and flags shared with the service API (wslc.idl).
+import "WSLCShared.idl";
+
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCCompatSessionManager;")
 cpp_quote("class DECLSPEC_UUID(\"9fcd2067-9fc6-4efa-9eb0-698169ebf7d3\") WSLCCompatSessionManagerFactory;")
@@ -33,59 +36,6 @@ struct _WSLCCompatVersion {
     ULONG Minor;
     ULONG Revision;
 } WSLCCompatVersion;
-
-typedef enum _WSLCCompatVirtualMachineTerminationReason
-{
-    WSLCCompatVirtualMachineTerminationReasonUnknown,
-    WSLCCompatVirtualMachineTerminationReasonShutdown,
-    WSLCCompatVirtualMachineTerminationReasonCrashed,
-} WSLCCompatVirtualMachineTerminationReason;
-
-typedef enum _WSLCCompatFD
-{
-    WSLCCompatFDStdin = 0,
-    WSLCCompatFDStdout = 1,
-    WSLCCompatFDStderr = 2,
-    WSLCCompatFDTty = 3,
-} WSLCCompatFD;
-
-typedef enum _WSLCCompatSignal
-{
-    WSLCCompatSignalNone = 0,
-    WSLCCompatSignalSIGHUP = 1,
-    WSLCCompatSignalSIGINT = 2,
-    WSLCCompatSignalSIGQUIT = 3,
-    WSLCCompatSignalSIGILL = 4,
-    WSLCCompatSignalSIGTRAP = 5,
-    WSLCCompatSignalSIGABRT = 6,
-    WSLCCompatSignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
-    WSLCCompatSignalSIGBUS = 7,
-    WSLCCompatSignalSIGFPE = 8,
-    WSLCCompatSignalSIGKILL = 9,
-    WSLCCompatSignalSIGUSR1 = 10,
-    WSLCCompatSignalSIGSEGV = 11,
-    WSLCCompatSignalSIGUSR2 = 12,
-    WSLCCompatSignalSIGPIPE = 13,
-    WSLCCompatSignalSIGALRM = 14,
-    WSLCCompatSignalSIGTERM = 15,
-    WSLCCompatSignalSIGTKFLT = 16,
-    WSLCCompatSignalSIGCHLD = 17,
-    WSLCCompatSignalSIGCONT = 18,
-    WSLCCompatSignalSIGSTOP = 19,
-    WSLCCompatSignalSIGTSTP = 20,
-    WSLCCompatSignalSIGTTIN = 21,
-    WSLCCompatSignalSIGTTOU = 22,
-    WSLCCompatSignalSIGURG = 23,
-    WSLCCompatSignalSIGXCPU = 24,
-    WSLCCompatSignalSIGXFSZ = 25,
-    WSLCCompatSignalSIGVTALRM = 26,
-    WSLCCompatSignalSIGPROF = 27,
-    WSLCCompatSignalSIGWINCH = 28,
-    WSLCCompatSignalSIGIO = 29,
-    WSLCCompatSignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
-    WSLCCompatSignalSIGPWR = 30,
-    WSLCCompatSignalSIGSYS = 31
-} WSLCCompatSignal;
 
 [
     uuid(EAA15E20-7FCC-485B-B798-ED4095DBACA5),
@@ -132,15 +82,6 @@ typedef struct _WSLCCompatImageInformation
     char ParentId[256];
 } WSLCCompatImageInformation;
 
-typedef enum _WSLCCompatListImagesFlags
-{
-    WSLCCompatListImagesFlagsNone = 0,
-    WSLCCompatListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
-    WSLCCompatListImagesFlagsDigests = 2, // Include digest information
-} WSLCCompatListImagesFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatListImagesFlags);")
-
 typedef struct _WSLCCompatKeyValuePair
 {
     [string] LPCSTR Key;
@@ -153,19 +94,10 @@ typedef WSLCCompatKeyValuePair WSLCCompatFilter;
 
 typedef struct _WSLCCompatListImagesOptions
 {
-    DWORD Flags; // WSLCCompatListImagesFlags (can combine with bitwise OR)
+    DWORD Flags; // WSLCListImagesFlags (can combine with bitwise OR)
     [unique, size_is(FiltersCount)] const WSLCCompatFilter* Filters;
     ULONG FiltersCount;
 } WSLCCompatListImagesOptions;
-
-typedef enum _WSLCCompatProcessFlags
-{
-    WSLCCompatProcessFlagsNone = 0,
-    WSLCCompatProcessFlagsStdin = 1,
-    WSLCCompatProcessFlagsTty = 2
-} WSLCCompatProcessFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatProcessFlags);")
 
 typedef struct _WSLCCompatStringArray
 {
@@ -179,7 +111,7 @@ typedef struct _WSLCCompatProcessOptions
     [unique] LPCSTR User;
     WSLCCompatStringArray CommandLine;
     WSLCCompatStringArray Environment;
-    WSLCCompatProcessFlags Flags;
+    WSLCProcessFlags Flags;
 } WSLCCompatProcessOptions;
 
 typedef struct _WSLCCompatNamedVolume
@@ -233,25 +165,6 @@ typedef struct _WSLCCompatContainerNetwork
     ULONG NetworksCount;
 } WSLCCompatContainerNetwork;
 
-typedef enum _WSLCCompatContainerFlags
-{
-    WSLCCompatContainerFlagsNone = 0,
-    WSLCCompatContainerFlagsRm = 1, // Delete the container when it exits.
-    WSLCCompatContainerFlagsGpu = 2, // Enable GPU access.
-    WSLCCompatContainerFlagsInit = 4, // Run the container under an init process.
-    WSLCCompatContainerFlagsPublishAll = 8, // Publish all exposed ports.
-} WSLCCompatContainerFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatContainerFlags);")
-
-typedef enum _WSLCCompatContainerStartFlags
-{
-    WSLCCompatContainerStartFlagsNone = 0,
-    WSLCCompatContainerStartFlagsAttach = 1, // Attach stdio handles on start.
-} WSLCCompatContainerStartFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatContainerStartFlags);")
-
 typedef struct _WSLCCompatContainerOptions
 {
     LPCSTR Image;
@@ -264,8 +177,8 @@ typedef struct _WSLCCompatContainerOptions
     ULONG PortsCount;
     [unique, size_is(LabelsCount)] const WSLCCompatLabel* Labels;
     ULONG LabelsCount;
-    WSLCCompatContainerFlags Flags;
-    WSLCCompatSignal StopSignal;
+    WSLCContainerFlags Flags;
+    WSLCSignal StopSignal;
     [unique] LPCSTR HostName;
     [unique] LPCSTR DomainName;
 
@@ -287,53 +200,28 @@ typedef struct _WSLCCompatContainerOptions
     ULONG UlimitsCount;
 } WSLCCompatContainerOptions;
 
-typedef enum _WSLCCompatContainerState
-{
-    WSLCCompatContainerStateInvalid = 0,
-    WSLCCompatContainerStateCreated = 1,
-    WSLCCompatContainerStateRunning = 2,
-    WSLCCompatContainerStateExited = 3,
-    WSLCCompatContainerStateDeleted = 4,
-} WSLCCompatContainerState;
-
 typedef char WSLCCompatContainerId[WSLCCompat_CONTAINER_ID_LENGTH + 1];
 
 typedef [system_handle(sh_file)] HANDLE WSLCCompatFileHandle;
 typedef [system_handle(sh_pipe)] HANDLE WSLCCompatPipeHandle;
 typedef [system_handle(sh_socket)] HANDLE WSLCCompatSocketHandle;
 
-typedef enum _WSLCCompatHandleType
-{
-    WSLCCompatHandleTypeUnknown = 0,
-    WSLCCompatHandleTypeFile = 1,
-    WSLCCompatHandleTypePipe = 2,
-    WSLCCompatHandleTypeSocket = 3
-} WSLCCompatHandleType;
-
 typedef struct _WSLCCompatHandle
 {
-    WSLCCompatHandleType Type;
+    WSLCHandleType Type;
 
-    [switch_type(WSLCCompatHandleType), switch_is(Type)]
+    [switch_type(WSLCHandleType), switch_is(Type)]
     union
     {
-        [case(WSLCCompatHandleTypeFile)]
+        [case(WSLCHandleTypeFile)]
         WSLCCompatFileHandle File;
-        [case(WSLCCompatHandleTypePipe)]
+        [case(WSLCHandleTypePipe)]
         WSLCCompatPipeHandle Pipe;
-        [case(WSLCCompatHandleTypeSocket)]
+        [case(WSLCHandleTypeSocket)]
         WSLCCompatSocketHandle Socket;
         [default];
     } Handle;
 } WSLCCompatHandle;
-
-typedef enum _WSLCCompatProcessState
-{
-    WSLCCompatProcessStateUnknown = 0,
-    WSLCCompatProcessStateRunning = 1,
-    WSLCCompatProcessStateExited = 2,
-    WSLCCompatProcessStateSignalled = 3
-} WSLCCompatProcessState;
 
 [
     uuid(AC69DD0D-6616-4C4F-91F2-C39D6034EA82),
@@ -344,37 +232,10 @@ interface IWSLCCompatProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
-    HRESULT GetStdHandle([in] WSLCCompatFD Fd, [out] WSLCCompatHandle* Handle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCCompatHandle* Handle);
     HRESULT GetPid([out] int* Pid);
-    HRESULT GetState([out] WSLCCompatProcessState* State, [out] int* Code);
+    HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);
 }
-
-typedef enum _WSLCCompatNetworkingMode
-{
-    WSLCCompatNetworkingModeNone,
-    WSLCCompatNetworkingModeNAT,
-    WSLCCompatNetworkingModeVirtioProxy
-} WSLCCompatNetworkingMode;
-
-typedef enum _WSLCCompatFeatureFlags
-{
-    WSLCCompatFeatureFlagsNone = 0,
-    WSLCCompatFeatureFlagsDnsTunneling = 1,
-    WSLCCompatFeatureFlagsEarlyBootDmesg = 2,
-    WSLCCompatFeatureFlagsGPU = 4,
-    WSLCCompatFeatureFlagsVirtioFs = 8,
-    WSLCCompatFeatureFlagsDebug = 16,
-} WSLCCompatFeatureFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatFeatureFlags);")
-
-typedef enum _WSLCCompatSessionStorageFlags
-{
-    WSLCCompatSessionStorageFlagsNone = 0,
-    WSLCCompatSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
-} WSLCCompatSessionStorageFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatSessionStorageFlags);")
 
 typedef struct _WSLCCompatSessionSettings {
     LPCWSTR DisplayName;
@@ -383,24 +244,15 @@ typedef struct _WSLCCompatSessionSettings {
     ULONG CpuCount;
     ULONG MemoryMb;
     ULONG BootTimeoutMs;
-    WSLCCompatNetworkingMode NetworkingMode;
-    WSLCCompatFeatureFlags FeatureFlags;
+    WSLCNetworkingMode NetworkingMode;
+    WSLCFeatureFlags FeatureFlags;
     WSLCCompatHandle DmesgOutput;
-    WSLCCompatSessionStorageFlags StorageFlags;
+    WSLCSessionStorageFlags StorageFlags;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
 } WSLCCompatSessionSettings;
-
-typedef enum _WSLCCompatDeleteFlags
-{
-    WSLCCompatDeleteFlagsNone = 0,
-    WSLCCompatDeleteFlagsForce = 1,
-    WSLCCompatDeleteFlagsDeleteVolumes = 2,
-} WSLCCompatDeleteFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatDeleteFlags);")
 
 [
     uuid(8C3C91FA-D550-41B9-AD9D-23DCBF96F549),
@@ -409,41 +261,26 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatDeleteFlags);")
 ]
 interface IWSLCCompatContainer : IUnknown
 {
-    HRESULT Stop([in] WSLCCompatSignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLCCompatContainerStartFlags Flags);
-    HRESULT Delete([in] WSLCCompatDeleteFlags Flags);
-    HRESULT GetState([out] WSLCCompatContainerState* State);
+    HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
+    HRESULT Start([in] WSLCContainerStartFlags Flags);
+    HRESULT Delete([in] WSLCDeleteFlags Flags);
+    HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCCompatProcess** Process);
     HRESULT Exec([in, ref] const WSLCCompatProcessOptions* Options, [out] IWSLCCompatProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT GetId([out, string] WSLCCompatContainerId Id);
 }
 
-typedef enum _WSLCCompatDeletedImageType
-{
-    WSLCCompatDeletedImageTypeDeleted = 0,
-    WSLCCompatDeletedImageTypeUntagged = 1
-} WSLCCompatDeletedImageType;
-
 typedef struct _WSLCCompatDeletedImageInformation
 {
     char Image[WSLCCompat_MAX_IMAGE_NAME_LENGTH + 1];
-    WSLCCompatDeletedImageType Type;
+    WSLCDeletedImageType Type;
 } WSLCCompatDeletedImageInformation;
-
-typedef enum _WSLCCompatDeleteImageFlags
-{
-    WSLCCompatDeleteImageFlagsNone = 0,
-    WSLCCompatDeleteImageFlagsForce = 1,
-    WSLCCompatDeleteImageFlagsNoPrune = 2,
-} WSLCCompatDeleteImageFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatDeleteImageFlags);")
 
 typedef struct _WSLCCompatDeleteImageOptions
 {
     LPCSTR Image; // Image can be ID or Repo:Tag.
-    DWORD Flags; // WSLCCompatDeleteImageFlags
+    DWORD Flags; // WSLCDeleteImageFlags
 } WSLCCompatDeleteImageOptions;
 
 typedef struct _WSLCCompatTagImageOptions
@@ -499,7 +336,7 @@ interface IWSLCCompatSession : IUnknown
 
     // Returns the cached termination reason and details. These are only available after the
     // termination event has been signaled; before that the call fails.
-    HRESULT GetTerminationReason([out] WSLCCompatVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
+    HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLCCompatVolumeOptions* Options, [out] WSLCCompatVolumeInformation* VolumeInfo);
@@ -510,15 +347,6 @@ interface IWSLCCompatSession : IUnknown
 
     HRESULT RegisterCrashDumpCallback([in] IWSLCCompatCrashDumpCallback* Callback, [out] IUnknown** Subscription);
 }
-
-typedef enum _WSLCCompatSessionFlags
-{
-    WSLCCompatSessionFlagsNone = 0,
-    WSLCCompatSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
-    WSLCCompatSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
-} WSLCCompatSessionFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCCompatSessionFlags);")
 
 [
     uuid(279F2047-DA35-45A3-B671-AFD2302D5D16),
@@ -531,5 +359,5 @@ interface IWSLCCompatSessionManager : IUnknown
     HRESULT IsClientVersionSupported([in] const WSLCCompatVersion* ClientVersion, [out] BOOL* IsSupported);
 
     // Session management.
-    HRESULT CreateSession([in, unique] const WSLCCompatSessionSettings* Settings, WSLCCompatSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
+    HRESULT CreateSession([in, unique] const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
 }

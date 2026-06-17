@@ -41,35 +41,35 @@ struct FlagsTraits
 template <>
 struct FlagsTraits<WslcSessionFeatureFlags>
 {
-    using WslcType = WSLCCompatFeatureFlags;
+    using WslcType = WSLCFeatureFlags;
     constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
-    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WSLCCompatFeatureFlagsGPU);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslcFeatureFlagsGPU);
 };
 
 template <>
 struct FlagsTraits<WslcContainerFlags>
 {
-    using WslcType = WSLCCompatContainerFlags;
+    using WslcType = WSLCContainerFlags;
     constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
-    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCCompatContainerFlagsRm);
-    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCCompatContainerFlagsGpu);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCContainerFlagsRm);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCContainerFlagsGpu);
     // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
 };
 
 template <>
 struct FlagsTraits<WslcContainerStartFlags>
 {
-    using WslcType = WSLCCompatContainerStartFlags;
+    using WslcType = WSLCContainerStartFlags;
     constexpr static WslcContainerStartFlags Mask = WSLC_CONTAINER_START_FLAG_ATTACH;
-    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLCCompatContainerStartFlagsAttach);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLCContainerStartFlagsAttach);
 };
 
 template <>
 struct FlagsTraits<WslcDeleteContainerFlags>
 {
-    using WslcType = WSLCCompatDeleteFlags;
+    using WslcType = WSLCDeleteFlags;
     constexpr static WslcDeleteContainerFlags Mask = WSLC_DELETE_CONTAINER_FLAG_FORCE;
-    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLCCompatDeleteFlagsForce);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLCDeleteFlagsForce);
 };
 
 template <typename Flags>
@@ -79,22 +79,22 @@ typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
     return static_cast<typename traits::WslcType>(flags & traits::Mask);
 }
 
-WSLCCompatSignal Convert(WslcSignal signal)
+WSLCSignal Convert(WslcSignal signal)
 {
     switch (signal)
     {
     case WSLC_SIGNAL_NONE:
-        return WSLCCompatSignal::WSLCCompatSignalNone;
+        return WSLCSignal::WSLCSignalNone;
     case WSLC_SIGNAL_SIGHUP:
-        return WSLCCompatSignal::WSLCCompatSignalSIGHUP;
+        return WSLCSignal::WSLCSignalSIGHUP;
     case WSLC_SIGNAL_SIGINT:
-        return WSLCCompatSignal::WSLCCompatSignalSIGINT;
+        return WSLCSignal::WSLCSignalSIGINT;
     case WSLC_SIGNAL_SIGQUIT:
-        return WSLCCompatSignal::WSLCCompatSignalSIGQUIT;
+        return WSLCSignal::WSLCSignalSIGQUIT;
     case WSLC_SIGNAL_SIGKILL:
-        return WSLCCompatSignal::WSLCCompatSignalSIGKILL;
+        return WSLCSignal::WSLCSignalSIGKILL;
     case WSLC_SIGNAL_SIGTERM:
-        return WSLCCompatSignal::WSLCCompatSignalSIGTERM;
+        return WSLCSignal::WSLCSignalSIGTERM;
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcSignal: %i", signal);
     }
@@ -434,13 +434,13 @@ try
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    runtimeSettings.NetworkingMode = WSLCCompatNetworkingModeVirtioProxy;
+    runtimeSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
-    WI_SetFlag(runtimeSettings.FeatureFlags, WSLCCompatFeatureFlagsVirtioFs);
-    WI_SetFlag(runtimeSettings.FeatureFlags, WSLCCompatFeatureFlagsDnsTunneling);
+    WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+    WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(
-            sessionManager->CreateSession(&runtimeSettings, WSLCCompatSessionFlagsNone, nullptr, &result->session))))
+            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -598,9 +598,9 @@ STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessi
 try
 {
     static_assert(
-        WSLC_SESSION_TERMINATION_REASON_UNKNOWN == WSLCCompatVirtualMachineTerminationReasonUnknown &&
-            WSLC_SESSION_TERMINATION_REASON_SHUTDOWN == WSLCCompatVirtualMachineTerminationReasonShutdown &&
-            WSLC_SESSION_TERMINATION_REASON_CRASHED == WSLCCompatVirtualMachineTerminationReasonCrashed,
+        WSLC_SESSION_TERMINATION_REASON_UNKNOWN == WSLCVirtualMachineTerminationReasonUnknown &&
+            WSLC_SESSION_TERMINATION_REASON_SHUTDOWN == WSLCVirtualMachineTerminationReasonShutdown &&
+            WSLC_SESSION_TERMINATION_REASON_CRASHED == WSLCVirtualMachineTerminationReasonCrashed,
         "Termination reason enum values mismatch.");
 
     RETURN_HR_IF_NULL(E_POINTER, reason);
@@ -609,7 +609,7 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
 
-    WSLCCompatVirtualMachineTerminationReason runtimeReason = WSLCCompatVirtualMachineTerminationReasonUnknown;
+    WSLCVirtualMachineTerminationReason runtimeReason = WSLCVirtualMachineTerminationReasonUnknown;
     wil::unique_cotaskmem_string details;
     RETURN_IF_FAILED(internalType->session->GetTerminationReason(&runtimeReason, &details));
 
@@ -690,10 +690,10 @@ try
         // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
         try
         {
-            WSLCCompatContainerState state{};
+            WSLCContainerState state{};
             THROW_IF_FAILED(internalType->container->GetState(&state));
 
-            if (state == WSLCCompatContainerStateExited || state == WSLCCompatContainerStateDeleted)
+            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
             {
                 ioCallback->Complete();
             }
@@ -725,11 +725,11 @@ try
 
         try
         {
-            WSLCCompatProcessState state{};
+            WSLCProcessState state{};
             int exitCode{};
             THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
 
-            if (state == WSLCCompatProcessStateExited || state == WSLCCompatProcessStateSignalled)
+            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
             {
                 internalType->ioCallbacks->Complete();
             }
@@ -1159,9 +1159,9 @@ STDAPI WslcGetContainerState(_In_ WslcContainer container, _Out_ WslcContainerSt
 try
 {
     static_assert(
-        WSLC_CONTAINER_STATE_INVALID == WSLCCompatContainerStateInvalid && WSLC_CONTAINER_STATE_CREATED == WSLCCompatContainerStateCreated &&
-            WSLC_CONTAINER_STATE_RUNNING == WSLCCompatContainerStateRunning &&
-            WSLC_CONTAINER_STATE_EXITED == WSLCCompatContainerStateExited && WSLC_CONTAINER_STATE_DELETED == WSLCCompatContainerStateDeleted,
+        WSLC_CONTAINER_STATE_INVALID == WslcContainerStateInvalid && WSLC_CONTAINER_STATE_CREATED == WslcContainerStateCreated &&
+            WSLC_CONTAINER_STATE_RUNNING == WslcContainerStateRunning &&
+            WSLC_CONTAINER_STATE_EXITED == WslcContainerStateExited && WSLC_CONTAINER_STATE_DELETED == WslcContainerStateDeleted,
         "Container state enum values mismatch.");
 
     auto internalType = CheckAndGetInternalType(container);
@@ -1170,7 +1170,7 @@ try
 
     *state = WSLC_CONTAINER_STATE_INVALID;
 
-    WSLCCompatContainerState runtimeState{};
+    WSLCContainerState runtimeState{};
     RETURN_IF_FAILED(internalType->container->GetState(&runtimeState));
 
     *state = static_cast<WslcContainerState>(runtimeState);
@@ -1294,8 +1294,8 @@ STDAPI WslcGetProcessState(_In_ WslcProcess process, _Out_ WslcProcessState* sta
 try
 {
     static_assert(
-        WSLC_PROCESS_STATE_UNKNOWN == WSLCCompatProcessStateUnknown && WSLC_PROCESS_STATE_RUNNING == WSLCCompatProcessStateRunning &&
-            WSLC_PROCESS_STATE_EXITED == WSLCCompatProcessStateExited && WSLC_PROCESS_STATE_SIGNALLED == WSLCCompatProcessStateSignalled,
+        WSLC_PROCESS_STATE_UNKNOWN == WslcProcessStateUnknown && WSLC_PROCESS_STATE_RUNNING == WslcProcessStateRunning &&
+            WSLC_PROCESS_STATE_EXITED == WslcProcessStateExited && WSLC_PROCESS_STATE_SIGNALLED == WslcProcessStateSignalled,
         "Process state enum values mismatch.");
 
     auto internalType = CheckAndGetInternalType(process);
@@ -1304,7 +1304,7 @@ try
 
     *state = WSLC_PROCESS_STATE_UNKNOWN;
 
-    WSLCCompatProcessState runtimeState{};
+    WSLCProcessState runtimeState{};
     int exitCode{};
     RETURN_IF_FAILED(internalType->process->GetState(&runtimeState, &exitCode));
 
@@ -1322,9 +1322,9 @@ try
 
     *exitCode = -1;
 
-    WSLCCompatProcessState runtimeState{};
+    WSLCProcessState runtimeState{};
     RETURN_IF_FAILED(internalType->process->GetState(&runtimeState, exitCode));
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), runtimeState != WSLCCompatProcessStateExited);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), runtimeState != WslcProcessStateExited);
     return S_OK;
 }
 CATCH_RETURN();

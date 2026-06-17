@@ -617,7 +617,7 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(
-    const WSLCCompatSessionSettings* Settings, WSLCCompatSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
+    const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Session);
@@ -628,12 +628,12 @@ try
     Microsoft::WRL::ComPtr<IWSLCSession> session;
     if (Settings == nullptr)
     {
-        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), apicompat::Convert(Flags), warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, warning.Get(), &session));
     }
     else
     {
         const auto settings = apicompat::Convert(*Settings);
-        RETURN_IF_FAILED(CreateSession(settings.Get(), apicompat::Convert(Flags), warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
     }
 
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);

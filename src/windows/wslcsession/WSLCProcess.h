@@ -39,8 +39,7 @@ public:
     IFACEMETHOD(ResizeTty)(_In_ ULONG Rows, _In_ ULONG Columns) override;
 
     // IWSLCCompatProcess - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
-    IFACEMETHOD(GetStdHandle)(_In_ WSLCCompatFD Fd, _Out_ WSLCCompatHandle* Handle) override;
-    IFACEMETHOD(GetState)(_Out_ WSLCCompatProcessState* State, _Out_ int* Code) override;
+    IFACEMETHOD(GetStdHandle)(_In_ WSLCFD Fd, _Out_ WSLCCompatHandle* Handle) override;
 
     wil::unique_handle GetStdHandle(int Index);
     HANDLE GetExitEvent();

@@ -126,28 +126,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(WSLCCompatFD Fd, WSLCCompatHandle* Handle)
+HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCCompatHandle* Handle)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Handle);
 
     WSLCHandle handle{};
-    RETURN_IF_FAILED(GetStdHandle(apicompat::Convert(Fd), &handle));
+    RETURN_IF_FAILED(GetStdHandle(Fd, &handle));
 
     *Handle = apicompat::Convert(handle);
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCProcess::GetState(WSLCCompatProcessState* State, int* Code)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, State);
-
-    WSLCProcessState state{};
-    RETURN_IF_FAILED(GetState(&state, Code));
-
-    *State = apicompat::Convert(state);
     return S_OK;
 }
 CATCH_RETURN();

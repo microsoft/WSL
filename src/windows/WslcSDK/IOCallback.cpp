@@ -55,7 +55,7 @@ IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIO
 
             if (runResult && m_process && m_callbackOptions && m_callbackOptions->onExit)
             {
-                WSLCCompatProcessState state{};
+                WSLCProcessState state{};
                 int exitCode = -1;
 
                 // Prefer to make the callback even if we don't properly retrieve the exit code.
@@ -66,7 +66,7 @@ IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIO
                 }
                 else
                 {
-                    WI_ASSERT(state == WSLCCompatProcessStateExited);
+                    WI_ASSERT(state == WslcProcessStateExited);
                 }
 
                 // Regardless of our ability to get the proper exit code, inform the caller that the process
@@ -123,7 +123,7 @@ wil::unique_handle IOCallback::GetIOHandle(IWSLCCompatProcess* process, WslcProc
 {
     WSLCCompatHandle handle{};
 
-    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCCompatFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
+    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
     // The handle value is the same regardless of the union member that was populated.
     return wil::unique_handle{handle.Handle.File};

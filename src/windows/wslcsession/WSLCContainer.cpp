@@ -2542,33 +2542,10 @@ HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) ? S_OK : S_FALSE;
 }
 
-HRESULT WSLCContainer::Stop(WSLCCompatSignal Signal, LONG TimeoutSeconds)
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags)
 {
-    return Stop(apicompat::Convert(Signal), TimeoutSeconds);
+    return Start(Flags, nullptr, nullptr);
 }
-
-HRESULT WSLCContainer::Start(WSLCCompatContainerStartFlags Flags)
-{
-    return Start(apicompat::Convert(Flags), nullptr, nullptr);
-}
-
-HRESULT WSLCContainer::Delete(WSLCCompatDeleteFlags Flags)
-{
-    return Delete(apicompat::Convert(Flags));
-}
-
-HRESULT WSLCContainer::GetState(WSLCCompatContainerState* State)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, State);
-
-    WSLCContainerState state{};
-    RETURN_IF_FAILED(GetState(&state));
-
-    *State = apicompat::Convert(state);
-    return S_OK;
-}
-CATCH_RETURN();
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCCompatProcess** Process)
 try

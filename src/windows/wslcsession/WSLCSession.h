@@ -200,8 +200,8 @@ public:
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
-    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate) are
-    // served by the single existing override and require no additional code here.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
+    // GetTerminationReason) are served by the single existing override and require no additional code here.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
@@ -232,7 +232,6 @@ public:
         _Out_ IWSLCCompatContainer** Container) override;
     IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
-    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCCompatVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 

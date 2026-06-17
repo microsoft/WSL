@@ -14,15 +14,6 @@ namespace {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(Destination, Source) != 0);
     }
 
-    // Throws E_INVALIDARG if Value contains any bit outside of KnownMask.
-    template <typename TValue, typename TMask>
-    void ThrowIfUnknownFlags(TValue Value, TMask KnownMask, PCSTR Name)
-    {
-        const auto value = static_cast<unsigned long long>(Value);
-        const auto mask = static_cast<unsigned long long>(KnownMask);
-        THROW_HR_IF_MSG(E_INVALIDARG, (value & ~mask) != 0, "Invalid %hs value: 0x%llx", Name, value);
-    }
-
     template <typename TOut, typename TIn>
     std::vector<TOut> ConvertArray(const TIn* Items, ULONG Count)
     {
@@ -95,313 +86,6 @@ namespace {
 } // namespace
 
 //
-// Enum conversions.
-//
-
-WSLCFD Convert(WSLCCompatFD Fd)
-{
-    switch (Fd)
-    {
-    case WSLCCompatFDStdin:
-        return WSLCFDStdin;
-    case WSLCCompatFDStdout:
-        return WSLCFDStdout;
-    case WSLCCompatFDStderr:
-        return WSLCFDStderr;
-    case WSLCCompatFDTty:
-        return WSLCFDTty;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatFD value: %i", static_cast<int>(Fd));
-}
-
-WSLCSignal Convert(WSLCCompatSignal Signal)
-{
-    switch (Signal)
-    {
-    case WSLCCompatSignalNone:
-        return WSLCSignalNone;
-    case WSLCCompatSignalSIGHUP:
-        return WSLCSignalSIGHUP;
-    case WSLCCompatSignalSIGINT:
-        return WSLCSignalSIGINT;
-    case WSLCCompatSignalSIGQUIT:
-        return WSLCSignalSIGQUIT;
-    case WSLCCompatSignalSIGILL:
-        return WSLCSignalSIGILL;
-    case WSLCCompatSignalSIGTRAP:
-        return WSLCSignalSIGTRAP;
-    case WSLCCompatSignalSIGABRT:
-        return WSLCSignalSIGABRT;
-    case WSLCCompatSignalSIGBUS:
-        return WSLCSignalSIGBUS;
-    case WSLCCompatSignalSIGFPE:
-        return WSLCSignalSIGFPE;
-    case WSLCCompatSignalSIGKILL:
-        return WSLCSignalSIGKILL;
-    case WSLCCompatSignalSIGUSR1:
-        return WSLCSignalSIGUSR1;
-    case WSLCCompatSignalSIGSEGV:
-        return WSLCSignalSIGSEGV;
-    case WSLCCompatSignalSIGUSR2:
-        return WSLCSignalSIGUSR2;
-    case WSLCCompatSignalSIGPIPE:
-        return WSLCSignalSIGPIPE;
-    case WSLCCompatSignalSIGALRM:
-        return WSLCSignalSIGALRM;
-    case WSLCCompatSignalSIGTERM:
-        return WSLCSignalSIGTERM;
-    case WSLCCompatSignalSIGTKFLT:
-        return WSLCSignalSIGTKFLT;
-    case WSLCCompatSignalSIGCHLD:
-        return WSLCSignalSIGCHLD;
-    case WSLCCompatSignalSIGCONT:
-        return WSLCSignalSIGCONT;
-    case WSLCCompatSignalSIGSTOP:
-        return WSLCSignalSIGSTOP;
-    case WSLCCompatSignalSIGTSTP:
-        return WSLCSignalSIGTSTP;
-    case WSLCCompatSignalSIGTTIN:
-        return WSLCSignalSIGTTIN;
-    case WSLCCompatSignalSIGTTOU:
-        return WSLCSignalSIGTTOU;
-    case WSLCCompatSignalSIGURG:
-        return WSLCSignalSIGURG;
-    case WSLCCompatSignalSIGXCPU:
-        return WSLCSignalSIGXCPU;
-    case WSLCCompatSignalSIGXFSZ:
-        return WSLCSignalSIGXFSZ;
-    case WSLCCompatSignalSIGVTALRM:
-        return WSLCSignalSIGVTALRM;
-    case WSLCCompatSignalSIGPROF:
-        return WSLCSignalSIGPROF;
-    case WSLCCompatSignalSIGWINCH:
-        return WSLCSignalSIGWINCH;
-    case WSLCCompatSignalSIGIO:
-        return WSLCSignalSIGIO;
-    case WSLCCompatSignalSIGPWR:
-        return WSLCSignalSIGPWR;
-    case WSLCCompatSignalSIGSYS:
-        return WSLCSignalSIGSYS;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid Signal value: %i", static_cast<int>(Signal));
-}
-
-WSLCProcessFlags Convert(WSLCCompatProcessFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatProcessFlagsStdin | WSLCCompatProcessFlagsTty, "WSLCCompatProcessFlags");
-
-    WSLCProcessFlags result = WSLCProcessFlagsNone;
-    WI_SetFlagIf(result, WSLCProcessFlagsStdin, WI_IsFlagSet(Flags, WSLCCompatProcessFlagsStdin));
-    WI_SetFlagIf(result, WSLCProcessFlagsTty, WI_IsFlagSet(Flags, WSLCCompatProcessFlagsTty));
-    return result;
-}
-
-WSLCContainerFlags Convert(WSLCCompatContainerFlags Flags)
-{
-    ThrowIfUnknownFlags(
-        Flags,
-        WSLCCompatContainerFlagsRm | WSLCCompatContainerFlagsGpu | WSLCCompatContainerFlagsInit | WSLCCompatContainerFlagsPublishAll,
-        "WSLCCompatContainerFlags");
-
-    WSLCContainerFlags result = WSLCContainerFlagsNone;
-    WI_SetFlagIf(result, WSLCContainerFlagsRm, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsRm));
-    WI_SetFlagIf(result, WSLCContainerFlagsGpu, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsGpu));
-    WI_SetFlagIf(result, WSLCContainerFlagsInit, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsInit));
-    WI_SetFlagIf(result, WSLCContainerFlagsPublishAll, WI_IsFlagSet(Flags, WSLCCompatContainerFlagsPublishAll));
-    return result;
-}
-
-WSLCContainerStartFlags Convert(WSLCCompatContainerStartFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatContainerStartFlagsAttach, "WSLCCompatContainerStartFlags");
-
-    WSLCContainerStartFlags result = WSLCContainerStartFlagsNone;
-    WI_SetFlagIf(result, WSLCContainerStartFlagsAttach, WI_IsFlagSet(Flags, WSLCCompatContainerStartFlagsAttach));
-    return result;
-}
-
-WSLCDeleteFlags Convert(WSLCCompatDeleteFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatDeleteFlagsForce | WSLCCompatDeleteFlagsDeleteVolumes, "WSLCCompatDeleteFlags");
-
-    WSLCDeleteFlags result = WSLCDeleteFlagsNone;
-    WI_SetFlagIf(result, WSLCDeleteFlagsForce, WI_IsFlagSet(Flags, WSLCCompatDeleteFlagsForce));
-    WI_SetFlagIf(result, WSLCDeleteFlagsDeleteVolumes, WI_IsFlagSet(Flags, WSLCCompatDeleteFlagsDeleteVolumes));
-    return result;
-}
-
-WSLCNetworkingMode Convert(WSLCCompatNetworkingMode Mode)
-{
-    switch (Mode)
-    {
-    case WSLCCompatNetworkingModeNone:
-        return WSLCNetworkingModeNone;
-    case WSLCCompatNetworkingModeNAT:
-        return WSLCNetworkingModeNAT;
-    case WSLCCompatNetworkingModeVirtioProxy:
-        return WSLCNetworkingModeVirtioProxy;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatNetworkingMode value: %i", static_cast<int>(Mode));
-}
-
-WSLCFeatureFlags Convert(WSLCCompatFeatureFlags Flags)
-{
-    ThrowIfUnknownFlags(
-        Flags,
-        WSLCCompatFeatureFlagsDnsTunneling | WSLCCompatFeatureFlagsEarlyBootDmesg | WSLCCompatFeatureFlagsGPU |
-            WSLCCompatFeatureFlagsVirtioFs | WSLCCompatFeatureFlagsDebug,
-        "WSLCCompatFeatureFlags");
-
-    WSLCFeatureFlags result = WslcFeatureFlagsNone;
-    WI_SetFlagIf(result, WslcFeatureFlagsDnsTunneling, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsDnsTunneling));
-    WI_SetFlagIf(result, WslcFeatureFlagsEarlyBootDmesg, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsEarlyBootDmesg));
-    WI_SetFlagIf(result, WslcFeatureFlagsGPU, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsGPU));
-    WI_SetFlagIf(result, WslcFeatureFlagsVirtioFs, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsVirtioFs));
-    WI_SetFlagIf(result, WslcFeatureFlagsDebug, WI_IsFlagSet(Flags, WSLCCompatFeatureFlagsDebug));
-    return result;
-}
-
-WSLCSessionStorageFlags Convert(WSLCCompatSessionStorageFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatSessionStorageFlagsNoCreate, "WSLCCompatSessionStorageFlags");
-
-    WSLCSessionStorageFlags result = WSLCSessionStorageFlagsNone;
-    WI_SetFlagIf(result, WSLCSessionStorageFlagsNoCreate, WI_IsFlagSet(Flags, WSLCCompatSessionStorageFlagsNoCreate));
-    return result;
-}
-
-WSLCSessionFlags Convert(WSLCCompatSessionFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatSessionFlagsPersistent | WSLCCompatSessionFlagsOpenExisting, "WSLCCompatSessionFlags");
-
-    WSLCSessionFlags result = WSLCSessionFlagsNone;
-    WI_SetFlagIf(result, WSLCSessionFlagsPersistent, WI_IsFlagSet(Flags, WSLCCompatSessionFlagsPersistent));
-    WI_SetFlagIf(result, WSLCSessionFlagsOpenExisting, WI_IsFlagSet(Flags, WSLCCompatSessionFlagsOpenExisting));
-    return result;
-}
-
-WSLCListImagesFlags Convert(WSLCCompatListImagesFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatListImagesFlagsAll | WSLCCompatListImagesFlagsDigests, "WSLCCompatListImagesFlags");
-
-    WSLCListImagesFlags result = WSLCListImagesFlagsNone;
-    WI_SetFlagIf(result, WSLCListImagesFlagsAll, WI_IsFlagSet(Flags, WSLCCompatListImagesFlagsAll));
-    WI_SetFlagIf(result, WSLCListImagesFlagsDigests, WI_IsFlagSet(Flags, WSLCCompatListImagesFlagsDigests));
-    return result;
-}
-
-WSLCDeleteImageFlags Convert(WSLCCompatDeleteImageFlags Flags)
-{
-    ThrowIfUnknownFlags(Flags, WSLCCompatDeleteImageFlagsForce | WSLCCompatDeleteImageFlagsNoPrune, "WSLCCompatDeleteImageFlags");
-
-    WSLCDeleteImageFlags result = WSLCDeleteImageFlagsNone;
-    WI_SetFlagIf(result, WSLCDeleteImageFlagsForce, WI_IsFlagSet(Flags, WSLCCompatDeleteImageFlagsForce));
-    WI_SetFlagIf(result, WSLCDeleteImageFlagsNoPrune, WI_IsFlagSet(Flags, WSLCCompatDeleteImageFlagsNoPrune));
-    return result;
-}
-
-WSLCHandleType Convert(WSLCCompatHandleType Type)
-{
-    switch (Type)
-    {
-    case WSLCCompatHandleTypeUnknown:
-        return WSLCHandleTypeUnknown;
-    case WSLCCompatHandleTypeFile:
-        return WSLCHandleTypeFile;
-    case WSLCCompatHandleTypePipe:
-        return WSLCHandleTypePipe;
-    case WSLCCompatHandleTypeSocket:
-        return WSLCHandleTypeSocket;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCCompatHandleType value: %i", static_cast<int>(Type));
-}
-
-WSLCCompatProcessState Convert(WSLCProcessState State)
-{
-    switch (State)
-    {
-    case WslcProcessStateUnknown:
-        return WSLCCompatProcessStateUnknown;
-    case WslcProcessStateRunning:
-        return WSLCCompatProcessStateRunning;
-    case WslcProcessStateExited:
-        return WSLCCompatProcessStateExited;
-    case WslcProcessStateSignalled:
-        return WSLCCompatProcessStateSignalled;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCProcessState value: %i", static_cast<int>(State));
-}
-
-WSLCCompatContainerState Convert(WSLCContainerState State)
-{
-    switch (State)
-    {
-    case WslcContainerStateInvalid:
-        return WSLCCompatContainerStateInvalid;
-    case WslcContainerStateCreated:
-        return WSLCCompatContainerStateCreated;
-    case WslcContainerStateRunning:
-        return WSLCCompatContainerStateRunning;
-    case WslcContainerStateExited:
-        return WSLCCompatContainerStateExited;
-    case WslcContainerStateDeleted:
-        return WSLCCompatContainerStateDeleted;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCContainerState value: %i", static_cast<int>(State));
-}
-
-WSLCCompatVirtualMachineTerminationReason Convert(WSLCVirtualMachineTerminationReason Reason)
-{
-    switch (Reason)
-    {
-    case WSLCVirtualMachineTerminationReasonUnknown:
-        return WSLCCompatVirtualMachineTerminationReasonUnknown;
-    case WSLCVirtualMachineTerminationReasonShutdown:
-        return WSLCCompatVirtualMachineTerminationReasonShutdown;
-    case WSLCVirtualMachineTerminationReasonCrashed:
-        return WSLCCompatVirtualMachineTerminationReasonCrashed;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCVirtualMachineTerminationReason value: %i", static_cast<int>(Reason));
-}
-
-WSLCCompatHandleType Convert(WSLCHandleType Type)
-{
-    switch (Type)
-    {
-    case WSLCHandleTypeUnknown:
-        return WSLCCompatHandleTypeUnknown;
-    case WSLCHandleTypeFile:
-        return WSLCCompatHandleTypeFile;
-    case WSLCHandleTypePipe:
-        return WSLCCompatHandleTypePipe;
-    case WSLCHandleTypeSocket:
-        return WSLCCompatHandleTypeSocket;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCHandleType value: %i", static_cast<int>(Type));
-}
-
-WSLCCompatDeletedImageType Convert(WSLCDeletedImageType Type)
-{
-    switch (Type)
-    {
-    case WSLCDeletedImageTypeDeleted:
-        return WSLCCompatDeletedImageTypeDeleted;
-    case WSLCDeletedImageTypeUntagged:
-        return WSLCCompatDeletedImageTypeUntagged;
-    }
-
-    THROW_HR_MSG(E_INVALIDARG, "Invalid WSLCDeletedImageType value: %i", static_cast<int>(Type));
-}
-
-//
 // Scalar / non-owning struct conversions.
 //
 
@@ -426,19 +110,19 @@ WSLCCompatVersion Convert(const WSLCVersion& Version)
 WSLCHandle Convert(const WSLCCompatHandle& Handle)
 {
     WSLCHandle result{};
-    result.Type = Convert(Handle.Type);
+    result.Type = Handle.Type;
     switch (Handle.Type)
     {
-    case WSLCCompatHandleTypeFile:
+    case WSLCHandleTypeFile:
         result.Handle.File = Handle.Handle.File;
         break;
-    case WSLCCompatHandleTypePipe:
+    case WSLCHandleTypePipe:
         result.Handle.Pipe = Handle.Handle.Pipe;
         break;
-    case WSLCCompatHandleTypeSocket:
+    case WSLCHandleTypeSocket:
         result.Handle.Socket = Handle.Handle.Socket;
         break;
-    case WSLCCompatHandleTypeUnknown:
+    case WSLCHandleTypeUnknown:
         break;
     }
 
@@ -448,7 +132,7 @@ WSLCHandle Convert(const WSLCCompatHandle& Handle)
 WSLCCompatHandle Convert(const WSLCHandle& Handle)
 {
     WSLCCompatHandle result{};
-    result.Type = Convert(Handle.Type);
+    result.Type = Handle.Type;
     switch (Handle.Type)
     {
     case WSLCHandleTypeFile:
@@ -482,7 +166,7 @@ WSLCProcessOptions Convert(const WSLCCompatProcessOptions& Options)
     result.User = Options.User;
     result.CommandLine = Convert(Options.CommandLine);
     result.Environment = Convert(Options.Environment);
-    result.Flags = Convert(Options.Flags);
+    result.Flags = Options.Flags;
     return result;
 }
 
@@ -544,7 +228,7 @@ WSLCDeleteImageOptions Convert(const WSLCCompatDeleteImageOptions& Options)
 {
     WSLCDeleteImageOptions result{};
     result.Image = Options.Image;
-    result.Flags = static_cast<DWORD>(Convert(static_cast<WSLCCompatDeleteImageFlags>(Options.Flags)));
+    result.Flags = Options.Flags;
     return result;
 }
 
@@ -573,7 +257,7 @@ WSLCCompatDeletedImageInformation Convert(const WSLCDeletedImageInformation& Ima
 {
     WSLCCompatDeletedImageInformation result{};
     CopyString(result.Image, Image.Image);
-    result.Type = Convert(Image.Type);
+    result.Type = Image.Type;
     return result;
 }
 
@@ -608,8 +292,8 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
     m_value.Labels = m_labels.empty() ? nullptr : m_labels.data();
     m_value.LabelsCount = Options.LabelsCount;
 
-    m_value.Flags = Convert(Options.Flags);
-    m_value.StopSignal = Convert(Options.StopSignal);
+    m_value.Flags = Options.Flags;
+    m_value.StopSignal = Options.StopSignal;
     m_value.HostName = Options.HostName;
     m_value.DomainName = Options.DomainName;
 
@@ -661,7 +345,7 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)
 {
-    m_value.Flags = static_cast<DWORD>(Convert(static_cast<WSLCCompatListImagesFlags>(Options.Flags)));
+    m_value.Flags = Options.Flags;
 
     m_filters = ConvertArray<WSLCFilter>(Options.Filters, Options.FiltersCount);
     m_value.Filters = m_filters.empty() ? nullptr : m_filters.data();
@@ -690,11 +374,11 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.CpuCount = Settings.CpuCount;
     m_value.MemoryMb = Settings.MemoryMb;
     m_value.BootTimeoutMs = Settings.BootTimeoutMs;
-    m_value.NetworkingMode = Convert(Settings.NetworkingMode);
+    m_value.NetworkingMode = Settings.NetworkingMode;
 
-    m_value.FeatureFlags = Convert(Settings.FeatureFlags);
+    m_value.FeatureFlags = Settings.FeatureFlags;
     m_value.DmesgOutput = Convert(Settings.DmesgOutput);
-    m_value.StorageFlags = Convert(Settings.StorageFlags);
+    m_value.StorageFlags = Settings.StorageFlags;
     m_value.RootVhdOverride = Settings.RootVhdOverride;
     m_value.RootVhdTypeOverride = Settings.RootVhdTypeOverride;
 }

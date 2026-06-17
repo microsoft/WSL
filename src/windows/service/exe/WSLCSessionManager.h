@@ -209,8 +209,5 @@ public:
     IFACEMETHOD(GetVersion)(_Out_ WSLCCompatVersion* Version) override;
     IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
     IFACEMETHOD(CreateSession)(
-        const WSLCCompatSessionSettings* Settings,
-        WSLCCompatSessionFlags Flags,
-        IWSLCCompatWarningCallback* WarningCallback,
-        IWSLCCompatSession** Session) override;
+        const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session) override;
 };
