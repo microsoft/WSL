@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCVolumes.h"
@@ -73,7 +74,7 @@ private:
 // The SYSTEM service creates the VM and passes IWSLCVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLCSession() = default;
@@ -197,6 +198,40 @@ public:
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
+
+    // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
+    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(LoadImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_ LPCSTR ImageName,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLCCompatListImagesOptions* Options, _Out_ WSLCCompatImageInformation** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLCCompatDeleteImageOptions* Options, _Out_ WSLCCompatDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
+    IFACEMETHOD(TagImage)(_In_ const WSLCCompatTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(CreateContainer)(
+        _In_ const WSLCCompatContainerOptions* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 

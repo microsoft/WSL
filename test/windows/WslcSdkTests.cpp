@@ -356,10 +356,10 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
-        auto process = launcher.Launch(comSession);
+        auto process = launcher.Launch(*comSession);
         auto result = process.WaitAndCaptureOutput();
         VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
 
@@ -2220,8 +2220,8 @@ class WslcSdkTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        return WSLCE2ETests::StartLocalRegistry(session, username, password, port);
+        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        return WSLCE2ETests::StartLocalRegistry(*session, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.
