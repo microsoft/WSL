@@ -2068,7 +2068,7 @@ Usage:
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
     <value>The --session option cannot be used with this command.</value>
-    <comment>{Locked="--session"}Command line arguments should not be translated</comment>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Failed to launch command {}. Errno = {}</value>
