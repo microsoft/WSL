@@ -360,6 +360,7 @@ void RemoveContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
+        PrintMessage(id);
     }
 }
 
@@ -750,6 +751,7 @@ void StopContainers(CLIExecutionContext& context)
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
+        PrintMessage(id);
     }
 }
 
@@ -795,6 +797,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

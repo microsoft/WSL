@@ -162,7 +162,15 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
-        kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+        if constexpr (!wsl::shared::Arm64)
+        {
+            kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+        }
+        else
+        {
+            kernelCmdLine += L" earlycon=pl011,0xeffec000,115200";
+        }
+
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
     }
 
@@ -381,7 +389,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Socket);
 
-    auto socket = wsl::windows::common::hvsocket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+    auto socket = socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
     *Socket = reinterpret_cast<HANDLE>(socket->release());

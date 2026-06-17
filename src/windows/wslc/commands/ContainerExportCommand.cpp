@@ -29,7 +29,6 @@ std::vector<Argument> ContainerExportCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Output, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerExportOutputArgDescription()),
-        Argument::Create(ArgType::Session),
     };
 }
 
