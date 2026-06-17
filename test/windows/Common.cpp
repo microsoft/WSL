@@ -2517,12 +2517,38 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
+static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
+{
+    std::wstring value;
+    if (FAILED(wil::GetEnvironmentVariableW(Name.c_str(), value)))
+    {
+        return std::nullopt;
+    }
+    return value;
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name) : m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), nullptr));
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) :
+    m_name(Name), m_originalValue(CaptureEnvValue(Name))
 {
     VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));
 }
 
 ScopedEnvVariable::~ScopedEnvVariable()
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), m_originalValue.has_value() ? m_originalValue->c_str() : nullptr));
+}
+
+void ScopedEnvVariable::Set(const std::wstring& Value)
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), Value.c_str()));
+}
+
+void ScopedEnvVariable::Clear()
 {
     VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), nullptr));
 }

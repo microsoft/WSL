@@ -35,6 +35,6 @@ constexpr EnvBinding c_envBindings[] = {
 
 // Populates target for any ArgType in definedArgs not already set.
 // Never throws on user input or environment state.
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept;
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs);
 
 } // namespace wsl::windows::wslc
