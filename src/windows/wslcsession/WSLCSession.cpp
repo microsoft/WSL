@@ -2799,6 +2799,7 @@ try
                 try
                 {
                     m_virtualMachine->Unmount(c_containerdStorage);
+                    m_storageMounted = false;
                 }
                 CATCH_LOG();
             }
