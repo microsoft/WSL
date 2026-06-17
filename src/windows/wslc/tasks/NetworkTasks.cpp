@@ -49,7 +49,7 @@ static bool TryInspectNetwork(Session& session, const std::string& networkName, 
     }
 }
 
-static bool TryDeleteNetwork(Session& session, const std::string& networkName)
+static bool TryDeleteNetwork(Session& session, const std::string& networkName, bool force)
 {
     try
     {
@@ -60,7 +60,11 @@ static bool TryDeleteNetwork(Session& session, const std::string& networkName)
     {
         if (ex.GetErrorCode() == WSLC_E_NETWORK_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcNetworkNotFound(networkName.c_str()), stderr);
+            if (!force)
+            {
+                PrintMessage(Localization::MessageWslcNetworkNotFound(networkName.c_str()), stderr);
+            }
+
             return false;
         }
 
@@ -100,13 +104,14 @@ void DeleteNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto networkNames = context.Args.GetAll<ArgType::NetworkName>();
+    const bool force = context.Args.Contains(ArgType::NetworkForce);
     for (const auto& name : networkNames)
     {
-        if (TryDeleteNetwork(session, WideToMultiByte(name)))
+        if (TryDeleteNetwork(session, WideToMultiByte(name), force))
         {
             PrintMessage(name);
         }
-        else
+        else if (!force)
         {
             context.ExitCode = 1;
         }

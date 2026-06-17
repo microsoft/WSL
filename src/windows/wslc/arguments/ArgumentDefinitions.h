@@ -77,6 +77,7 @@ _(Memory,         "memory",              L"m",              Kind::Value,       L
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,   "network-alias",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkAliasArgDescription()) \
+_(NetworkForce,   "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_NetworkForceArgDescription()) \
 _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
@@ -118,6 +119,7 @@ _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        L
 _(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
+_(VolumeForce,    "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_VolumeForceArgDescription()) \
 _(VolumeName,     "volume-name",         NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on

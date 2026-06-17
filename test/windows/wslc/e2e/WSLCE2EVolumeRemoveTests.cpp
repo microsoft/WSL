@@ -131,6 +131,36 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_NotFound)
+    {
+        auto result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_Valid)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_MixedFoundNotFound)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {} {}", TestVolumeName, TestVolumeName2));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -177,6 +207,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"                   //
+                << L"  -f,--force     Do not error if the volume does not exist\r\n" //
                 << L"  -?,--help      Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();

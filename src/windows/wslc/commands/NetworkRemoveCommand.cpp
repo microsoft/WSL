@@ -27,6 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkRemoveCommand::GetArguments() const
 {
     return {
+        Argument::Create(ArgType::NetworkForce),
         Argument::Create(ArgType::NetworkName, true, NO_LIMIT),
     };
 }
