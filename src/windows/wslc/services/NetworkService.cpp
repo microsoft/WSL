@@ -81,4 +81,27 @@ wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Sessi
     THROW_IF_FAILED(session.Get()->InspectNetwork(name.c_str(), &output));
     return FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
 }
+
+models::PruneNetworksResult NetworkService::Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
+{
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLCNetworkName> networks;
+    THROW_IF_FAILED(session.Get()->PruneNetworks(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &networks, networks.size_address<ULONG>()));
+
+    models::PruneNetworksResult result;
+    result.PrunedNetworks.reserve(networks.size());
+    for (auto ptr = networks.get(), end = networks.get() + networks.size(); ptr != end; ++ptr)
+    {
+        result.PrunedNetworks.emplace_back(*ptr);
+    }
+
+    return result;
+}
 } // namespace wsl::windows::wslc::services

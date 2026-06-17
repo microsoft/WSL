@@ -28,6 +28,7 @@ set(SOURCES
     IORelay.cpp
     OptionParser.cpp
     ServiceProcessLauncher.cpp
+    WindowsCertStore.cpp
     )
 
 set(HEADERS
@@ -38,6 +39,7 @@ set(HEADERS
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h
     WSLCProcessIO.h

@@ -31,7 +31,6 @@ std::vector<Argument> NetworkCreateCommand::GetArguments() const
         Argument::Create(ArgType::Driver, std::nullopt, std::nullopt, Localization::WSLCCLI_NetworkDriverOptionDescription()),
         Argument::Create(ArgType::Options, false, NO_LIMIT),
         Argument::Create(ArgType::Label, false, NO_LIMIT, Localization::WSLCCLI_NetworkLabelArgDescription()),
-        Argument::Create(ArgType::Session),
     };
 }
 

@@ -45,6 +45,7 @@ using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
+using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace settings = wsl::windows::wslc::settings;
 
@@ -167,6 +168,8 @@ CATCH_LOG()
 void WSLCSessionManagerImpl::CreateSession(
     _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
+    THROW_HR_IF_NULL(E_POINTER, WslcSession);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
@@ -183,6 +186,9 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionListEntry{}.DisplayName));
+        THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCSessionFlagsValid), "Invalid session flags: 0x%x", Flags);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG, WI_IsAnyFlagSet(Settings->FeatureFlags, ~WSLCFeatureFlagsValid), "Invalid feature flags: 0x%x", Settings->FeatureFlags);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
@@ -263,21 +269,23 @@ void WSLCSessionManagerImpl::CreateSession(
         notifier = wil::MakeOrThrow<WSLCPluginNotifier>(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
-        // Create the VM in the SYSTEM service (privileged).
-        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        // Create the VM factory in the SYSTEM service (privileged). The per-user session
+        // uses it to create the VM. Funneling VM creation through a factory lets the session
+        // own when VMs are created, rather than having one handed to it up front.
+        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
 
-        // Launch per-user COM server factory and add it to our job object for crash cleanup.
+        // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        AddSessionProcessToJobObject(factory.get());
+        wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
+        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid)});
+            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -317,11 +325,12 @@ void WSLCSessionManagerImpl::CreateSession(
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateSession",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(resolvedDisplayName.c_str(), "Name"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
@@ -334,6 +343,8 @@ void WSLCSessionManagerImpl::CreateSession(
 
 void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 {
+    THROW_HR_IF_NULL(E_POINTER, Session);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
         if (entry.SessionId != Id)
@@ -353,6 +364,8 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
 {
+    THROW_HR_IF_NULL(E_POINTER, Session);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
 
     // Null name = default session, resolved from caller's token + username.
@@ -381,6 +394,9 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
+    THROW_HR_IF_NULL(E_POINTER, Sessions);
+    THROW_HR_IF_NULL(E_POINTER, SessionsCount);
+
     std::vector<WSLCSessionListEntry> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) noexcept {
@@ -432,24 +448,18 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     return sessionSettings;
 }
 
-void WSLCSessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory)
+wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory)
 {
-    EnsureJobObjectCreated();
+    // Use a fresh job per session; reusing one fails intermittently with
+    // ERROR_ACCESS_DENIED once it's assigned to a process the system put in another job.
+    wil::unique_handle jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
     wil::unique_handle process;
     THROW_IF_FAILED(Factory->GetProcessHandle(process.put()));
 
-    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_sessionJobObject.get(), process.get()));
-}
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), process.get()));
 
-void WSLCSessionManagerImpl::EnsureJobObjectCreated()
-{
-    // Create a job object that will automatically terminate all child processes
-    // when the job handle is closed (i.e., when wslservice exits or crashes).
-    std::call_once(m_jobObjectInitFlag, [this] {
-        m_sessionJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
-        WSL_LOG("SessionManagerJobObjectCreated", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
-    });
+    return jobObject;
 }
 
 CallingProcessTokenInfo WSLCSessionManagerImpl::GetCallingProcessTokenInfo()

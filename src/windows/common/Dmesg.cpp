@@ -15,56 +15,44 @@ Abstract:
 #include "precomp.h"
 #include "Dmesg.h"
 
+using wsl::windows::common::io::EventHandle;
+using wsl::windows::common::io::HandleWrapper;
+using wsl::windows::common::io::MultiHandleWait;
+using wsl::windows::common::io::ReadNamedPipe;
+using wsl::windows::common::io::WriteHandle;
+using wsl::windows::common::io::WriteNamedPipe;
+
 DmesgCollector::DmesgCollector(
-    GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
+    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
     m_com1PipeName(Com1PipeName),
+    m_vmExitEvent(ExitEvent),
+    m_outputHandle(std::move(OutputHandle)),
     m_runtimeId(VmId),
     m_debugConsole(EnableDebugConsole),
-    m_telemetry(EnableTelemetry),
-    m_outputHandle(std::move(OutputHandle))
+    m_telemetry(EnableTelemetry)
 {
-    m_exitEvent.reset(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
-    m_overlappedEvent.create(wil::EventOptions::ManualReset);
-    m_overlapped.hEvent = m_overlappedEvent.get();
-    m_threadExit.create(wil::EventOptions::ManualReset);
-    m_exitEvents = {m_threadExit.get(), m_exitEvent.get()};
 }
 
 DmesgCollector::~DmesgCollector()
 {
-    m_threadExit.SetEvent();
-    if (m_earlyConsoleWorker.joinable())
+    m_threadExitEvent.SetEvent();
+    if (m_thread.joinable())
     {
-        m_earlyConsoleWorker.join();
-    }
-
-    if (m_virtioWorker.joinable())
-    {
-        m_virtioWorker.join();
+        m_thread.join();
     }
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
-    GUID VmId,
-    const wil::unique_event& ExitEvent,
-    bool EnableTelemetry,
-    bool EnableDebugConsole,
-    const std::wstring& Com1PipeName,
-    bool EnableEarlyBootConsole,
-    wil::unique_handle&& OutputHandle)
+    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole, wil::unique_handle&& OutputHandle)
 {
     auto dmesgCollector = std::shared_ptr<DmesgCollector>(
         new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));
 
-    if (FAILED(dmesgCollector->Start(EnableEarlyBootConsole)))
-    {
-        return {};
-    }
-
+    dmesgCollector->Start(EnableEarlyBootConsole);
     return dmesgCollector;
 }
 
-std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSource Source)
+std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe()
 {
     std::wstring pipeName = wsl::windows::common::helpers::GetUniquePipeName();
     wil::unique_hfile pipe(CreateNamedPipeW(
@@ -72,46 +60,89 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    auto workerThread = std::thread([this, Source, Pipe = std::move(pipe)]() {
-        try
-        {
-            wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
-
-            // When the pipe connects, start reading data.
-            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, m_exitEvents);
-
-            std::vector<char> buffer(LX_RELAY_BUFFER_SIZE);
-            const auto allBuffer = gsl::make_span(buffer);
-            OVERLAPPED overlapped = {};
-            const wil::unique_event overlappedEvent(wil::EventOptions::ManualReset);
-            overlapped.hEvent = overlappedEvent.get();
-            for (;;)
-            {
-                overlappedEvent.ResetEvent();
-                const auto bytesRead = wsl::windows::common::relay::InterruptableRead(
-                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), m_exitEvents, &overlapped);
-
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                auto validBuffer = allBuffer.subspan(0, bytesRead);
-                ProcessInput(Source, validBuffer);
-            }
-        }
-        catch (...)
-        {
-            auto error = wil::ResultFromCaughtException();
-            LOG_HR_IF(error, error != E_ABORT); // E_ABORT is expected during shutdown.
-        }
-    });
-
-    return std::pair{std::move(pipeName), std::move(workerThread)};
+    return {std::move(pipeName), std::move(pipe)};
 }
+
+void DmesgCollector::Run()
+try
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
+
+    MultiHandleWait io;
+
+    if (m_earlyConsolePipe)
+    {
+        io.AddHandle(
+            std::make_unique<ReadNamedPipe>(
+                HandleWrapper{std::move(m_earlyConsolePipe)},
+                [this](const gsl::span<char>& Input) { ProcessInput(DmesgCollectorEarlyConsole, Input); }),
+            MultiHandleWait::IgnoreErrors);
+    }
+
+    io.AddHandle(
+        std::make_unique<ReadNamedPipe>(
+            HandleWrapper{std::move(m_virtioConsolePipe)},
+            [this](const gsl::span<char>& Input) { ProcessInput(DmesgCollectorConsole, Input); }),
+        MultiHandleWait::IgnoreErrors);
+
+    if (m_outputHandle)
+    {
+        auto output = std::make_unique<WriteHandle>(
+            HandleWrapper{std::move(m_outputHandle), [this]() { m_outputWrite = nullptr; }}, std::vector<char>{}, false);
+        m_outputWrite = output.get();
+        io.AddHandle(std::move(output), MultiHandleWait::IgnoreErrors);
+    }
+
+    if (m_com1Pipe)
+    {
+        const bool reconnect = m_pipeServer && !m_debugConsole;
+
+        auto com1 = std::make_unique<WriteNamedPipe>(
+            HandleWrapper{std::move(m_com1Pipe), [this]() { m_com1Write = nullptr; }}, reconnect, !m_pipeServer);
+        m_com1Write = com1.get();
+        io.AddHandle(std::move(com1), MultiHandleWait::IgnoreErrors);
+    }
+
+    // The loop runs until either exit event is signaled.
+    io.AddHandle(std::make_unique<EventHandle>(m_threadExitEvent.get()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<EventHandle>(m_vmExitEvent), MultiHandleWait::CancelOnCompleted);
+
+    io.Run({});
+}
+CATCH_LOG()
+
+namespace {
+
+template <typename TWriter>
+void Push(TWriter& Writer, const gsl::span<char>& Input, const char* Target)
+{
+    constexpr size_t c_maxDmesgPendingBytes = 1024 * 1024;
+
+    const auto pending = Writer.PendingBytes();
+
+    // Don't fill the buffer past c_maxDmesgPendingBytes. If full, just drop the bytes with a warning.
+    if (pending + Input.size() > c_maxDmesgPendingBytes)
+    {
+        WSL_LOG(
+            "DmesgOutputDropped",
+            TraceLoggingValue(Target, "target"),
+            TraceLoggingValue(static_cast<uint64_t>(pending), "pendingBytes"));
+
+        return;
+    }
+
+    Writer.Push(Input);
+}
+
+} // namespace
 
 void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Input)
 {
+    if (Input.empty())
+    {
+        return;
+    }
+
     RingBuffer* ringBuffer = nullptr;
     bool sendToComPipe = m_debugConsole;
     if (Source == DmesgCollectorEarlyConsole)
@@ -122,7 +153,7 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
         else
         {
-            sendToComPipe = !m_debugConsole && m_com1Pipe;
+            sendToComPipe = !m_debugConsole;
         }
     }
     else
@@ -153,63 +184,18 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
         }
     }
 
-    if (sendToComPipe)
+    if (sendToComPipe && m_com1Write)
     {
-        WriteToCom1(Input);
+        Push(*m_com1Write, Input, "com1");
     }
 
-    if (m_outputHandle != nullptr)
+    if (m_outputWrite != nullptr)
     {
-        m_overlappedEvent.ResetEvent();
-        if (wsl::windows::common::relay::InterruptableWrite(
-                m_outputHandle.get(), gslhelpers::convert_span<gsl::byte>(Input), m_exitEvents, &m_overlapped) == 0)
-        {
-            m_outputHandle = nullptr;
-        }
+        Push(*m_outputWrite, Input, "output");
     }
 }
 
-void DmesgCollector::WriteToCom1(const gsl::span<char>& Input)
-{
-    auto lock = m_lock.lock_exclusive();
-    if (!m_com1Pipe)
-    {
-        return;
-    }
-
-    // If this is not writing to the debug console, emulate the normal
-    // serial pipe behavior of waiting for a pipe connection.
-    if (m_waitForConnection)
-    {
-        if (FAILED(wil::ResultFromException(
-                [&]() { wsl::windows::common::helpers::ConnectPipe(m_com1Pipe.get(), INFINITE, m_exitEvents); })))
-        {
-            return;
-        }
-
-        m_waitForConnection = false;
-    }
-
-    m_overlappedEvent.ResetEvent();
-    const auto buffer = gslhelpers::convert_span<gsl::byte>(Input);
-    if (wsl::windows::common::relay::InterruptableWrite(m_com1Pipe.get(), buffer, m_exitEvents, &m_overlapped) == 0)
-    {
-        if (m_debugConsole || !m_pipeServer)
-        {
-            // A disconnect from the debug console, or from a pipe that was acting as the server, doesn't have any
-            // reconnect mechanism, so don't try to write anymore bytes.
-            m_com1Pipe.reset();
-        }
-        else
-        {
-            // Emulate the normal serial behavior of waiting for a pipe connection to write.
-            m_waitForConnection = true;
-        }
-    }
-}
-
-HRESULT DmesgCollector::Start(bool EnableEarlyBootConsole)
-try
+void DmesgCollector::Start(bool EnableEarlyBootConsole)
 {
     if (!m_com1PipeName.empty())
     {
@@ -232,8 +218,6 @@ try
             if (m_com1Pipe)
             {
                 m_pipeServer = true;
-                // If the debug console is not active, may have to wait for a connection.
-                m_waitForConnection = !m_debugConsole;
             }
         }
 
@@ -242,10 +226,10 @@ try
 
     if (EnableEarlyBootConsole)
     {
-        std::tie(m_earlyConsoleName, m_earlyConsoleWorker) = StartDmesgThread(DmesgCollectorEarlyConsole);
+        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe();
     }
 
-    std::tie(m_virtioConsoleName, m_virtioWorker) = StartDmesgThread(DmesgCollectorConsole);
-    return S_OK;
+    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe();
+
+    m_thread = std::thread([this]() { Run(); });
 }
-CATCH_RETURN()

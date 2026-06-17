@@ -32,6 +32,8 @@ struct SessionService
     static int Enter(const std::wstring& storagePath, const std::wstring& displayName);
     static std::vector<SessionInformation> List();
     static wsl::windows::wslc::models::Session OpenSession(const std::wstring& displayName);
+    // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
+    static int Run(const std::wstring& name, const std::vector<std::string>& arguments);
     static int TerminateSession(const std::wstring& displayName);
 };
 } // namespace wsl::windows::wslc::services

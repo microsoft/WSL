@@ -18,6 +18,7 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
 #include "wslutil.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
 #include "winrt/Helpers.h"

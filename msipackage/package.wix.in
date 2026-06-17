@@ -306,9 +306,9 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- ITerminationCallback-->
-                <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
-                    <RegistryValue Value="ITerminationCallback" Type="string" />
+                <!-- ICrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801}">
+                    <RegistryValue Value="ICrashDumpCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -357,6 +357,14 @@
                 <!-- IWSLCVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLCVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCVirtualMachineFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B}">
+                    <RegistryValue Value="IWSLCVirtualMachineFactory" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>

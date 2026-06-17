@@ -124,6 +124,19 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
     }
 
+    case ArgType::NetworkAlias:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::NetworkAlias>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
+            }
+        }
+        break;
+    }
+
     default:
         break;
     }
@@ -169,10 +182,7 @@ void ValidateFilter(const std::vector<std::wstring>& values)
 {
     for (const auto& value : values)
     {
-        if (value.find(L'=') == std::wstring::npos)
-        {
-            throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
-        }
+        std::ignore = ParseFilter(value);
     }
 }
 
@@ -404,6 +414,17 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
     if (pos == std::wstring::npos)
     {
         return {WideToMultiByte(value), std::string{}};
+    }
+
+    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+}
+
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+{
+    auto pos = value.find(L'=');
+    if (pos == std::wstring::npos)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
     }
 
     return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};

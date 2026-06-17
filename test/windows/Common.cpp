@@ -1390,6 +1390,48 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+HostFileChange::HostFileChange(const std::filesystem::path& Path, const std::string& NewContent) : m_path(Path)
+{
+    if (std::filesystem::exists(m_path))
+    {
+        std::ifstream file(m_path, std::ios::binary);
+        THROW_HR_IF(E_FAIL, !file.is_open());
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        m_originalContent = buffer.str();
+    }
+
+    Update(NewContent);
+}
+
+HostFileChange::~HostFileChange()
+try
+{
+    if (m_originalContent.has_value())
+    {
+        std::filesystem::create_directories(m_path.parent_path());
+        std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        if (file.is_open())
+        {
+            file.write(m_originalContent->data(), static_cast<std::streamsize>(m_originalContent->size()));
+        }
+    }
+    else
+    {
+        std::filesystem::remove(m_path);
+    }
+}
+CATCH_LOG()
+
+void HostFileChange::Update(const std::string& NewContent) const
+{
+    std::filesystem::create_directories(m_path.parent_path());
+    std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+    THROW_HR_IF(E_FAIL, !file.is_open());
+    file.write(NewContent.data(), static_cast<std::streamsize>(NewContent.size()));
+    THROW_HR_IF(E_FAIL, !file.good());
+}
+
 std::wstring ReadFileContent(const std::string& Path)
 {
     std::ifstream configRead(Path);
@@ -1496,11 +1538,12 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
         L"debugConsoleLogFile=" +
-        EscapePath(kernelLogs) +
+        EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
-        L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
+        boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
     {
@@ -2474,14 +2517,42 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
+static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));
+    std::wstring value;
+    HRESULT hr = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+    THROW_IF_FAILED(hr);
+    return value;
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name) : m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), nullptr));
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) :
+    m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), Value.c_str()));
 }
 
 ScopedEnvVariable::~ScopedEnvVariable()
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), nullptr));
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), m_originalValue.has_value() ? m_originalValue->c_str() : nullptr));
+}
+
+void ScopedEnvVariable::Set(const std::wstring& Value)
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), Value.c_str()));
+}
+
+void ScopedEnvVariable::Clear()
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
@@ -2918,7 +2989,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
 }
 
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
 {
     using namespace wsl::windows::common;
 
@@ -2934,6 +3005,8 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
         LoadTestImage(session, "wslc-registry:latest");
     }
 
+    const bool useTls = !tlsCertDir.empty();
+
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 
     if (!username.empty())
@@ -2942,15 +3015,40 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
         env.push_back(std::format("PASSWORD={}", password));
     }
 
-    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    if (useTls)
+    {
+        env.push_back("REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt");
+        env.push_back("REGISTRY_HTTP_TLS_KEY=/certs/server.key");
+    }
+
+    // TLS needs a non-loopback address for real verification, so use bridge networking and reach the
+    // container by its bridge IP. Plain HTTP uses host networking with a published loopback port.
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, useTls ? "bridge" : "host");
     launcher.SetEntrypoint({"/entrypoint.sh"});
-    launcher.AddPort(port, port, AF_INET);
+
+    if (useTls)
+    {
+        launcher.AddVolume(tlsCertDir, "/certs", true);
+    }
+    else
+    {
+        launcher.AddPort(port, port, AF_INET);
+    }
 
     auto container = launcher.Launch(session, WSLCContainerStartFlagsAttach);
 
     // Wait for the container to actually bind the port before continuing.
     auto initProcess = container.GetInitProcess();
     WaitForOutput(initProcess.GetStdHandle(WSLCFDStderr), std::format("listening on [::]:{}", port));
+
+    if (useTls)
+    {
+        auto inspect = container.Inspect();
+        THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());
+        auto address = std::format("{}:{}", inspect.NetworkSettings.Networks.begin()->second.IPAddress, port);
+
+        return {std::move(container), std::move(address)};
+    }
 
     auto address = std::format("127.0.0.1:{}", port);
     auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));

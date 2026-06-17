@@ -145,7 +145,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
+        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -351,7 +351,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
             auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
@@ -379,7 +379,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
     }
 
     auto result = RunWslc(listCommand);
@@ -398,7 +398,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
     if (!sessionName.empty())
     {
-        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
     }
 
     auto loadResult = RunWslc(loadCommand);
@@ -559,5 +559,45 @@ std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, con
 
     VERIFY_FAIL(L"Timed out waiting for expected UDP echo reply from container");
     return {};
+}
+
+namespace {
+
+    void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+    {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const std::string data = session.GetStdoutData();
+                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
+                },
+                std::chrono::milliseconds(200),
+                std::chrono::seconds(60));
+        }
+        catch (...)
+        {
+            const std::string data = session.GetStdoutData();
+            VERIFY_FAIL(std::format(
+                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
+                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                            .c_str());
+        }
+    }
+
+} // namespace
+
+void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+{
+    constexpr SHORT resizedColumns = 100;
+    constexpr SHORT resizedRows = 37;
+    VERIFY_IS_TRUE(columns != resizedColumns || rows != resizedRows, L"Resized tty size must differ from the initial size");
+
+    WaitForTtySize(session, columns, rows);
+
+    session.ResizePseudoConsole(resizedColumns, resizedRows);
+    WaitForTtySize(session, resizedColumns, resizedRows);
+
+    session.Terminate();
 }
 } // namespace WSLCE2ETests

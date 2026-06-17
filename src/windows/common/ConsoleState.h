@@ -32,12 +32,14 @@ public:
     ConsoleState& operator=(ConsoleState&&) = delete;
 
     COORD GetWindowSize() const;
+    void SetInteractiveMode();
 
 private:
     void RestoreConsoleState();
 
     wil::unique_hfile m_InputHandle;
     wil::unique_hfile m_OutputHandle;
+    bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
     std::optional<UINT> m_SavedInputCodePage{};
     std::optional<DWORD> m_SavedOutputMode{};

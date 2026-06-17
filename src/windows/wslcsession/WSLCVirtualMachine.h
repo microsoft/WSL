@@ -122,7 +122,13 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
+    // Invoked when a Linux process crash dump has been written to disk. The arguments mirror
+    // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
+    // fanning them out to any registered COM callbacks.
+    using TOnCrashDump =
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -145,6 +151,8 @@ public:
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -161,6 +169,12 @@ public:
     HANDLE TerminatingEvent() const
     {
         return m_vmTerminatingEvent.get();
+    }
+
+    // Retrieves the cached termination reason and details from the underlying VM.
+    HRESULT GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) const
+    {
+        return m_vm->GetTerminationReason(Reason, Details);
     }
 
     GUID VmId() const
@@ -190,6 +204,8 @@ private:
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
         _In_ const std::vector<WSLCProcessFd>& Fds = {},
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -221,6 +237,10 @@ private:
     ULONG m_bootTimeoutMs{};
 
     std::string m_rootVhdType;
+
+    // Invoked by the crash dump collection thread after a crash dump is fully written.
+    // Supplied by the session, which fans out to any registered ICrashDumpCallback subscribers.
+    TOnCrashDump m_onCrashDump;
 
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
