@@ -120,8 +120,10 @@ private:
 
     // Returns the fd backing this fid for self-targeted ops (fstatat with
     // AT_EMPTY_PATH, /proc/self/fd reopens, openat using this fid as dirfd).
-    // Non-root fids return the O_PATH fd pinned by Walk/Create; the root fid
-    // returns m_Root->RootFd. Caller must hold m_Lock.
+    // Non-root fids return m_PathFd; the root fid returns m_Root->RootFd.
+    // Callers must hold m_Lock once the fid is published (reachable from other
+    // threads); Walk() may call this before publication, while it still has
+    // exclusive access to the fid.
     int PathFd() const noexcept;
 
     // This lock protects all state except:
@@ -130,8 +132,11 @@ private:
     // - m_Root, m_Uid: these members don't change after initialization.
     mutable std::shared_mutex m_Lock;
     std::string m_FileName;
-    // O_PATH | O_NOFOLLOW fd pinning the inode this fid refers to. Empty for
-    // the root fid (PathFd() falls back to m_Root->RootFd).
+    // fd pinning the inode this fid refers to, returned by PathFd() as the
+    // self/dirfd handle. Walk() installs an O_PATH | O_NOFOLLOW fd here;
+    // Create() installs a dup of the newly opened file fd (same inode, and
+    // write-capable, but no broader than the m_File fd it is duped from). Empty
+    // for the root fid (PathFd() falls back to m_Root->RootFd).
     wil::unique_fd m_PathFd;
     std::unique_ptr<DirectoryEnumerator> m_Enumerator;
     wil::unique_fd m_File;
