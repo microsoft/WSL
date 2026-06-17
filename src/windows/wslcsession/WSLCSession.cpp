@@ -1034,7 +1034,9 @@ try
         if (ProgressCallback != nullptr)
         {
             std::string line{content.begin(), content.end()};
-            THROW_IF_FAILED(ProgressCallback->OnProgress(line.c_str(), "log", 0, 0));
+            line += '\n';
+            bool isStep = line.find("STEP ") == 0;
+            THROW_IF_FAILED(ProgressCallback->OnProgress(line.c_str(), isStep ? "step" : "log", 0, 0));
         }
     };
 
