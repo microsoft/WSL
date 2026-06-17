@@ -50,6 +50,14 @@ void OpenOrCreateDefaultSession(CLIExecutionContext& context)
     }
 }
 
+void OpenDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenDefaultSession());
+    }
+}
+
 void ResolveSession(CLIExecutionContext& context)
 {
     OpenSessionIfSpecified(context);

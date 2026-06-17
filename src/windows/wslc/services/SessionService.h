@@ -31,6 +31,8 @@ struct SessionService
     static std::vector<SessionInformation> List();
     // Opens an existing session by name. Throws if not found.
     static wsl::windows::wslc::models::Session OpenSession(const std::wstring& name);
+    // Opens the default session. Throws WSLC_E_SESSION_NOT_FOUND if no default session exists.
+    static wsl::windows::wslc::models::Session OpenDefaultSession();
     // Opens or creates the default session.
     static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession();
     // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
@@ -38,7 +40,7 @@ struct SessionService
     static int TerminateSession(const wsl::windows::wslc::models::Session& session);
 
 private:
-    // Common session-open logic shared by OpenSession and OpenOrCreateDefaultSession.
-    static wsl::windows::wslc::models::Session OpenSessionByName(const wil::com_ptr<IWSLCSessionManager>& manager, const std::wstring& name);
+    // Common open-only session lookup with unified error handling.
+    static wsl::windows::wslc::models::Session OpenSessionByName(const wil::com_ptr<IWSLCSessionManager>& manager, LPCWSTR displayName);
 };
 } // namespace wsl::windows::wslc::services

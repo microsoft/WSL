@@ -39,6 +39,9 @@ std::wstring SessionTerminateCommand::LongDescription() const
 
 void SessionTerminateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession << TerminateSession;
+    context                       //
+        << OpenSessionIfSpecified //
+        << OpenDefaultSession     //
+        << TerminateSession;
 }
 } // namespace wsl::windows::wslc
