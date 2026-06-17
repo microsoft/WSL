@@ -321,6 +321,9 @@ void VirtioNetworking::SetupLoopbackDevice()
     createLoopbackDevice.deviceName = c_loopbackDeviceName;
     createLoopbackDevice.type = hns::DeviceType::Loopback;
     createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
+
+    // ipv6 duplicate address detection (DAD) breaks the ipv6 localhost relay since we can't predict the address before the guest tells us about it.
+    createLoopbackDevice.flags = hns::CreateDeviceFlags::DisableDAD;
     constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }
