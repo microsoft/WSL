@@ -49,9 +49,6 @@ class WSLCE2ENetworkCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_DefaultDriver_Success)
     {
-        // TODO: http://task.ms/62564313
-        SKIP_TEST_UNSTABLE();
-
         auto result = RunWslc(std::format(L"network create {}", TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
