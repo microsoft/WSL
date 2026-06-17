@@ -43,8 +43,8 @@ std::wstring NetworkPruneCommand::LongDescription() const
 
 void NetworkPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneNetworks;
 }
 } // namespace wsl::windows::wslc

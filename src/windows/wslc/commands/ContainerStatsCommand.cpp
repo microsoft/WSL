@@ -58,8 +58,8 @@ void ContainerStatsCommand::ValidateArgumentsInternal(const ArgMap& execArgs) co
 
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ShowContainerStats;
 }
 } // namespace wsl::windows::wslc

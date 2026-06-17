@@ -29,27 +29,31 @@ namespace wsl::windows::wslc::task {
 
 void AttachToSession(CLIExecutionContext& context)
 {
-    std::wstring sessionName;
-    if (context.GlobalArgs.Contains(ArgType::Session))
-    {
-        sessionName = context.GlobalArgs.Get<ArgType::Session>();
-    }
-
-    context.ExitCode = SessionService::Attach(sessionName);
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::Attach(session);
 }
 
-void CreateSession(CLIExecutionContext& context)
+void OpenSessionIfSpecified(CLIExecutionContext& context)
 {
     if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        // User specified a session name — open only, don't create.
         const auto& sessionName = context.GlobalArgs.Get<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
-        return;
     }
+}
 
-    // Create/open the default session.
-    context.Data.Add<Data::Session>(SessionService::CreateDefaultSession());
+void OpenOrCreateDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession());
+    }
+}
+
+void ResolveSession(CLIExecutionContext& context)
+{
+    OpenSessionIfSpecified(context);
+    OpenOrCreateDefaultSession(context);
 }
 
 void ListSessions(CLIExecutionContext& context)
@@ -78,22 +82,13 @@ void ListSessions(CLIExecutionContext& context)
 
 void TerminateSession(CLIExecutionContext& context)
 {
-    std::wstring sessionName;
-    if (context.GlobalArgs.Contains(ArgType::Session))
-    {
-        sessionName = context.GlobalArgs.Get<ArgType::Session>();
-    }
-
-    context.ExitCode = SessionService::TerminateSession(sessionName);
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::TerminateSession(session);
 }
 
 void RunInSession(CLIExecutionContext& context)
 {
-    std::wstring sessionName;
-    if (context.GlobalArgs.Contains(ArgType::Session))
-    {
-        sessionName = context.GlobalArgs.Get<ArgType::Session>();
-    }
+    auto& session = context.Data.Get<Data::Session>();
 
     std::vector<std::string> arguments;
     arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
@@ -105,7 +100,7 @@ void RunInSession(CLIExecutionContext& context)
         }
     }
 
-    context.ExitCode = SessionService::Run(sessionName, arguments);
+    context.ExitCode = SessionService::Run(session, arguments);
 }
 
 void EnterSession(CLIExecutionContext& context)

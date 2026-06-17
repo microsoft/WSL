@@ -44,8 +44,8 @@ std::wstring ImageInspectCommand::LongDescription() const
 
 void ImageInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << InspectImages;
 }
 } // namespace wsl::windows::wslc

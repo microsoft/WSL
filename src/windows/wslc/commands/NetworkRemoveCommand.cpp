@@ -43,7 +43,7 @@ std::wstring NetworkRemoveCommand::LongDescription() const
 
 void NetworkRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << DeleteNetworks;
 }
 } // namespace wsl::windows::wslc

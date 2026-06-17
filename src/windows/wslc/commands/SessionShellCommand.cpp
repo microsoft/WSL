@@ -39,6 +39,6 @@ std::wstring SessionShellCommand::LongDescription() const
 
 void SessionShellCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << AttachToSession;
+    context << ResolveSession << AttachToSession;
 }
 } // namespace wsl::windows::wslc
