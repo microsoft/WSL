@@ -643,9 +643,7 @@ class WSLCE2EContainerRunTests
         // podman: "fill out specgen: container directory cannot be empty"
         VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
         auto stderrText = result.Stderr.value_or(L"");
-        VERIFY_IS_TRUE(
-            stderrText.find(L"empty") != std::wstring::npos ||
-            stderrText.find(L"absolute") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"empty") != std::wstring::npos || stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir)
@@ -686,13 +684,10 @@ class WSLCE2EContainerRunTests
         auto mockIp = StartMockDnsServer(AlpineImage, kMockDnsName, kProbeDomain, kProbeAnswer);
         auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(kMockDnsName); });
 
-        auto result = RunWslc(std::format(
-            L"container run --rm --dns {} {} getent hosts {}",
-            mockIp, AlpineImage.NameAndTag(), kProbeDomain));
+        auto result =
+            RunWslc(std::format(L"container run --rm --dns {} {} getent hosts {}", mockIp, AlpineImage.NameAndTag(), kProbeDomain));
 
-        VERIFY_IS_TRUE(
-            result.Stdout.has_value() &&
-            result.Stdout->find(kProbeAnswer) != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->find(kProbeAnswer) != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)

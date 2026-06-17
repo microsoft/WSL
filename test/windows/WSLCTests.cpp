@@ -752,8 +752,7 @@ class WSLCTests
         {
             // podman reports a missing local image as WSLC_E_IMAGE_NOT_FOUND ("failed to find image
             // ...: image not known"), which is more precise than dockerd's generic E_FAIL.
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
             ValidateCOMErrorMessageContains(L"failed to find image");
         }
 
@@ -1597,8 +1596,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(BuildImageLargeFile)
     {
-        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rmi", "-f", "wslc-test-build-large:latest"});
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "builder", "prune", "-f"}, 0);
+        RunCommand(m_defaultSession.get(), {"/usr/bin/podman", "rmi", "-f", "wslc-test-build-large:latest"});
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/podman", "builder", "prune", "-f"}, 0);
 
         auto contextDir = std::filesystem::current_path() / "build-context-large";
         std::filesystem::create_directories(contextDir);
@@ -1638,7 +1637,16 @@ class WSLCTests
             }
         }
 
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build-large:latest"));
+        std::string buildOutput;
+        auto buildCallback = Microsoft::WRL::Make<CapturingProgressCallback>(buildOutput);
+        LPCSTR largeTag = "wslc-test-build-large:latest";
+        WSLCBuildImageOptions buildOptions{.Tags = {&largeTag, 1}};
+        auto buildResult = BuildImageFromContext(contextDir, &buildOptions, buildCallback.Get());
+        if (FAILED(buildResult))
+        {
+            LogError("podman build output:\n%hs", buildOutput.c_str());
+        }
+        VERIFY_SUCCEEDED(buildResult);
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-large:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-large:latest", "wslc-build-large-container");
@@ -1682,8 +1690,11 @@ class WSLCTests
         LPCSTR tag = "wslc-test-build-multistage:latest";
         WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
-        VERIFY_IS_TRUE(output.find("[greeting] WSL containers") != std::string::npos);
-        VERIFY_IS_TRUE(output.find("[description] support multi-stage builds") != std::string::npos);
+
+        VERIFY_IS_TRUE(output.find("AS greeting") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("WSL containers") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("AS description") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("support multi-stage builds") != std::string::npos);
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-multistage:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-multistage:latest", "wslc-build-multistage-container");

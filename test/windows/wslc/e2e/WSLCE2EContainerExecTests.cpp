@@ -398,8 +398,7 @@ class WSLCE2EContainerExecTests
         // before wslc can extract it (see Category C analysis). Verify
         // behavioral contract: exec fails + non-empty diagnostic output.
         VERIFY_ARE_NOT_EQUAL(0, result.ExitCode.value_or(0));
-        VERIFY_IS_TRUE((result.Stdout.has_value() && !result.Stdout->empty()) ||
-                       (result.Stderr.has_value() && !result.Stderr->empty()));
+        VERIFY_IS_TRUE((result.Stdout.has_value() && !result.Stdout->empty()) || (result.Stderr.has_value() && !result.Stderr->empty()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_WorkDir)

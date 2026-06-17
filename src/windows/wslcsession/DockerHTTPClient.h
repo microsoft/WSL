@@ -73,9 +73,7 @@ public:
     bool HasErrorMessage() const
     {
         auto it = m_response.find(boost::beast::http::field::content_type);
-        return it != m_response.end() &&
-               it->value().starts_with("application/json") &&
-               !m_responseBody.empty();
+        return it != m_response.end() && it->value().starts_with("application/json") && !m_responseBody.empty();
     }
 
     uint16_t StatusCode() const noexcept
@@ -247,11 +245,7 @@ private:
     // that take a large binary payload (LoadImage, ImportImage). Returns the HTTPRequestContext
     // with the socket positioned to read the response.
     std::unique_ptr<HTTPRequestContext> SendStreamRequest(
-        boost::beast::http::verb Method,
-        const URL& Url,
-        uint64_t ContentLength,
-        std::string_view ContentType,
-        HANDLE BodySource);
+        boost::beast::http::verb Method, const URL& Url, uint64_t ContentLength, std::string_view ContentType, HANDLE BodySource);
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
@@ -282,6 +276,11 @@ private:
 
         if constexpr (!std::is_same_v<TResponse, void>)
         {
+            if (body.empty())
+            {
+                return TResponse{};
+            }
+
             return wsl::shared::FromJson<TResponse>(body.c_str());
         }
     }

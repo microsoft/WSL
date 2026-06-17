@@ -101,8 +101,7 @@ std::optional<std::string> ResolveDetachKeys(LPCSTR DetachKeys)
         for (size_t start = 0;;)
         {
             const auto comma = keys.find(',', start);
-            const auto token =
-                std::string_view(keys).substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            const auto token = std::string_view(keys).substr(start, comma == std::string::npos ? std::string::npos : comma - start);
             THROW_HR_IF(E_INVALIDARG, !IsValidDetachToken(token));
             if (comma == std::string::npos)
             {
@@ -499,10 +498,7 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
     return wsl::shared::ToJson(wrapper);
 }
 
-void ProcessNamedVolumes(
-    const WSLCContainerOptions& containerOptions,
-    wsl::windows::common::docker_schema::CreateContainer& request,
-    WSLCVolumes& volumes)
+void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::windows::common::docker_schema::CreateContainer& request, WSLCVolumes& volumes)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
 
