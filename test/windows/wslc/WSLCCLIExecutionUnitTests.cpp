@@ -18,6 +18,7 @@ Abstract:
 
 #include "SessionModel.h"
 
+#include "AsyncExecution.h"
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
@@ -101,6 +102,12 @@ class WSLCCLIExecutionUnitTests
             {
                 std::vector<WSLCVolumeInformation> volumes;
                 dataMap.Add<Data::Volumes>(std::move(volumes));
+                handled = true;
+            }
+            else if (dataType == Data::Networks)
+            {
+                std::vector<WSLCNetworkInformation> networks;
+                dataMap.Add<Data::Networks>(std::move(networks));
                 handled = true;
             }
 
@@ -338,6 +345,106 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    TEST_METHOD(SetContainerOptionsFromArgs_WithoutNetwork_NetworksIsEmpty)
+    {
+        CLIExecutionContext context;
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Networks.empty());
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkSingleValue_SetsNetwork)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkMultipleValues_PreservesOrder)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 --network net2 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+    }
+
+    TEST_METHOD(RunCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"\" ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkSingleValue_SetsNetwork)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkMultipleValues_PreservesOrder)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network net1 --network net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"\" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
     // code as the CLI up to the point of command execution, including parsing and argument validtion.
@@ -345,6 +452,13 @@ class WSLCCLIExecutionUnitTests
     // found and the provided command line parsed correctly according to the command's defined arguments,
     // and the argument validation rules are correctly applied. The test cases are defined in
     // CommandLineTestCases.h and cover various valid and invalid command lines.
+    //
+    // Mirrors CoreMain's pipeline:
+    //   1. Globals scan (optionsOnly + stopOnUnknown): consume recognized
+    //      globals, leave everything else in place. Env apply is intentionally
+    //      skipped so test behavior is not affected by the host environment.
+    //   2. Subcommand resolution.
+    //   3. Leaf command parse + validate.
     TEST_METHOD(CommandLineParsing_AllCases)
     {
         std::vector<CommandLineTestCase> testCases = {
@@ -376,6 +490,21 @@ class WSLCCLIExecutionUnitTests
             {
                 Invocation invocation{std::move(args)};
                 std::unique_ptr<Command> command = std::make_unique<RootCommand>();
+                const Command* const rootCommand = command.get();
+
+                // Pass 1: globals scan. Lenient on unknowns so non-global tokens
+                // (subcommands, root options, errors) flow to subsequent passes.
+                CLIExecutionContext context;
+                const auto cliGlobals = rootCommand->GetGlobalArguments();
+                rootCommand->ParseArguments(
+                    invocation,
+                    context.GlobalArgs,
+                    cliGlobals,
+                    /*optionsOnly*/ true,
+                    /*stopOnUnknown*/ true);
+                rootCommand->ValidateArguments(context.GlobalArgs, cliGlobals, /*runInternalHook*/ false);
+
+                // Pass 2: walk down to the leaf subcommand.
                 std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
                 while (subCommand)
                 {
@@ -386,9 +515,7 @@ class WSLCCLIExecutionUnitTests
                 // Ensure we found the expected command
                 VERIFY_ARE_EQUAL(testCase.expectedCommand, command->Name());
 
-                CLIExecutionContext context;
-
-                // Parse and validate and compare to expected results.
+                // Pass 3: leaf parse + validate.
                 command->ParseArguments(invocation, context.Args);
                 command->ValidateArguments(context.Args);
             }
@@ -407,4 +534,100 @@ class WSLCCLIExecutionUnitTests
         }
     }
 };
+
+class ForEachAsyncUnitTests
+{
+    WSLC_TEST_CLASS(ForEachAsyncUnitTests)
+
+    TEST_METHOD(ForEachAsync_SuccessCallbackInvokedForAllItems)
+    {
+        const std::vector<int> items = {1, 2, 3, 4, 5};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item * 2; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); });
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item * 2) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_ErrorCallbackInvokedOnFailure)
+    {
+        const std::vector<int> items = {1, 2, 3};
+        std::vector<int> failedItems;
+        std::vector<int> succeededItems;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) -> int {
+                if (item == 2)
+                {
+                    THROW_HR(E_FAIL);
+                }
+                return item;
+            },
+            [&](int result) { succeededItems.push_back(result); },
+            [&](int item, wil::ResultException /*error*/) { failedItems.push_back(item); });
+
+        VERIFY_ARE_EQUAL(1u, failedItems.size());
+        VERIFY_ARE_EQUAL(2, failedItems[0]);
+        VERIFY_ARE_EQUAL(2u, succeededItems.size());
+    }
+
+    TEST_METHOD(ForEachAsync_EmptyInputProducesNoCallbacks)
+    {
+        const std::vector<int> items;
+        bool successCalled = false;
+        bool errorCalled = false;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item; },
+            [&](int /*result*/) { successCalled = true; },
+            [&](int /*item*/, wil::ResultException /*error*/) { errorCalled = true; });
+
+        VERIFY_IS_FALSE(successCalled);
+        VERIFY_IS_FALSE(errorCalled);
+    }
+
+    TEST_METHOD(ForEachAsync_BatchSizeOfOneProcessesAllItems)
+    {
+        const std::vector<int> items = {10, 20, 30, 40, 50};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [](int item) { return item; },
+            [&](int result) { results.push_back(result); },
+            [](int /*item*/, wil::ResultException /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            /*batchSize=*/1);
+
+        VERIFY_ARE_EQUAL(items.size(), results.size());
+        for (int item : items)
+        {
+            VERIFY_IS_TRUE(std::find(results.begin(), results.end(), item) != results.end());
+        }
+    }
+
+    TEST_METHOD(ForEachAsync_ErrorInOnErrorPropagatesThrow)
+    {
+        const std::vector<int> items = {1};
+
+        VERIFY_THROWS_SPECIFIC(
+            ForEachAsync<int>(
+                items,
+                [](int /*item*/) -> int { THROW_HR(E_ACCESSDENIED); },
+                [](int /*result*/) {},
+                [](int /*item*/, wil::ResultException error) { throw error; }),
+            wil::ResultException,
+            [](const wil::ResultException& ex) { return ex.GetErrorCode() == E_ACCESSDENIED; });
+    }
+};
+
 } // namespace WSLCCLIExecutionUnitTests

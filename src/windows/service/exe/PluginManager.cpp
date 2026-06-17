@@ -120,41 +120,22 @@ wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
 
 extern "C" {
 
-HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPSTR Mountpoint)
+HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly)
 try
 {
-    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
-    auto nameLength = wcslen(Name);
-
-    RETURN_HR_IF_MSG(
-        E_INVALIDARG,
-        nameLength == 0 ||
-            !std::ranges::all_of(Name, Name + nameLength, [&](auto c) { return c == '-' || c == '_' || iswalnum(c); }),
-        "Invalid mount name: %ls",
-        Name);
+    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
-
-    // Mount the folder under /mnt/wsl-plugin/<Name>. Convert Name to UTF-8 for the Linux path.
-    const auto linuxPath = std::format("/mnt/wsl-plugin/{}", Name);
-
-    THROW_HR_IF_MSG(E_INVALIDARG, linuxPath.length() >= WSLC_MOUNTPOINT_LENGTH, "Mountpoint too long: %hs", linuxPath.c_str());
-
-    auto result = session->MountWindowsFolder(WindowsPath, linuxPath.c_str(), ReadOnly);
+    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly);
 
     WSL_LOG(
         "WslcPluginMountFolderCall",
         TraceLoggingValue(Session, "SessionId"),
         TraceLoggingValue(WindowsPath, "WindowsPath"),
-        TraceLoggingValue(linuxPath.c_str(), "LinuxPath"),
+        TraceLoggingValue(Mountpoint, "Mountpoint"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
-        TraceLoggingValue(Name, "Name"),
         TraceLoggingValue(result, "Result"));
-
-    if (SUCCEEDED(result))
-    {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(Mountpoint, WSLC_MOUNTPOINT_LENGTH, linuxPath.c_str()) != 0);
-    }
 
     return result;
 }
@@ -163,6 +144,7 @@ CATCH_RETURN();
 HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint)
 try
 {
+    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint is actually owned by the plugin.
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
@@ -215,7 +197,7 @@ try
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
 
     if (Errno != nullptr)
     {
@@ -439,6 +421,7 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
             WSL_LOG(
                 "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
+            SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
             ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), e.name.c_str());
         }
     }
@@ -475,6 +458,7 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
+            SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
             ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), e.name.c_str());
         }
     }

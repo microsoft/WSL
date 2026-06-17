@@ -251,6 +251,8 @@ private:
 
     void VirtioFsWorker(_In_ const wil::unique_socket& socket);
 
+    std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
+
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
 
     static LX_INIT_DRVFS_MOUNT s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken);
@@ -304,6 +306,9 @@ private:
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;
+    uint64_t m_hvPciSwiotlbBase = 0;
+    uint64_t m_hvPciSwiotlbSize = 0;
+    std::wstring m_swiotlbOption;
     std::wstring m_sharedMemoryRoot;
     std::filesystem::path m_installPath;
     std::wstring m_userProfile;

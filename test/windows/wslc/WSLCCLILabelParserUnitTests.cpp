@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
-#include "VolumeModel.h"
+#include "ArgumentValidation.h"
 
 using namespace wsl::windows::wslc;
 
@@ -35,7 +35,7 @@ class WSLCCLILabelParserUnitTests
 
         for (const auto& [input, expectedKey, expectedValue] : validLabels)
         {
-            auto result = models::Label::Parse(input);
+            auto result = validation::ParseLabel(input);
             VERIFY_ARE_EQUAL(expectedKey, result.first);
             VERIFY_ARE_EQUAL(expectedValue, result.second);
         }
@@ -53,7 +53,7 @@ class WSLCCLILabelParserUnitTests
         {
             try
             {
-                (void)models::Label::Parse(input);
+                (void)validation::ParseLabel(input);
                 VERIFY_FAIL(L"Expected exception");
             }
             catch (const wil::ResultException& ex)

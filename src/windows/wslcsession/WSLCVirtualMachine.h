@@ -121,7 +121,13 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
+    // Invoked when a Linux process crash dump has been written to disk. The arguments mirror
+    // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
+    // fanning them out to any registered COM callbacks.
+    using TOnCrashDump =
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -144,6 +150,8 @@ public:
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -162,6 +170,12 @@ public:
         return m_vmTerminatingEvent.get();
     }
 
+    // Retrieves the cached termination reason and details from the underlying VM.
+    HRESULT GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) const
+    {
+        return m_vm->GetTerminationReason(Reason, Details);
+    }
+
     GUID VmId() const
     {
         return m_vmId;
@@ -175,6 +189,11 @@ private:
     // Initial setup during Connect()
     void ConfigureNetworking();
 
+    // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
+    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
+    // can include the swiotlb token. Called after the root filesystem is mounted.
+    void ReadGuestCapabilities();
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
@@ -182,6 +201,8 @@ private:
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
         _In_ const std::vector<WSLCProcessFd>& Fds = {},
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -214,6 +235,10 @@ private:
 
     std::string m_rootVhdType;
 
+    // Invoked by the crash dump collection thread after a crash dump is fully written.
+    // Supplied by the session, which fans out to any registered ICrashDumpCallback subscribers.
+    TOnCrashDump m_onCrashDump;
+
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
 
@@ -229,6 +254,10 @@ private:
 
     wsl::shared::SocketChannel m_initChannel;
     DWORD m_initChannelTimeout = 30 * 1000;
+
+    // Swiotlb pool reserved by the guest kernel (zero when the kernel lacks the WSL patch).
+    uint64_t m_hvPciSwiotlbBase = 0;
+    uint64_t m_hvPciSwiotlbSize = 0;
 
     // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
     // Declared before the port relay pipes so it is destroyed after them: any remaining

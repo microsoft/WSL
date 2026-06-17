@@ -3168,8 +3168,21 @@ try
     }
     else
     {
+        auto matchesPrefix = [Path](const std::string_view& prefix) {
+            if (!wsl::shared::string::StartsWith(Path, prefix, true))
+            {
+                return false;
+            }
+
+            // Validate that the next character is a path separator or the end of the string to prevent matching other distribution paths like:
+            // \\wsl.localhost\<distro-name>-<suffix>
+
+            auto nextChar = Path[prefix.size()];
+            return nextChar == '\0' || nextChar == PATH_SEP || nextChar == PATH_SEP_NT;
+        };
+
         auto PrefixLength = Prefix.length();
-        if (!wsl::shared::string::StartsWith(Path, Prefix, true))
+        if (!matchesPrefix(Prefix))
         {
             //
             // Check the old \\wsl$ prefix if it's not \\wsl.localhost.
@@ -3177,7 +3190,7 @@ try
 
             std::string CompatPrefix{PLAN9_RDR_COMPAT_PREFIX};
             CompatPrefix += DistributionName;
-            if (!wsl::shared::string::StartsWith(Path, CompatPrefix, true))
+            if (!matchesPrefix(CompatPrefix))
             {
                 return {};
             }
@@ -3326,6 +3339,22 @@ std::string UtilReadFileContent(std::string_view path)
     return {std::istreambuf_iterator<char>(file), {}};
 }
 
+HvPciSwiotlbPool UtilReadHvPciSwiotlbPool()
+{
+    HvPciSwiotlbPool pool{};
+    try
+    {
+        pool.Base = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_base"), nullptr, 0);
+        pool.Size = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_size"), nullptr, 0);
+    }
+    catch (...)
+    {
+        pool = {};
+    }
+
+    return pool;
+}
+
 uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
 {
     uint16_t LinuxAddressFamily = AF_UNSPEC;
@@ -3343,7 +3372,7 @@ uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
     return LinuxAddressFamily;
 }
 
-int WriteToFile(const char* Path, const char* Content, int permissions)
+int WriteToFile(const char* Path, const char* Content, int OpenFlags, int Permissions)
 
 /*++
 
@@ -3357,6 +3386,10 @@ Arguments:
 
     Content - Supplies the content to be written to the file.
 
+    OpenFlags - Supplies the flags passed to open().
+
+    Permissions - Supplies the file mode used when O_CREAT causes the file to be created.
+
 Return Value:
 
     0 on success, -1 on failure.
@@ -3364,7 +3397,7 @@ Return Value:
 --*/
 
 {
-    wil::unique_fd Fd{open(Path, (O_WRONLY | O_CLOEXEC | O_CREAT), permissions)};
+    wil::unique_fd Fd{open(Path, OpenFlags, Permissions)};
     if (!Fd)
     {
         int errnoPrev = errno;

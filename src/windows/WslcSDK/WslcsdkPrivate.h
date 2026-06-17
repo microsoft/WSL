@@ -33,8 +33,6 @@ typedef struct WslcSessionOptionsInternal
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
-    WslcSessionTerminationCallback terminationCallback;
-    PVOID terminationCallbackContext;
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
@@ -87,7 +85,7 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerNamedVolume* namedVolumes;
     uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    WSLCContainerNetworkType networking;
+    PCSTR networkMode;
     WslcContainerFlags containerFlags;
 
 } WslcContainerOptionsInternal;
@@ -107,10 +105,19 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 struct WslcSessionImpl
 {
     wil::com_ptr<IWSLCSession> session;
-    wil::com_ptr<ITerminationCallback> terminationCallback;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
+
+// Backs a WslcCrashDumpSubscription handle. Keeps the COM shim alive and holds the service-side
+// subscription whose release unregisters the callback.
+struct WslcCrashDumpSubscriptionImpl
+{
+    wil::com_ptr<ICrashDumpCallback> callback;
+    wil::com_ptr<IUnknown> subscription;
+};
+
+WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle);
 
 struct WslcContainerImpl
 {

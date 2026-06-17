@@ -306,9 +306,9 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- ITerminationCallback-->
-                <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
-                    <RegistryValue Value="ITerminationCallback" Type="string" />
+                <!-- ICrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801}">
+                    <RegistryValue Value="ICrashDumpCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -317,6 +317,14 @@
                 <!-- IProgressCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
                     <RegistryValue Value="IProgressCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWarningCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8153ED5D-8ABB-408B-ADBE-C0F3B13E07C3}">
+                    <RegistryValue Value="IWarningCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -349,6 +357,14 @@
                 <!-- IWSLCVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLCVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCVirtualMachineFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B}">
+                    <RegistryValue Value="IWSLCVirtualMachineFactory" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -620,6 +636,11 @@
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
         <CustomAction Id="CalculateWslSettingsProtocolIds" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="CalculateWslSettingsProtocolIds" Return="check" Execute='immediate' />
 
+        <!-- Disable WSLService before StopServices so SCM rejects activation attempts
+             from COM clients while it is being stopped on uninstall. -->
+        <CustomAction Id="DisableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="DisableWslService" Return="ignore" Execute="deferred" />
+        <CustomAction Id="EnableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="EnableWslService" Return="ignore" Execute="rollback" />
+
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
@@ -674,6 +695,11 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+
+            <!-- Rollback CA must be sequenced before the forward action so it is registered
+                 in the rollback script first. -->
+            <Custom Action="EnableWslService" Before="DisableWslService" Condition='REMOVE~="ALL"' />
+            <Custom Action="DisableWslService" Before="StopServices" Condition='REMOVE~="ALL"' />
 
         </InstallExecuteSequence>
 

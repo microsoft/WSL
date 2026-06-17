@@ -1,7 +1,7 @@
 set(SOURCES
     IOCallback.cpp
     ProgressCallback.cpp
-    TerminationCallback.cpp
+    CrashDumpCallback.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
 )
@@ -9,7 +9,7 @@ set(HEADERS
     Defaults.h
     IOCallback.h
     ProgressCallback.h
-    TerminationCallback.h
+    CrashDumpCallback.h
     wslcsdk.h
     WslcsdkPrivate.h
 )
@@ -23,7 +23,7 @@ set_target_properties(wslcsdk
 
 add_subdirectory(winrt)
 
-if (WSL_BUILD_SDKCS)
+if (WSL_INCLUDE_SDK_CSHARP)
     add_subdirectory(csharp)
 endif()
 

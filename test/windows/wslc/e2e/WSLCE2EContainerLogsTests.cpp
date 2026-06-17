@@ -200,6 +200,30 @@ class WSLCE2EContainerLogsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Follow)
+    {
+        // Sleep between the two lines so the second is not produced until after line 1 is read.
+        constexpr int InterLineSleepSeconds = 2;
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo follow-line-1; sleep {}; echo follow-line-2\"",
+            WslcContainerName,
+            DebianImage.NameAndTag(),
+            InterLineSleepSeconds));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto logsSession = RunWslcInteractive(std::format(L"container logs -f {}", WslcContainerName));
+
+        // If --follow buffered, line 1 would arrive only after the container exited.
+        logsSession.ExpectStdout("follow-line-1\n");
+        VERIFY_IS_TRUE(logsSession.IsRunning(), L"`logs -f` should still be running mid-sleep after line 1");
+
+        logsSession.ExpectStdout("follow-line-2\n");
+
+        auto exitCode = logsSession.Wait(30000);
+        VERIFY_ARE_EQUAL(0, exitCode);
+        logsSession.VerifyNoErrors();
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-logs";
     const TestImage& DebianImage = DebianTestImage();

@@ -40,9 +40,10 @@ EXTERN_C_START
 #define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
 #define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
 #define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 88
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -53,7 +54,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 104
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -123,7 +124,20 @@ typedef enum WslcSessionTerminationReason
     WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
 } WslcSessionTerminationReason;
 
-typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
+typedef struct WslcSessionCrashDumpInfo
+{
+    _Field_z_ PCWSTR dumpPath;
+    _Field_z_ PCSTR processName;
+    uint64_t pid;
+    uint32_t signal;
+    uint64_t timestamp;
+} WslcSessionCrashDumpInfo;
+
+typedef __callback void(CALLBACK* WslcSessionCrashDumpCallback)(_In_ const WslcSessionCrashDumpInfo* info, _In_opt_ PVOID context);
+
+// Opaque handle returned by WslcRegisterSessionCrashDumpCallback. Holding it keeps the crash dump
+// registration alive; pass it to WslcReleaseCrashDumpSubscription to unsubscribe.
+DECLARE_HANDLE(WslcCrashDumpSubscription);
 
 STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
@@ -138,12 +152,24 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
-// Pass in Null for callback to clear the termination callback
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext);
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);
+
+// Registers a callback invoked when a Linux process crash dump is written for the session.
+// Works for any caller holding a live session. The returned subscription keeps the registration
+// alive; release it with WslcReleaseCrashDumpSubscription to unsubscribe. Multiple subscriptions
+// can be registered against the same session.
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription);
 
 // CONTAINER DEFINITIONS
 

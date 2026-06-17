@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentValidation.h"
+#include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
@@ -21,7 +22,6 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
-#include "VolumeModel.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
@@ -59,6 +59,76 @@ std::string FormatBytes(uint64_t bytes)
         // This matches the behaviour of `docker stats`.
         return std::format("{} B", bytes);
     }
+}
+
+nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
+{
+    // Calculate CPU %
+    // Formula matches Docker CLI: https://github.com/docker/cli/blob/master/cli/command/container/stats_helpers.go
+    double cpuPercent = 0.0;
+    const auto cpuDelta =
+        static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) - static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
+    const auto systemDelta = static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
+    if (systemDelta > 0.0 && cpuDelta > 0.0)
+    {
+        uint32_t onlineCpus = stats.cpu_stats.online_cpus;
+        if (onlineCpus == 0 && stats.cpu_stats.cpu_usage.percpu_usage.has_value())
+        {
+            onlineCpus = static_cast<uint32_t>(stats.cpu_stats.cpu_usage.percpu_usage->size());
+        }
+
+        cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
+    }
+
+    // Calculate memory %
+    double memPercent = 0.0;
+    if (stats.memory_stats.limit > 0)
+    {
+        memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
+    }
+
+    // Aggregate network I/O
+    uint64_t netRxBytes = 0;
+    uint64_t netTxBytes = 0;
+    if (stats.networks.has_value())
+    {
+        for (const auto& [iface, netStats] : *stats.networks)
+        {
+            netRxBytes += netStats.rx_bytes;
+            netTxBytes += netStats.tx_bytes;
+        }
+    }
+
+    // Aggregate block I/O
+    uint64_t blkReadBytes = 0;
+    uint64_t blkWriteBytes = 0;
+    if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+    {
+        for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+        {
+            if (_stricmp(entry.op.c_str(), "read") == 0)
+            {
+                blkReadBytes += entry.value;
+            }
+            else if (_stricmp(entry.op.c_str(), "write") == 0)
+            {
+                blkWriteBytes += entry.value;
+            }
+        }
+    }
+
+    const auto& containerName = stats.name.empty() ? stats.id : stats.name;
+
+    return {
+        {"ID", stats.id},
+        {"Name", containerName},
+        {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
+        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemPerc", std::format("{:.2f}%", memPercent)},
+        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"PIDs", stats.pids_stats.current},
+    };
 }
 
 } // namespace
@@ -179,6 +249,31 @@ void KillContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Kill(session, WideToMultiByte(id), signal);
+        PrintMessage(id);
+    }
+}
+
+void ExportContainer(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        ContainerService::Export(session, containerId, output);
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ContainerExportStdoutIsTerminalError());
+        }
+
+        ContainerService::Export(session, containerId, stdoutHandle);
     }
 }
 
@@ -266,6 +361,7 @@ void RemoveContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
+        PrintMessage(id);
     }
 }
 
@@ -352,6 +448,24 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
     }
 
+    if (context.Args.Contains(ArgType::Memory))
+    {
+        options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
+    }
+
+    if (context.Args.Contains(ArgType::Cpus))
+    {
+        options.NanoCpus = validation::GetNanoCpusFromString(context.Args.Get<ArgType::Cpus>());
+    }
+
+    if (context.Args.Contains(ArgType::Ulimit))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::Ulimit>())
+        {
+            options.Ulimits.emplace_back(validation::ParseUlimit(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
@@ -428,6 +542,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::Network))
+    {
+        auto networks = context.Args.GetAll<ArgType::Network>();
+        options.Networks.reserve(options.Networks.size() + networks.size());
+        for (const auto& value : networks)
+        {
+            options.Networks.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::NetworkAlias))
+    {
+        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        options.NetworkAliases.reserve(aliases.size());
+        for (const auto& value : aliases)
+        {
+            options.NetworkAliases.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
@@ -447,7 +581,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         for (const auto& label : context.Args.GetAll<ArgType::Label>())
         {
-            auto parsed = Label::Parse(label);
+            auto parsed = validation::ParseLabel(label);
             options.Labels.emplace_back(parsed.first, parsed.second);
         }
     }
@@ -495,100 +629,41 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
     }
 
-    // Build stats as a json array first for later filtering or display either as json or table format.
+    // Fetch stats for all containers concurrently in batches. The Docker engine blocks for ~1s
+    // per request to collect a valid precpu_stats sample, so issuing requests in parallel keeps
+    // wall time proportional to ceil(N / batchSize) rather than N.
     nlohmann::json statsJson = nlohmann::json::array();
-    for (const auto& containerId : containers)
-    {
-        wsl::windows::common::docker_schema::ContainerStats stats;
-        try
-        {
-            stats = ContainerService::Stats(session, WideToMultiByte(containerId));
-        }
-        catch (const wil::ResultException& ex)
-        {
+    wsl::windows::wslc::ForEachAsync<std::wstring>(
+        containers,
+        // Work to be done for each container ID on a separate thread.
+        [&session](const std::wstring& containerId) {
+            // ContainerService::Stats makes COM calls, so we must ensure COM is initialized on this thread.
+            auto comCleanup = wil::CoInitializeEx(COINIT_MULTITHREADED);
+            return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
+        },
+        // On Success
+        [&](const nlohmann::json& entry) { statsJson.push_back(entry); },
+        // On Error
+        [&](const std::wstring& containerId, wil::ResultException error) {
             if (!userSpecifiedContainers)
             {
-                // If the user did not explicitly specify a container then there may be expected
-                // race conditions between listing containers and querying stats.
-                switch (ex.GetErrorCode())
+                switch (error.GetErrorCode())
                 {
                 case RPC_E_DISCONNECTED:
                 case WSLC_E_CONTAINER_NOT_FOUND:
-                    continue;
+                    // Container disappeared between list and stats fetch, and
+                    // the user did not specify these containers, so silently skip.
+                    return;
                 }
             }
 
-            LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
-            throw;
-        }
-
-        // Calculate CPU %
-        double cpuPercent = 0.0;
-        const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
-                              static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
-        const auto systemDelta =
-            static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
-        const auto onlineCpus = stats.cpu_stats.online_cpus > 0 ? stats.cpu_stats.online_cpus : 1u;
-        if (systemDelta > 0.0 && cpuDelta >= 0.0)
-        {
-            cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
-        }
-
-        // Calculate memory %
-        double memPercent = 0.0;
-        if (stats.memory_stats.limit > 0)
-        {
-            memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
-        }
-
-        // Aggregate network I/O
-        uint64_t netRxBytes = 0;
-        uint64_t netTxBytes = 0;
-        if (stats.networks.has_value())
-        {
-            for (const auto& [iface, netStats] : *stats.networks)
-            {
-                netRxBytes += netStats.rx_bytes;
-                netTxBytes += netStats.tx_bytes;
-            }
-        }
-
-        // Aggregate block I/O
-        uint64_t blkReadBytes = 0;
-        uint64_t blkWriteBytes = 0;
-        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
-        {
-            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
-            {
-                if (_stricmp(entry.op.c_str(), "read") == 0)
-                {
-                    blkReadBytes += entry.value;
-                }
-                else if (_stricmp(entry.op.c_str(), "write") == 0)
-                {
-                    blkWriteBytes += entry.value;
-                }
-            }
-        }
-
-        const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-        const auto cpuPercentStr = std::format("{:.2f}%", cpuPercent);
-        const auto memPercentStr = std::format("{:.2f}%", memPercent);
-        const auto memUsage = std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit));
-        const auto netIo = std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes));
-        const auto blkIo = std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes));
-
-        statsJson.push_back({
-            {"ID", stats.id},
-            {"Name", containerName},
-            {"CPUPerc", cpuPercentStr},
-            {"MemUsage", memUsage},
-            {"MemPerc", memPercentStr},
-            {"NetIO", netIo},
-            {"BlockIO", blkIo},
-            {"PIDs", stats.pids_stats.current},
-        });
-    }
+            // Failure to retrieve a container should stop execution with
+            // no container information displayed.
+            LOG_HR_MSG(error.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
+            throw error;
+        },
+        10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
+    );
 
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
@@ -654,8 +729,14 @@ void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-    const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    const auto& containerId = context.Args.Get<ArgType::ContainerId>();
+    const bool attach = context.Args.Contains(ArgType::Attach);
+    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
+
+    if (!attach)
+    {
+        PrintMessage(containerId);
+    }
 }
 
 void StopContainers(CLIExecutionContext& context)
@@ -677,6 +758,7 @@ void StopContainers(CLIExecutionContext& context)
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
+        PrintMessage(id);
     }
 }
 
@@ -722,6 +804,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

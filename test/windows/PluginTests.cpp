@@ -617,7 +617,7 @@ class PluginTests
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -664,8 +664,7 @@ class PluginTests
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
             Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}
-            WSLCMountFolder(../escape): {}
-            WSLCMountFolder(): {}
+            WSLCMountFolder(relative): {}
             Test completed
             WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
@@ -675,7 +674,6 @@ class PluginTests
             E_INVALIDARG,
             HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
             HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
-            E_INVALIDARG,
             E_INVALIDARG);
 
         ValidateLogFile(ExpectedOutput.c_str());
@@ -704,7 +702,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
 
             auto emptyAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
-            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr));
+            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr, nullptr));
 
             // Delete the local tagged copy so PullImage actually downloads it.
             WSLCDeleteImageOptions deleteOpts{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
@@ -712,7 +710,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
             // Pull the image back — this should trigger the ImageCreated plugin callback.
-            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr));
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
         }
 
         constexpr auto ExpectedOutput =
@@ -739,7 +737,7 @@ class PluginTests
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
         ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
 

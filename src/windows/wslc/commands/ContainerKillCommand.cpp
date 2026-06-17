@@ -28,7 +28,6 @@ std::vector<Argument> ContainerKillCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Signal),
     };
 }

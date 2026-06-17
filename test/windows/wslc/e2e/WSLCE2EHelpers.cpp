@@ -52,7 +52,7 @@ namespace {
     {
         const auto sessionManager = OpenSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -145,7 +145,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
+        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -244,6 +244,36 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
     }
 }
 
+void VerifyNetworkIsListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Network '{}' not found in network list output", networkName).c_str());
+}
+
+void VerifyNetworkIsNotListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            VERIFY_FAIL(std::format(L"Network '{}' found in network list output", networkName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -321,7 +351,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
             auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
@@ -349,7 +379,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
     }
 
     auto result = RunWslc(listCommand);
@@ -368,7 +398,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
     if (!sessionName.empty())
     {
-        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
     }
 
     auto loadResult = RunWslc(loadCommand);
@@ -422,6 +452,31 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
     }
 }
 
+void EnsureNetworkDoesNotExist(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            auto deleteResult = RunWslc(std::format(L"network rm {}", networkName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+wslc_schema::Network InspectNetwork(const std::wstring& networkName)
+{
+    auto result = RunWslc(std::format(L"network inspect {}", networkName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::Network>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 {
     // Ensure the default elevated session exists before opening it via COM.
@@ -438,7 +493,8 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
     return std::move(session);
 }
 
-std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
 {
     // Check if the registry image is already loaded on this session.
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -452,6 +508,8 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         LoadTestImage(session, "wslc-registry:latest");
     }
 
+    const bool useTls = !tlsCertDir.empty();
+
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 
     if (!username.empty())
@@ -460,19 +518,50 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         env.push_back(std::format("PASSWORD={}", password));
     }
 
-    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    if (useTls)
+    {
+        env.push_back("REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt");
+        env.push_back("REGISTRY_HTTP_TLS_KEY=/certs/server.key");
+    }
+
+    // TLS needs a non-loopback address for real verification, so use bridge networking and reach the
+    // container by its bridge IP. Plain HTTP uses host networking with a published loopback port.
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, useTls ? "bridge" : "host");
     launcher.SetEntrypoint({"/entrypoint.sh"});
-    launcher.AddPort(port, port, AF_INET);
 
-    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+    if (useTls)
+    {
+        launcher.AddVolume(tlsCertDir, "/certs", true);
+    }
+    else
+    {
+        launcher.AddPort(port, port, AF_INET);
+    }
 
-    auto address = std::format("127.0.0.1:{}", port);
-    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+    auto container = launcher.Launch(session);
 
-    int expectedCode = username.empty() ? 200 : 401;
-    ExpectHttpResponse(url.c_str(), expectedCode, true);
+    // Wait for the registry to bind the port before continuing.
+    auto initProcess = container.GetInitProcess();
+    WaitForOutput(initProcess.GetStdHandle(2), std::format("listening on [::]:{}", port));
 
-    return {std::move(container), std::move(address)};
+    if (useTls)
+    {
+        auto inspect = container.Inspect();
+        THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());
+        auto address = std::format("{}:{}", inspect.NetworkSettings.Networks.begin()->second.IPAddress, port);
+
+        return {std::move(container), std::move(address)};
+    }
+    else
+    {
+        auto address = std::format("127.0.0.1:{}", port);
+        auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+        int expectedCode = username.empty() ? 200 : 401;
+        ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+        return {std::move(container), std::move(address)};
+    }
 }
 
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)
@@ -497,5 +586,45 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
     return std::format(L"python3 -m http.server {}", port);
+}
+
+namespace {
+
+    void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+    {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const std::string data = session.GetStdoutData();
+                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
+                },
+                std::chrono::milliseconds(200),
+                std::chrono::seconds(60));
+        }
+        catch (...)
+        {
+            const std::string data = session.GetStdoutData();
+            VERIFY_FAIL(std::format(
+                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
+                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                            .c_str());
+        }
+    }
+
+} // namespace
+
+void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
+{
+    constexpr SHORT resizedColumns = 100;
+    constexpr SHORT resizedRows = 37;
+    VERIFY_IS_TRUE(columns != resizedColumns || rows != resizedRows, L"Resized tty size must differ from the initial size");
+
+    WaitForTtySize(session, columns, rows);
+
+    session.ResizePseudoConsole(resizedColumns, resizedRows);
+    WaitForTtySize(session, resizedColumns, resizedRows);
+
+    session.Terminate();
 }
 } // namespace WSLCE2ETests

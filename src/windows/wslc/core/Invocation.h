@@ -88,9 +88,17 @@ struct Invocation
     {
         return {m_args.size(), m_args};
     }
+    // Marks i as consumed: the next begin() returns i + 1.
     void consume(const iterator& i)
     {
         m_currentFirstArg = i.index() + 1;
+    }
+    // Sets the start of the unconsumed range to i: the next begin() returns i.
+    // Use this when a parser stopped at an unconsumed token (e.g. options-only
+    // parsing that stopped on the first positional / subcommand token).
+    void consumeUntil(const iterator& i)
+    {
+        m_currentFirstArg = i.index();
     }
 
 private:

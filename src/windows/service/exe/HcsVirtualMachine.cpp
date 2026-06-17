@@ -134,12 +134,19 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 #endif
 
+    // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
+    // command line, virtiofs shares, and the VirtioProxy virtio-net adapter.
+    // Only needed when a virtio device that requires bounce buffers will be attached.
+    ULONG64 swiotlbSizeBytes = 0;
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    {
+        swiotlbSizeBytes = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
+    }
+
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
-
-    // Append common kernel parameters shared between WSL2 and WSLC.
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -151,11 +158,19 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     }
 
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent.get(), true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
-        kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+        if constexpr (!wsl::shared::Arm64)
+        {
+            kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+        }
+        else
+        {
+            kernelCmdLine += L" earlycon=pl011,0xeffec000,115200";
+        }
+
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
     }
 
@@ -278,12 +293,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
 
-    // Configure termination callback
-    if (Settings->TerminationCallback)
-    {
-        m_terminationCallback = Settings->TerminationCallback;
-    }
-
     hcs::RegisterCallback(m_computeSystem.get(), &HcsVirtualMachine::OnVmExitCallback, this);
 
     // Create a listening socket for mini_init to connect to once the VM is running.
@@ -368,6 +377,8 @@ bool HcsVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 HRESULT HcsVirtualMachine::GetId(_Out_ GUID* VmId)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, VmId);
+
     *VmId = m_vmId;
     return S_OK;
 }
@@ -376,7 +387,9 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::AcceptConnection(_Out_ HANDLE* Socket)
 try
 {
-    auto socket = wsl::windows::common::hvsocket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+    RETURN_HR_IF_NULL(E_POINTER, Socket);
+
+    auto socket = socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
     *Socket = reinterpret_cast<HANDLE>(socket->release());
@@ -456,7 +469,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
     }
     else
     {
@@ -573,11 +586,22 @@ try
     }
     else
     {
+        std::wstring options = ReadOnly ? L"ro" : L"";
+        if (!m_swiotlbOption.empty())
+        {
+            if (!options.empty())
+            {
+                options += L";";
+            }
+
+            options += m_swiotlbOption;
+        }
+
         it->second = m_guestDeviceManager->AddGuestDevice(
             VIRTIO_FS_DEVICE_ID,
             m_virtioFsClassId,
             shareName.c_str(),
-            ReadOnly ? L"ro" : L"",
+            options.c_str(),
             WindowsPath,
             VIRTIO_FS_FLAGS_TYPE_FILES,
             m_userToken.get());
@@ -614,9 +638,34 @@ try
 }
 CATCH_RETURN()
 
+HRESULT HcsVirtualMachine::ApplyGuestCapabilities(_In_ const WSLCGuestCapabilities* Capabilities)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Capabilities);
+
+    std::lock_guard lock(m_lock);
+
+    THROW_HR_IF(E_INVALIDARG, !m_swiotlbOption.empty());
+
+    if (Capabilities->HvPciSwiotlbBase != 0 && Capabilities->HvPciSwiotlbSize != 0)
+    {
+        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+    }
+
+    WSL_LOG(
+        "WSLCApplyGuestCapabilities",
+        TraceLoggingValue(Capabilities->HvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(Capabilities->HvPciSwiotlbSize, "HvPciSwiotlbSize"));
+
+    return S_OK;
+}
+CATCH_RETURN()
+
 HRESULT HcsVirtualMachine::GetTerminationEvent(_Out_ HANDLE* Event)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, Event);
+
     *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
 
     return S_OK;
@@ -645,8 +694,6 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    m_vmExitEvent.SetEvent();
-
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
     auto reason = WSLCVirtualMachineTerminationReasonUnknown;
@@ -668,11 +715,33 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
         }
     }
 
-    if (m_terminationCallback)
-    {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
-    }
+    // Cache the termination reason and details before signaling the exit event. These fields are
+    // written once here (OnExit fires once and m_vmExitEvent is never reset) and published to readers
+    // by the SetEvent below; GetTerminationReason only reads them after observing the signaled event.
+    m_terminationReason = reason;
+    m_terminationDetails = Event->EventData;
+
+    m_vmExitEvent.SetEvent();
 }
+
+HRESULT HcsVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once in OnExit before m_vmExitEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vmExitEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 {
@@ -790,3 +859,77 @@ void HcsVirtualMachine::FreeLun(ULONG Lun)
 
     m_lunBitmap[Lun] = false;
 }
+
+namespace wsl::windows::service::wslc {
+
+WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings)
+{
+    THROW_HR_IF(E_POINTER, Settings == nullptr);
+
+    m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_storagePath = Settings->StoragePath ? Settings->StoragePath : L"";
+
+    if (Settings->RootVhdOverride != nullptr)
+    {
+        m_rootVhdOverride.emplace(Settings->RootVhdOverride);
+    }
+
+    if (Settings->RootVhdTypeOverride != nullptr)
+    {
+        m_rootVhdTypeOverride.emplace(Settings->RootVhdTypeOverride);
+    }
+
+    // Keep our own duplicate of the dmesg sink so recreated VMs can reuse it.
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
+    {
+        m_dmesgOutput.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
+    }
+
+    m_maximumStorageSizeMb = Settings->MaximumStorageSizeMb;
+    m_cpuCount = Settings->CpuCount;
+    m_memoryMb = Settings->MemoryMb;
+    m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_networkingMode = Settings->NetworkingMode;
+    m_featureFlags = Settings->FeatureFlags;
+    m_storageFlags = Settings->StorageFlags;
+}
+
+WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
+{
+    WSLCSessionSettings settings{};
+    settings.DisplayName = m_displayName.c_str();
+    settings.StoragePath = m_storagePath.empty() ? nullptr : m_storagePath.c_str();
+    settings.MaximumStorageSizeMb = m_maximumStorageSizeMb;
+    settings.CpuCount = m_cpuCount;
+    settings.MemoryMb = m_memoryMb;
+    settings.BootTimeoutMs = m_bootTimeoutMs;
+    settings.NetworkingMode = m_networkingMode;
+    settings.FeatureFlags = m_featureFlags;
+    settings.StorageFlags = m_storageFlags;
+    settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
+    settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;
+
+    if (m_dmesgOutput)
+    {
+        settings.DmesgOutput = wslutil::ToCOMInputHandle(m_dmesgOutput.get());
+    }
+
+    return settings;
+}
+
+HRESULT WSLCVirtualMachineFactory::CreateVirtualMachine(_Out_ IWSLCVirtualMachine** Vm)
+try
+{
+    RETURN_HR_IF(E_POINTER, Vm == nullptr);
+    *Vm = nullptr;
+
+    const auto settings = BuildSettings();
+    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(&settings);
+    THROW_IF_NULL_ALLOC(vm);
+
+    *Vm = vm.Detach();
+    return S_OK;
+}
+CATCH_RETURN()
+
+} // namespace wsl::windows::service::wslc

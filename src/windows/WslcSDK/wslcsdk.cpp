@@ -17,7 +17,7 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "Defaults.h"
 #include "ProgressCallback.h"
-#include "TerminationCallback.h"
+#include "CrashDumpCallback.h"
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
@@ -99,14 +99,14 @@ WSLCSignal Convert(WslcSignal signal)
     }
 }
 
-WSLCContainerNetworkType Convert(WslcContainerNetworkingMode mode)
+PCSTR Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
     case WSLC_CONTAINER_NETWORKING_MODE_NONE:
-        return WSLCContainerNetworkTypeNone;
+        return "none";
     case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
-        return WSLCContainerNetworkTypeBridged;
+        return "bridge";
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
@@ -434,17 +434,12 @@ try
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
     runtimeSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
-    auto terminationCallback = TerminationCallback::CreateIf(internalType);
-    if (terminationCallback)
-    {
-        result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
-        runtimeSettings.TerminationCallback = terminationCallback.get();
-    }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -585,15 +580,82 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent)
 try
 {
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-    RETURN_HR_IF(E_INVALIDARG, terminationCallback == nullptr && terminationContext != nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, terminationEvent);
+    *terminationEvent = nullptr;
 
-    internalType->terminationCallback = terminationCallback;
-    internalType->terminationCallbackContext = terminationContext;
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+
+    RETURN_HR(internalType->session->GetTerminationEvent(terminationEvent));
+}
+CATCH_RETURN();
+
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason)
+try
+{
+    static_assert(
+        WSLC_SESSION_TERMINATION_REASON_UNKNOWN == WSLCVirtualMachineTerminationReasonUnknown &&
+            WSLC_SESSION_TERMINATION_REASON_SHUTDOWN == WSLCVirtualMachineTerminationReasonShutdown &&
+            WSLC_SESSION_TERMINATION_REASON_CRASHED == WSLCVirtualMachineTerminationReasonCrashed,
+        "Termination reason enum values mismatch.");
+
+    RETURN_HR_IF_NULL(E_POINTER, reason);
+    *reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+
+    WSLCVirtualMachineTerminationReason runtimeReason = WSLCVirtualMachineTerminationReasonUnknown;
+    wil::unique_cotaskmem_string details;
+    RETURN_IF_FAILED(internalType->session->GetTerminationReason(&runtimeReason, &details));
+
+    *reason = static_cast<WslcSessionTerminationReason>(runtimeReason);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, subscription);
+    *subscription = nullptr;
+    RETURN_HR_IF_NULL(E_INVALIDARG, crashDumpCallback);
+
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalSession = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+
+    auto result = std::make_unique<WslcCrashDumpSubscriptionImpl>();
+    auto callback = winrt::make_self<CrashDumpCallback>(crashDumpCallback, crashDumpContext);
+    result->callback = callback.get();
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
+            internalSession->session->RegisterCrashDumpCallback(result->callback.get(), &result->subscription))))
+    {
+        *subscription = reinterpret_cast<WslcCrashDumpSubscription>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription)
+try
+{
+    auto internalType = CheckAndGetInternalTypeUniquePointer(subscription);
+
+    // Release the service-side subscription first so it unregisters cleanly, then drop the shim.
+    internalType->subscription.reset();
+    internalType->callback.reset();
 
     return S_OK;
 }
@@ -604,10 +666,7 @@ try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    // Intentionally destroy session before termination callback in the event that
-    // the termination callback ends up being invoked by session destruction.
     internalType->session.reset();
-    internalType->terminationCallback.reset();
 
     return S_OK;
 }
@@ -616,7 +675,30 @@ CATCH_RETURN();
 STDAPI WslcReleaseContainer(_In_ WslcContainer container)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(container);
+    // Reject release attempts originating from the container's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(container);
+        auto ioCallback = peek->ioCallbacks.load();
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), ioCallback && ioCallback->IsOnIOCallbackThread());
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(container);
+    auto ioCallback = internalType->ioCallbacks.load();
+    if (ioCallback)
+    {
+        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
+        try
+        {
+            WSLCContainerState state{};
+            THROW_IF_FAILED(internalType->container->GetState(&state));
+
+            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
+            {
+                ioCallback->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }
@@ -625,7 +707,34 @@ CATCH_RETURN();
 STDAPI WslcReleaseProcess(_In_ WslcProcess process)
 try
 {
-    CheckAndGetInternalTypeUniquePointer(process);
+    // Reject release attempts originating from the process's own IO thread.
+    {
+        auto* peek = CheckAndGetInternalType(process);
+        if (peek->ioCallbacks && peek->ioCallbacks->IsOnIOCallbackThread())
+        {
+            RETURN_HR(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+        }
+    }
+
+    auto internalType = CheckAndGetInternalTypeUniquePointer(process);
+    if (internalType->ioCallbacks)
+    {
+        // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
+        // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
+
+        try
+        {
+            WSLCProcessState state{};
+            int exitCode{};
+            THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
+
+            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
+            {
+                internalType->ioCallbacks->Complete();
+            }
+        }
+        CATCH_LOG();
+    }
 
     return S_OK;
 }
@@ -643,7 +752,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = WSLCContainerNetworkTypeNone;
+    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -772,7 +881,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
+    // SDK only exposes the network mode (no additional endpoints today).
+    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -780,7 +890,7 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -808,7 +918,7 @@ try
     // TODO: Consider if we should just override flags when callbacks were provided instead.
     RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr, nullptr))))
     {
         if (hasIOCallback)
         {
@@ -883,7 +993,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(containerSettings);
 
-    internalType->networking = Convert(networkingMode);
+    internalType->networkMode = Convert(networkingMode);
 
     return S_OK;
 }
@@ -1280,7 +1390,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1290,7 +1400,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1328,7 +1438,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1407,7 +1517,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 

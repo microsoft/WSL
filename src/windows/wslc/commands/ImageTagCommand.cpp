@@ -29,7 +29,6 @@ std::vector<Argument> ImageTagCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Source, true),
         Argument::Create(ArgType::Target, true),
-        Argument::Create(ArgType::Session),
     };
 }
 

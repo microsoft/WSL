@@ -53,47 +53,6 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
     return true;
 }
-template <typename TFilters>
-nlohmann::json PruneFiltersToJson(const TFilters& filters)
-{
-    nlohmann::json j;
-
-    if constexpr (requires { filters.dangling; })
-    {
-        if (filters.dangling.has_value())
-        {
-            j["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
-        }
-    }
-
-    if constexpr (requires { filters.all; })
-    {
-        if (filters.all.has_value() && filters.all.value())
-        {
-            j["all"] = nlohmann::json::array({"true"});
-        }
-    }
-
-    if constexpr (requires { filters.until; })
-    {
-        if (filters.until.has_value())
-        {
-            j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
-        }
-    }
-
-    if (!filters.presentLabels.empty())
-    {
-        j["label"] = filters.presentLabels;
-    }
-
-    if (!filters.absentLabels.empty())
-    {
-        j["label!"] = filters.absentLabels;
-    }
-
-    return j;
-}
 
 } // namespace
 
@@ -231,43 +190,16 @@ std::string DockerHTTPClient::Authenticate(const std::string& serverAddress, con
     return response.IdentityToken.value_or("");
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/json");
 
     url.SetParameter("all", all);
     url.SetParameter("digests", digests);
 
-    // Build filters JSON if any filters are set
-    nlohmann::json filtersJson;
-
-    if (filters.reference.has_value())
+    if (!filters.empty())
     {
-        filtersJson["reference"] = nlohmann::json::array({filters.reference.value()});
-    }
-
-    if (filters.before.has_value())
-    {
-        filtersJson["before"] = nlohmann::json::array({filters.before.value()});
-    }
-
-    if (filters.since.has_value())
-    {
-        filtersJson["since"] = nlohmann::json::array({filters.since.value()});
-    }
-
-    if (filters.dangling.has_value())
-    {
-        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
-    }
-
-    if (!filters.labels.empty())
-    {
-        filtersJson["label"] = filters.labels;
-    }
-
-    if (!filtersJson.empty())
-    {
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 
@@ -295,13 +227,28 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
-docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesFilters& filters)
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImages(const std::vector<std::string>& NamesOrIds)
+{
+    auto url = URL::Create("/images/get");
+    for (const auto& name : NamesOrIds)
+    {
+        // 'names' is a repeated query parameter.
+        // See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Image/operation/ImageGet
+        url.SetParameter("names", name);
+    }
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket)};
+}
+
+docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/prune");
 
-    auto filtersJson = PruneFiltersToJson(filters);
-    if (!filtersJson.empty())
+    if (!filters.empty())
     {
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 
@@ -408,7 +355,10 @@ docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string
 {
     auto url = URL::Create("/containers/{}/stats", Id);
     url.SetParameter("stream", false);
-    url.SetParameter("one-shot", true);
+
+    // Intentionally omit one-shot=true: the Docker engine blocks internally for ~1s
+    // to collect a prior sample, and returns a single response with both cpu_stats and
+    // precpu_stats correctly populated — giving a valid delta for CPU % calculation.
     return Transaction<EmptyRequest, docker_schema::ContainerStats>(verb::get, url);
 }
 
@@ -499,6 +449,16 @@ void DockerHTTPClient::RemoveNetwork(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/networks/{}", Name));
 }
 
+void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/connect", NetworkName), Request);
+}
+
+void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
+}
+
 std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
 {
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
@@ -507,6 +467,18 @@ std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
 docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
 {
     return Transaction<docker_schema::EmptyRequest, docker_schema::Network>(verb::get, URL::Create("/networks/{}", Name));
+}
+
+docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/networks/prune");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

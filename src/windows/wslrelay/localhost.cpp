@@ -291,15 +291,11 @@ try
 {
     // Begin accepting connections until the relay is stopped.
 
-    const int AddressFamily = WindowsAddressFamily(Arguments->Family);
-
     for (;;)
     {
-        wil::unique_socket InetSocket(WSASocket(AddressFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        THROW_LAST_ERROR_IF(!InetSocket);
-
-        if (!wsl::windows::common::socket::CancellableAccept(
-                Arguments->ListenSocket.get(), InetSocket.get(), INFINITE, Arguments->ExitEvent.get()))
+        auto InetSocket =
+            wsl::windows::common::socket::CancellableAccept(Arguments->ListenSocket.get(), INFINITE, Arguments->ExitEvent.get());
+        if (!InetSocket)
         {
             break; // Exit event was signaled, exit.
         }
@@ -308,7 +304,7 @@ try
 
         WSL_LOG("PortRelayUsage", TraceLoggingValue(Arguments->Family, "family"), TraceLoggingValue(Arguments->Port, "port"), TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-        auto RelayThread = std::thread([Arguments, InetSocket = std::move(InetSocket)]() {
+        auto RelayThread = std::thread([Arguments, InetSocket = std::move(*InetSocket)]() {
             try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"Port relay");
@@ -401,6 +397,7 @@ struct PortRelay
         wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
+    // Completes the overlapped AcceptEx initiated by ScheduleAccept, and sets accept context on the accepted socket.
     void CompleteAccept()
     {
         Pending = false;
@@ -411,8 +408,12 @@ struct PortRelay
         {
             THROW_WIN32(WSAGetLastError());
         }
+
+        // Set the accept context to mark the socket as connected.
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
     }
 
+    // If the accept completes immediately, accept context will be set on the accepted socket.
     bool ScheduleAccept()
     {
         WI_VERIFY(!Pending);
@@ -429,6 +430,8 @@ struct PortRelay
             return false;
         }
 
+        // Set the accept context to mark the socket as connected.
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
         return true;
     }
 };

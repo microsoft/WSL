@@ -28,7 +28,6 @@ std::vector<Argument> ContainerAttachCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true),
-        Argument::Create(ArgType::Session),
     };
 }
 
