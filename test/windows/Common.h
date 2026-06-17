@@ -339,10 +339,8 @@ public:
     // Restores the original value.
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const ScopedEnvVariable&) = delete;
-    ScopedEnvVariable(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(const ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
 
     // Sets the variable to a new value.
     void Set(const std::wstring& Value);
