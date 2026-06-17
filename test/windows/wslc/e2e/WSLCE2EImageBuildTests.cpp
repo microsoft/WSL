@@ -183,6 +183,71 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(!inspectData.Config.value().Cmd.has_value() || inspectData.Config.value().Cmd.value() != finalStageCmd);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Label_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
+
+        // Use both the short alias (-l) and long form (--label) to confirm both parse paths.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabel.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+
+        auto firstIt = labels.find("first");
+        VERIFY_IS_TRUE(firstIt != labels.end());
+        VERIFY_ARE_EQUAL(std::string("one"), firstIt->second);
+
+        auto secondIt = labels.find("second");
+        VERIFY_IS_TRUE(secondIt != labels.end());
+        VERIFY_ARE_EQUAL(std::string("two"), secondIt->second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_LabelOverridesDockerfile_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label-override";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(
+            dockerfilePath, "FROM debian:latest\nLABEL conflict=from-dockerfile\nCMD [\"echo\", \"label-override-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabelOverride.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+        auto it = labels.find("conflict");
+        VERIFY_IS_TRUE(it != labels.end());
+        VERIFY_ARE_EQUAL(std::string("from-cli"), it->second);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
         BuildFromContextFile(L"Dockerfile", BuiltImageDockerfile);
@@ -290,6 +355,8 @@ private:
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
     const TestImage BuiltImageNoCache{L"wslc-e2e-build-no-cache", L"latest", L""};
+    const TestImage BuiltImageLabel{L"wslc-e2e-build-label", L"latest", L""};
+    const TestImage BuiltImageLabelOverride{L"wslc-e2e-build-label-override", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
@@ -317,6 +384,8 @@ private:
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
         EnsureImageIsDeleted(BuiltImageNoCache);
+        EnsureImageIsDeleted(BuiltImageLabel);
+        EnsureImageIsDeleted(BuiltImageLabelOverride);
     }
 
     static auto SetupTestDirectory(const std::filesystem::path& testRoot)

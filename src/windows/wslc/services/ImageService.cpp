@@ -119,6 +119,7 @@ void ImageService::Build(
     const std::wstring& contextPath,
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
+    const std::vector<std::wstring>& labels,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
     WSLCBuildImageFlags flags,
@@ -167,6 +168,10 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    std::vector<std::string> labelStrings;
+    std::vector<LPCSTR> labelPointers;
+    toMultiByte(labels, labelStrings, labelPointers);
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
     auto contextPathStr = absolutePath.wstring();
@@ -177,6 +182,7 @@ void ImageService::Build(
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
+        .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
