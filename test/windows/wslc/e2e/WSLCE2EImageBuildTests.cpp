@@ -281,6 +281,33 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ShmSizeAndUlimit_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-resource-limits";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"resource-limit-ok\"]\n");
+
+        // Build with --shm-size and --ulimit to verify they are accepted and piped through.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --shm-size 256m --ulimit nofile=1024:2048",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageResourceLimits.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageResourceLimits.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
+        VERIFY_ARE_EQUAL(BuiltImageResourceLimits.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -290,6 +317,7 @@ private:
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
     const TestImage BuiltImageNoCache{L"wslc-e2e-build-no-cache", L"latest", L""};
+    const TestImage BuiltImageResourceLimits{L"wslc-e2e-build-resource-limits", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
@@ -317,6 +345,7 @@ private:
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
         EnsureImageIsDeleted(BuiltImageNoCache);
+        EnsureImageIsDeleted(BuiltImageResourceLimits);
     }
 
     static auto SetupTestDirectory(const std::filesystem::path& testRoot)
