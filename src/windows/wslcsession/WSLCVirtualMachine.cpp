@@ -200,6 +200,31 @@ std::string VMPortMapping::BindingAddressString() const
     return buffer;
 }
 
+int VMPortMapping::ConnectFamily() const
+{
+    // netavark publishes an IPv6-loopback container port via an OUTPUT-chain DNAT whose post-DNAT
+    // src=::1 cannot be routed off lo (there is no IPv6 equivalent of net.ipv4.conf.*.route_localnet).
+    // For such ports we publish and relay over IPv4 loopback instead, which works via route_localnet.
+    // The Windows-side listener still uses the requested family, so clients keep reaching [::1]:port.
+    if (m_containerPublished && BindAddress.si_family == AF_INET6 && IsLocalhost())
+    {
+        return AF_INET;
+    }
+
+    return BindAddress.si_family;
+}
+
+std::string VMPortMapping::PublishHostIp() const
+{
+    // See ConnectFamily
+    if (m_containerPublished && BindAddress.si_family == AF_INET6 && IsLocalhost())
+    {
+        return "127.0.0.1";
+    }
+
+    return BindingAddressString();
+}
+
 void VMPortMapping::Attach(WSLCVirtualMachine& Vm)
 {
     WI_ASSERT(this->Vm == nullptr);
@@ -223,12 +248,16 @@ VMPortMapping VMPortMapping::LocalhostTcpMapping(int Family, uint16_t WindowsPor
 
 VMPortMapping VMPortMapping::FromWSLCPortMapping(const ::WSLCPortMapping& Mapping)
 {
-    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress);
+    VMPortMapping mapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress);
+    mapping.m_containerPublished = true;
+    return mapping;
 }
 
 VMPortMapping VMPortMapping::FromContainerMetaData(const wslc::WSLCPortMapping& Mapping)
 {
-    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str());
+    VMPortMapping mapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str());
+    mapping.m_containerPublished = true;
+    return mapping;
 }
 
 VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
@@ -240,10 +269,12 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
         VmPort = std::move(Other.VmPort);
         BindAddress = Other.BindAddress;
         Vm = Other.Vm;
+        m_containerPublished = Other.m_containerPublished;
 
         Other.Protocol = 0;
         ZeroMemory(&Other.BindAddress, sizeof(Other.BindAddress));
         Other.Vm = nullptr;
+        Other.m_containerPublished = false;
     }
     return *this;
 }
@@ -910,7 +941,8 @@ void WSLCVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
+void WSLCVirtualMachine::MapRelayPort(
+    _In_ int ListenFamily, _In_ int ConnectFamily, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -919,7 +951,8 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
     WSLC_MAP_PORT message;
     message.WindowsPort = WindowsPort;
     message.LinuxPort = LinuxPort;
-    message.AddressFamily = Family;
+    message.AddressFamily = ListenFamily;
+    message.ConnectAddressFamily = ConnectFamily;
     message.Stop = Remove;
 
     DWORD bytesTransfered{};
@@ -930,7 +963,14 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
     THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
-    THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
+    THROW_IF_FAILED_MSG(
+        result,
+        "Failed to map port: WindowsPort=%d, LinuxPort=%d, ListenFamily=%d, ConnectFamily=%d, Remove=%d",
+        WindowsPort,
+        LinuxPort,
+        ListenFamily,
+        ConnectFamily,
+        Remove);
 }
 
 void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
@@ -950,7 +990,7 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.ConnectFamily(), Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
@@ -962,7 +1002,7 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.ConnectFamily(), Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
     else
     {
@@ -982,12 +1022,12 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLCNetworkingModeNAT)
     {
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.ConnectFamily(), Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
         // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.ConnectFamily(), Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
     else
     {

@@ -1743,6 +1743,7 @@ struct WSLC_MAP_PORT
     uint16_t WindowsPort{};
     uint16_t LinuxPort{};
     uint32_t AddressFamily{};
+    uint32_t ConnectAddressFamily{};
     bool Stop{};
 
     PRETTY_PRINT(FIELD(Header));

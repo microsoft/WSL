@@ -1810,7 +1810,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
         portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
+            common::docker_schema::PortMapping{.HostIp = e.VmMapping.PublishHostIp(), .HostPort = std::to_string(hostPort)});
     }
 
     auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
