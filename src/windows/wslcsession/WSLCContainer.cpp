@@ -2090,7 +2090,6 @@ void WSLCContainerImpl::UnmapPorts()
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
 {
     // Snapshot under the lock, then notify outside it, pinning each control via lock() first
-    // (avoids the use after free, and avoids calling back under m_processesLock).
     decltype(m_processes) processes;
     {
         std::lock_guard processesLock{m_processesLock};

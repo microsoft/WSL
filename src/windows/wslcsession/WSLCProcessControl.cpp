@@ -116,11 +116,6 @@ DockerExecProcessControl::DockerExecProcessControl(
 {
 }
 
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    // The container holds only a weak reference to this control.
-}
-
 int DockerExecProcessControl::GetPid() const
 {
     std::lock_guard lock{m_lock};
