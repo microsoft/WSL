@@ -10195,7 +10195,16 @@ class WSLCTests
     WSLC_TEST_METHOD(InteractiveDetach)
     {
         auto validateDetaches = [](HANDLE TtyIn, HANDLE TtyOut, const std::vector<char>& Input) {
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(TtyIn, Input.data(), static_cast<DWORD>(Input.size()), nullptr, nullptr));
+            // podman's detach detection (containers/common detach.Copy) only recognizes the detach
+            // sequence when each key arrives in its own read; a single multi-byte write lands as one
+            // read and is treated as normal input. Real interactive clients send one keystroke per
+            // write, so emit the sequence one byte at a time with a brief gap (so the relay forwards
+            // separate reads), matching how a user actually types e.g. ctrl-p,ctrl-q.
+            for (char c : Input)
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(TtyIn, &c, 1, nullptr, nullptr));
+                Sleep(50);
+            }
 
             std::string output;
             auto onRead = [&](const gsl::span<char>& data) { output.append(data.data(), data.size()); };
@@ -10271,8 +10280,8 @@ class WSLCTests
         }
 
         {
-            // Validate that invalid detach keys fail with the appropriate error.
-            // N.B. Docker doesn't set an error message for this specific case.
+            // Validate that invalid detach keys are rejected up front with E_INVALIDARG, across the
+            // start-with-attach, attach, and exec paths.
             WSLCContainerLauncher launcher("debian:latest", "test-detach", {"cat"}, {}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             auto container = launcher.Create(*m_defaultSession);
 
@@ -10290,11 +10299,10 @@ class WSLCTests
             WSLCProcessLauncher processLauncher({}, {"cat"}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             processLauncher.SetDetachKeys("invalid");
 
-            // N.B. Docker returns HTTP 500 if the detach keys are invalid, but unlike other cases there's a proper error message.
+            // Invalid detach keys are rejected up front with E_INVALIDARG; the exec path validates the
+            // keys before sending them to the backend, consistent with the Start/Attach cases above.
             auto [result, _] = processLauncher.LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, E_FAIL);
-
-            ValidateCOMErrorMessage(L"Invalid escape keys (invalid) provided");
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
     }
 
