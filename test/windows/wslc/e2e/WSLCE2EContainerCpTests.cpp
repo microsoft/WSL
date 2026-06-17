@@ -175,6 +175,48 @@ class WSLCE2EContainerCpTests
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlag)
+    {
+        // Create and start a container.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        // Cp with -a flag (archive mode preserves uid/gid).
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp -a - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Verify the file was copied.
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagLongForm)
+    {
+        // Create and start a container.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        // Cp with --archive flag (long form).
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp --archive - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Verify the file was copied.
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container-cp";
     const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-cp";

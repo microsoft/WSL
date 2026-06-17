@@ -15,6 +15,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerCpCommand::GetArguments() const
 {
     return {
+        Argument::Create(ArgType::Archive),
         Argument::Create(ArgType::Source, true, std::nullopt, Localization::WSLCCLI_CpSourceArgDescription()),
         Argument::Create(ArgType::Target, true, std::nullopt, Localization::WSLCCLI_CpTargetArgDescription()),
     };

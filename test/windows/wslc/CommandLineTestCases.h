@@ -188,6 +188,8 @@ COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path/to/deep/dir", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp somefile cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive - cont1:/path", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp -", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp - ", L"cp", false)
