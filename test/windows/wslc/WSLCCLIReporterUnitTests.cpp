@@ -254,6 +254,61 @@ class WSLCCLIReporterUnitTests
         VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Warning).has_value());
         VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Error).has_value());
     }
+
+    TEST_METHOD(Reporter_Write_MixesSequencesWithStandardFormatArgs)
+    {
+        // Reporter.Write is std::format under the hood — any formattable type works
+        // alongside Sequences. Sequences are stripped when color is off; everything
+        // else formats normally through std::format machinery.
+        //
+        // This test exercises four sequence categories in a single format call:
+        //   SGR color   (Format::Fg::BrightRed)  — color, stripped by NoColor
+        //   Non-color   (Erase::LineForward)      — not color, survives NoColor
+        //   Hyperlink   (ConstructedSequence OSC8) — color, stripped by NoColor
+        //   SGR reset   (Format::Default)         — color, stripped by NoColor
+        //
+        // Hyperlink open/close are separate sequences so the visible link text
+        // degrades gracefully when sequences are stripped.
+
+        const auto& eraseLine = Erase::LineForward; // \x1b[K  — non-color CSI
+        const auto linkOpen = Format::LinkOpen(L"https://example.com");
+        const auto& linkClose = Format::LinkClose;
+
+        // Format: <color>Count: <int>, hex: <hex>, <erase><linkOpen>click here<linkClose><reset>
+        constexpr auto fmt = L"{}Count: {}, hex: {:04x}, {}{}click here{}{}\n";
+
+        // VT + color enabled: equivalent to std::format with all sequence bytes.
+        {
+            CaptureReporter cap{/*vtEnabled*/ true};
+            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+
+            const auto expected = std::format(
+                fmt, Format::Fg::BrightRed.Get(), 42, 255u, eraseLine.Get(), linkOpen.Get(), linkClose.Get(), Format::Default.Get());
+            VERIFY_ARE_EQUAL(expected, cap.captured());
+        }
+
+        // NoColor (VT enabled, color disabled): non-color sequences pass through,
+        // color sequences (SGR, hyperlink) replaced with empty string.
+        {
+            CaptureReporter cap{/*vtEnabled*/ true};
+            cap.reporter.SetNoColor(true);
+            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+
+            const std::wstring_view empty;
+            const auto expected = std::format(fmt, empty, 42, 255u, eraseLine.Get(), empty, empty, empty);
+            VERIFY_ARE_EQUAL(expected, cap.captured());
+        }
+
+        // VT disabled: all sequences replaced with empty string.
+        {
+            CaptureReporter cap{/*vtEnabled*/ false};
+            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+
+            const std::wstring_view empty;
+            const auto expected = std::format(fmt, empty, 42, 255u, empty, empty, empty, empty);
+            VERIFY_ARE_EQUAL(expected, cap.captured());
+        }
+    }
 };
 
 } // namespace WSLCCLIReporterUnitTests

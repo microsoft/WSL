@@ -81,40 +81,21 @@ struct CapturePipe
         // ReadPipeOverlapped=true so PartialHandleRead's InterruptableRead can be
         // interrupted by m_exitEvent during teardown if fclose hasn't run yet.
         auto [r, w] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
-        const int writeFd = _open_osfhandle(reinterpret_cast<intptr_t>(w.get()), _O_WRONLY | _O_TEXT);
-        THROW_HR_IF(E_FAIL, writeFd < 0);
-        w.release();
+        wil::unique_handle writeHandle{w.release()};
+        m_file = FileFromHandle(writeHandle, "w");
 
-        auto closeFd = wil::scope_exit([&] { _close(writeFd); });
-
-        WI_VERIFY(_setmode(writeFd, _O_U8TEXT) != -1);
-
-        m_file = _fdopen(writeFd, "w");
-        THROW_HR_IF(E_FAIL, m_file == nullptr);
-
-        closeFd.release();
+        const int fd = _fileno(m_file.get());
+        WI_VERIFY(_setmode(fd, _O_U8TEXT) != -1);
 
         // Disable CRT buffering so each fwprintf is a single write. Prevents
         // _O_U8TEXT from splitting VT escape sequences across buffer flushes.
-        setvbuf(m_file, nullptr, _IONBF, 0);
+        setvbuf(m_file.get(), nullptr, _IONBF, 0);
 
-        auto closeFile = wil::scope_exit([&] {
-            fclose(m_file);
-            m_file = nullptr;
-        });
-
+        // CapturePipe owns the read pipe; PartialHandleRead borrows it via .get().
+        // m_readPipe is declared before m_reader so destruction order tears the reader
+        // down first (joining its thread) and only then closes the handle it was reading.
         m_readPipe = std::move(r);
         m_reader = std::make_unique<PartialHandleRead>(m_readPipe.get());
-
-        closeFile.release();
-    }
-
-    ~CapturePipe()
-    {
-        if (m_file)
-        {
-            fclose(m_file);
-        }
     }
 
     NON_COPYABLE(CapturePipe);
@@ -122,16 +103,12 @@ struct CapturePipe
 
     FILE* file() const
     {
-        return m_file;
+        return m_file.get();
     }
 
     std::wstring captured()
     {
-        if (m_file)
-        {
-            fclose(m_file);
-            m_file = nullptr;
-        }
+        m_file.reset();
 
         m_reader->ExpectClosed();
         std::wstring result = wsl::shared::string::MultiByteToWide(m_reader->GetData());
@@ -148,7 +125,7 @@ struct CapturePipe
     }
 
 private:
-    FILE* m_file = nullptr;
+    wil::unique_file m_file;
     wil::unique_hfile m_readPipe;
     std::unique_ptr<PartialHandleRead> m_reader;
 };
