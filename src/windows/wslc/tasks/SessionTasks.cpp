@@ -29,13 +29,13 @@ namespace wsl::windows::wslc::task {
 
 void AttachToSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
+    std::wstring sessionName;
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        sessionId = context.Args.Get<ArgType::SessionId>();
+        sessionName = context.GlobalArgs.Get<ArgType::Session>();
     }
 
-    context.ExitCode = SessionService::Attach(sessionId);
+    context.ExitCode = SessionService::Attach(sessionName);
 }
 
 void CreateSession(CLIExecutionContext& context)
@@ -78,13 +78,13 @@ void ListSessions(CLIExecutionContext& context)
 
 void TerminateSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
+    std::wstring sessionName;
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        sessionId = context.Args.Get<ArgType::SessionId>();
+        sessionName = context.GlobalArgs.Get<ArgType::Session>();
     }
 
-    context.ExitCode = SessionService::TerminateSession(sessionId);
+    context.ExitCode = SessionService::TerminateSession(sessionName);
 }
 
 void RunInSession(CLIExecutionContext& context)

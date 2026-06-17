@@ -28,7 +28,6 @@ std::vector<Argument> NetworkPruneCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Filter, false, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

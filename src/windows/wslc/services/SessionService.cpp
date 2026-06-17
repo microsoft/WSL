@@ -45,8 +45,7 @@ namespace {
         HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
         if (FAILED(hr))
         {
-            THROW_HR_WITH_USER_ERROR_IF(
-                hr, Localization::MessageWslcSessionNotFound(sessionName.c_str()), hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            THROW_HR_WITH_USER_ERROR_IF(hr, Localization::MessageWslcSessionNotFound(sessionName.c_str()), hr == WSLC_E_SESSION_NOT_FOUND);
 
             THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcOpenSessionFailed(sessionName.c_str()));
         }
@@ -182,7 +181,14 @@ Session SessionService::OpenSession(const std::wstring& displayName)
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->OpenSessionByName(displayName.c_str(), &session));
+    HRESULT hr = sessionManager->OpenSessionByName(displayName.c_str(), &session);
+    if (FAILED(hr))
+    {
+        THROW_HR_WITH_USER_ERROR_IF(hr, Localization::MessageWslcSessionNotFound(displayName.c_str()), hr == WSLC_E_SESSION_NOT_FOUND);
+
+        THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcOpenSessionFailed(displayName.c_str()));
+    }
+
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -216,7 +222,7 @@ int SessionService::TerminateSession(const std::wstring& displayName)
     HRESULT hr = sessionManager->OpenSessionByName(displayName.empty() ? nullptr : displayName.c_str(), &session);
     if (FAILED(hr))
     {
-        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
+        if (hr == WSLC_E_SESSION_NOT_FOUND)
         {
             wslutil::PrintMessage(
                 displayName.empty() ? Localization::MessageWslcDefaultSessionNotFound()
