@@ -47,7 +47,7 @@ namespace {
         {
             THROW_HR_WITH_USER_ERROR_IF(hr, Localization::MessageWslcSessionNotFound(sessionName.c_str()), hr == WSLC_E_SESSION_NOT_FOUND);
 
-            THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcOpenSessionFailed(sessionName.c_str()));
+            THROW_IF_FAILED(hr);
         }
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
@@ -186,7 +186,7 @@ Session SessionService::OpenSession(const std::wstring& displayName)
     {
         THROW_HR_WITH_USER_ERROR_IF(hr, Localization::MessageWslcSessionNotFound(displayName.c_str()), hr == WSLC_E_SESSION_NOT_FOUND);
 
-        THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcOpenSessionFailed(displayName.c_str()));
+        THROW_IF_FAILED(hr);
     }
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());

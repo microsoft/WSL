@@ -145,11 +145,13 @@ class WSLCE2EGlobalTests
         auto nonAdminName = GetExpectedDefaultSessionName(false);
         auto adminName = GetExpectedDefaultSessionName(true);
         auto result = RunWslc(std::format(L"--session \"{}\" container list", nonAdminName), ElevationType::Elevated);
-        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", nonAdminName), .ExitCode = 1});
 
         // Ensure non-elevated cannot create the elevated session.
         result = RunWslc(std::format(L"--session \"{}\" container list", adminName), ElevationType::NonElevated);
-        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", adminName), .ExitCode = 1});
     }
 
     // Regression test for session name squatting vulnerability.
@@ -379,7 +381,7 @@ class WSLCE2EGlobalTests
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");
-        result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = L"Session not found: 'INVALID_SESSION_NAME'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
 
         // Verify session list
         result = RunWslc(L"system session list");
@@ -506,7 +508,7 @@ class WSLCE2EGlobalTests
 
         {
             auto result = RunWslc(L"--session not-found system session run echo OK");
-            result.Verify({.Stdout = L"", .Stderr = L"Session not found: 'not-found'\r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Session not found: 'not-found'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
         }
 
         {
