@@ -1720,6 +1720,16 @@ try
         {
             // During the preview period, the package may not be published yet, so fall back to getting it from GH.
             // When moving to GA, change this to a hard error to indicate a service configuration issue.
+            if (callback)
+            {
+                callback(0);
+            }
+            auto scope = wil::scope_exit([&]() {
+                if (callback)
+                {
+                    callback(100);
+                };
+            });
             wsl::windows::common::install::UpdatePackage(true, false, false);
         }
     }
