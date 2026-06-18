@@ -291,7 +291,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"resource-limit-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"resource-limit-ok\"]\n");
 
         // Build with --shm-size and --ulimit to verify they are accepted and piped through.
         auto buildResult = RunWslc(std::format(
