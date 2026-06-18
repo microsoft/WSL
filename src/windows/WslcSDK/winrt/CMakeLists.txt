@@ -16,6 +16,7 @@ set(SOURCES
     PushImageOptions.cpp
     ServiceVersion.cpp
     Session.cpp
+    SessionCrashDumpInformation.cpp
     SessionSettings.cpp
     Streams.cpp
     TagImageOptions.cpp
@@ -39,6 +40,7 @@ set(HEADERS
     PushImageOptions.h
     ServiceVersion.h
     Session.h
+    SessionCrashDumpInformation.h
     SessionSettings.h
     Streams.h
     TagImageOptions.h

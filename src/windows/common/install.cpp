@@ -77,9 +77,9 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
-int UpdatePackageImpl(bool preRelease, bool repair)
+int UpdatePackageImpl(bool preRelease, bool repair, bool CallerOwnsProcess)
 {
-    if (!repair)
+    if (!repair && CallerOwnsProcess)
     {
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
@@ -88,11 +88,17 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
-        PrintMessage(Localization::MessageUpdateNotNeeded());
+        if (CallerOwnsProcess)
+        {
+            PrintMessage(Localization::MessageUpdateNotNeeded());
+        }
         return 0;
     }
 
-    PrintMessage(Localization::MessageUpdatingToVersion(version.c_str()));
+    if (CallerOwnsProcess)
+    {
+        PrintMessage(Localization::MessageUpdatingToVersion(version.c_str()));
+    }
 
     const bool msiInstall = wsl::shared::string::EndsWith<wchar_t>(release.name, L".msi");
     const auto downloadPath = DownloadFile(release.url, release.name);
@@ -106,7 +112,10 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
-            PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+            if (CallerOwnsProcess)
+            {
+                PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+            }
         }
         else if (exitCode != 0)
         {
@@ -131,7 +140,7 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
         THROW_IF_FAILED(result.get().ExtendedErrorCode());
 
-        // Note: If the installation is successful, this process is expected to receive and Ctrl-C and exit
+        // Note: If the installation is successful, this process is expected to receive a Ctrl-C and exit
     }
 
     return 0;
@@ -333,24 +342,29 @@ void wsl::windows::common::install::MsiMessageCallback(INSTALLMESSAGE type, LPCW
     }
 }
 
-int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair)
+int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, bool CallerOwnsProcess)
 {
-    // Register a console control handler so "^C" is not printed when the app platform terminates the process.
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(
-        [](DWORD ctrlType) {
-            if (ctrlType == CTRL_C_EVENT)
-            {
-                ExitProcess(0);
-            }
-            return FALSE;
-        },
-        TRUE));
+    bool clearHandler = false;
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { if (clearHandler) SetConsoleCtrlHandler(nullptr, FALSE); });
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { SetConsoleCtrlHandler(nullptr, FALSE); });
+    if (CallerOwnsProcess)
+    {
+        // Register a console control handler so "^C" is not printed when the app platform terminates the process.
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(
+            [](DWORD ctrlType) {
+                if (ctrlType == CTRL_C_EVENT)
+                {
+                    ExitProcess(0);
+                }
+                return FALSE;
+            },
+            TRUE));
+        clearHandler = true;
+    }
 
     try
     {
-        return UpdatePackageImpl(PreRelease, Repair);
+        return UpdatePackageImpl(PreRelease, Repair, CallerOwnsProcess);
     }
     catch (...)
     {

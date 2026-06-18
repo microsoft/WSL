@@ -939,6 +939,7 @@ interface IWSLCSessionManager : IUnknown
     HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }
 
+// Ensure wslcsdk.h and wslcsdk.idl are also updated.
 cpp_quote("#define WSLC_E_BASE (0x0600)")
 cpp_quote("#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2) /* 0x80040602 */")
