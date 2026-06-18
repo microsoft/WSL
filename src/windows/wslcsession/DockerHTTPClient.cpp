@@ -797,6 +797,9 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
     // Parse the response header
     constexpr auto bufferSize = 16 * 1024;
+    // Docker response header max size.
+    constexpr size_t maxHeaderSize = 64 * 1024;
+    constexpr DWORD headerReceiveTimeoutMs = 30 * 1000;
     size_t Offset = 0;
     std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
@@ -807,16 +810,20 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
     // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_BUFFER_OVERFLOW), Offset >= maxHeaderSize, "HTTP response header exceeded %zu bytes", maxHeaderSize);
+
         buffer.resize(Offset + bufferSize);
 
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK, headerReceiveTimeoutMs);
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
+        // Scan only the newly peeked bytes [Offset, Offset + bytesRead)
         size_t i{};
-        for (i = 0; i < bytesRead + Offset && lineFeeds < 2; i++)
+        for (i = Offset; i < bytesRead + Offset && lineFeeds < 2; i++)
         {
             if (buffer[i] == '\n')
             {
@@ -828,10 +835,14 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
             }
         }
 
-        // Consume the buffer from the socket.
+        WI_ASSERT(i >= Offset);
+        const size_t toConsume = i - Offset;
+
+        // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), i - Offset), m_exitingEvent);
-        WI_ASSERT(bytesRead == i - Offset);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0, headerReceiveTimeoutMs);
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);
 
         Offset += bytesRead;
         buffer.resize(Offset);
