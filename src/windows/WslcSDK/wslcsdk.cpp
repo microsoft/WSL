@@ -1724,13 +1724,11 @@ try
             {
                 callback(0);
             }
-            auto scope = wil::scope_exit([&]() {
-                if (callback)
-                {
-                    callback(100);
-                };
-            });
             wsl::windows::common::install::UpdatePackage(true, false, false);
+            if (callback)
+            {
+                callback(100);
+            };
         }
     }
 
