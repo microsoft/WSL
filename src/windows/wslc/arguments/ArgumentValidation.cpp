@@ -249,9 +249,36 @@ static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
         normalized += "+00:00";
     }
 
-    // Parse into millisecond precision so fractional seconds (e.g. ".123456789") are consumed
+    // Reject bare dot with no fractional digits (e.g. "10:30:00.+00:00") since
+    // std::chrono::parse is lenient about this.
+    auto dotPos = normalized.find('.');
+    if (dotPos != std::string::npos && (dotPos + 1 >= normalized.size() || !std::isdigit(normalized[dotPos + 1])))
+    {
+        return std::nullopt;
+    }
+
+    // Pre-validate day-of-month since std::chrono::parse silently wraps invalid dates (e.g. Feb 31 → Mar 2).
+    if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
+    {
+        int year = 0, month = 0, day = 0;
+        auto yResult = std::from_chars(normalized.data(), normalized.data() + 4, year);
+        auto mResult = std::from_chars(normalized.data() + 5, normalized.data() + 7, month);
+        auto dResult = std::from_chars(normalized.data() + 8, normalized.data() + 10, day);
+
+        if (yResult.ec == std::errc() && mResult.ec == std::errc() && dResult.ec == std::errc())
+        {
+            auto ymd = std::chrono::year{year} / std::chrono::month{static_cast<unsigned>(month)} /
+                       std::chrono::day{static_cast<unsigned>(day)};
+            if (!ymd.ok())
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    // Parse into nanosecond precision so fractional seconds (e.g. ".123456789") are consumed
     // by std::chrono::parse rather than requiring manual stripping.
-    std::chrono::sys_time<std::chrono::milliseconds> utcTime;
+    std::chrono::sys_time<std::chrono::nanoseconds> utcTime;
     std::istringstream stream(normalized);
     stream >> std::chrono::parse("%FT%T%Ez", utcTime);
     if (stream.fail())
