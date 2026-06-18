@@ -586,7 +586,9 @@ try
     }
     else
     {
-        std::wstring options = ReadOnly ? L"ro" : L"";
+        // N.B. The 'metadata' option is required so the virtiofs device host persists per-file
+        //      uid/gid in NTFS extended attributes. Without it, all files appear as root-owned.
+        std::wstring options = ReadOnly ? L"ro;metadata" : L"metadata";
         if (!m_swiotlbOption.empty())
         {
             if (!options.empty())
