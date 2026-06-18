@@ -3663,6 +3663,18 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
     return S_OK;
 }
 
+bool LxssUserSessionImpl::TryInvokeUnderInstanceLock(std::chrono::milliseconds Timeout, const std::function<HRESULT()>& Work, _Out_ HRESULT& Result)
+{
+    std::unique_lock<std::recursive_timed_mutex> lock(m_instanceLock, std::defer_lock);
+    if (!lock.try_lock_for(Timeout))
+    {
+        return false;
+    }
+
+    Result = Work();
+    return true;
+}
+
 HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket)
 {
     std::lock_guard lock(m_instanceLock);
