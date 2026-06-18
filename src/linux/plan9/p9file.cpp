@@ -144,8 +144,10 @@ bool File::IsOnRoot(const std::shared_ptr<const IRoot>& root)
     return m_Root == root;
 }
 
-// Returns the fd that pins this fid's inode (O_PATH fd from Walk/Create, or
-// the share RootFd for the root fid). Caller must hold m_Lock.
+// Returns the fd that pins this fid's inode (installed by Walk/Create, or the
+// share RootFd for the root fid). Callers must hold m_Lock once the fid is
+// published; Walk() may call this before publication, while it still has
+// exclusive access to the fid.
 int File::PathFd() const noexcept
 {
     return m_PathFd ? m_PathFd.get() : m_Root->RootFd;
@@ -282,13 +284,15 @@ Expected<Qid> File::Walk(std::string_view name)
 // Reads the attributes of a file or directory.
 Expected<std::tuple<UINT64, Qid, StatResult>> File::GetAttr(UINT64 mask)
 {
-    util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
     struct stat stat;
     Qid qid;
     {
         // Hold the lock so the path fd cannot change underneath us.
         std::shared_lock<std::shared_mutex> lock{m_Lock};
         qid = m_Qid;
+
+        // Override the thread's uid/gid only for the stat call itself.
+        util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
         int error = fstatat(PathFd(), "", &stat, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH);
         if (error < 0)
         {
