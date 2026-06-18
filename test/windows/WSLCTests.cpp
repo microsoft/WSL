@@ -5093,6 +5093,29 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkCreateDefaultDriverTest)
+    {
+        const std::string networkName = "default-driver-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
+    }
+
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
     {
         WSLCNetworkOptions options{};
