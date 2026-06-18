@@ -309,7 +309,21 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ProcessCrashedEvent)
     {
-        // Positive: A crashing process must fire the ProcessCrashed event with correctly populated info.
+        // Start a long-running container so we can exec non-PID-1 processes into it.
+        // The crashing process must NOT be the container's init process: Linux silently
+        // drops kill()-sent signals with default disposition when targeting PID 1 in a
+        // PID namespace, so no core dump would be generated if we crash the init process.
+        auto initProcSettings = WSLCSDK::ProcessSettings();
+        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(initProcSettings);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+        container.Start();
+
+        // Positive: A crashing exec process must fire the ProcessCrashed event with correctly populated info.
         {
             std::promise<WSLCSDK::SessionCrashDumpInformation> promise;
 
@@ -324,17 +338,11 @@ class WslcSdkWinRtTests
                 }
             });
 
-            auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
-
-            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.InitProcess(procSettings);
-
-            auto container = m_defaultSession.CreateContainer(containerSettings);
-            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            auto execSettings = WSLCSDK::ProcessSettings();
+            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             const auto beforeCrash = winrt::clock::now();
-            container.Start();
+            StartProcessAndWaitForExit(container.CreateProcess(execSettings), 30s);
 
             auto future = promise.get_future();
             VERIFY_ARE_EQUAL(future.wait_for(60s), std::future_status::ready);
@@ -347,8 +355,10 @@ class WslcSdkWinRtTests
             VERIFY_IS_TRUE(std::wstring_view(info.ProcessName()).find(L"sh") != std::wstring_view::npos);
             VERIFY_IS_GREATER_THAN(info.Pid(), 0ull);
             VERIFY_ARE_EQUAL(info.Signal(), 11u); // SIGSEGV = 11
-            VERIFY_IS_TRUE(info.Timestamp() >= beforeCrash);
-            VERIFY_IS_TRUE(info.Timestamp() <= afterCrash);
+
+            // Crash timestamps are second-granularity; allow some slack around the measured window.
+            VERIFY_IS_TRUE(info.Timestamp() >= beforeCrash - 1s);
+            VERIFY_IS_TRUE(info.Timestamp() <= afterCrash + 1s);
         }
 
         // Negative: After revoking the subscription token, the handler must no longer fire.
@@ -360,16 +370,10 @@ class WslcSdkWinRtTests
                 // revoker goes out of scope here — handler is unsubscribed before any crash is triggered.
             }
 
-            auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            auto execSettings = WSLCSDK::ProcessSettings();
+            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
-            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.InitProcess(procSettings);
-
-            auto container = m_defaultSession.CreateContainer(containerSettings);
-            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
-
-            StartContainerAndWaitForInitProcessExit(container, 60s);
+            StartProcessAndWaitForExit(container.CreateProcess(execSettings), 60s);
 
             // Allow the event system time to dispatch any pending callbacks.
             Sleep(1000);
