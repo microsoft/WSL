@@ -1674,7 +1674,8 @@ try
     // Installing these components requires elevation.
     RETURN_HR_IF(
         HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        !wsl::windows::common::security::IsTokenElevated(GetCurrentThreadEffectiveToken()) && !wsl::windows::common::security::IsTokenLocalSystem(nullptr));
+        !wsl::windows::common::security::IsTokenElevated(GetCurrentThreadEffectiveToken()) &&
+            !wsl::windows::common::security::IsTokenLocalSystem(nullptr));
 
     if (needsVirtualMachine)
     {

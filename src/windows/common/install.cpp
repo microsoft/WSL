@@ -345,7 +345,12 @@ void wsl::windows::common::install::MsiMessageCallback(INSTALLMESSAGE type, LPCW
 int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, bool CallerOwnsProcess)
 {
     bool clearHandler = false;
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { if (clearHandler) SetConsoleCtrlHandler(nullptr, FALSE); });
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (clearHandler)
+        {
+            SetConsoleCtrlHandler(nullptr, FALSE);
+        }
+    });
 
     if (CallerOwnsProcess)
     {
