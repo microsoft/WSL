@@ -221,7 +221,7 @@
                 </RegistryKey>
 
                 <!-- WslDeviceHost_VirtioNet -->
-                <RegistryKey Root="HKCR" Key="CLSID\{16479D2E-F0C3-4DBA-BF7A-04FFF0892B07}">
+                <RegistryKey Root="HKCR" Key="CLSID\{9E0D1898-CA63-424E-8D49-9D6067A36BCE}">
                     <RegistryValue Value="WslDeviceHost_Net" Type="string" />
                     <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string" />
 
