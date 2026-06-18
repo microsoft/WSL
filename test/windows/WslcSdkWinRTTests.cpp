@@ -169,7 +169,7 @@ class WslcSdkWinRtTests
     // Extracts the underlying IWSLCSession COM object from the WinRT session projection.
     IWSLCSession& DefaultComSession()
     {
-        return *reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session;
+        return *reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.

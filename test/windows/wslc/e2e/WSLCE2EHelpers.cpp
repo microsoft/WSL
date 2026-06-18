@@ -512,6 +512,14 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
     VERIFY_IS_TRUE(file.good());
 }
 
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    THROW_HR_IF_MSG(E_FAIL, !file.is_open(), "Failed to open %ls for writing", filePath.c_str());
+    file << content;
+    THROW_HR_IF_MSG(E_FAIL, !file.good(), "Failed to write to %ls", filePath.c_str());
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
     return std::format(L"python3 -u -m http.server {}", port);

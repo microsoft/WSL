@@ -356,10 +356,10 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
-        auto process = launcher.Launch(comSession);
+        auto process = launcher.Launch(*comSession);
         auto result = process.WaitAndCaptureOutput();
         VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
 
@@ -2215,7 +2215,7 @@ class WslcSdkTests
     // Extracts the underlying IWSLCSession COM object from the SDK session handle.
     IWSLCSession& DefaultComSession()
     {
-        return *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
+        return *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.

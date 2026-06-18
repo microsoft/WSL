@@ -15,8 +15,10 @@ Abstract:
 #include "precomp.h"
 #include "WSLCProcess.h"
 #include "WSLCVirtualMachine.h"
+#include "APICompat.h"
 
 using wsl::windows::service::wslc::WSLCProcess;
+namespace apicompat = wsl::windows::common::apicompat;
 
 WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags) :
     m_control(std::move(Control)), m_io(std::move(Io)), m_flags(Flags)
@@ -120,6 +122,19 @@ HRESULT WSLCProcess::ResizeTty(ULONG Rows, ULONG Columns)
 try
 {
     m_control->ResizeTty(Rows, Columns);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCCompatHandle* Handle)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Handle);
+
+    WSLCHandle handle{};
+    RETURN_IF_FAILED(GetStdHandle(Fd, &handle));
+
+    *Handle = apicompat::Convert(handle);
     return S_OK;
 }
 CATCH_RETURN();
