@@ -55,7 +55,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Remove),
-        // Argument::Create(ArgType::Scheme),
+        Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
         Argument::Create(ArgType::TMPFS, false, NO_LIMIT),

@@ -273,6 +273,7 @@ private:
         options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
                 << L"  -p,--password     " << Localization::WSLCCLI_LoginPasswordArgDescription() << L"\r\n"
                 << L"  --password-stdin  " << Localization::WSLCCLI_LoginPasswordStdinArgDescription() << L"\r\n"
+                << L"  --scheme          " << Localization::WSLCCLI_SchemeArgDescription() << L"\r\n"
                 << L"  -u,--username     " << Localization::WSLCCLI_LoginUsernameArgDescription() << L"\r\n"
                 << L"  -?,--help         " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
                 << L"\r\n";

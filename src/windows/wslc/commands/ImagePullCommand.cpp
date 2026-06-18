@@ -28,7 +28,7 @@ std::vector<Argument> ImagePullCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        // Argument::Create(ArgType::Scheme),
+        Argument::Create(ArgType::Scheme),
         // Argument::Create(ArgType::Progress),
     };
 }

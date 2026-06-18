@@ -151,6 +151,16 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::ValidateGpus({L"0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L"gpu0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L""}, L"gpusArg"), ArgumentException);
+
+        // Verify scheme validation
+        VERIFY_NO_THROW(validation::ValidateScheme({L"http"}, L"schemeArg"));
+        VERIFY_NO_THROW(validation::ValidateScheme({L"https"}, L"schemeArg"));
+        VERIFY_NO_THROW(validation::ValidateScheme({L"auto"}, L"schemeArg"));
+        VERIFY_NO_THROW(validation::ValidateScheme({L"HTTP"}, L"schemeArg")); // Case-insensitive
+        VERIFY_NO_THROW(validation::ValidateScheme({L"Auto"}, L"schemeArg"));
+        VERIFY_THROWS(validation::ValidateScheme({L"ftp"}, L"schemeArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateScheme({L""}, L"schemeArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateScheme({L"h2c"}, L"schemeArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.

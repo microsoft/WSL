@@ -43,7 +43,13 @@ void Login(CLIExecutionContext& context)
         serverAddress = WideToMultiByte(context.Args.Get<ArgType::Server>());
     }
 
-    auto [credUsername, credSecret] = RegistryService::Authenticate(session, serverAddress, username, password);
+    std::string scheme;
+    if (context.Args.Contains(ArgType::Scheme))
+    {
+        scheme = WideToMultiByte(context.Args.Get<ArgType::Scheme>());
+    }
+
+    auto [credUsername, credSecret] = RegistryService::Authenticate(session, serverAddress, username, password, scheme.c_str());
     RegistryService::Store(serverAddress, credUsername, credSecret);
 
     PrintMessage(Localization::WSLCCLI_LoginSucceeded());

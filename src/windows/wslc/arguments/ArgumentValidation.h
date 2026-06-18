@@ -80,6 +80,7 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
+void ValidateScheme(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value);
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value);

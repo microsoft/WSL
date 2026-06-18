@@ -23,6 +23,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
 #include <list>
+#include <map>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -105,6 +106,7 @@ public:
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ LPCSTR Scheme,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -123,10 +125,11 @@ public:
     IFACEMETHOD(PushImage)(
         _In_ LPCSTR Image,
         _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ LPCSTR Scheme,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
+    IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _In_opt_ LPCSTR Scheme, _Out_ LPSTR* IdentityToken) override;
     IFACEMETHOD(PruneImages)(
         _In_opt_ const WSLCFilter* Filters,
         _In_ ULONG FiltersCount,
@@ -250,6 +253,10 @@ private:
     void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
+
+    using ScopeGuard = decltype(wil::scope_exit(std::function<void()>{}));
+    [[nodiscard]] ScopeGuard ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme);
+    void ApplyInsecureRegistries();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
@@ -289,6 +296,7 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
+    std::map<std::string, int> m_insecureRegistries;
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 

@@ -137,6 +137,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
     }
 
+    case ArgType::Scheme:
+        validation::ValidateScheme(execArgs.GetAll<ArgType::Scheme>(), m_name);
+        break;
+
     default:
         break;
     }
@@ -428,6 +432,17 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     }
 
     return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+}
+
+void ValidateScheme(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        if (!IsEqual(value, L"http", true) && !IsEqual(value, L"https", true) && !IsEqual(value, L"auto", true))
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidSchemeError(argName, value));
+        }
+    }
 }
 
 } // namespace wsl::windows::wslc::validation

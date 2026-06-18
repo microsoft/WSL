@@ -94,6 +94,7 @@ std::vector<Argument> RegistryLoginCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Password),
         Argument::Create(ArgType::PasswordStdin),
+        Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Username),
         Argument::Create(ArgType::Server),
     };

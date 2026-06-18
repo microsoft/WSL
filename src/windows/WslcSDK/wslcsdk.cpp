@@ -1390,7 +1390,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, nullptr, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1518,7 +1518,7 @@ try
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
+        internalType->session->PushImage(options->image, options->registryAuth, nullptr, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1542,7 +1542,7 @@ try
     *identityToken = nullptr;
 
     wil::unique_cotaskmem_ansistring token;
-    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, nullptr, &token));
     if (SUCCEEDED(hr))
     {
         *identityToken = token.release();

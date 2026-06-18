@@ -263,12 +263,12 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
-void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, LPCSTR scheme, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), scheme, callback, warningCallback.Get()));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -295,12 +295,12 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, LPCSTR scheme, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), scheme, callback, warningCallback.Get()));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)

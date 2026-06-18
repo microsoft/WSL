@@ -494,7 +494,7 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 }
 
 std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir, bool useBridge)
 {
     // Check if the registry image is already loaded on this session.
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -509,6 +509,7 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
     }
 
     const bool useTls = !tlsCertDir.empty();
+    const bool needsBridge = useTls || useBridge;
 
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 
@@ -524,16 +525,16 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
         env.push_back("REGISTRY_HTTP_TLS_KEY=/certs/server.key");
     }
 
-    // TLS needs a non-loopback address for real verification, so use bridge networking and reach the
+    // TLS and useBridge need a non-loopback address, so use bridge networking and reach the
     // container by its bridge IP. Plain HTTP uses host networking with a published loopback port.
-    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, useTls ? "bridge" : "host");
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, needsBridge ? "bridge" : "host");
     launcher.SetEntrypoint({"/entrypoint.sh"});
 
     if (useTls)
     {
         launcher.AddVolume(tlsCertDir, "/certs", true);
     }
-    else
+    else if (!needsBridge)
     {
         launcher.AddPort(port, port, AF_INET);
     }
@@ -544,7 +545,7 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
     auto initProcess = container.GetInitProcess();
     WaitForOutput(initProcess.GetStdHandle(2), std::format("listening on [::]:{}", port));
 
-    if (useTls)
+    if (needsBridge)
     {
         auto inspect = container.Inspect();
         THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());

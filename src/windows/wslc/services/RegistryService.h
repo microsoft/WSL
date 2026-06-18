@@ -28,7 +28,7 @@ public:
     static void Erase(const std::string& serverAddress);
     static std::vector<std::wstring> List();
     static std::pair<std::string, std::string> Authenticate(
-        wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password);
+        wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password, LPCSTR scheme);
 
     // Default registry server address used when no explicit server is provided.
     static constexpr auto DefaultServer = "https://index.docker.io/v1/";

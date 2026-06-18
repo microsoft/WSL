@@ -2983,7 +2983,12 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
-    <value>Use this scheme for registry connection</value>
+    <value>Transport scheme for registry connection [http|https|auto]</value>
+    <comment>{Locked="http"}{Locked="https"}{Locked="auto"}{Locked="--scheme"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidSchemeError" xml:space="preserve">
+    <value>Invalid {} value: '{}'. Supported values are: http, https, auto.</value>
+    <comment>{Locked="http"}{Locked="https"}{Locked="auto"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Mount tmpfs to the container at the given path</value>

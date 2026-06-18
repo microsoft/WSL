@@ -212,7 +212,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
             ImageProgressCallback callback;
             PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
-            imageService.Pull(session, image, &callback);
+            imageService.Pull(session, image, "", &callback);
         }
         return containerLauncher.Create(*session.Get(), warningCallback);
     }

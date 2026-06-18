@@ -702,7 +702,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
 
             auto emptyAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
-            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr, nullptr));
+            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr, nullptr, nullptr));
 
             // Delete the local tagged copy so PullImage actually downloads it.
             WSLCDeleteImageOptions deleteOpts{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
@@ -710,7 +710,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
             // Pull the image back — this should trigger the ImageCreated plugin callback.
-            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr, nullptr));
         }
 
         constexpr auto ExpectedOutput =

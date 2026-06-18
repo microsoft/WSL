@@ -192,7 +192,8 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
     const std::string& username = "",
     const std::string& password = "",
     USHORT port = 5000,
-    const std::wstring& tlsCertDir = L"");
+    const std::wstring& tlsCertDir = L"",
+    bool useBridge = false);
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);

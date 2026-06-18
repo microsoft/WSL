@@ -182,8 +182,14 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
+    std::string scheme;
+    if (context.Args.Contains(ArgType::Scheme))
+    {
+        scheme = WideToMultiByte(context.Args.Get<ArgType::Scheme>());
+    }
+
     ImageProgressCallback callback;
-    services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Pull(session, WideToMultiByte(imageId), scheme.c_str(), &callback);
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -193,8 +199,14 @@ void PushImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
+    std::string scheme;
+    if (context.Args.Contains(ArgType::Scheme))
+    {
+        scheme = WideToMultiByte(context.Args.Get<ArgType::Scheme>());
+    }
+
     ImageProgressCallback callback;
-    services::ImageService::Push(session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Push(session, WideToMultiByte(imageId), scheme.c_str(), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)

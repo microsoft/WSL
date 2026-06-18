@@ -601,6 +601,73 @@ void WSLCSession::StartDockerd()
     WSL_LOG("DockerdStarted");
 }
 
+[[nodiscard]] WSLCSession::ScopeGuard WSLCSession::ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme)
+{
+    if (scheme == nullptr || strcmp(scheme, "http") != 0)
+    {
+        return wil::scope_exit(std::function<void()>{[] {}});
+    }
+
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(registry);
+    m_insecureRegistries[server]++;
+
+    WSL_LOG("ConfigureInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
+    ApplyInsecureRegistries();
+
+    return wil::scope_exit(std::function<void()>{[this, server = std::move(server)]
+    {
+        auto it = m_insecureRegistries.find(server);
+        if (it != m_insecureRegistries.end())
+        {
+            if (--it->second == 0)
+            {
+                m_insecureRegistries.erase(it);
+            }
+
+            WSL_LOG("RemoveInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
+            try
+            {
+                ApplyInsecureRegistries();
+            }
+            CATCH_LOG();
+        }
+    }});
+}
+
+void WSLCSession::ApplyInsecureRegistries()
+{
+    std::string registriesJson;
+    for (const auto& [reg, count] : m_insecureRegistries)
+    {
+        if (!registriesJson.empty())
+        {
+            registriesJson += ", ";
+        }
+
+        registriesJson += std::format("\"{}\"", reg);
+    }
+
+    auto daemonJson = std::format(R"({{"insecure-registries": [{}]}})", registriesJson);
+
+    constexpr auto c_daemonJsonPath = "/etc/docker/daemon.json";
+    auto script = std::format("mkdir -p /etc/docker && cat > '{}'", c_daemonJsonPath);
+
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    std::unique_ptr<OverlappedIOHandle> writeStdin(
+        new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{daemonJson.begin(), daemonJson.end()}));
+    std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+    extraHandles.emplace_back(std::move(writeStdin));
+
+    const auto result = process.WaitAndCaptureOutput(10000UL, std::move(extraHandles));
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Failed to write daemon.json: %hs", launcher.FormatResult(result).c_str());
+
+    // Signal dockerd to reload configuration.
+    WI_ASSERT(m_dockerdProcess.has_value());
+    THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP));
+}
+
 void WSLCSession::InstallTrustedRootCertificates()
 try
 {
@@ -767,7 +834,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, LPCSTR Scheme, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -776,6 +843,8 @@ try
 
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     EnforceRegistryAllowlist(repo);
+
+    auto insecureGuard = ConfigureInsecureRegistry(repo, Scheme);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -1605,7 +1674,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, LPCSTR Scheme, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -1615,6 +1684,8 @@ try
 
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     EnforceRegistryAllowlist(repo);
+
+    auto insecureGuard = ConfigureInsecureRegistry(repo, Scheme);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -1673,7 +1744,7 @@ std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
     return wsl::shared::ToJson(wslcInspect);
 }
 
-HRESULT WSLCSession::Authenticate(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken)
+HRESULT WSLCSession::Authenticate(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _In_ LPCSTR Scheme, _Out_ LPSTR* IdentityToken)
 try
 {
     WSLCExecutionContext context(this);
@@ -1684,6 +1755,8 @@ try
     RETURN_HR_IF_NULL(E_POINTER, IdentityToken);
 
     *IdentityToken = nullptr;
+
+    auto insecureGuard = ConfigureInsecureRegistry(ServerAddress, Scheme);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());

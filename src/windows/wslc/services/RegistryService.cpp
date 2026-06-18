@@ -88,10 +88,10 @@ std::vector<std::wstring> RegistryService::List()
 }
 
 std::pair<std::string, std::string> RegistryService::Authenticate(
-    wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password)
+    wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password, LPCSTR scheme)
 {
     wil::unique_cotaskmem_ansistring identityToken;
-    THROW_IF_FAILED(session.Get()->Authenticate(serverAddress.c_str(), username.c_str(), password.c_str(), &identityToken));
+    THROW_IF_FAILED(session.Get()->Authenticate(serverAddress.c_str(), username.c_str(), password.c_str(), scheme, &identityToken));
 
     // If the registry returned an identity token, use it. Otherwise fall back to username/password.
     if (identityToken && strlen(identityToken.get()) > 0)
