@@ -895,7 +895,16 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
             ULONG index;
             WI_VERIFY(_BitScanForward(&index, fixedDrives) != FALSE);
             const wchar_t fixedDrivePath[] = {gsl::narrow_cast<wchar_t>(L'A' + index), L':', L'\\', L'\0'};
-            AddVirtioFsShare(Admin, fixedDrivePath, TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS), UserToken);
+            try
+            {
+                AddVirtioFsShare(Admin, fixedDrivePath, TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS), UserToken);
+            }
+            catch (...)
+            {
+                const auto result = wil::ResultFromCaughtException();
+                WSL_LOG(
+                    "AddVirtioFsShareError", TraceLoggingValue(fixedDrivePath, "DrivePath"), TraceLoggingValue(result, "result"));
+            }
             fixedDrives ^= (1 << index);
         }
     }
