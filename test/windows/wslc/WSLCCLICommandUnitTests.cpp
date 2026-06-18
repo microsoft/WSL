@@ -24,6 +24,7 @@ Abstract:
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
+#include "EnvironmentOptions.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -187,6 +188,53 @@ class WSLCCLICommandUnitTests
         }
 
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
+    }
+
+    // RootCommand exposes Session as the sole CLI global option. The override
+    // is the entry point for future globals; the test pins the current shape.
+    TEST_METHOD(RootCommand_GlobalArguments_OnlySession)
+    {
+        auto root = RootCommand();
+        auto globals = root.GetGlobalArguments();
+
+        VERIFY_ARE_EQUAL(1u, globals.size());
+        VERIFY_ARE_EQUAL(ArgType::Session, globals[0].Type());
+        VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
+    }
+
+    // RootCommand exposes NoColor as the sole env-eligible global option.
+    TEST_METHOD(RootCommand_EnvArguments_OnlyNoColor)
+    {
+        auto root = RootCommand();
+        auto envArgs = root.GetEnvArguments();
+
+        VERIFY_ARE_EQUAL(1u, envArgs.size());
+        VERIFY_ARE_EQUAL(ArgType::NoColor, envArgs[0].Type());
+        VERIFY_ARE_EQUAL(Kind::Flag, envArgs[0].Kind());
+    }
+
+    // Every ArgType advertised by GetEnvArguments() must have at least one entry
+    // in c_envBindings; otherwise ApplyEnvironmentOptions() has nothing to apply
+    // and help output would lie about env support.
+    TEST_METHOD(RootCommand_EnvArguments_AllHaveBindings)
+    {
+        auto root = RootCommand();
+        auto envArgs = root.GetEnvArguments();
+
+        for (const auto& a : envArgs)
+        {
+            bool found = false;
+            for (const auto& b : c_envBindings)
+            {
+                if (b.Type == a.Type())
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
+        }
     }
 
     // Walk every command in the root tree and verify no argument collisions.

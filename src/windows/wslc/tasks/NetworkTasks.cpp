@@ -191,4 +191,23 @@ void ListNetworks(CLIExecutionContext& context)
         THROW_HR(E_UNEXPECTED);
     }
 }
+
+void PruneNetworks(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    std::vector<std::pair<std::string, std::string>> filters;
+    for (const auto& value : context.Args.GetAll<ArgType::Filter>())
+    {
+        filters.push_back(validation::ParseFilter(value));
+    }
+
+    auto result = NetworkService::Prune(session, filters);
+
+    for (const auto& networkName : result.PrunedNetworks)
+    {
+        PrintMessage(Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
+    }
+}
 } // namespace wsl::windows::wslc::task

@@ -1,7 +1,6 @@
 set(SOURCES
     IOCallback.cpp
     ProgressCallback.cpp
-    TerminationCallback.cpp
     CrashDumpCallback.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
@@ -10,7 +9,6 @@ set(HEADERS
     Defaults.h
     IOCallback.h
     ProgressCallback.h
-    TerminationCallback.h
     CrashDumpCallback.h
     wslcsdk.h
     WslcsdkPrivate.h

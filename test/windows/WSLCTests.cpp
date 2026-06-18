@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslc.h"
+#include "wslccompat.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
@@ -235,23 +236,23 @@ class WSLCTests
 
     WSLC_TEST_METHOD(IsClientVersionSupported)
     {
-        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        wil::com_ptr<IWSLCCompatSessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
         BOOL isSupported = FALSE;
 
         // The current version should always be supported.
-        const WSLCVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        const WSLCCompatVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&currentVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
 
         // A very old version should not be supported.
-        const WSLCVersion oldVersion{1, 0, 0};
+        const WSLCCompatVersion oldVersion{1, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&oldVersion, &isSupported));
         VERIFY_IS_FALSE(isSupported);
 
         // A very high version should be supported.
-        const WSLCVersion futureVersion{99, 0, 0};
+        const WSLCCompatVersion futureVersion{99, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&futureVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
     }
@@ -2928,46 +2929,26 @@ class WSLCTests
         }
     }
 
-    WSLC_TEST_METHOD(TerminationCallback)
+    WSLC_TEST_METHOD(TerminationEvent)
     {
-        class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
-        {
+        auto session = CreateSession(GetDefaultSessionSettings(L"termination-event-test"));
 
-        public:
-            CallbackInstance(std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)>&& callback) :
-                m_callback(std::move(callback))
-            {
-            }
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_IS_NOT_NULL(terminationEvent.get());
 
-            HRESULT OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details) override
-            {
-                m_callback(Reason, Details);
-                return S_OK;
-            }
+        // The reason is unavailable until the session has terminated.
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_ARE_EQUAL(session->GetTerminationReason(&reason, &details), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
-        private:
-            std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)> m_callback;
-        };
+        // Terminating the session should signal the event and record a graceful shutdown reason.
+        VERIFY_SUCCEEDED(session->Terminate());
 
-        std::promise<std::pair<WSLCVirtualMachineTerminationReason, std::wstring>> promise;
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
 
-        CallbackInstance callback{[&](WSLCVirtualMachineTerminationReason reason, LPCWSTR details) {
-            promise.set_value(std::make_pair(reason, details));
-        }};
-
-        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
-        sessionSettings.TerminationCallback = &callback;
-
-        auto session = CreateSession(sessionSettings);
-
-        session.reset();
-        auto future = promise.get_future();
-        auto result = future.wait_for(std::chrono::seconds(30));
-        VERIFY_ARE_EQUAL(result, std::future_status::ready);
-        auto [reason, details] = future.get();
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
-        VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
     WSLC_TEST_METHOD(CrashDumpCallback)
@@ -4260,11 +4241,31 @@ class WSLCTests
             VERIFY_ARE_EQUAL(error, std::error_code{});
         }
 
-        wil::com_ptr<IWSLCContainer> notFound;
-        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+        // The container can still be opened even though its backing volume is gone, so the
+        // user is able to inspect and delete it.
+        wil::com_ptr<IWSLCContainer> recoveredContainer;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &recoveredContainer));
 
-        // Deleting the named volume should fail since the volume was not recovered.
-        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLC_E_VOLUME_NOT_FOUND);
+        // Starting it must fail since the referenced volume cannot be brought online.
+        VERIFY_ARE_EQUAL(recoveredContainer->Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
+        ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
+
+        // Inspecting the volume reports the failure via an "Error" entry in its status.
+        {
+            wil::unique_cotaskmem_ansistring inspectOutput;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput));
+            auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(inspectOutput.get());
+            VERIFY_IS_TRUE(inspect.Status.has_value());
+            VERIFY_IS_TRUE(inspect.Status->contains("Error"));
+
+            // The backing .vhdx was deleted, so recovery fails to attach it with ERROR_FILE_NOT_FOUND.
+            const auto expectedError = wsl::shared::string::WideToMultiByte(GetErrorString(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)));
+            VERIFY_ARE_EQUAL(inspect.Status->at("Error"), expectedError);
+        }
+
+        // The unavailable volume can still be deleted once the container referencing it is removed.
+        VERIFY_SUCCEEDED(recoveredContainer->Delete(WSLCDeleteFlagsForce));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
     }
 
     WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
@@ -4955,6 +4956,123 @@ class WSLCTests
 
         // Delete non-existent should fail.
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
+    }
+
+    void CreateNamedNetwork(const std::string& Name, const std::vector<WSLCLabel>& Labels = {})
+    {
+        WSLCNetworkOptions options{};
+        options.Name = Name.c_str();
+        options.Driver = "bridge";
+        options.Labels = Labels.empty() ? nullptr : Labels.data();
+        options.LabelsCount = static_cast<ULONG>(Labels.size());
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+    }
+
+    WSLC_TEST_METHOD(PruneNetworksTest)
+    {
+        auto expectPrune = [&](const std::vector<std::string>& expected,
+                               const std::vector<WSLCFilter>& filters = {},
+                               const std::source_location& source = std::source_location::current()) {
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(filtersPtr, filtersCount, deleted.addressof(), deleted.size_address<ULONG>()));
+
+            std::vector<std::string> names;
+            for (const auto& n : deleted)
+            {
+                names.emplace_back(n);
+            }
+
+            VerifyAreEqualUnordered(expected, names, source);
+        };
+
+        // Prune with no managed networks present returns empty.
+        expectPrune({});
+
+        // Prune removes unused managed networks.
+        {
+            const std::string a = "wslc-prune-net-a";
+            const std::string b = "wslc-prune-net-b";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(a.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(b.c_str()));
+            });
+
+            CreateNamedNetwork(a);
+            CreateNamedNetwork(b);
+
+            expectPrune({a, b});
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+            for (const auto& n : networks)
+            {
+                VERIFY_ARE_NOT_EQUAL(a, std::string(n.Name));
+                VERIFY_ARE_NOT_EQUAL(b, std::string(n.Name));
+            }
+
+            cleanup.release();
+        }
+
+        // Label filter (key=value).
+        {
+            const std::string labeled = "wslc-prune-net-labeled";
+            const std::string unlabeled = "wslc-prune-net-unlabeled";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(labeled.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            });
+
+            CreateNamedNetwork(labeled, {{"wslc-prune-net-test", "yes"}});
+            CreateNamedNetwork(unlabeled);
+
+            expectPrune({labeled}, {{"label", "wslc-prune-net-test=yes"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            cleanup.release();
+        }
+
+        // Label filter (negation).
+        {
+            const std::string keep = "wslc-prune-net-keep";
+            const std::string drop = "wslc-prune-net-drop";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(drop.c_str()));
+            });
+
+            CreateNamedNetwork(keep, {{"wslc-prune-net-keep", "yes"}});
+            CreateNamedNetwork(drop);
+
+            expectPrune({drop}, {{"label!", "wslc-prune-net-keep"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+            cleanup.release();
+        }
+
+        // Filter with null Key rejected.
+        {
+            WSLCFilter filters[] = {{nullptr, "true"}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
+
+        // Filter with null Value rejected.
+        {
+            WSLCFilter filters[] = {{"label", nullptr}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)
@@ -10874,6 +10992,69 @@ class WSLCTests
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+    }
+
+    WSLC_TEST_METHOD(WarningCallbackGuestVolumeRecovery)
+    {
+        SKIP_TEST_SERVER();
+
+        constexpr auto c_sessionName = L"warning-guest-volume-recovery";
+        constexpr auto c_volumeName = "wslc-test-warning-guest-recovery";
+        auto storagePath = (std::filesystem::current_path() / "test-warning-guest-volume-recovery").wstring();
+        auto cleanupDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storagePath, ec);
+        });
+
+        // Create a session and, via the docker CLI, inject a "local" volume with driver options we don't support (type=nfs).
+        // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
+        // session recovers it.
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+            auto session = CreateSession(settings);
+
+            ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/docker",
+                 "volume",
+                 "create",
+                 "--driver",
+                 "local",
+                 "--opt",
+                 "type=nfs",
+                 "--opt",
+                 "o=addr=127.0.0.1,rw",
+                 "--opt",
+                 "device=:/exports/test",
+                 c_volumeName},
+                0);
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+
+        // Restart with a warning callback and verify the unsupported volume triggers a recovery warning when the session loads.
+        {
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            settings.StoragePath = storagePath.c_str();
+
+            const auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+            auto warnings = warningCallback->GetWarnings();
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+
+            // Clean up the volume from Docker's metadata.
+            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);
 
             VERIFY_SUCCEEDED(session->Terminate());
         }

@@ -137,9 +137,8 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                                    //
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n" //
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"      //
+        options << L"The following options are available:\r\n"                               //
+                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n" //
                 << L"\r\n";
         return options.str();
     }

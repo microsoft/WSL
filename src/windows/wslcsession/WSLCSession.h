@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCVolumes.h"
@@ -73,7 +74,7 @@ private:
 // The SYSTEM service creates the VM and passes IWSLCVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLCSession() = default;
@@ -98,6 +99,8 @@ public:
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
+    IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -175,6 +178,9 @@ public:
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneNetworks)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
+        override;
 
     IFACEMETHOD(Terminate()) override;
 
@@ -192,6 +198,40 @@ public:
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
+
+    // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
+    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(LoadImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_ LPCSTR ImageName,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLCCompatListImagesOptions* Options, _Out_ WSLCCompatImageInformation** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLCCompatDeleteImageOptions* Options, _Out_ WSLCCompatDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
+    IFACEMETHOD(TagImage)(_In_ const WSLCCompatTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(CreateContainer)(
+        _In_ const WSLCCompatContainerOptions* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -244,6 +284,7 @@ private:
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void StartPodmanSystemService();
+    void InstallTrustedRootCertificates();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(
         DockerHTTPClient::HTTPRequestContext& Request,
@@ -275,14 +316,17 @@ private:
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmExitedEvent;
+
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
     wil::srwlock m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_podmanSystemServiceProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
-    std::atomic<bool> m_terminated{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 

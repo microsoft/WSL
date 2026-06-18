@@ -157,6 +157,7 @@ public:
     common::docker_schema::Network InspectNetwork(const std::string& Name);
     void ConnectContainerToNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
     void DisconnectContainerFromNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
+    common::docker_schema::PruneNetworkResult PruneNetworks(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Image management.
     std::unique_ptr<HTTPRequestContext> PullImage(

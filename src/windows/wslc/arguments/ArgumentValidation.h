@@ -83,5 +83,6 @@ void ValidateFilter(const std::vector<std::wstring>& values);
 
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value);
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value);
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
 } // namespace wsl::windows::wslc::validation

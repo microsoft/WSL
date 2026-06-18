@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "WslcsdkPrivate.h"
 
-IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
+IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
     m_process(process), m_callbackOptions(std::make_unique<WslcContainerProcessIOCallbackOptions>(options))
 {
     using namespace wsl::windows::common::io;
@@ -119,11 +119,12 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
     return options.onStdOut || options.onStdErr || options.onExit;
 }
 
-wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle)
+wil::unique_handle IOCallback::GetIOHandle(IWSLCCompatProcess* process, WslcProcessIOHandle ioHandle)
 {
-    wsl::windows::common::wslutil::COMOutputHandle handle;
+    WSLCCompatHandle handle{};
 
     THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
-    return handle.Release();
+    // The handle value is the same regardless of the union member that was populated.
+    return wil::unique_handle{handle.Handle.File};
 }

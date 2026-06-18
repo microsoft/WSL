@@ -96,7 +96,6 @@ std::vector<Argument> RegistryLoginCommand::GetArguments() const
         Argument::Create(ArgType::PasswordStdin),
         Argument::Create(ArgType::Username),
         Argument::Create(ArgType::Server),
-        Argument::Create(ArgType::Session),
     };
 }
 

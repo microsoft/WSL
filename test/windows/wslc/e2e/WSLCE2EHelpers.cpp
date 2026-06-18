@@ -148,7 +148,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
+        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -396,7 +396,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
             auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
@@ -424,7 +424,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
     }
 
     auto result = RunWslc(listCommand);
@@ -443,7 +443,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
     if (!sessionName.empty())
     {
-        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
     }
 
     auto loadResult = RunWslc(loadCommand);
@@ -538,7 +538,8 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
     return std::move(session);
 }
 
-std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
 {
     // Check if the registry image is already loaded on this session.
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -552,6 +553,8 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         LoadTestImage(session, "wslc-registry:latest");
     }
 
+    const bool useTls = !tlsCertDir.empty();
+
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
 
     if (!username.empty())
@@ -560,27 +563,50 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
         env.push_back(std::format("PASSWORD={}", password));
     }
 
-    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    if (useTls)
+    {
+        env.push_back("REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt");
+        env.push_back("REGISTRY_HTTP_TLS_KEY=/certs/server.key");
+    }
+
+    // TLS needs a non-loopback address for real verification, so use bridge networking and reach the
+    // container by its bridge IP. Plain HTTP uses host networking with a published loopback port.
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env, useTls ? "bridge" : "host");
     launcher.SetEntrypoint({"/entrypoint.sh"});
-    launcher.AddPort(port, port, AF_INET);
 
-    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+    if (useTls)
+    {
+        launcher.AddVolume(tlsCertDir, "/certs", true);
+    }
+    else
+    {
+        launcher.AddPort(port, port, AF_INET);
+    }
 
-    // Use "localhost:<port>" rather than the IP literal "127.0.0.1:<port>" so
-    // login/push/pull go through podman's docker-compat /auth fast-path that
-    // recognises only the literal "localhost:" prefix as insecure
-    // (containers/podman pkg/api/handlers/compat/auth.go). Loopback IPv4/IPv6
-    // literals otherwise fall through to default-HTTPS handling and fail the
-    // TLS handshake against this plain-HTTP test registry. "localhost" is the
-    // convention podman's own apiv2 suite uses (test/apiv2/60-auth.at) and
-    // the wider container-tooling ecosystem (kind, minikube, k3d) recommends.
-    auto address = std::format("localhost:{}", port);
-    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+    auto container = launcher.Launch(session);
 
-    int expectedCode = username.empty() ? 200 : 401;
-    ExpectHttpResponse(url.c_str(), expectedCode, true);
+    // Wait for the registry to bind the port before continuing.
+    auto initProcess = container.GetInitProcess();
+    WaitForOutput(initProcess.GetStdHandle(2), std::format("listening on [::]:{}", port));
 
-    return {std::move(container), std::move(address)};
+    if (useTls)
+    {
+        auto inspect = container.Inspect();
+        THROW_HR_IF(E_UNEXPECTED, inspect.NetworkSettings.Networks.empty());
+        auto address = std::format("{}:{}", inspect.NetworkSettings.Networks.begin()->second.IPAddress, port);
+
+        return {std::move(container), std::move(address)};
+    }
+    else
+    {
+        auto address = std::format("localhost:{}", port);
+        auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+        int expectedCode = username.empty() ? 200 : 401;
+        ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+        return {std::move(container), std::move(address)};
+    }
 }
 
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)
@@ -600,6 +626,14 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
     }
 
     VERIFY_IS_TRUE(file.good());
+}
+
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    THROW_HR_IF_MSG(E_FAIL, !file.is_open(), "Failed to open %ls for writing", filePath.c_str());
+    file << content;
+    THROW_HR_IF_MSG(E_FAIL, !file.good(), "Failed to write to %ls", filePath.c_str());
 }
 
 std::wstring GetPythonHttpServerScript(uint16_t port)

@@ -19,11 +19,15 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
+#include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
+#include "APICompat.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
+using io::OverlappedIOHandle;
+using io::WriteHandle;
 using wsl::shared::Localization;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
@@ -168,10 +172,40 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
         wslcConfig.Entrypoint = dockerConfig.Entrypoint;
         wslcConfig.Env = dockerConfig.Env;
         wslcConfig.Labels = dockerConfig.Labels;
+        wslcConfig.StopSignal = dockerConfig.StopSignal;
         wslcConfig.User = dockerConfig.User;
         wslcConfig.WorkingDir = dockerConfig.WorkingDir;
 
+        if (dockerConfig.ExposedPorts.has_value())
+        {
+            std::map<std::string, wslc_schema::EmptyObject> ports;
+            for (const auto& [port, _] : dockerConfig.ExposedPorts.value())
+            {
+                ports.emplace(port, wslc_schema::EmptyObject{});
+            }
+            wslcConfig.ExposedPorts = std::move(ports);
+        }
+
+        if (dockerConfig.Volumes.has_value())
+        {
+            std::map<std::string, wslc_schema::EmptyObject> volumes;
+            for (const auto& [path, _] : dockerConfig.Volumes.value())
+            {
+                volumes.emplace(path, wslc_schema::EmptyObject{});
+            }
+            wslcConfig.Volumes = std::move(volumes);
+        }
+
         wslcInspect.Config = wslcConfig;
+    }
+
+    if (dockerInspect.RootFS.has_value())
+    {
+        const auto& dockerRootFS = dockerInspect.RootFS.value();
+        wslc_schema::ImageRootFS wslcRootFS{};
+        wslcRootFS.Type = dockerRootFS.Type;
+        wslcRootFS.Layers = dockerRootFS.Layers;
+        wslcInspect.RootFS = std::move(wslcRootFS);
     }
 
     return wslcInspect;
@@ -394,6 +428,9 @@ try
 
     // Podman needs /dev/shm (tmpfs) for its shm-based lock manager.
     m_virtualMachine->Mount("", "/dev/shm", "tmpfs", "rw,nosuid,nodev", 0);
+
+    // Mirror the host's trusted root CAs into the VM before dockerd starts.
+    InstallTrustedRootCertificates();
 
     StartPodmanSystemService();
 
@@ -678,6 +715,44 @@ void WSLCSession::StartPodmanSystemService()
 
     m_podmanSystemServiceProcess = StartProcess("/usr/bin/podman", args, "podman", std::bind(&WSLCSession::OnDockerdExited, this));
     WSL_LOG("Podman system service started");
+}
+
+void WSLCSession::InstallTrustedRootCertificates()
+try
+{
+    const auto pem = CollectTrustedRootCertificatesPem();
+    if (pem.empty())
+    {
+        WSL_LOG("InstallTrustedRootCertificatesSkipped");
+        return;
+    }
+
+    // dockerd and containerd read the certificates found in /etc/ssl/certs into
+    // their default system certificate pool.
+    constexpr auto c_certPath = "/etc/ssl/certs/wsl-windows-roots.pem";
+    const auto script = std::format("cat > '{}'", c_certPath);
+
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    std::unique_ptr<OverlappedIOHandle> writeStdin(
+        new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{pem.begin(), pem.end()}));
+    std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+    extraHandles.emplace_back(std::move(writeStdin));
+
+    const auto result = process.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    WSL_LOG(
+        "InstalledTrustedRootCertificates",
+        TraceLoggingValue(c_certPath, "Path"),
+        TraceLoggingValue(static_cast<uint64_t>(pem.size()), "BundleBytes"));
+}
+catch (...)
+{
+    // Best-effort: failing to install the host's trusted roots must not prevent the session from starting.
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to install trusted root certificates into the VM");
+    EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
@@ -1828,6 +1903,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
@@ -1877,6 +1953,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             m_virtualMachine.value(),
             m_pluginNotifier.get(),
             m_networks,
+            m_volumes.value(),
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -2680,6 +2757,79 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PruneNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkName** Networks, ULONG* NetworksCount)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Networks);
+    RETURN_HR_IF_NULL(E_POINTER, NetworksCount);
+    *Networks = nullptr;
+    *NetworksCount = 0;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    // Scope the prune to WSLC-managed networks.
+    filters["label"].push_back(WSLCNetworkManagedLabel);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+
+    docker_schema::PruneNetworkResult pruneResult;
+    try
+    {
+        pruneResult = m_dockerClient->PruneNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
+
+    if (!pruneResult.NetworksDeleted.has_value() || pruneResult.NetworksDeleted->empty())
+    {
+        return S_OK;
+    }
+
+    std::vector<std::string> deleted;
+    deleted.reserve(pruneResult.NetworksDeleted->size());
+    for (const auto& name : *pruneResult.NetworksDeleted)
+    {
+        // Only report networks that we manage.
+        if (!m_networks.contains(name))
+        {
+            WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
+            continue;
+        }
+        deleted.push_back(name);
+    }
+
+    if (deleted.empty())
+    {
+        return S_OK;
+    }
+
+    // Erase before marshalling: docker has already pruned these, so m_networks must stay in sync.
+    for (const auto& name : deleted)
+    {
+        m_networks.erase(name);
+    }
+
+    WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
+
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkName[]>(deleted.size());
+    for (size_t i = 0; i < deleted.size(); ++i)
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, strcpy_s(output[i], deleted[i].c_str()) != 0, "Unexpected network name length: %hs", deleted[i].c_str());
+    }
+
+    *Networks = output.release();
+    *NetworksCount = static_cast<ULONG>(deleted.size());
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const
 {
     const HANDLE waitHandles[] = {Event, m_sessionTerminatingEvent.get()};
@@ -2785,9 +2935,20 @@ try
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
+
+        // The VM exited on its own, so it recorded the cause.
+        if (m_virtualMachine)
+        {
+            wil::unique_cotaskmem_string details;
+            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
+            m_terminationDetails = details ? details.get() : L"";
+        }
     }
     else
     {
+        // The VM is still alive, so this is a graceful shutdown initiated by us.
+        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+
         if (m_virtualMachine)
         {
             m_virtualMachine->OnSessionTerminated();
@@ -2841,7 +3002,8 @@ try
         m_swapVhdPath.clear();
     }
 
-    m_terminated = true;
+    m_sessionTerminatedEvent.SetEvent();
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -3011,7 +3173,170 @@ CATCH_RETURN();
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCSession) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) ? S_OK : S_FALSE;
+}
+
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ImportImage(
+    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Images);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *Images = nullptr;
+    *Count = 0;
+
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> imagesImpl;
+
+    if (Options == nullptr)
+    {
+        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &imagesImpl, imagesImpl.size_address<ULONG>()));
+    }
+    else
+    {
+        const auto options = apicompat::Convert(*Options);
+        RETURN_IF_FAILED(ListImages(options.Get(), &imagesImpl, imagesImpl.size_address<ULONG>()));
+    }
+
+    if (imagesImpl.size() > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatImageInformation[]>(imagesImpl.size());
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (size_t index = 0; index < imagesImpl.size(); index++)
+        {
+            converted[index] = apicompat::Convert(imagesImpl[index]);
+        }
+
+        *Images = converted.release();
+    }
+
+    *Count = static_cast<ULONG>(imagesImpl.size());
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::DeleteImage(const WSLCCompatDeleteImageOptions* Options, WSLCCompatDeletedImageInformation** DeletedImages, ULONG* Count)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *DeletedImages = nullptr;
+    *Count = 0;
+
+    const auto options = apicompat::Convert(*Options);
+
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> imagesImpl;
+
+    RETURN_IF_FAILED(DeleteImage(&options, &imagesImpl, imagesImpl.size_address<ULONG>()));
+
+    if (imagesImpl.size() > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatDeletedImageInformation[]>(imagesImpl.size());
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (size_t index = 0; index < imagesImpl.size(); index++)
+        {
+            converted[index] = apicompat::Convert(imagesImpl[index]);
+        }
+
+        *DeletedImages = converted.release();
+    }
+
+    *Count = static_cast<ULONG>(imagesImpl.size());
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::TagImage(const WSLCCompatTagImageOptions* Options)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+
+    const auto options = apicompat::Convert(*Options);
+    return TagImage(&options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto options = apicompat::Convert(*Options);
+
+    Microsoft::WRL::ComPtr<IWSLCContainer> container;
+    RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
+
+    return container.CopyTo(Container);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateVolume(const WSLCCompatVolumeOptions* Options, WSLCCompatVolumeInformation* VolumeInfo)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+
+    const auto options = apicompat::Convert(*Options);
+
+    WSLCVolumeInformation info{};
+    WSLCVolumeInformation* internalInfo = (VolumeInfo != nullptr) ? &info : nullptr;
+    RETURN_IF_FAILED(CreateVolume(options.Get(), internalInfo));
+
+    if (VolumeInfo != nullptr)
+    {
+        *VolumeInfo = apicompat::Convert(info);
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Callback, IUnknown** Subscription)
+{
+    const auto callback = apicompat::Convert(Callback);
+
+    return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
@@ -3139,9 +3464,42 @@ HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
     RETURN_HR_IF_NULL(E_POINTER, State);
 
-    *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
+    *State = m_sessionTerminatedEvent.is_signaled() ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
     return S_OK;
 }
+
+HRESULT WSLCSession::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    RETURN_HR_IF(E_POINTER, Event == nullptr);
+
+    *Event = nullptr;
+
+    // Duplicate the "terminated" event. The caller owns the returned handle, which stays valid even after the session is released.
+    *Event = wsl::windows::common::wslutil::DuplicateHandle(m_sessionTerminatedEvent.get(), SYNCHRONIZE);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    // m_terminationReason/m_terminationDetails are written once before m_sessionTerminatedEvent is
+    // signaled and never modified afterward, so observing the signaled event safely publishes them.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_sessionTerminatedEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 void WSLCSession::RecoverExistingContainers()
 {
@@ -3160,7 +3518,7 @@ void WSLCSession::RecoverExistingContainers()
                 *this,
                 m_virtualMachine.value(),
                 m_pluginNotifier.get(),
-                *m_volumes,
+                m_volumes.value(),
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

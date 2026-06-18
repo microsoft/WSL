@@ -48,6 +48,7 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:
     struct DiskInfo
@@ -103,7 +104,13 @@ private:
     std::atomic<bool> m_vmSavedStateCaptured = false;
     std::atomic<bool> m_crashLogCaptured = false;
 
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
+    // Termination reason and details, cached in OnExit before m_vmExitEvent is signaled and never
+    // modified afterward. Publication relies on the event: readers (GetTerminationReason) only access
+    // these after observing m_vmExitEvent signaled, so no lock is needed. Keeping them lock-free also
+    // avoids contending for m_lock from the HCS exit callback, which the destructor holds while the
+    // callback is drained.
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
 };
 
 //
@@ -134,8 +141,6 @@ private:
     // Duplicated dmesg sink (best-effort): only the first VM is guaranteed a live sink;
     // subsequent VMs reuse this duplicate, whose writes simply fail if the sink is gone.
     wil::unique_handle m_dmesgOutput;
-
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
 
     ULONGLONG m_maximumStorageSizeMb{};
     ULONG m_cpuCount{};

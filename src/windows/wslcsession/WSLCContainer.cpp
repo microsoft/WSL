@@ -23,6 +23,9 @@ Abstract:
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
+#include "APICompat.h"
+
+namespace apicompat = wsl::windows::common::apicompat;
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -595,6 +598,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::string&& Image,
     std::string NetworkMode,
     std::vector<WSLCVolumeMount>&& volumes,
+    std::vector<std::string>&& namedVolumes,
+    WSLCVolumes& Volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
@@ -613,6 +618,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_networkMode(std::move(NetworkMode)),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
+    m_namedVolumes(std::move(namedVolumes)),
+    m_volumes(Volumes),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
@@ -655,7 +662,10 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
     for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
 
     m_containerEvents.Reset();
@@ -668,16 +678,6 @@ WSLCContainerImpl::~WSLCContainerImpl()
         auto lock = m_lock.lock_exclusive();
         wrapper = ReleaseResources();
     }
-}
-
-void WSLCContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
-{
-    std::lock_guard processesLock{m_processesLock};
-
-    auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
-    WI_ASSERT(remove.size() == 1);
-
-    m_processes.erase(remove.begin(), remove.end());
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -872,6 +872,28 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
     });
+
+    // Refuse to start if any referenced named volume is in a failed state.
+    std::vector<std::string> unavailableVolumes;
+    for (const auto& volumeName : m_namedVolumes)
+    {
+        const auto [code, message] = m_volumes.GetVolumeStatus(volumeName);
+        if (FAILED(code))
+        {
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
+            unavailableVolumes.push_back(volumeName);
+        }
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_AVAILABLE,
+        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
+        !unavailableVolumes.empty());
+
+    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
+
+    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
+    MapPorts();
 
     m_stopNotification.Event.ResetEvent();
     m_stopNotification.EventTime.store(0, std::memory_order_relaxed);
@@ -1331,13 +1353,15 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
             io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
-        auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
+        auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
 
         {
             std::lock_guard processesLock{m_processesLock};
 
-            // Store a non owning reference to the process.
-            m_processes.push_back(control.get());
+            // Drop entries for execs that have since been released, then store a non-owning weak
+            // reference. The owning shared_ptr is moved into the COM WSLCProcess returned below.
+            std::erase_if(m_processes, [](const auto& weak) { return weak.expired(); });
+            m_processes.push_back(control);
         }
 
         // Poll for the exec'd process to either be running, or failed.
@@ -1512,6 +1536,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCVirtualMachine& virtualMachine,
     IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    WSLCVolumes& volumesManager,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1910,6 +1935,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
+    // Collect the names of referenced docker named volumes so Start() can verify
+    // they are available before running the container.
+    std::vector<std::string> namedVolumes;
+    namedVolumes.reserve(containerOptions.NamedVolumesCount);
+    for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
+    {
+        namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
+    }
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
@@ -1919,6 +1953,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::string(containerOptions.Image),
         networkMode,
         std::move(volumes),
+        std::move(namedVolumes),
+        volumesManager,
         std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
@@ -1954,19 +1990,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    // Validate that all named volumes mounted by the container were successfully recovered
-    // by the volumes manager. If any are missing (e.g. backing VHD removed while the service was
-    // down), refuse to open the container so it cannot enter a broken state.
+    // Collect the names of referenced docker named volumes.
+    std::vector<std::string> namedVolumes;
     for (const auto& mount : dockerContainer.Mounts)
     {
         if (mount.Type == "volume" && !mount.Name.empty())
         {
-            THROW_HR_IF_MSG(
-                E_UNEXPECTED,
-                !volumes.ContainsVolume(mount.Name),
-                "Cannot open container %hs: referenced volume '%hs' is not available",
-                dockerContainer.Id.c_str(),
-                mount.Name.c_str());
+            namedVolumes.push_back(mount.Name);
         }
     }
 
@@ -2021,6 +2051,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(networkMode),
         std::move(metadata.Volumes),
+        std::move(namedVolumes),
+        volumes,
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
@@ -2257,16 +2289,22 @@ void WSLCContainerImpl::UnmapPorts()
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
 {
-    std::lock_guard processesLock{m_processesLock};
+    // Snapshot under the lock, then notify outside it, pinning each control via lock() first
+    decltype(m_processes) processes;
+    {
+        std::lock_guard processesLock{m_processesLock};
+        processes = std::exchange(m_processes, {});
+    }
 
     // Notify all processes that the container has exited.
     // The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-    for (auto& process : m_processes)
+    for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
-
-    m_processes.clear();
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()
@@ -2699,5 +2737,41 @@ CATCH_RETURN();
 
 HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCContainer) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) ? S_OK : S_FALSE;
 }
+
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags)
+{
+    return Start(Flags, nullptr, nullptr);
+}
+
+HRESULT WSLCContainer::GetInitProcess(IWSLCCompatProcess** Process)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(GetInitProcess(&process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Exec(const WSLCCompatProcessOptions* Options, IWSLCCompatProcess** Process)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    const auto options = apicompat::Convert(*Options);
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(Exec(&options, nullptr, &process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();

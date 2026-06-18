@@ -31,7 +31,6 @@ std::vector<Argument> ContainerStatsCommand::GetArguments() const
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
-        Argument::Create(ArgType::Session),
     };
 }
 

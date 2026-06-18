@@ -249,6 +249,31 @@ void KillContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Kill(session, WideToMultiByte(id), signal);
+        PrintMessage(id);
+    }
+}
+
+void ExportContainer(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        ContainerService::Export(session, containerId, output);
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ContainerExportStdoutIsTerminalError());
+        }
+
+        ContainerService::Export(session, containerId, stdoutHandle);
     }
 }
 
@@ -336,6 +361,7 @@ void RemoveContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
+        PrintMessage(id);
     }
 }
 
@@ -703,8 +729,14 @@ void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-    const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    const auto& containerId = context.Args.Get<ArgType::ContainerId>();
+    const bool attach = context.Args.Contains(ArgType::Attach);
+    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
+
+    if (!attach)
+    {
+        PrintMessage(containerId);
+    }
 }
 
 void StopContainers(CLIExecutionContext& context)
@@ -726,6 +758,7 @@ void StopContainers(CLIExecutionContext& context)
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
+        PrintMessage(id);
     }
 }
 
@@ -771,6 +804,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

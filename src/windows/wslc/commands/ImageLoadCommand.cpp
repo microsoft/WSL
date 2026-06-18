@@ -28,7 +28,6 @@ std::vector<Argument> ImageLoadCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Input),
-        Argument::Create(ArgType::Session),
     };
 }
 

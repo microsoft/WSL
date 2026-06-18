@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 #include <windows.h>
 #include "wslcsdk.h"
-#include "wslc.h"
+#include "WSLCCompat.h"
 #include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
@@ -33,8 +33,6 @@ typedef struct WslcSessionOptionsInternal
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
-    WslcSessionTerminationCallback terminationCallback;
-    PVOID terminationCallbackContext;
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
@@ -106,8 +104,7 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLCSession> session;
-    wil::com_ptr<ITerminationCallback> terminationCallback;
+    wil::com_ptr<IWSLCCompatSession> session;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
@@ -116,7 +113,7 @@ WslcSessionImpl* GetInternalType(WslcSession handle);
 // subscription whose release unregisters the callback.
 struct WslcCrashDumpSubscriptionImpl
 {
-    wil::com_ptr<ICrashDumpCallback> callback;
+    wil::com_ptr<IWSLCCompatCrashDumpCallback> callback;
     wil::com_ptr<IUnknown> subscription;
 };
 
@@ -124,7 +121,7 @@ WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle)
 
 struct WslcContainerImpl
 {
-    wil::com_ptr<IWSLCContainer> container;
+    wil::com_ptr<IWSLCCompatContainer> container;
     WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
     std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
@@ -133,7 +130,7 @@ WslcContainerImpl* GetInternalType(WslcContainer handle);
 
 struct WslcProcessImpl
 {
-    wil::com_ptr<IWSLCProcess> process;
+    wil::com_ptr<IWSLCCompatProcess> process;
     std::shared_ptr<IOCallback> ioCallbacks;
 };
 

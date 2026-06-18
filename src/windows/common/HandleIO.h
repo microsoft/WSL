@@ -3,6 +3,7 @@
 #pragma once
 
 #include <concurrent_queue.h>
+#include <deque>
 #include <list>
 
 #define LX_RELAY_BUFFER_SIZE 0x1000
@@ -139,25 +140,32 @@ private:
     bool m_connected = false;
 };
 
-class SingleAcceptHandle : public OverlappedIOHandle
+class AcceptHandle : public OverlappedIOHandle
 {
 public:
-    NON_COPYABLE(SingleAcceptHandle)
-    NON_MOVABLE(SingleAcceptHandle)
+    NON_COPYABLE(AcceptHandle)
+    NON_MOVABLE(AcceptHandle)
 
-    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
-    ~SingleAcceptHandle();
+    AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::function<void(wil::unique_socket&&)>&& OnAccepted);
+    ~AcceptHandle();
 
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    void CreateAcceptSocket();
+    void OnComplete();
+
     HandleWrapper ListenSocket;
-    HandleWrapper AcceptedSocket;
+    wil::unique_socket AcceptedSocket;
+    int AddressFamily{};
+    int SocketType{};
+    int Protocol{};
+    bool AcceptOnce{};
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::function<void()> OnAccepted;
+    std::function<void(wil::unique_socket&&)> OnAccepted;
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
 };
 
@@ -227,6 +235,32 @@ private:
     bool ReadingHeader = true;
     size_t BytesRemaining = sizeof(MESSAGE_HEADER);
     size_t CurrentOffset = 0;
+};
+
+class ReadConsoleHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(ReadConsoleHandle);
+    NON_MOVABLE(ReadConsoleHandle);
+
+    ReadConsoleHandle(
+        HandleWrapper&& Console,
+        std::function<void(const gsl::span<char>& Buffer)>&& OnRead,
+        std::function<void()>&& UpdateTerminalSize = []() {},
+        std::vector<char> DetachSequence = {},
+        std::function<void()>&& OnDetach = []() {});
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper Console;
+    std::function<void(const gsl::span<char>& Buffer)> OnRead;
+    std::function<void()> UpdateTerminalSize;
+    std::vector<char> DetachSequence;
+    std::function<void()> OnDetach;
+    std::deque<char> CurrentSequence;
 };
 
 class WriteHandle : public OverlappedIOHandle
@@ -302,8 +336,11 @@ public:
     NON_COPYABLE(RelayHandle);
     NON_MOVABLE(RelayHandle);
 
-    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
-        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output), {}, false)
+    template <typename... TArgs>
+    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output, TArgs&&... InputArgs) :
+        Read(
+            std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }, std::forward<TArgs>(InputArgs)...),
+        Write(std::move(Output), {}, false)
     {
     }
 
