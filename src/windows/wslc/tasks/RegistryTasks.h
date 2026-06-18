@@ -19,4 +19,5 @@ using wsl::windows::wslc::execution::CLIExecutionContext;
 namespace wsl::windows::wslc::task {
 void Login(CLIExecutionContext& context);
 void Logout(CLIExecutionContext& context);
+void EditRegistry(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

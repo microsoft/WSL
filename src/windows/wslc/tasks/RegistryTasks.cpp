@@ -63,4 +63,29 @@ void Logout(CLIExecutionContext& context)
     PrintMessage(Localization::WSLCCLI_LogoutSucceeded(MultiByteToWide(serverAddress)));
 }
 
+void EditRegistry(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+
+    auto& session = context.Data.Get<Data::Session>();
+
+    if (context.Args.Contains(ArgType::AddInsecure))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::AddInsecure>())
+        {
+            auto server = WideToMultiByte(value);
+            THROW_IF_FAILED(session.Get()->AddInsecureRegistry(server.c_str()));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::RemoveInsecure))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::RemoveInsecure>())
+        {
+            auto server = WideToMultiByte(value);
+            THROW_IF_FAILED(session.Get()->RemoveInsecureRegistry(server.c_str()));
+        }
+    }
+}
+
 } // namespace wsl::windows::wslc::task

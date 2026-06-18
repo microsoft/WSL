@@ -2651,10 +2651,17 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Password: </value>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
-    <value>Manage registry credentials.</value>
+    <value>Manage registry credentials and settings.</value>
   </data>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
-    <value>Manage registry credentials, including logging in and out of container registries.</value>
+    <value>Manage registry credentials and settings, including logging in and out of container registries and configuring insecure registry access.</value>
+  </data>
+  <data name="WSLCCLI_RegistryEditDesc" xml:space="preserve">
+    <value>Edit the session's registry configuration.</value>
+  </data>
+  <data name="WSLCCLI_RegistryEditLongDesc" xml:space="preserve">
+    <value>Edit the session's registry configuration. Use --add-insecure and --remove-insecure to manage registries that allow plaintext HTTP connections. Changes persist for the lifetime of the session.</value>
+    <comment>{Locked="--add-insecure"}{Locked="--remove-insecure"}{Locked="HTTP"}</comment>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
     <value>System-level commands</value>
@@ -2740,6 +2747,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Show all regardless of state.</value>
+  </data>
+  <data name="WSLCCLI_AddInsecureArgDescription" xml:space="preserve">
+    <value>Add a registry to the session's insecure registries list, allowing HTTP connections.</value>
+    <comment>{Locked="--add-insecure"}{Locked="HTTP"}</comment>
   </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Set build-time variables (KEY=VALUE)</value>
@@ -2884,6 +2895,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Remove the container after it stops</value>
+  </data>
+  <data name="WSLCCLI_RemoveInsecureArgDescription" xml:space="preserve">
+    <value>Remove a registry from the session's insecure registries list.</value>
+    <comment>{Locked="--remove-insecure"}</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal to stop the container</value>

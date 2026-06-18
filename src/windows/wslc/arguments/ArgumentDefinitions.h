@@ -34,6 +34,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        Localization::WSLCCLI_AllArgDescription()) \
+_(AddInsecure,    "add-insecure",        NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_AddInsecureArgDescription()) \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildArgDescription()) \
 _(BuildPull,      "pull",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_BuildPullArgDescription()) \
@@ -95,6 +96,7 @@ _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        L
 /*_(Pull,           "pull",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_PullArgDescription())*/ \
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
+_(RemoveInsecure, "remove-insecure",     NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_RemoveInsecureArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \

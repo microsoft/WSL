@@ -63,6 +63,7 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RegistryCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<RegistryEditCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryLogoutCommand>(FullName()));
     return commands;
@@ -176,6 +177,31 @@ void RegistryLogoutCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context //
         << Logout;
+}
+
+// Registry Edit Command
+std::vector<Argument> RegistryEditCommand::GetArguments() const
+{
+    return {
+        Argument::Create(ArgType::AddInsecure),
+        Argument::Create(ArgType::RemoveInsecure),
+    };
+}
+
+std::wstring RegistryEditCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_RegistryEditDesc();
+}
+
+std::wstring RegistryEditCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_RegistryEditLongDesc();
+}
+
+void RegistryEditCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    context //
+        << CreateSession << EditRegistry;
 }
 
 } // namespace wsl::windows::wslc

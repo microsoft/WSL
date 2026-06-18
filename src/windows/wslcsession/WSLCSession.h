@@ -23,6 +23,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
 #include <list>
+#include <set>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -185,6 +186,10 @@ public:
 
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
 
+    // Insecure registry management.
+    IFACEMETHOD(AddInsecureRegistry)(_In_ LPCSTR ServerAddress) override;
+    IFACEMETHOD(RemoveInsecureRegistry)(_In_ LPCSTR ServerAddress) override;
+
     // Called by CrashDumpSubscription when its last reference is released. The iterator must
     // have been returned by RegisterCrashDumpCallback against this session.
     void RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) noexcept;
@@ -250,6 +255,7 @@ private:
     void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
+    void ApplyInsecureRegistries();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
@@ -289,6 +295,8 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
+    std::mutex m_insecureRegistriesMutex;
+    std::set<std::string> m_insecureRegistries;
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 

@@ -601,6 +601,79 @@ void WSLCSession::StartDockerd()
     WSL_LOG("DockerdStarted");
 }
 
+HRESULT WSLCSession::AddInsecureRegistry(LPCSTR ServerAddress)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, ServerAddress);
+
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(ServerAddress);
+    WSL_LOG("AddInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
+
+    {
+        auto lock = std::lock_guard(m_insecureRegistriesMutex);
+        m_insecureRegistries.insert(server);
+    }
+
+    ApplyInsecureRegistries();
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::RemoveInsecureRegistry(LPCSTR ServerAddress)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, ServerAddress);
+
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(ServerAddress);
+    WSL_LOG("RemoveInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
+
+    {
+        auto lock = std::lock_guard(m_insecureRegistriesMutex);
+        m_insecureRegistries.erase(server);
+    }
+
+    ApplyInsecureRegistries();
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::ApplyInsecureRegistries()
+{
+    std::string registriesJson;
+    {
+        auto lock = std::lock_guard(m_insecureRegistriesMutex);
+        for (const auto& reg : m_insecureRegistries)
+        {
+            if (!registriesJson.empty())
+            {
+                registriesJson += ", ";
+            }
+
+            registriesJson += std::format("\"{}\"", reg);
+        }
+    }
+
+    auto daemonJson = std::format(R"({{"insecure-registries": [{}]}})", registriesJson);
+
+    constexpr auto c_daemonJsonPath = "/etc/docker/daemon.json";
+    auto script = std::format("mkdir -p /etc/docker && cat > '{}'", c_daemonJsonPath);
+
+    ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    std::unique_ptr<OverlappedIOHandle> writeStdin(
+        new WriteHandle(process.GetStdHandle(WSLCFDStdin), std::vector<char>{daemonJson.begin(), daemonJson.end()}));
+    std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+    extraHandles.emplace_back(std::move(writeStdin));
+
+    const auto result = process.WaitAndCaptureOutput(10000UL, std::move(extraHandles));
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Failed to write daemon.json: %hs", launcher.FormatResult(result).c_str());
+
+    // Signal dockerd to reload configuration.
+    WI_ASSERT(m_dockerdProcess.has_value());
+    THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP));
+}
+
 void WSLCSession::InstallTrustedRootCertificates()
 try
 {
