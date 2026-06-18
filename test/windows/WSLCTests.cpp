@@ -5552,21 +5552,17 @@ class WSLCTests
             ValidateProcessOutput(process, {{1, "/new-dir\n"}});
         }
 
-        // Validate that hostname is correctly wired.
-        // N.B. The container domainname is NOT validated: podman has no support for setting a
-        // container's NIS/UTS domainname (its specgen has no Domainname field and its compat
-        // /containers/create handler drops the Docker "Domainname" request field), so $(domainname)
-        // resolves to "(none)". dockerd applied it. The product still forwards Domainname; tracked
-        // separately for a podman-side feature. See https://github.com/containers/podman (specgen).
+        // Validate that hostname and domainname are correctly wired.
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname)"});
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname); echo $(domainname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
-            ValidateProcessOutput(process, {{1, "my-host-name\n"}});
+            ValidateProcessOutput(process, {{1, "my-host-name\nmy-domain-name\n"}});
         }
 
         // Validate that containers without DNS configuration use default DNS.
