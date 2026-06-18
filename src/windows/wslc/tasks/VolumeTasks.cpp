@@ -108,7 +108,7 @@ void DeleteVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
-    const bool force = context.Args.Contains(ArgType::VolumeForce);
+    const bool force = context.Args.Contains(ArgType::Force);
     for (const auto& name : volumeNames)
     {
         if (TryDeleteVolume(session, WideToMultiByte(name), force))

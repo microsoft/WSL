@@ -104,7 +104,7 @@ void DeleteNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto networkNames = context.Args.GetAll<ArgType::NetworkName>();
-    const bool force = context.Args.Contains(ArgType::NetworkForce);
+    const bool force = context.Args.Contains(ArgType::Force);
     for (const auto& name : networkNames)
     {
         if (TryDeleteNetwork(session, WideToMultiByte(name), force))
