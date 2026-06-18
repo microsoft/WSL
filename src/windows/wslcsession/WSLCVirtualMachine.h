@@ -192,8 +192,7 @@ public:
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
 private:
-    void MapRelayPort(
-        _In_ int ListenFamily, _In_ int ConnectFamily, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
+    void MapRelayPort(_In_ int ListenFamily, _In_ int ConnectFamily, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 
     // Initial setup during Connect()
     void ConfigureNetworking();

@@ -930,36 +930,36 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
             const char* env[] = {"PYTHONUNBUFFERED=1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
-        
+
             WslcContainerSettings containerSettings4;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings4));
             VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings4, &procSettings));
             VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings4, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
-        
+
             sockaddr_storage addr6{};
             auto* sin6 = reinterpret_cast<sockaddr_in6*>(&addr6);
             sin6->sin6_family = AF_INET6;
             VERIFY_ARE_EQUAL(inet_pton(AF_INET6, "::1", &sin6->sin6_addr), 1);
-        
+
             WslcContainerPortMapping mapping{};
             mapping.windowsPort = 12344;
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
             mapping.windowsAddress = &addr6;
             VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings4, &mapping, 1));
-        
+
             UniqueContainer container;
             VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings4, &container, nullptr));
             VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
-        
+
             UniqueProcess process;
             VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
-        
+
             wil::unique_handle ownedStdout;
             VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &ownedStdout));
-        
+
             WaitForOutput(std::move(ownedStdout), "Serving HTTP on", 30s);
-        
+
             ExpectHttpResponse(L"http://[::1]:12344", 200);
         }
 

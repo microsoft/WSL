@@ -612,8 +612,7 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                 {
                     ports.emplace(
                         key,
-                        CreatePortListener(
-                            message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily, message->ConnectAddressFamily));
+                        CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily, message->ConnectAddressFamily));
                     update = true;
                 }
                 catch (...)
