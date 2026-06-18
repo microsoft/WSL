@@ -58,12 +58,8 @@ class WSLCE2EVolumePruneTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_NoAllFlag_PrunesUnusedNamedVolume)
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_NoAllFlag_PreservesNamedVolumes)
     {
-        // Unlike docker, podman's volume prune has no "anonymous-only" default mode:
-        // a plain `volume prune` (without --all) removes every unused volume, including
-        // named ones. See WSLCVolumes::PruneVolumes, which strips the "all" filter and
-        // forwards to podman's prune-all-unused behavior.
         RunWslc(std::format(L"volume create {}", TestVolumeName)).Verify({.Stderr = L"", .ExitCode = 0});
         VerifyVolumeIsListed(TestVolumeName);
 
@@ -73,12 +69,11 @@ class WSLCE2EVolumePruneTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
-        VERIFY_ARE_EQUAL(3u, output.size());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[0].find(std::format(L"Deleted: {}", TestVolumeName)));
-        VERIFY_ARE_EQUAL(output[1], L"");
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[2].find(L"Total reclaimed space:"));
+        VERIFY_ARE_EQUAL(2u, output.size());
+        VERIFY_ARE_EQUAL(output[0], L"");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[1].find(L"Total reclaimed space:"));
 
-        VerifyVolumeIsNotListed(TestVolumeName);
+        VerifyVolumeIsListed(TestVolumeName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_AllFlag_RemovesNamedVolume)

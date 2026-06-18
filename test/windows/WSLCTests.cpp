@@ -4764,9 +4764,9 @@ class WSLCTests
         // Prune with no eligible volumes (none created yet) returns an empty set.
         expectPrune({}, {{"all", "true"}});
 
-        // podman has no docker-style "anonymous-only" default: prune always targets all unused
-        // volumes regardless of the all filter (WSLC strips the unsupported all filter). With none
-        // present, returns empty.
+        // Without the "all" filter, prune targets only anonymous unused volumes
+        // (Docker-compatible, honored by the patched podman compat /volumes/prune).
+        // With no volumes present, returns empty.
         expectPrune({});
 
         // all=true prunes unused named guest volumes.
@@ -4787,6 +4787,18 @@ class WSLCTests
             auto volumes = ListVolumes();
             VERIFY_IS_FALSE(volumes.contains(a));
             VERIFY_IS_FALSE(volumes.contains(b));
+        }
+
+        // Without all=true, an unused *named* volume is preserved (only anonymous volumes
+        // are pruned). Mirrors docker; relies on the patched podman compat /volumes/prune.
+        {
+            const std::string named = "wslc-prune-named-keep";
+            CreateNamedVolume(named, "guest");
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(named.c_str())); });
+
+            expectPrune({});
+            VERIFY_IS_TRUE(ListVolumes().contains(named));
         }
 
         // In-use volume is not pruned.
