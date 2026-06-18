@@ -29,7 +29,6 @@ std::vector<Argument> VolumePruneCommand::GetArguments() const
     return {
         Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_VolumePruneAllArgDescription()),
         Argument::Create(ArgType::Filter, false, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

@@ -29,7 +29,6 @@ std::vector<Argument> ImageImportCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ImportFile, true),
         Argument::Create(ArgType::ImageId),
-        Argument::Create(ArgType::Session),
     };
 }
 

@@ -29,7 +29,6 @@ std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

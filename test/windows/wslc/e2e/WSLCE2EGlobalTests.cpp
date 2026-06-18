@@ -116,7 +116,7 @@ class WSLCE2EGlobalTests
 
         // Try to explicitly target the admin session from non-elevated process
         auto adminName = GetExpectedDefaultSessionName(true);
-        result = RunWslc(std::format(L"container list --session {}", adminName), ElevationType::NonElevated);
+        result = RunWslc(std::format(L"--session {} container list", adminName), ElevationType::NonElevated);
 
         // Should fail with access denied.
         result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
@@ -130,7 +130,7 @@ class WSLCE2EGlobalTests
 
         // Elevated user should be able to explicitly target the non-admin session
         auto nonAdminName = GetExpectedDefaultSessionName(false);
-        result = RunWslc(std::format(L"container list --session {}", nonAdminName), ElevationType::Elevated);
+        result = RunWslc(std::format(L"--session {} container list", nonAdminName), ElevationType::Elevated);
 
         // This should work - elevated users can access non-elevated sessions
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -144,11 +144,11 @@ class WSLCE2EGlobalTests
         // Ensure elevated cannot create the non-elevated session.
         auto nonAdminName = GetExpectedDefaultSessionName(false);
         auto adminName = GetExpectedDefaultSessionName(true);
-        auto result = RunWslc(std::format(L"container list --session {}", nonAdminName), ElevationType::Elevated);
+        auto result = RunWslc(std::format(L"--session {} container list", nonAdminName), ElevationType::Elevated);
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
 
         // Ensure non-elevated cannot create the elevated session.
-        result = RunWslc(std::format(L"container list --session {}", adminName), ElevationType::NonElevated);
+        result = RunWslc(std::format(L"--session {} container list", adminName), ElevationType::NonElevated);
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
@@ -378,7 +378,7 @@ class WSLCE2EGlobalTests
         EnsureImageIsLoaded(DebianTestImage(), session.Name());
 
         // Verify targeting a non-existent session fails.
-        auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
+        auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");
         result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
 
         // Verify session list
@@ -391,12 +391,12 @@ class WSLCE2EGlobalTests
         VERIFY_ARE_NOT_EQUAL(findResult, std::wstring::npos);
 
         // Run container list in the test session, which should succeed if the session is valid.
-        result = RunWslc(std::format(L"container list --session {}", session.Name()));
+        result = RunWslc(std::format(L"--session {} container list", session.Name()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Add a container to the new session.
         result = RunWslc(
-            std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+            std::format(L"--session {} container create --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 
@@ -492,6 +492,29 @@ class WSLCE2EGlobalTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Session_Run)
+    {
+        {
+            auto result = RunWslc(L"system session run echo OK");
+            result.Verify({.Stdout = L"OK\n", .Stderr = L"", .ExitCode = 0});
+        }
+
+        {
+            auto result = RunWslc(std::format(L"--session {} system session run echo OK", GetExpectedDefaultSessionName(true)));
+            result.Verify({.Stdout = L"OK\n", .Stderr = L"", .ExitCode = 0});
+        }
+
+        {
+            auto result = RunWslc(L"--session not-found system session run echo OK");
+            result.Verify({.Stdout = L"", .Stderr = L"Session not found: 'not-found'\r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        }
+
+        {
+            auto result = RunWslc(L"system session run not-found");
+            result.Verify({.Stdout = L"", .Stderr = L"Failed to launch command not-found. Errno = 2\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Session_List_Verbose)
     {
         auto result = RunWslc(L"container list");
@@ -553,6 +576,7 @@ private:
             {L"build", Localization::WSLCCLI_ImageBuildDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
+            {L"export", Localization::WSLCCLI_ContainerExportDesc()},
             {L"images", Localization::WSLCCLI_ImageListDesc()},
             {L"import", Localization::WSLCCLI_ImageImportDesc()},
             {L"inspect", Localization::WSLCCLI_InspectDesc()},

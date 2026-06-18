@@ -86,11 +86,16 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
+        auto session = OpenDefaultElevatedSession();
+
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 5000);
+        auto reference = std::format(L"{}/invalid-image:latest", registryAddress);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
+
         std::wstringstream expectedError;
-        expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
-                      << L"manifest for " << InvalidImage.NameAndTag()
-                      << L" not found: manifest unknown: manifest tagged by \"latest\" is not found\r\n"
+        expectedError << L"Image '" << reference << L"' not found, pulling\r\n"
+                      << L"manifest for " << reference << L" not found: manifest unknown: manifest unknown\r\n"
                       << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
@@ -435,7 +440,7 @@ class WSLCE2EContainerCreateTests
 
         // Start the container.
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
 
         // Verify with retry timeout of 1 minute.
         VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
@@ -453,7 +458,7 @@ class WSLCE2EContainerCreateTests
 
         // Start again - should succeed without error
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is still running
         VerifyContainerIsListed(containerId, L"running");
@@ -1183,7 +1188,6 @@ private:
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --session         Specify the session to use\r\n"
                 << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

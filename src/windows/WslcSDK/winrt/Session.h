@@ -45,12 +45,15 @@ private:
     void EnsureStarted() const;
     winrt::Microsoft::WSL::Containers::SessionSettings m_settings; // Only kept until Start() is called
 
-    static void CALLBACK TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept;
+    // Threadpool callback that raises the Terminated event once the session's termination handle is signaled.
+    static void CALLBACK OnTerminated(PTP_CALLBACK_INSTANCE instance, PVOID context, PTP_WAIT wait, TP_WAIT_RESULT waitResult) noexcept;
 
-    // Releasing the session handle may trigger the termination callback.
-    // Keep these two in this order so that the session handle is released before the termination event is destructed.
     winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;
     wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
+
+    // Bridges the one-off termination event surfaced by the SDK to the WinRT Terminated event.
+    wil::unique_handle m_terminationEvent;
+    wil::unique_threadpool_wait m_terminationWait;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {

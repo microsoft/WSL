@@ -341,6 +341,6 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

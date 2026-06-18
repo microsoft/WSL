@@ -15,7 +15,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include <fstream>
 
 namespace WSLCE2ETests {
 
@@ -60,7 +59,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
 
         auto buildResult = RunWslc(
             std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImage.NameAndTag()));
@@ -84,10 +83,10 @@ class WSLCE2EImageBuildTests
 
         // Create a simple file in the context directory
         auto filePath = contextDir / L"hello.txt";
-        WriteTestFile(filePath, "hello from wslc build\n");
+        WriteTestFileContent(filePath, "hello from wslc build\n");
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath,
             "FROM debian:latest\n"
             "ARG TEST_LABEL=default_value\n"
@@ -134,7 +133,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
 
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
@@ -158,7 +157,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath,
             "FROM debian:latest AS build-stage\n"
             "RUN echo build > /stage.txt\n"
@@ -198,8 +197,8 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-both-files";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        WriteTestFile(testRoot / L"Dockerfile", "FROM debian:latest\n");
-        WriteTestFile(testRoot / L"Containerfile", "FROM debian:latest\n");
+        WriteTestFileContent(testRoot / L"Dockerfile", "FROM debian:latest\n");
+        WriteTestFileContent(testRoot / L"Containerfile", "FROM debian:latest\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
         buildResult.Verify(
@@ -226,7 +225,7 @@ class WSLCE2EImageBuildTests
         auto cleanup = SetupTestDirectory(testRoot);
 
         auto containerfilePath = testRoot / L"Containerfile";
-        WriteTestFile(containerfilePath, "FROM debian:latest\n");
+        WriteTestFileContent(containerfilePath, "FROM debian:latest\n");
 
         // Deny read access so wslc cannot open the file.
         SetPathAccess(containerfilePath, GENERIC_READ, DENY_ACCESS);
@@ -254,7 +253,7 @@ class WSLCE2EImageBuildTests
         // `RUN date +%N` produces a different output each invocation, so without caching the
         // resulting layer (and therefore the image id) changes every build.
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath,
             "FROM debian:latest\n"
             "RUN date +%N > /timestamp.txt\n");
@@ -296,7 +295,7 @@ private:
         auto testRoot = std::filesystem::current_path() / image.Name;
         auto cleanup = SetupTestDirectory(testRoot);
 
-        WriteTestFile(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
+        WriteTestFileContent(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\" -t {}", testRoot.wstring(), image.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
@@ -317,30 +316,6 @@ private:
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
         EnsureImageIsDeleted(BuiltImageNoCache);
-    }
-
-    static auto SetupTestDirectory(const std::filesystem::path& testRoot)
-    {
-        std::error_code ec;
-        std::filesystem::remove_all(testRoot, ec);
-        THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(testRoot), "%hs", ec.message().c_str());
-
-        std::filesystem::create_directories(testRoot, ec);
-        THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(testRoot), "%hs", ec.message().c_str());
-
-        return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [testRoot]() {
-            std::error_code removeError;
-            std::filesystem::remove_all(testRoot, removeError);
-        });
-    }
-
-    static void WriteTestFile(const std::filesystem::path& path, const std::string& content)
-    {
-        std::ofstream file(path);
-        THROW_HR_IF(E_FAIL, !file.is_open());
-        file << content;
-        THROW_HR_IF(E_FAIL, !file.good());
-        file.close();
     }
 };
 } // namespace WSLCE2ETests

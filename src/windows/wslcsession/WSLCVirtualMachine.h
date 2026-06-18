@@ -170,6 +170,12 @@ public:
         return m_vmTerminatingEvent.get();
     }
 
+    // Retrieves the cached termination reason and details from the underlying VM.
+    HRESULT GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) const
+    {
+        return m_vm->GetTerminationReason(Reason, Details);
+    }
+
     GUID VmId() const
     {
         return m_vmId;

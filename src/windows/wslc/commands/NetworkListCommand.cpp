@@ -30,7 +30,6 @@ std::vector<Argument> NetworkListCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_NetworkListQuietArgDesc()),
-        Argument::Create(ArgType::Session),
     };
 }
 
