@@ -108,21 +108,6 @@ try
 }
 CATCH_LOG()
 
-void WriteDockerDaemonConfig()
-try
-{
-    constexpr auto c_daemonConfigPath = "/etc/docker/daemon.json";
-
-    THROW_ERRNO_IF(EEXIST, std::filesystem::exists(c_daemonConfigPath));
-
-    nlohmann::json config = nlohmann::json::object();
-    config["features"]["cdi"] = true;
-
-    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/docker", 0755) < 0);
-    THROW_LAST_ERROR_IF(WriteToFile(c_daemonConfigPath, config.dump().c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
-}
-CATCH_LOG()
-
 int WslcGpuHookEntry()
 try
 {
@@ -737,7 +722,6 @@ void HandleMessageImpl(
             THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSLC_GPU_HOOK) < 0 && errno != EEXIST);
 
             WriteWslcCdiSpec();
-            WriteDockerDaemonConfig();
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
