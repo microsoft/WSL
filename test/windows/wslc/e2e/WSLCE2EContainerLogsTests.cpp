@@ -195,7 +195,13 @@ class WSLCE2EContainerLogsTests
         {
             if (!line.empty())
             {
-                VERIFY_IS_TRUE(line.find(L'T') != std::wstring::npos);
+                // Validate RFC3339 structure: YYYY-MM-DDTHH:MM:SS at the start of the line
+                VERIFY_IS_TRUE(line.size() >= 20);
+                VERIFY_ARE_EQUAL(line[4], L'-');
+                VERIFY_ARE_EQUAL(line[7], L'-');
+                VERIFY_ARE_EQUAL(line[10], L'T');
+                VERIFY_ARE_EQUAL(line[13], L':');
+                VERIFY_ARE_EQUAL(line[16], L':');
             }
         }
     }

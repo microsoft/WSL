@@ -236,60 +236,24 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
 }
 
 // Parses an RFC3339 timestamp (e.g. "2024-01-15T10:30:00Z" or "2024-01-15T10:30:00+05:30")
-// into a ULONGLONG Unix epoch value using std::chrono::parse.
+// into a ULONGLONG Unix epoch seconds value using std::chrono::parse.
+// Note: +HHMM (no colon) offsets are not supported; use +HH:MM format.
 static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
 {
-    // Strip fractional seconds (e.g. ".123456789") before parsing, since we only need
-    // second-level precision and std::chrono::parse into sys_seconds doesn't consume them.
     std::string normalized = input;
-    auto dotPos = normalized.find('.');
-    if (dotPos != std::string::npos)
-    {
-        auto endOfFrac = dotPos + 1;
-        if (endOfFrac >= normalized.size() || normalized[endOfFrac] < '0' || normalized[endOfFrac] > '9')
-        {
-            return std::nullopt; // '.' with no digits is invalid per RFC3339
-        }
-
-        while (endOfFrac < normalized.size() && normalized[endOfFrac] >= '0' && normalized[endOfFrac] <= '9')
-        {
-            ++endOfFrac;
-        }
-
-        normalized.erase(dotPos, endOfFrac - dotPos);
-    }
 
     // Normalize trailing 'Z'/'z' to '+00:00' so %Ez can parse it uniformly.
-    // This avoids %Z greedily consuming trailing characters as a timezone abbreviation.
     if (!normalized.empty() && (normalized.back() == 'Z' || normalized.back() == 'z'))
     {
         normalized.pop_back();
         normalized += "+00:00";
     }
 
-    // Validate the date components from the input before parsing the full timestamp.
-    // std::chrono::parse normalizes invalid dates (e.g. Feb 31 → March) instead of rejecting them,
-    // so we pre-validate the year-month-day from the input string.
-    if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
-    {
-        int year{}, month{}, day{};
-        auto r1 = std::from_chars(normalized.data(), normalized.data() + 4, year);
-        auto r2 = std::from_chars(normalized.data() + 5, normalized.data() + 7, month);
-        auto r3 = std::from_chars(normalized.data() + 8, normalized.data() + 10, day);
-        if (r1.ec == std::errc() && r2.ec == std::errc() && r3.ec == std::errc())
-        {
-            std::chrono::year_month_day ymd{
-                std::chrono::year{year}, std::chrono::month{static_cast<unsigned>(month)}, std::chrono::day{static_cast<unsigned>(day)}};
-            if (!ymd.ok())
-            {
-                return std::nullopt;
-            }
-        }
-    }
-
-    std::chrono::sys_seconds utcSeconds;
+    // Parse into millisecond precision so fractional seconds (e.g. ".123456789") are consumed
+    // by std::chrono::parse rather than requiring manual stripping.
+    std::chrono::sys_time<std::chrono::milliseconds> utcTime;
     std::istringstream stream(normalized);
-    stream >> std::chrono::parse("%FT%T%Ez", utcSeconds);
+    stream >> std::chrono::parse("%FT%T%Ez", utcTime);
     if (stream.fail())
     {
         return std::nullopt;
@@ -301,7 +265,7 @@ static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
         return std::nullopt;
     }
 
-    auto epochSeconds = utcSeconds.time_since_epoch().count();
+    auto epochSeconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch()).count();
     if (epochSeconds < 0)
     {
         return std::nullopt;

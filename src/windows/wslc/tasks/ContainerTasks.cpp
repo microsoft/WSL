@@ -776,6 +776,9 @@ void ViewContainerLogs(CLIExecutionContext& context)
         tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
     }
 
+    // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
+    // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
+    // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
