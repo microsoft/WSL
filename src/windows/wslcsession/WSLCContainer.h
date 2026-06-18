@@ -140,7 +140,6 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
-        WSLCVolumes& Volumes,
         IORelay& Relay);
 
     static std::unique_ptr<WSLCContainerImpl> Open(

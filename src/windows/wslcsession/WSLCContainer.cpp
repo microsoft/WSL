@@ -890,11 +890,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
-    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
-
-    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
-    MapPorts();
-
     m_stopNotification.Event.ResetEvent();
     m_stopNotification.EventTime.store(0, std::memory_order_relaxed);
 
@@ -1540,7 +1535,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
-    WSLCVolumes& Volumes,
     IORelay& IoRelay)
 {
     common::docker_schema::CreateContainer request;
@@ -1736,7 +1730,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    ProcessNamedVolumes(containerOptions, request, Volumes);
+    ProcessNamedVolumes(containerOptions, request, volumesManager);
 
     // Configure GPU support if requested.
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsGpu))
@@ -1931,7 +1925,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     {
         if (mount.Type == "volume" && !mount.Name.empty())
         {
-            Volumes.TrackExistingVolume(mount.Name);
+            volumesManager.TrackExistingVolume(mount.Name);
         }
     }
 

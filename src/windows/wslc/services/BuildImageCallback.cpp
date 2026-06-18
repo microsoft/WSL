@@ -179,7 +179,7 @@ try
         const auto newlines = wide.substr(bodyLength);
         wide.resize(bodyLength);
 
-        WriteTerminal(std::format(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines))
+        WriteTerminal(std::format(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines));
         return S_OK;
     }
 

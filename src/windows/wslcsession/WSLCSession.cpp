@@ -1970,7 +1970,6 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
-            m_volumes.value(),
             m_ioRelay);
 
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
