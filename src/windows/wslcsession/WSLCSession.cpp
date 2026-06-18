@@ -2421,6 +2421,18 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
+    // Validate filter keys client-side: podman returns HTTP 500 (-> E_FAIL) for an unknown filter,
+    // but an unknown filter key is a bad argument. podman's volume-prune endpoint
+    // (GeneratePruneVolumeFilters) supports after/since/label/label!/until; "all" is a WSLC-level
+    // filter that WSLCVolumes::PruneVolumes consumes (stripped before the request reaches podman).
+    for (const auto& [key, values] : filters)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            std::format("invalid filter '{}'", key),
+            key != "all" && key != "after" && key != "since" && key != "label" && key != "label!" && key != "until");
+    }
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
@@ -2780,6 +2792,15 @@ try
     *NetworksCount = 0;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
+    // Validate filter keys client-side: podman returns HTTP 500 (-> E_FAIL) for an unknown filter,
+    // but an unknown filter key is a bad argument. The network-prune endpoint supports until/label
+    // (and label! for negated label match).
+    for (const auto& [key, values] : filters)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, std::format("invalid filter '{}'", key), key != "until" && key != "label" && key != "label!");
+    }
 
     // Scope the prune to WSLC-managed networks.
     filters["label"].push_back(WSLCNetworkManagedLabel);

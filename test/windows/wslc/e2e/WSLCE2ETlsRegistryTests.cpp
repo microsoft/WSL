@@ -29,7 +29,7 @@ using namespace wsl::windows::common;
 namespace {
     // The bridge IP assigned to the first container started in a fresh session. The registry is always
     // the first container we start in this test's session, so this is deterministic.
-    constexpr auto c_registryIp = "172.17.0.2";
+    constexpr auto c_registryIp = "10.88.0.2";
     constexpr USHORT c_registryPort = 5000;
 
     // DER-encodes a certificate-extension value structure (e.g. CERT_ALT_NAME_INFO for the SAN OID).
