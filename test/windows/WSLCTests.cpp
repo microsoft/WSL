@@ -5566,15 +5566,14 @@ class WSLCTests
 
         // Validate that hostname and domainname are correctly wired.
         {
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname); echo $(domainname)"});
+            WSLCContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
-            ValidateProcessOutput(process, {{1, "my-host-name\nmy-domain-name\n"}});
+            ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
         }
 
         // Validate that containers without DNS configuration use default DNS.
@@ -11017,9 +11016,11 @@ class WSLCTests
             std::filesystem::remove_all(storagePath, ec);
         });
 
-        // Create a session and, via the docker CLI, inject a "local" volume with driver options we don't support (type=nfs).
+        // Create a session and, via the podman CLI, inject a "local" volume with driver options we don't support (type=nfs).
         // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
-        // session recovers it.
+        // session recovers it. The backend's /usr/bin/docker shim targets a non-existent dockerd socket in the podman-based
+        // system distro, so inject via podman directly. podman's local driver does not validate the opts and silently creates
+        // the volume (exit 0), which is exactly the unsupported state we want to recover from.
         {
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
             settings.StoragePath = storagePath.c_str();
@@ -11027,7 +11028,7 @@ class WSLCTests
 
             ExpectCommandResult(
                 session.get(),
-                {"/usr/bin/docker",
+                {"/usr/bin/podman",
                  "volume",
                  "create",
                  "--driver",
@@ -11061,8 +11062,9 @@ class WSLCTests
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
-            // Clean up the volume from Docker's metadata.
-            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);
+            // Clean up the volume from the backend's metadata via podman directly (the /usr/bin/docker shim targets a
+            // non-existent dockerd socket in the podman-based system distro).
+            ExpectCommandResult(session.get(), {"/usr/bin/podman", "volume", "rm", "-f", c_volumeName}, 0);
 
             VERIFY_SUCCEEDED(session->Terminate());
         }

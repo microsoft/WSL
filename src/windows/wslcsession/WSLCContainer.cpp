@@ -1828,8 +1828,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         // In that networking mode, the host port always matches the vm port.
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
-        portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = e.VmMapping.PublishHostIp(), .HostPort = std::to_string(hostPort)});
+        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = e.VmMapping.PublishHostIp(), .HostPort = std::to_string(hostPort)});
     }
 
     auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);

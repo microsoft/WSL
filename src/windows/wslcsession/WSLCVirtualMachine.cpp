@@ -964,13 +964,7 @@ void WSLCVirtualMachine::MapRelayPort(
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
     THROW_IF_FAILED_MSG(
-        result,
-        "Failed to map port: WindowsPort=%d, LinuxPort=%d, ListenFamily=%d, ConnectFamily=%d, Remove=%d",
-        WindowsPort,
-        LinuxPort,
-        ListenFamily,
-        ConnectFamily,
-        Remove);
+        result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, ListenFamily=%d, ConnectFamily=%d, Remove=%d", WindowsPort, LinuxPort, ListenFamily, ConnectFamily, Remove);
 }
 
 void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
