@@ -1182,10 +1182,21 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
 
     if (pendingErrorJson.has_value())
     {
-        auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+        try
+        {
+            auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, httpStatusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, httpStatusCode == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, *pendingErrorJson);
+        }
     }
 }
 
@@ -2400,6 +2411,7 @@ HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULON
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, DestPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, DestPath[0] == '\0');
     return CallImpl(&WSLCContainerImpl::UploadArchive, TarHandle, DestPath, ContentSize);
 }
 

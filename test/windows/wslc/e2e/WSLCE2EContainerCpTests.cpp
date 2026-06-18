@@ -226,8 +226,7 @@ class WSLCE2EContainerCpTests
 
         CreateTestTarFile();
 
-        const auto cpResult =
-            RunWslcWithStdinFile(std::format(L"container cp -a=true - {}:/tmp", WslcContainerName), TarPath);
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp -a=true - {}:/tmp", WslcContainerName), TarPath);
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
@@ -246,8 +245,7 @@ class WSLCE2EContainerCpTests
 
         CreateTestTarFile();
 
-        const auto cpResult =
-            RunWslcWithStdinFile(std::format(L"container cp -a=false - {}:/tmp", WslcContainerName), TarPath);
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp -a=false - {}:/tmp", WslcContainerName), TarPath);
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
@@ -266,8 +264,7 @@ class WSLCE2EContainerCpTests
 
         CreateTestTarFile();
 
-        const auto cpResult =
-            RunWslcWithStdinFile(std::format(L"container cp --archive=true - {}:/tmp", WslcContainerName), TarPath);
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp --archive=true - {}:/tmp", WslcContainerName), TarPath);
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
@@ -286,8 +283,7 @@ class WSLCE2EContainerCpTests
 
         CreateTestTarFile();
 
-        const auto cpResult =
-            RunWslcWithStdinFile(std::format(L"container cp --archive=false - {}:/tmp", WslcContainerName), TarPath);
+        const auto cpResult = RunWslcWithStdinFile(std::format(L"container cp --archive=false - {}:/tmp", WslcContainerName), TarPath);
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
@@ -302,8 +298,7 @@ class WSLCE2EContainerCpTests
         // Test -a=invalid should fail with an error.
         CreateTestTarFile();
 
-        const auto result =
-            RunWslcWithStdinFile(std::format(L"container cp -a=invalid - {}:/tmp", WslcContainerName), TarPath);
+        const auto result = RunWslcWithStdinFile(std::format(L"container cp -a=invalid - {}:/tmp", WslcContainerName), TarPath);
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());

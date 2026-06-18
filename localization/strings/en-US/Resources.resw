@@ -2450,8 +2450,8 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
     <value>Copy a tar archive from stdin into a container. Use '-' as the source to read from stdin.
-Usage: wslc container cp - CONTAINER:DEST_PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:DEST_PATH"}</comment>
+Usage: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}</comment>
   </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Source path or '-' to read from stdin</value>

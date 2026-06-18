@@ -310,6 +310,9 @@ void CopyToContainer(CLIExecutionContext& context)
         contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
     }
 
+    // Note: The --archive/-a flag is accepted for CLI compatibility with docker cp, but is a
+    // no-op here. Since stdin provides a pre-built tar archive, uid/gid ownership is already
+    // encoded in the tar headers and Docker's PUT /archive extracts preserving that metadata.
     ContainerService::CopyToContainer(session, containerId, destPath, stdinHandle, contentSize);
 }
 
