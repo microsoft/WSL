@@ -8,80 +8,204 @@ Module Name:
 
 Abstract:
 
-    Header file for outputting data in a table format.
+    Structured table output for the WSLC CLI. Cells are either plain text or
+    format-string + Sequence args. Sequences are zero display width; the table
+    measures visible width by counting non-placeholder characters. At render
+    time, sequences are emitted or stripped based on Reporter color state.
 
 --*/
 #pragma once
 
 #include <algorithm>
 #include <array>
-#include <cwchar>
-#include <functional>
-#include <sstream>
+#include <initializer_list>
+#include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
-#include <wslutil.h>
+#include "Reporter.h"
+#include "VTSupport.h"
 
 namespace wsl::windows::wslc {
 
-namespace detail {
-    // This function outputs a table line.
-    inline void PrintTableLine(const std::wstring& line, FILE* stream)
-    {
-        ::wsl::windows::common::wslutil::PrintMessage(line, stream);
-    }
-} // namespace detail
+using namespace wsl::windows::common::vt;
 
-// Helper function to get display width of a string
-// For now, uses simple length (can be enhanced with proper Unicode width calculation)
-inline size_t GetStringColumnWidth(const wchar_t* str)
+// A table cell: either plain text or a format string with Sequence placeholders.
+// Every {} in the format string corresponds to a Sequence (zero display width).
+// Visible width is the count of non-placeholder characters in the format string.
+struct FormattedCell
 {
-    if (!str)
-    {
-        return 0;
-    }
-    return wcslen(str);
-}
+    std::wstring fmt;
+    std::vector<const Sequence*> sequences;
 
-// Helper function to trim string to a specific column width
-inline std::wstring TrimStringToColumnWidth(const wchar_t* str, size_t maxWidth, size_t& actualWidth)
+    // Default constructor — empty cell.
+    FormattedCell() = default;
+
+    // Implicit from wstring — plain text cell (no formatting).
+    FormattedCell(std::wstring text) : fmt(std::move(text))
+    {
+    }
+
+    // Implicit from wstring_view.
+    FormattedCell(std::wstring_view text) : fmt(text)
+    {
+    }
+
+    // Implicit from literal.
+    FormattedCell(const wchar_t* text) : fmt(text)
+    {
+    }
+
+    // Formatted cell: format string with Sequence placeholders.
+    FormattedCell(std::wstring format, std::initializer_list<const Sequence*> seqs) : fmt(std::move(format)), sequences(seqs)
+    {
+    }
+
+    // Single-sequence cell: wraps text with the sequence and a trailing reset.
+    FormattedCell(std::wstring_view text, const Sequence& seq) : sequences({&seq, &Format::Default})
+    {
+        fmt.reserve(4 + text.size());
+        fmt += L"{}";
+        fmt += text;
+        fmt += L"{}";
+    }
+
+    // Visible width: count characters that are not part of {} placeholders.
+    size_t VisibleWidth() const
+    {
+        size_t width = 0;
+        for (size_t i = 0; i < fmt.size(); ++i)
+        {
+            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
+            {
+                ++i; // skip the pair
+            }
+            else
+            {
+                ++width;
+            }
+        }
+        return width;
+    }
+
+    // Renders the cell with or without sequences.
+    // When colorEnabled, {} placeholders are replaced with sequence bytes.
+    // When !colorEnabled, {} placeholders are replaced with empty.
+    std::wstring Render(bool colorEnabled) const
+    {
+        if (sequences.empty())
+        {
+            return fmt; // plain text, no placeholders
+        }
+
+        std::wstring result;
+        result.reserve(fmt.size() + (colorEnabled ? sequences.size() * 8 : 0));
+        size_t seqIdx = 0;
+
+        for (size_t i = 0; i < fmt.size(); ++i)
+        {
+            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
+            {
+                if (colorEnabled && seqIdx < sequences.size())
+                {
+                    result.append(sequences[seqIdx]->Get());
+                }
+                ++seqIdx;
+                ++i; // skip the pair
+            }
+            else
+            {
+                result += fmt[i];
+            }
+        }
+
+        return result;
+    }
+
+    // Renders with visible text truncated to maxWidth characters, appending ellipsis.
+    // Sequences after the truncation point are still emitted (for resets).
+    std::wstring RenderTruncated(size_t maxWidth, bool colorEnabled) const
+    {
+        if (sequences.empty())
+        {
+            // Plain text: simple truncation.
+            if (fmt.size() <= maxWidth)
+            {
+                return fmt;
+            }
+            return fmt.substr(0, maxWidth > 0 ? maxWidth - 1 : 0) + L"\u2026";
+        }
+
+        std::wstring result;
+        result.reserve(fmt.size());
+        size_t seqIdx = 0;
+        size_t visibleChars = 0;
+        bool truncated = false;
+
+        for (size_t i = 0; i < fmt.size(); ++i)
+        {
+            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
+            {
+                // Always emit sequences (they're invisible); they handle resets after truncation.
+                if (colorEnabled && seqIdx < sequences.size())
+                {
+                    result.append(sequences[seqIdx]->Get());
+                }
+                ++seqIdx;
+                ++i;
+            }
+            else if (!truncated)
+            {
+                if (visibleChars < maxWidth - 1)
+                {
+                    result += fmt[i];
+                    ++visibleChars;
+                }
+                else
+                {
+                    result += L'\u2026';
+                    truncated = true;
+                }
+            }
+            // After truncation, skip remaining visible chars but continue to emit sequences.
+        }
+
+        return result;
+    }
+};
+
+// Controls how a column handles content that exceeds its available width.
+enum class ColumnOverflow
 {
-    if (!str)
-    {
-        actualWidth = 0;
-        return L"";
-    }
+    // Truncates content with an ellipsis at MaxWidth; column width is fixed and does not
+    // participate in the shrink loop.
+    Truncate,
 
-    size_t len = wcslen(str);
-    if (len <= maxWidth)
-    {
-        actualWidth = len;
-        return std::wstring(str);
-    }
+    // Participates in the shrink loop: reduced largest-first down to MinWidth, then truncated.
+    // PreferredShrink=true marks this as a higher-priority shrink target.
+    Shrink,
 
-    actualWidth = maxWidth;
-    return std::wstring(str, maxWidth);
-}
+    // Wraps long values across multiple physical rows; width is remaining space after other columns.
+    Wrap,
+};
 
-// Column width configuration options
 struct ColumnWidthConfig
 {
     static constexpr size_t NoLimit = 0;
 
-    size_t MinWidth = NoLimit;   // Minimum column width (NoLimit = use header width)
-    size_t MaxWidth = NoLimit;   // Maximum column width (NoLimit = unlimited)
-    bool PreferredShrink = true; // Should this column shrink first when space is limited?
+    size_t MinWidth = NoLimit; // Minimum visible width (NoLimit = header width).
+    size_t MaxWidth = NoLimit; // Maximum visible width cap (NoLimit = unlimited).
+    ColumnOverflow Overflow = ColumnOverflow::Truncate;
+    bool PreferredShrink = true; // Prioritizes this column in the shrink loop.
 };
 
-// Column definition with name and configuration
 struct ColumnDefinition
 {
     std::wstring Name;
     ColumnWidthConfig Config;
 };
 
-// Enables output data in a table format.
 // TODO: Improve for use with sparse data.
 template <size_t FieldCount>
 struct TableOutput
@@ -89,38 +213,41 @@ struct TableOutput
     static_assert(FieldCount > 0, "TableOutput requires at least one column");
 
     using header_t = std::array<std::wstring, FieldCount>;
-    using line_t = std::array<std::wstring, FieldCount>;
+    using line_t = std::array<FormattedCell, FieldCount>;
     using column_config_t = std::array<ColumnWidthConfig, FieldCount>;
     using column_def_t = std::array<ColumnDefinition, FieldCount>;
-    using OutputFn = std::function<void(const std::wstring&)>;
 
     static constexpr size_t DefaultColumnPadding = 3; // Docker-like spacing between columns
 
-    // For redirected console the receiver controls the width. This should be a large value but not
-    // too large. A few thousand should be reasonable and prevents potential arithmetic issues later.
+    // Generous fallback used when the destination is redirected (no real console width).
+    // The wrap pass is skipped in that case so the receiver controls its own width.
     static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
 
-    // Constructor with default behavior (no column limits)
-    TableOutput(header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(false), m_columnPadding(columnPadding), m_outputFn(DefaultOutputFn())
+    TableOutput(Reporter& reporter, header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding, Reporter::Level level = Reporter::Level::Output) :
+        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding)
     {
         InitializeColumns(std::move(header));
     }
 
-    // Constructor with column width configuration (legacy)
-    TableOutput(header_t&& header, column_config_t&& config, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer),
-        m_limitColumnWidths(true),
-        m_columnPadding(columnPadding),
-        m_columnConfigs(std::move(config)),
-        m_outputFn(DefaultOutputFn())
+    TableOutput(
+        Reporter& reporter,
+        header_t&& header,
+        column_config_t&& config,
+        size_t sizingBuffer = 50,
+        size_t columnPadding = DefaultColumnPadding,
+        Reporter::Level level = Reporter::Level::Output) :
+        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding), m_columnConfigs(std::move(config))
     {
         InitializeColumns(std::move(header));
     }
 
-    // Constructor with column definitions (name + config together)
-    TableOutput(column_def_t&& columns, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(true), m_columnPadding(columnPadding), m_outputFn(DefaultOutputFn())
+    TableOutput(
+        Reporter& reporter,
+        column_def_t&& columns,
+        size_t sizingBuffer = 50,
+        size_t columnPadding = DefaultColumnPadding,
+        Reporter::Level level = Reporter::Level::Output) :
+        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding)
     {
         header_t headers;
         for (size_t i = 0; i < FieldCount; ++i)
@@ -131,61 +258,79 @@ struct TableOutput
         InitializeColumns(std::move(headers));
     }
 
-    // Enable/disable column width limiting
-    void SetColumnWidthLimiting(bool enable)
-    {
-        m_limitColumnWidths = enable;
-    }
-
-    // Set configuration for a specific column
+    // Updates config store and Column state; safe to call after construction.
     void SetColumnConfig(size_t columnIndex, const ColumnWidthConfig& config)
     {
         if (columnIndex < FieldCount)
         {
             m_columnConfigs[columnIndex] = config;
+            SyncColumnFromConfig(columnIndex);
         }
     }
 
-    // Set whether to always show header even when there are no rows
     void SetAlwaysShowHeader(bool alwaysShow)
     {
         m_alwaysShowHeader = alwaysShow;
     }
-
-    // Set whether to show the header row
     void SetShowHeader(bool showHeader)
     {
         m_showHeader = showHeader;
     }
-
-    // Override the output function (e.g. redirect to a stringstream in tests).
-    void SetOutputFunction(OutputFn fn)
+    // Sets spaces prepended to every row. Does not affect column width calculations.
+    void SetRowIndent(size_t spaces)
     {
-        FAIL_FAST_IF_MSG(!fn, "OutputFn must not be empty");
-        m_outputFn = std::move(fn);
+        m_rowIndent = spaces;
     }
 
-    // Override the console width used for column shrinking (useful in tests).
-    // Pass 0 to restore the default behaviour (query the real console).
+    // Overrides console width for column shrinking; pass 0 to restore default (Reporter-derived).
+    // When set, the wrap pass also runs as if a real console were attached.
     void SetConsoleWidthOverride(size_t width)
     {
         m_consoleWidthOverride = width;
     }
+    // Promotes all Truncate columns to Shrink globally; no effect on Wrap columns.
+    void SetColumnWidthLimiting(bool enable)
+    {
+        for (size_t i = 0; i < FieldCount; ++i)
+        {
+            if (enable && m_columnConfigs[i].Overflow == ColumnOverflow::Truncate)
+            {
+                m_columnConfigs[i].Overflow = ColumnOverflow::Shrink;
+                SyncColumnFromConfig(i);
+            }
+        }
+    }
 
-    void OutputLine(line_t&& line)
+    void WriteRow(line_t&& line)
     {
         m_empty = false;
 
-        // When width limiting is disabled, buffer all rows to ensure accurate column sizing
-        // and prevent truncation (e.g., for --no-trunc flag)
-        if (!m_limitColumnWidths || m_buffer.size() < m_sizingBuffer)
+        // Buffer rows to ensure accurate column sizing before flush.
+        if (m_dataRowCount < m_sizingBuffer)
         {
             m_buffer.emplace_back(std::move(line));
+            ++m_dataRowCount;
         }
         else
         {
             EvaluateAndFlushBuffer();
             OutputLineToStream(line);
+        }
+    }
+
+    // Emits a standalone text line that does not participate in column sizing.
+    // Use for section headers or blank separators between data rows.
+    void WriteLine(FormattedCell cell = {})
+    {
+        m_empty = false;
+
+        if (!m_bufferEvaluated)
+        {
+            m_buffer.emplace_back(std::move(cell));
+        }
+        else
+        {
+            OutputCellLineToStream(cell);
         }
     }
 
@@ -207,7 +352,9 @@ struct TableOutput
     }
 
 private:
-    // A column in the table.
+    // A break entry is a FormattedCell rendered as a standalone line (section header or blank).
+    using buffer_entry_t = std::variant<line_t, FormattedCell>;
+
     struct Column
     {
         std::wstring Name;
@@ -215,26 +362,42 @@ private:
         size_t MaxLength = 0;
         size_t ConfiguredMaxLength = 0; // Max length from configuration
         bool SpaceAfter = true;
+        ColumnOverflow Overflow = ColumnOverflow::Truncate;
     };
 
+    Reporter& m_reporter;
+    Reporter::Level m_outputLevel;
     std::array<Column, FieldCount> m_columns;
     column_config_t m_columnConfigs;
     size_t m_sizingBuffer;
     size_t m_columnPadding;
-    std::vector<line_t> m_buffer;
+    size_t m_rowIndent = 0;
+    std::vector<buffer_entry_t> m_buffer;
+    size_t m_dataRowCount = 0;
     bool m_bufferEvaluated = false;
     bool m_empty = true;
-    bool m_limitColumnWidths = false;
     bool m_alwaysShowHeader = true;
     bool m_showHeader = true;
     bool m_dropEmptyColumns = false;
-    std::wstringstream m_stream;
-    OutputFn m_outputFn;
     size_t m_consoleWidthOverride = 0;
 
-    static OutputFn DefaultOutputFn()
+    // Syncs Column state from m_columnConfigs[i]; call whenever a config entry changes.
+    void SyncColumnFromConfig(size_t i)
     {
-        return [](const std::wstring& line) { detail::PrintTableLine(line, stdout); };
+        auto& col = m_columns[i];
+        const auto& cfg = m_columnConfigs[i];
+
+        col.Overflow = cfg.Overflow;
+        col.ConfiguredMaxLength = (cfg.MaxWidth != ColumnWidthConfig::NoLimit) ? cfg.MaxWidth : 0;
+
+        if (cfg.MinWidth != ColumnWidthConfig::NoLimit)
+        {
+            col.MinLength = std::max(col.Name.size(), cfg.MinWidth);
+        }
+        else
+        {
+            col.MinLength = col.Name.size();
+        }
     }
 
     void InitializeColumns(header_t&& header)
@@ -242,59 +405,131 @@ private:
         for (size_t i = 0; i < FieldCount; ++i)
         {
             m_columns[i].Name = std::move(header[i]);
-            m_columns[i].MinLength = GetStringColumnWidth(m_columns[i].Name.c_str());
             m_columns[i].MaxLength = 0;
-
-            // Apply configured max width if limiting is enabled
-            if (m_limitColumnWidths && m_columnConfigs[i].MaxWidth != ColumnWidthConfig::NoLimit)
-            {
-                m_columns[i].ConfiguredMaxLength = m_columnConfigs[i].MaxWidth;
-            }
-
-            // Apply configured min width
-            if (m_columnConfigs[i].MinWidth != ColumnWidthConfig::NoLimit)
-            {
-                m_columns[i].MinLength = std::max(m_columns[i].MinLength, m_columnConfigs[i].MinWidth);
-            }
+            SyncColumnFromConfig(i);
         }
     }
 
-    size_t GetConsoleWidth()
+    // Returns the effective console width (in columns) of the destination, or std::nullopt
+    // when the destination is redirected. SetConsoleWidthOverride() takes precedence and is
+    // treated as a real console (the wrap pass uses has_value() to gate its behavior).
+    std::optional<size_t> GetEffectiveConsoleWidth() const
     {
         if (m_consoleWidthOverride > 0)
         {
             return m_consoleWidthOverride;
         }
 
-        CONSOLE_SCREEN_BUFFER_INFO consoleInfo{};
-        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-
-        if (GetConsoleScreenBufferInfo(hConsole, &consoleInfo))
+        if (const auto width = m_reporter.GetConsoleWidth(m_outputLevel); width.has_value())
         {
-            return static_cast<size_t>(consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
+            return static_cast<size_t>(*width);
         }
 
-        // stdout is not a real console (e.g. redirected/piped). Return a large value
-        // so column shrinking is not applied — the receiver controls its own display width.
-        return DefaultRedirectedConsoleWidth;
+        return std::nullopt;
+    }
+
+    // Splits visible text into word-boundary chunks of at most maxWidth chars.
+    static std::vector<std::wstring> WrapText(const std::wstring& text, size_t maxWidth)
+    {
+        if (maxWidth == 0 || text.length() <= maxWidth)
+        {
+            return {text};
+        }
+
+        std::vector<std::wstring> lines;
+        size_t pos = 0;
+
+        while (pos < text.length())
+        {
+            size_t chunkEnd = std::min(pos + maxWidth, text.length());
+
+            if (chunkEnd < text.length())
+            {
+                size_t breakAt = text.rfind(L' ', chunkEnd);
+                if (breakAt != std::wstring::npos && breakAt > pos)
+                {
+                    chunkEnd = breakAt;
+                }
+            }
+
+            lines.emplace_back(text.substr(pos, chunkEnd - pos));
+
+            pos = chunkEnd;
+            while (pos < text.length() && text[pos] == L' ')
+            {
+                ++pos;
+            }
+        }
+
+        return lines;
+    }
+
+    // Wraps a cell's visible text into chunks, preserving formatting on each chunk.
+    std::vector<FormattedCell> BuildWrappedCells(const FormattedCell& cell, const Column& col) const
+    {
+        if (col.Overflow != ColumnOverflow::Wrap || col.MaxLength == 0)
+        {
+            return {cell};
+        }
+
+        // Extract the visible text for wrapping.
+        const size_t visWidth = cell.VisibleWidth();
+        if (visWidth <= col.MaxLength)
+        {
+            return {cell};
+        }
+
+        // For plain cells, wrap the text directly.
+        if (cell.sequences.empty())
+        {
+            auto chunks = WrapText(cell.fmt, col.MaxLength);
+            std::vector<FormattedCell> result;
+            result.reserve(chunks.size());
+            for (auto& chunk : chunks)
+            {
+                result.emplace_back(std::move(chunk));
+            }
+            return result;
+        }
+
+        // For formatted cells, extract visible text, wrap it, then re-apply formatting.
+        std::wstring visibleText;
+        visibleText.reserve(visWidth);
+        for (size_t i = 0; i < cell.fmt.size(); ++i)
+        {
+            if (i + 1 < cell.fmt.size() && cell.fmt[i] == L'{' && cell.fmt[i + 1] == L'}')
+            {
+                ++i;
+            }
+            else
+            {
+                visibleText += cell.fmt[i];
+            }
+        }
+
+        auto chunks = WrapText(visibleText, col.MaxLength);
+        std::vector<FormattedCell> result;
+        result.reserve(chunks.size());
+        for (auto& chunk : chunks)
+        {
+            result.emplace_back(FormattedCell(std::wstring_view{chunk}, *cell.sequences.front()));
+        }
+        return result;
     }
 
     void OutputHeaderOnly()
     {
-        // Set MaxLength to MinLength for all columns (header width only)
         for (size_t i = 0; i < FieldCount; ++i)
         {
             m_columns[i].MaxLength = m_columns[i].MinLength;
         }
 
-        // Set spacing configuration
         m_columns[FieldCount - 1].SpaceAfter = false;
 
-        // Output the header
         line_t headerLine;
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            headerLine[i] = m_columns[i].Name.c_str();
+            headerLine[i] = FormattedCell(m_columns[i].Name);
         }
 
         OutputLineToStream(headerLine);
@@ -308,26 +543,29 @@ private:
             return;
         }
 
-        // Determine the maximum length for all columns
-        for (const auto& line : m_buffer)
+        // Determine the maximum visible width for each column across all buffered data rows.
+        for (const auto& entry : m_buffer)
         {
+            const auto* line = std::get_if<line_t>(&entry);
+            if (!line)
+            {
+                continue;
+            }
+
             for (size_t i = 0; i < FieldCount; ++i)
             {
-                size_t columnWidth = GetStringColumnWidth(line[i].c_str());
+                size_t w = (*line)[i].VisibleWidth();
 
-                // Apply configured max width if limiting is enabled
-                if (m_limitColumnWidths && m_columns[i].ConfiguredMaxLength != ColumnWidthConfig::NoLimit)
+                if (m_columns[i].ConfiguredMaxLength != ColumnWidthConfig::NoLimit)
                 {
-                    columnWidth = std::min(columnWidth, m_columns[i].ConfiguredMaxLength);
+                    w = std::min(w, m_columns[i].ConfiguredMaxLength);
                 }
 
-                m_columns[i].MaxLength = std::max(m_columns[i].MaxLength, columnWidth);
+                m_columns[i].MaxLength = std::max(m_columns[i].MaxLength, w);
             }
         }
 
-        // If there are actually columns with data, then also bring in the minimum size.
-        // When m_dropEmptyColumns is false, always apply MinLength so empty columns
-        // still render at least as wide as their header.
+        // Apply MinLength so empty columns still render at least as wide as their header.
         for (size_t i = 0; i < FieldCount; ++i)
         {
             if (m_columns[i].MaxLength || !m_dropEmptyColumns)
@@ -336,84 +574,102 @@ private:
             }
         }
 
-        // Only output the extra space if:
-        // 1. Not the last field
+        // Last column never needs trailing padding.
         m_columns[FieldCount - 1].SpaceAfter = false;
 
-        // 2. Not empty (taken care of by not doing anything if empty)
-        // 3. There are non-empty fields after
+        // Disable SpaceAfter on columns that are followed only by empty columns.
         for (size_t i = FieldCount - 1; i > 0; --i)
         {
             if (m_columns[i].MaxLength)
             {
                 break;
             }
-            else
-            {
-                m_columns[i - 1].SpaceAfter = false;
-            }
+            m_columns[i - 1].SpaceAfter = false;
         }
 
-        // Determine the total width required to not truncate any columns
+        // Compute total visible width required to not truncate any columns.
         size_t totalRequired = 0;
-
         for (size_t i = 0; i < FieldCount; ++i)
         {
             totalRequired += m_columns[i].MaxLength + (m_columns[i].SpaceAfter ? m_columnPadding : 0);
         }
 
-        // Only apply console width constraints if m_limitColumnWidths is true
-        if (m_limitColumnWidths)
+        const auto consoleWidthOpt = GetEffectiveConsoleWidth();
+        const size_t consoleWidth = consoleWidthOpt.value_or(DefaultRedirectedConsoleWidth);
+        const size_t availableWidth = (consoleWidth > m_rowIndent) ? consoleWidth - m_rowIndent : 0;
+
+        // Shrink pass: reduce Shrink columns until the total fits within the available width.
+        if (totalRequired > availableWidth)
         {
-            size_t consoleWidth = GetConsoleWidth();
+            size_t extra = totalRequired - availableWidth;
 
-            // If the total space would be too big, shrink them.
-            // We don't want to use the last column, lest we auto-wrap
-            if (totalRequired >= consoleWidth)
+            while (extra > 0)
             {
-                size_t extra = (totalRequired - consoleWidth) + 1;
+                size_t targetIndex = FieldCount;
+                size_t targetVal = 0;
 
-                while (extra > 0)
+                for (size_t j = 0; j < FieldCount; ++j)
                 {
-                    // Find the largest shrinkable column
-                    size_t targetIndex = 0;
-                    size_t targetVal = 0;
-
-                    for (size_t j = 0; j < FieldCount; ++j)
+                    if (m_columns[j].Overflow != ColumnOverflow::Shrink)
                     {
-                        // Skip columns at or below minimum
-                        if (m_columns[j].MaxLength <= m_columns[j].MinLength)
-                        {
-                            continue;
-                        }
-
-                        // Prefer columns marked as preferredShrink
-                        bool isPreferredShrink = m_columnConfigs[j].PreferredShrink;
-                        bool currentIsPreferred = m_columnConfigs[targetIndex].PreferredShrink;
-
-                        if (isPreferredShrink && !currentIsPreferred)
-                        {
-                            targetIndex = j;
-                            targetVal = m_columns[j].MaxLength;
-                        }
-                        else if (isPreferredShrink == currentIsPreferred && m_columns[j].MaxLength > targetVal)
-                        {
-                            targetIndex = j;
-                            targetVal = m_columns[j].MaxLength;
-                        }
+                        continue;
+                    }
+                    if (m_columns[j].MaxLength <= m_columns[j].MinLength)
+                    {
+                        continue;
                     }
 
-                    // If no shrinkable column found, break
-                    if (targetVal == 0)
-                    {
-                        break;
-                    }
+                    const bool isPreferred = m_columnConfigs[j].PreferredShrink;
+                    const bool currentPreferred = (targetIndex < FieldCount) ? m_columnConfigs[targetIndex].PreferredShrink : false;
 
-                    m_columns[targetIndex].MaxLength -= 1;
-                    extra -= 1;
+                    if (targetIndex == FieldCount || (isPreferred && !currentPreferred) ||
+                        (isPreferred == currentPreferred && m_columns[j].MaxLength > targetVal))
+                    {
+                        targetIndex = j;
+                        targetVal = m_columns[j].MaxLength;
+                    }
                 }
 
-                totalRequired = std::min(totalRequired, consoleWidth - 1);
+                if (targetIndex == FieldCount)
+                {
+                    break;
+                }
+
+                m_columns[targetIndex].MaxLength -= 1;
+                extra -= 1;
+            }
+        }
+
+        // Wrap pass: clamp each Wrap column to remaining space after all other columns.
+        // Skipped when the destination is redirected so the receiver controls its own width.
+        if (consoleWidthOpt.has_value())
+        {
+            for (size_t i = 0; i < FieldCount; ++i)
+            {
+                if (m_columns[i].Overflow != ColumnOverflow::Wrap || !m_columns[i].MaxLength)
+                {
+                    continue;
+                }
+
+                size_t otherWidth = 0;
+                for (size_t j = 0; j < FieldCount; ++j)
+                {
+                    if (j != i)
+                    {
+                        otherWidth += m_columns[j].MaxLength + (m_columns[j].SpaceAfter ? m_columnPadding : 0);
+                    }
+                }
+                if (m_columns[i].SpaceAfter)
+                {
+                    otherWidth += m_columnPadding;
+                }
+
+                const size_t wrapBudget = (availableWidth > otherWidth) ? availableWidth - otherWidth : 1;
+
+                if (m_columns[i].MaxLength > wrapBudget)
+                {
+                    m_columns[i].MaxLength = std::max(wrapBudget, m_columns[i].MinLength);
+                }
             }
         }
 
@@ -422,63 +678,90 @@ private:
             line_t headerLine;
             for (size_t i = 0; i < FieldCount; ++i)
             {
-                headerLine[i] = m_columns[i].Name.c_str();
+                headerLine[i] = FormattedCell(m_columns[i].Name);
             }
-
             OutputLineToStream(headerLine);
         }
 
-        for (const auto& line : m_buffer)
+        for (const auto& entry : m_buffer)
         {
-            OutputLineToStream(line);
+            if (const auto* line = std::get_if<line_t>(&entry))
+            {
+                OutputLineToStream(*line);
+            }
+            else if (const auto* cell = std::get_if<FormattedCell>(&entry))
+            {
+                OutputCellLineToStream(*cell);
+            }
         }
 
         m_bufferEvaluated = true;
     }
 
+    void OutputCellLineToStream(const FormattedCell& cell)
+    {
+        const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
+        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(colorEnabled));
+    }
+
+    // Renders a logical row, emitting multiple physical rows for word-wrapping columns.
     void OutputLineToStream(const line_t& line)
     {
+        const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
+
+        size_t physicalRows = 1;
+        std::array<std::vector<FormattedCell>, FieldCount> wrappedCells;
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            const auto& col = m_columns[i];
+            wrappedCells[i] = BuildWrappedCells(line[i], m_columns[i]);
+            physicalRows = std::max(physicalRows, wrappedCells[i].size());
+        }
 
-            if (col.MaxLength)
+        for (size_t row = 0; row < physicalRows; ++row)
+        {
+            std::wstring rowStr;
+
+            if (m_rowIndent > 0)
             {
-                size_t valueLength = GetStringColumnWidth(line[i].c_str());
+                rowStr.append(m_rowIndent, L' ');
+            }
 
-                if (valueLength > col.MaxLength)
+            for (size_t i = 0; i < FieldCount; ++i)
+            {
+                const auto& col = m_columns[i];
+                if (!col.MaxLength)
                 {
-                    size_t actualWidth;
-                    m_stream << TrimStringToColumnWidth(line[i].c_str(), col.MaxLength - 1, actualWidth) << L"\u2026"; // Unicode ellipsis character
+                    continue;
+                }
 
-                    // Some characters take 2 unit space, the trimmed string length might be 1 less than the expected length.
-                    if (actualWidth != col.MaxLength - 1)
-                    {
-                        m_stream << L' ';
-                    }
+                // On continuation rows, exhausted columns render as blank.
+                static const FormattedCell emptyCell{L""};
+                const FormattedCell& cell = (row < wrappedCells[i].size()) ? wrappedCells[i][row] : emptyCell;
+                const size_t valueLength = cell.VisibleWidth();
+
+                if (col.Overflow != ColumnOverflow::Wrap && valueLength > col.MaxLength)
+                {
+                    // Truncate and append ellipsis.
+                    rowStr.append(cell.RenderTruncated(col.MaxLength, colorEnabled));
 
                     if (col.SpaceAfter)
                     {
-                        m_stream << std::wstring(m_columnPadding, L' ');
+                        rowStr.append(m_columnPadding, L' ');
                     }
                 }
                 else
                 {
-                    m_stream << line[i];
+                    rowStr.append(cell.Render(colorEnabled));
 
                     if (col.SpaceAfter)
                     {
-                        m_stream << std::wstring(col.MaxLength - valueLength + m_columnPadding, L' ');
+                        rowStr.append(col.MaxLength - valueLength + m_columnPadding, L' ');
                     }
                 }
             }
+
+            m_reporter.Write(m_outputLevel, L"{}\n", rowStr);
         }
-
-        const std::wstring rendered = m_stream.str();
-        m_stream.str(L"");
-        m_stream.clear();
-
-        m_outputFn(rendered);
     }
 };
 
