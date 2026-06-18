@@ -5554,15 +5554,14 @@ class WSLCTests
 
         // Validate that hostname and domainname are correctly wired.
         {
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname); echo $(domainname)"});
+            WSLCContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
-            ValidateProcessOutput(process, {{1, "my-host-name\nmy-domain-name\n"}});
+            ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
         }
 
         // Validate that containers without DNS configuration use default DNS.
