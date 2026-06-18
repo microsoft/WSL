@@ -95,7 +95,7 @@ class WSLCE2EContainerCreateTests
 
         std::wstringstream expectedError;
         expectedError << L"Image '" << reference << L"' not found, pulling\r\n"
-                      << L"manifest for " << reference << L" not found: manifest unknown: manifest unknown\r\n"
+                      << L"{\"message\":\"manifest unknown: manifest unknown\"}\r\n\r\n"
                       << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
