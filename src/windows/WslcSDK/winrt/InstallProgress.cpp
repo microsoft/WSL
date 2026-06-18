@@ -17,12 +17,12 @@ Abstract:
 #include "Microsoft.WSL.Containers.InstallProgress.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-InstallProgress::InstallProgress(ComponentFlags component, uint32_t progress, uint32_t total) :
+InstallProgress::InstallProgress(winrt::Microsoft::WSL::Containers::Component component, uint32_t progress, uint32_t total) :
     m_component(component), m_progress(progress), m_total(total)
 {
 }
 
-ComponentFlags InstallProgress::Component()
+winrt::Microsoft::WSL::Containers::Component InstallProgress::Component()
 {
     return m_component;
 }

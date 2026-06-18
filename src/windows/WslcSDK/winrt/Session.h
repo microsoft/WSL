@@ -24,10 +24,14 @@ struct Session : SessionT<Session>
     void Start();
     void Terminate();
     winrt::Microsoft::WSL::Containers::Container CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings);
+    void PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PullImageAsync(
         winrt::Microsoft::WSL::Containers::PullImageOptions options);
+    void ImportImage(hstring const& path, hstring const& imageName);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> ImportImageAsync(hstring path, hstring imageName);
+    void LoadImage(hstring const& path);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> LoadImageAsync(hstring path);
+    void PushImage(winrt::Microsoft::WSL::Containers::PushImageOptions const& options);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PushImageAsync(
         winrt::Microsoft::WSL::Containers::PushImageOptions options);
     void DeleteImage(hstring const& nameOrId);
@@ -35,9 +39,12 @@ struct Session : SessionT<Session>
     void CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options);
     void DeleteVhdVolume(hstring const& name);
     hstring Authenticate(winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
-    winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> GetImages();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
+
+    void Close();
+    static void final_release(std::unique_ptr<Session> self);
 
     WslcSession ToHandle();
 

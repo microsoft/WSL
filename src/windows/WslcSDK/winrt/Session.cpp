@@ -89,6 +89,22 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
     return winrt::make<implementation::Container>(ToHandle(), containerSettings);
 }
 
+void Session::PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options)
+{
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for pull cannot be null");
+    }
+
+    EnsureStarted();
+
+    auto pullOptions = GetStruct(options);
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcPullSessionImage(ToHandle(), &pullOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(winrt::Microsoft::WSL::Containers::PullImageOptions options)
 {
     if (!options)
@@ -109,6 +125,29 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcPullSessionImage(ToHandle(), &pullOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Session::ImportImage(hstring const& path, hstring const& imageName)
+{
+    if (path.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
+    }
+
+    if (imageName.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
+    }
+
+    EnsureStarted();
+
+    auto name = winrt::to_string(imageName);
+
+    WslcImportImageOptions importOptions{};
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcImportSessionImageFromFile(ToHandle(), name.c_str(), path.c_str(), &importOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -142,6 +181,22 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
+void Session::LoadImage(hstring const& path)
+{
+    if (path.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
+    }
+
+    EnsureStarted();
+
+    WslcLoadImageOptions loadOptions{};
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcLoadSessionImageFromFile(ToHandle(), path.c_str(), &loadOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::LoadImageAsync(hstring path)
 {
     if (path.empty())
@@ -162,6 +217,22 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcLoadSessionImageFromFile(ToHandle(), path.c_str(), &loadOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Session::PushImage(winrt::Microsoft::WSL::Containers::PushImageOptions const& options)
+{
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for push cannot be null");
+    }
+
+    EnsureStarted();
+
+    auto pushOptions = GetStruct(options);
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcPushSessionImage(ToHandle(), &pushOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -281,7 +352,7 @@ void Session::Terminated(winrt::event_token const& token) noexcept
     m_terminatedEvent.remove(token);
 }
 
-IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
+IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::GetImages()
 {
     EnsureStarted();
 
@@ -302,6 +373,21 @@ WslcSession Session::ToHandle()
 {
     EnsureStarted();
     return m_session.get();
+}
+
+void Session::Close()
+{
+    m_terminationWait.reset();
+    m_terminationEvent.reset();
+
+    // Methods called after Close() will fail due to EnsureStarted().
+    m_session.reset();
+}
+
+void Session::final_release(std::unique_ptr<Session> self)
+{
+    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    self->Close();
 }
 
 void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID context, PTP_WAIT /* wait */, TP_WAIT_RESULT /* waitResult */) noexcept

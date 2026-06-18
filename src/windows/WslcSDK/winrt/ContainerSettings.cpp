@@ -126,19 +126,49 @@ void ContainerSettings::DomainName(hstring const& value)
     m_domainName = winrt::to_string(value);
 }
 
-ContainerFlags ContainerSettings::Flags()
+bool ContainerSettings::IsAutoRemoveEnabled()
 {
-    return m_flags;
+    return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_AUTO_REMOVE);
 }
 
-void ContainerSettings::Flags(ContainerFlags const& value)
+void ContainerSettings::IsAutoRemoveEnabled(bool value)
 {
     if (m_containerSettings)
     {
-        throw winrt::hresult_illegal_state_change(L"Cannot change container flags after container has been initialized");
+        throw winrt::hresult_illegal_state_change(L"Cannot change container settings after container has been initialized");
     }
 
-    m_flags = value;
+    WI_UpdateFlag(m_containerFlags, WSLC_CONTAINER_FLAG_AUTO_REMOVE, value);
+}
+
+bool ContainerSettings::IsGpuEnabled()
+{
+    return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_ENABLE_GPU);
+}
+
+void ContainerSettings::IsGpuEnabled(bool value)
+{
+    if (m_containerSettings)
+    {
+        throw winrt::hresult_illegal_state_change(L"Cannot change container settings after container has been initialized");
+    }
+
+    WI_UpdateFlag(m_containerFlags, WSLC_CONTAINER_FLAG_ENABLE_GPU, value);
+}
+
+bool ContainerSettings::IsPrivileged()
+{
+    return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_PRIVILEGED);
+}
+
+void ContainerSettings::IsPrivileged(bool value)
+{
+    if (m_containerSettings)
+    {
+        throw winrt::hresult_illegal_state_change(L"Cannot change container settings after container has been initialized");
+    }
+
+    WI_UpdateFlag(m_containerFlags, WSLC_CONTAINER_FLAG_PRIVILEGED, value);
 }
 
 winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> ContainerSettings::PortMappings()
@@ -234,7 +264,7 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
             winrt::check_hresult(WslcSetContainerSettingsDomainName(m_containerSettings.get(), m_domainName.c_str()));
         }
 
-        winrt::check_hresult(WslcSetContainerSettingsFlags(m_containerSettings.get(), static_cast<WslcContainerFlags>(m_flags)));
+        winrt::check_hresult(WslcSetContainerSettingsFlags(m_containerSettings.get(), m_containerFlags));
 
         if (m_portMappings.Size() > 0)
         {
