@@ -38,7 +38,17 @@ Session SessionService::OpenSessionByName(const wil::com_ptr<IWSLCSessionManager
     HRESULT hr = manager->OpenSessionByName(displayName, &session);
     if (FAILED(hr))
     {
-        THROW_HR_WITH_USER_ERROR_IF(hr, Localization::MessageWslcSessionNotFound(displayName ? displayName : L""), hr == WSLC_E_SESSION_NOT_FOUND);
+        if (hr == WSLC_E_SESSION_NOT_FOUND)
+        {
+            if (displayName)
+            {
+                THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcSessionNotFound(displayName));
+            }
+            else
+            {
+                THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcDefaultSessionNotFound());
+            }
+        }
 
         // Let well-known errors propagate with their system message.
         THROW_HR_IF(hr, hr == HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED));
