@@ -816,7 +816,7 @@ std::pair<std::string, std::string> wsl::windows::common::filesystem::GetHostAnd
     }
     else
     {
-        domainName.resize(size - 1, L'\0');
+        domainName.resize(size - 1, '\0');
         THROW_LAST_ERROR_IF(!GetComputerNameExA(ComputerNameDnsDomain, domainName.data(), &size));
         WI_ASSERT(domainName.size() == size);
 
