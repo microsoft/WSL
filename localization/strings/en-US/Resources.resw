@@ -2245,6 +2245,10 @@ Usage:
      <value>Flag argument cannot contain adjoined value: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Invalid boolean value for flag argument: '{}'. Expected true, false, 1, or 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Found a positional argument when none was expected: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

@@ -217,6 +217,99 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsTrue)
+    {
+        // Test -a=true syntax.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        const auto cpResult =
+            RunWslcWithStdinFile(std::format(L"container cp -a=true - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsFalse)
+    {
+        // Test -a=false syntax (no archive mode).
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        const auto cpResult =
+            RunWslcWithStdinFile(std::format(L"container cp -a=false - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsTrue)
+    {
+        // Test --archive=true syntax.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        const auto cpResult =
+            RunWslcWithStdinFile(std::format(L"container cp --archive=true - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsFalse)
+    {
+        // Test --archive=false syntax (no archive mode).
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        const auto cpResult =
+            RunWslcWithStdinFile(std::format(L"container cp --archive=false - {}:/tmp", WslcContainerName), TarPath);
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagInvalidValue)
+    {
+        // Test -a=invalid should fail with an error.
+        CreateTestTarFile();
+
+        const auto result =
+            RunWslcWithStdinFile(std::format(L"container cp -a=invalid - {}:/tmp", WslcContainerName), TarPath);
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container-cp";
     const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-cp";
