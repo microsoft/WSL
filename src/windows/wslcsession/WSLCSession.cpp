@@ -916,8 +916,10 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+    // Do not wait for the input relay to complete since it might not complete if the build fails.
+    io.AddHandle(
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
+        MultiHandleWait::NeedNotComplete);
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
