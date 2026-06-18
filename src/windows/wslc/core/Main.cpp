@@ -127,13 +127,25 @@ try
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
-        result = wil::ResultFromCaughtException();
 
+        // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
         if (context.CancelEvent && context.CancelEvent.is_signaled())
         {
-            fwprintf(stderr, L"\nCancelled.\n");
+            // Cancel events are often considered warnings rather than errors, as the user
+            // intentionally triggered it.
+            const auto strings = wslutil::ErrorToString({.Code = HRESULT_FROM_WIN32(ERROR_CANCELLED)});
+            context.Reporter.Warn(L"\n{}\n", strings.Message);
+
+            // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
+            // for cancellation is exit code 130, which is used by Docker compose and most shells.
+            // TODO: Consider switching to 130 or differentiate the cancellation types when we have
+            // more than image cancellation supported.
             return 1;
         }
+
+        // Using WSL shared utility to get the HRESULT from the caught exception.
+        // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
+        result = wil::ResultFromCaughtException();
 
         if (FAILED(result))
         {
@@ -141,11 +153,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
+                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
             }
             else
             {
-                wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
+                // Fallback for errors without context
+                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
             }
         }
     }

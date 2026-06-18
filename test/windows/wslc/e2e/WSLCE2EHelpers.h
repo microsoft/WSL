@@ -133,6 +133,24 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
 void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content);
+
+// Sets up a clean test directory and returns a scope_exit to remove it.
+inline auto SetupTestDirectory(const std::filesystem::path& directory)
+{
+    std::error_code ec;
+    std::filesystem::remove_all(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    std::filesystem::create_directories(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directory]() {
+        std::error_code removeError;
+        std::filesystem::remove_all(directory, removeError);
+    });
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port);
 
 // Default timeout of 0 will execute once.

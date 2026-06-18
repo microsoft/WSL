@@ -14,10 +14,20 @@ Abstract:
 
 #pragma once
 
+#include <fcntl.h>
+#include <io.h>
+#include <algorithm>
+#include <memory>
 #include <string>
+#include <vector>
 #include <Windows.h>
 #include <WexTestClass.h>
+#include <wil/resource.h>
+#include <wslutil.h>
+#include "windows/Common.h"
 #include "Invocation.h"
+#include "OutputChannel.h"
+#include "Reporter.h"
 #include "TableOutput.h"
 
 namespace WSLCTestHelpers {
@@ -61,6 +71,81 @@ inline void LogComment(const std::wstring& message)
 {
     WEX::Logging::Log::Comment(reinterpret_cast<const char8_t*>(WStringToUTF8(message).c_str()));
 }
+
+// RAII pipe pair for capturing FILE* output in tests.
+// file() is passed to OutputChannel/Reporter; captured() drains the read end after flush.
+struct CapturePipe
+{
+    CapturePipe()
+    {
+        // ReadPipeOverlapped=true so PartialHandleRead's InterruptableRead can be
+        // interrupted by m_exitEvent during teardown if fclose hasn't run yet.
+        auto [r, w] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wil::unique_handle writeHandle{w.release()};
+        m_file = FileFromHandle(writeHandle, "w");
+
+        const int fd = _fileno(m_file.get());
+        WI_VERIFY(_setmode(fd, _O_U8TEXT) != -1);
+
+        // Disable CRT buffering so each fwprintf is a single write. Prevents
+        // _O_U8TEXT from splitting VT escape sequences across buffer flushes.
+        setvbuf(m_file.get(), nullptr, _IONBF, 0);
+
+        // CapturePipe owns the read pipe; PartialHandleRead borrows it via .get().
+        // m_readPipe is declared before m_reader so destruction order tears the reader
+        // down first (joining its thread) and only then closes the handle it was reading.
+        m_readPipe = std::move(r);
+        m_reader = std::make_unique<PartialHandleRead>(m_readPipe.get());
+    }
+
+    NON_COPYABLE(CapturePipe);
+    NON_MOVABLE(CapturePipe);
+
+    FILE* file() const
+    {
+        return m_file.get();
+    }
+
+    std::wstring captured()
+    {
+        m_file.reset();
+
+        m_reader->ExpectClosed();
+        std::wstring result = wsl::shared::string::MultiByteToWide(m_reader->GetData());
+
+        // _O_U8TEXT prepends a UTF-8 BOM on some streams; strip it if present.
+        if (!result.empty() && result[0] == L'\xFEFF')
+        {
+            result.erase(0, 1);
+        }
+
+        // _O_U8TEXT translates \n to \r\n; strip \r so tests compare plain newlines.
+        result.erase(std::remove(result.begin(), result.end(), L'\r'), result.end());
+        return result;
+    }
+
+private:
+    wil::unique_file m_file;
+    wil::unique_hfile m_readPipe;
+    std::unique_ptr<PartialHandleRead> m_reader;
+};
+
+// Reporter wired to a single capture pipe for full output capture.
+// VT is disabled (not a console handle), so error output stays in the same pipe.
+struct CaptureReporter
+{
+    CapturePipe pipe;
+    wsl::windows::wslc::Reporter reporter;
+
+    explicit CaptureReporter(bool vtEnabled = false) : reporter(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
+    {
+    }
+
+    std::wstring captured()
+    {
+        return pipe.captured();
+    }
+};
 
 // Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
 template <size_t N>

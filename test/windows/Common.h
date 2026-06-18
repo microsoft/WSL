@@ -330,16 +330,27 @@ private:
 class ScopedEnvVariable
 {
 public:
+    // Captures any existing value and clears the variable.
+    explicit ScopedEnvVariable(const std::wstring& Name);
+
+    // Captures any existing value and sets the variable to Value.
     ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
+
+    // Restores the original value.
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const WslConfigChange&) = delete;
-    ScopedEnvVariable(WslConfigChange&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
+
+    // Sets the variable to a new value.
+    void Set(const std::wstring& Value);
+
+    // Clears (unsets) the variable.
+    void Clear();
 
 private:
     std::wstring m_name;
+    std::optional<std::wstring> m_originalValue;
 };
 
 class UniqueWebServer

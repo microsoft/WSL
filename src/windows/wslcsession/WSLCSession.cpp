@@ -22,6 +22,7 @@ Abstract:
 #include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
+#include "APICompat.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -127,10 +128,40 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
         wslcConfig.Entrypoint = dockerConfig.Entrypoint;
         wslcConfig.Env = dockerConfig.Env;
         wslcConfig.Labels = dockerConfig.Labels;
+        wslcConfig.StopSignal = dockerConfig.StopSignal;
         wslcConfig.User = dockerConfig.User;
         wslcConfig.WorkingDir = dockerConfig.WorkingDir;
 
+        if (dockerConfig.ExposedPorts.has_value())
+        {
+            std::map<std::string, wslc_schema::EmptyObject> ports;
+            for (const auto& [port, _] : dockerConfig.ExposedPorts.value())
+            {
+                ports.emplace(port, wslc_schema::EmptyObject{});
+            }
+            wslcConfig.ExposedPorts = std::move(ports);
+        }
+
+        if (dockerConfig.Volumes.has_value())
+        {
+            std::map<std::string, wslc_schema::EmptyObject> volumes;
+            for (const auto& [path, _] : dockerConfig.Volumes.value())
+            {
+                volumes.emplace(path, wslc_schema::EmptyObject{});
+            }
+            wslcConfig.Volumes = std::move(volumes);
+        }
+
         wslcInspect.Config = wslcConfig;
+    }
+
+    if (dockerInspect.RootFS.has_value())
+    {
+        const auto& dockerRootFS = dockerInspect.RootFS.value();
+        wslc_schema::ImageRootFS wslcRootFS{};
+        wslcRootFS.Type = dockerRootFS.Type;
+        wslcRootFS.Layers = dockerRootFS.Layers;
+        wslcInspect.RootFS = std::move(wslcRootFS);
     }
 
     return wslcInspect;
@@ -2961,7 +2992,170 @@ CATCH_RETURN();
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCSession) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) ? S_OK : S_FALSE;
+}
+
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ImportImage(
+    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto handle = apicompat::Convert(ImageHandle);
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
+}
+
+HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Images);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *Images = nullptr;
+    *Count = 0;
+
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> imagesImpl;
+
+    if (Options == nullptr)
+    {
+        RETURN_IF_FAILED(ListImages(static_cast<const WSLCListImagesOptions*>(nullptr), &imagesImpl, imagesImpl.size_address<ULONG>()));
+    }
+    else
+    {
+        const auto options = apicompat::Convert(*Options);
+        RETURN_IF_FAILED(ListImages(options.Get(), &imagesImpl, imagesImpl.size_address<ULONG>()));
+    }
+
+    if (imagesImpl.size() > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatImageInformation[]>(imagesImpl.size());
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (size_t index = 0; index < imagesImpl.size(); index++)
+        {
+            converted[index] = apicompat::Convert(imagesImpl[index]);
+        }
+
+        *Images = converted.release();
+    }
+
+    *Count = static_cast<ULONG>(imagesImpl.size());
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::DeleteImage(const WSLCCompatDeleteImageOptions* Options, WSLCCompatDeletedImageInformation** DeletedImages, ULONG* Count)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *DeletedImages = nullptr;
+    *Count = 0;
+
+    const auto options = apicompat::Convert(*Options);
+
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> imagesImpl;
+
+    RETURN_IF_FAILED(DeleteImage(&options, &imagesImpl, imagesImpl.size_address<ULONG>()));
+
+    if (imagesImpl.size() > 0)
+    {
+        auto converted = wil::make_unique_cotaskmem_nothrow<WSLCCompatDeletedImageInformation[]>(imagesImpl.size());
+        RETURN_IF_NULL_ALLOC(converted);
+
+        for (size_t index = 0; index < imagesImpl.size(); index++)
+        {
+            converted[index] = apicompat::Convert(imagesImpl[index]);
+        }
+
+        *DeletedImages = converted.release();
+    }
+
+    *Count = static_cast<ULONG>(imagesImpl.size());
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::TagImage(const WSLCCompatTagImageOptions* Options)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+
+    const auto options = apicompat::Convert(*Options);
+    return TagImage(&options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
+{
+    const auto progress = apicompat::Convert(ProgressCallback);
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+}
+
+HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto options = apicompat::Convert(*Options);
+
+    Microsoft::WRL::ComPtr<IWSLCContainer> container;
+    RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
+
+    return container.CopyTo(Container);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateVolume(const WSLCCompatVolumeOptions* Options, WSLCCompatVolumeInformation* VolumeInfo)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+
+    const auto options = apicompat::Convert(*Options);
+
+    WSLCVolumeInformation info{};
+    WSLCVolumeInformation* internalInfo = (VolumeInfo != nullptr) ? &info : nullptr;
+    RETURN_IF_FAILED(CreateVolume(options.Get(), internalInfo));
+
+    if (VolumeInfo != nullptr)
+    {
+        *VolumeInfo = apicompat::Convert(info);
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Callback, IUnknown** Subscription)
+{
+    const auto callback = apicompat::Convert(Callback);
+
+    return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)

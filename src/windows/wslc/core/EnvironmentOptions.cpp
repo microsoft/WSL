@@ -14,20 +14,17 @@ namespace wsl::windows::wslc {
 namespace {
 
     // nullopt iff the variable is not defined; engaged (possibly empty) otherwise.
-    std::optional<std::wstring> ReadEnv(const wchar_t* name) noexcept
-    try
+    std::optional<std::wstring> ReadEnv(const wchar_t* name)
     {
         std::wstring value;
         const HRESULT hr = wil::GetEnvironmentVariableW(name, value);
-        if (FAILED(hr))
+        if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
         {
             return std::nullopt;
         }
+
+        THROW_IF_FAILED(hr);
         return value;
-    }
-    catch (...)
-    {
-        return std::nullopt;
     }
 
 } // namespace
@@ -69,11 +66,6 @@ try
         }
     }
 }
-catch (...)
-{
-    // Must not throw: runs before NO_COLOR is applied, so a throw could
-    // surface as colored error output from the parser's error path.
-    LOG_CAUGHT_EXCEPTION();
-}
+CATCH_LOG()
 
 } // namespace wsl::windows::wslc
