@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    DiagTasks.h
+    SessionTasks.h
 
 Abstract:
 
-    Declaration of diag command execution tasks.
+    Declaration of session command execution tasks.
 
 --*/
 #pragma once
@@ -21,5 +21,6 @@ void AttachToSession(CLIExecutionContext& context);
 void CreateSession(CLIExecutionContext& context);
 void EnterSession(CLIExecutionContext& context);
 void ListSessions(CLIExecutionContext& context);
+void RunInSession(CLIExecutionContext& context);
 void TerminateSession(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

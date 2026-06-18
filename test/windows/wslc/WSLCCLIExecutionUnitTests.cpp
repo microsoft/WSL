@@ -452,6 +452,13 @@ class WSLCCLIExecutionUnitTests
     // found and the provided command line parsed correctly according to the command's defined arguments,
     // and the argument validation rules are correctly applied. The test cases are defined in
     // CommandLineTestCases.h and cover various valid and invalid command lines.
+    //
+    // Mirrors CoreMain's pipeline:
+    //   1. Globals scan (optionsOnly + stopOnUnknown): consume recognized
+    //      globals, leave everything else in place. Env apply is intentionally
+    //      skipped so test behavior is not affected by the host environment.
+    //   2. Subcommand resolution.
+    //   3. Leaf command parse + validate.
     TEST_METHOD(CommandLineParsing_AllCases)
     {
         std::vector<CommandLineTestCase> testCases = {
@@ -483,6 +490,21 @@ class WSLCCLIExecutionUnitTests
             {
                 Invocation invocation{std::move(args)};
                 std::unique_ptr<Command> command = std::make_unique<RootCommand>();
+                const Command* const rootCommand = command.get();
+
+                // Pass 1: globals scan. Lenient on unknowns so non-global tokens
+                // (subcommands, root options, errors) flow to subsequent passes.
+                CLIExecutionContext context;
+                const auto cliGlobals = rootCommand->GetGlobalArguments();
+                rootCommand->ParseArguments(
+                    invocation,
+                    context.GlobalArgs,
+                    cliGlobals,
+                    /*optionsOnly*/ true,
+                    /*stopOnUnknown*/ true);
+                rootCommand->ValidateArguments(context.GlobalArgs, cliGlobals, /*runInternalHook*/ false);
+
+                // Pass 2: walk down to the leaf subcommand.
                 std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
                 while (subCommand)
                 {
@@ -493,9 +515,7 @@ class WSLCCLIExecutionUnitTests
                 // Ensure we found the expected command
                 VERIFY_ARE_EQUAL(testCase.expectedCommand, command->Name());
 
-                CLIExecutionContext context;
-
-                // Parse and validate and compare to expected results.
+                // Pass 3: leaf parse + validate.
                 command->ParseArguments(invocation, context.Args);
                 command->ValidateArguments(context.Args);
             }

@@ -250,6 +250,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std
     m_additionalNetworks.push_back(Name);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
+{
+    m_primaryNetworkAliases.push_back(Alias);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
     IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
 {
@@ -259,7 +264,11 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
     }
 
-    result = container.value().Get().Start(Flags, nullptr, WarningCallback);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+
+    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }
@@ -366,6 +375,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
+
+    // Aliases for the primary endpoint.
+    std::vector<KeyValuePair> aliasKvps;
+    aliasKvps.reserve(m_primaryNetworkAliases.size());
+    for (const auto& alias : m_primaryNetworkAliases)
+    {
+        aliasKvps.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    options.ContainerNetwork.Settings = aliasKvps.empty() ? nullptr : aliasKvps.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(aliasKvps.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

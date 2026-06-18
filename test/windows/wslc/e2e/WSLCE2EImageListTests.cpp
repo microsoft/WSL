@@ -242,6 +242,41 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(foundDebian, L"Expected debian image when combining reference and dangling filters");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_NoTrunc_ShowsFullImageId)
+    {
+        // Pull the full image id from JSON output (always untruncated).
+        auto jsonResult = RunWslc(L"image list --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
+
+        std::string fullDebianId;
+        for (const auto& image : images)
+        {
+            if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name))
+            {
+                fullDebianId = image.Id;
+                break;
+            }
+        }
+        VERIFY_ARE_NOT_EQUAL(std::string{}, fullDebianId, L"Debian image was not present in `image list --format json` output");
+
+        fullDebianId = GetHashId(fullDebianId, true);
+        VERIFY_IS_GREATER_THAN(fullDebianId.size(), 12u);
+        const auto fullDebianIdW = wsl::shared::string::MultiByteToWide(fullDebianId);
+        const auto truncatedDebianIdW = fullDebianIdW.substr(0, 12);
+
+        // Default table truncates IMAGE ID to 12 chars.
+        auto truncResult = RunWslc(L"image list");
+        truncResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(truncResult.StdoutContainsSubstring(truncatedDebianIdW));
+        VERIFY_IS_FALSE(truncResult.StdoutContainsSubstring(fullDebianIdW));
+
+        // --no-trunc must show the full id.
+        auto noTruncResult = RunWslc(L"image list --no-trunc");
+        noTruncResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(noTruncResult.StdoutContainsSubstring(fullDebianIdW));
+    }
+
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
@@ -280,7 +315,6 @@ private:
                 << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
                 << L"  --no-trunc   Do not truncate output\r\n"
                 << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  --session    Specify the session to use\r\n"
                 << L"  --verbose    Output verbose details\r\n"
                 << L"  -?,--help    Shows help about the selected command\r\n"
                 << L"\r\n";

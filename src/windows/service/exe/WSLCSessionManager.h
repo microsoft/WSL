@@ -32,6 +32,7 @@ Abstract:
 
 #pragma once
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "COMImplClass.h"
 #include "wslutil.h"
 #include <atomic>
@@ -68,6 +69,8 @@ struct SessionEntry
 
     wil::shared_handle UserToken;
     std::vector<BYTE> UserSid;
+
+    wil::unique_handle JobObject;
 };
 
 class WSLCSessionManagerImpl
@@ -163,10 +166,9 @@ private:
         }
     }
 
-    void AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory);
+    [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory);
     WSLCSessionInitSettings CreateSessionSettings(
         _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
-    void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
@@ -174,11 +176,6 @@ private:
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;
-
-    // Job object that automatically terminates all child COM server processes
-    // when this service exits or crashes (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE).
-    std::once_flag m_jobObjectInitFlag;
-    wil::unique_handle m_sessionJobObject;
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Sessions are automatically cleaned up when the underlying session is released.
@@ -191,7 +188,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IFastRundown>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:
@@ -201,11 +198,16 @@ public:
     WSLCSessionManager(wsl::windows::service::wslc::WSLCSessionManagerImpl* Impl);
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
-    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
     IFACEMETHOD(CreateSession)(
         const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
     IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
+
+    // IWSLCCompatSessionManager.
+    IFACEMETHOD(GetVersion)(_Out_ WSLCCompatVersion* Version) override;
+    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
+    IFACEMETHOD(CreateSession)(
+        const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session) override;
 };

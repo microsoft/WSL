@@ -202,12 +202,10 @@
     <value>导出分发失败。</value>
   </data>
   <data name="MessageFsUpgradeNeeded" xml:space="preserve">
-    <value>为此分发实施适用于 Linux 的 Windows 子系统文件系统的一次性升级...
-</value>
+    <value>为此分发执行适用于 Linux 的 Windows 子系统文件系统的一次性升级...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
-    <value>无法启动，因为另一个实例正在权限未提升的状态下运行。不允许同时运行已提升权限的实例和未提升权限的实例。
-</value>
+    <value>无法启动，因为另一个实例正在权限未提升的状态下运行。不允许同时运行已提升权限的实例和未提升权限的实例。</value>
   </data>
   <data name="MessageImportFailed" xml:space="preserve">
     <value>导入分发失败。</value>
@@ -225,7 +223,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageImportingDistribution" xml:space="preserve">
-    <value>正在导入通讯组</value>
+    <value>正在导入分发</value>
   </data>
   <data name="MessageDownloadComplete" xml:space="preserve">
     <value>{} 已下载。</value>
@@ -235,8 +233,8 @@
     <value>适用于 Linux 的 Windows 子系统正在恢复以前的安装...</value>
   </data>
   <data name="MessageInvalidDistributionName" xml:space="preserve">
-    <value>无效的分发名称：“{}”。
-若要获取有效分发列表，请使用“wsl.exe --list --online'”。</value>
+    <value>无效的分发名称: '{}'。
+若要获取有效分发列表，请使用 'wsl.exe --list --online'。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
@@ -250,31 +248,28 @@
     <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidConsole" xml:space="preserve">
-    <value>不受支持的控制台设置。若要使用此功能，必须禁用旧的控制台。
-</value>
+    <value>不受支持的控制台设置。若要使用此功能，必须禁用旧控制台。</value>
   </data>
   <data name="MessageInvalidInteger" xml:space="preserve">
     <value>{} 不是有效整数。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidState" xml:space="preserve">
-    <value>正在进行此分发的安装、卸载或转换。
-</value>
+    <value>此分发的安装、卸载或转换正在进行。</value>
   </data>
   <data name="MessageLaunchingDistro" xml:space="preserve">
     <value>正在启动 {}...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageLowerIntegrity" xml:space="preserve">
-    <value>无法启动，因为另一个实例正在权限已提升的状态下运行。已提升权限的实例和未提升权限的实例不允许同时运行。
-</value>
+    <value>无法启动，因为另一个实例正在权限已提升的状态下运行。已提升权限的实例和未提升权限的实例不允许同时运行。</value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
     <value>适用于 Linux 的 Windows 子系统没有已安装的分发。
-可通过安装包含以下说明的分发来解决此问题：
+可按照以下说明安装分发来解决此问题:
 
-使用“wsl.exe --list --online' ”列出可用的分发
-和 “wsl.exe --install &lt;Distro&gt;” 进行安装。</value>
+使用 'wsl.exe --list --online' 列出可用的分发
+和 'wsl.exe --install &lt;Distro&gt;' 进行安装。</value>
     <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
@@ -302,8 +297,7 @@
     <value>找不到用户。</value>
   </data>
   <data name="MessageVmModeConversionInfo" xml:space="preserve">
-    <value>有关与 WSL 2 关键区别的信息，请访问 https://aka.ms/wsl2
-</value>
+    <value>有关与 WSL 2 关键差异的信息，请访问 https://aka.ms/wsl2</value>
   </data>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>正在进行转换，这可能需要几分钟时间。</value>
@@ -318,7 +312,7 @@
     <value>WSL2 无法启动，因为此计算机上未启用虚拟化。
 请确保计算机固件设置中“虚拟机平台”可选组件已启用，且虚拟化已开启。
 
-启用“虚拟机平台”通过运行: wsl.exe --install --no-distribution
+通过运行以下命令启用“虚拟机平台”: wsl.exe --install --no-distribution
 
 有关信息，请访问 https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
@@ -339,7 +333,7 @@
     <value>仅 WSL2 支持此操作。</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>使用量:
+    <value>用法:
     --networking-mode
        显示当前网络模式。
 
@@ -350,10 +344,10 @@
         显示 WSL VM ID。
 
     --version
-        显示 WSL 包的版本。
+        显示 WSL 程序包的版本。
 
     -n
-        不要打印换行符。</value>
+        不显示换行符。</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
 "}{Locked="--vm-id
@@ -382,21 +376,21 @@
     <value>对适用于 Linux 的 Windows 子系统执行管理操作
 
 用法:
-    /l, /list [选项]
-        列出已注册的分发版。
-        /all - (可选)列出所有分发版，包括
-               当前安装或未安装的分发版。
+    /l, /list [Option]
+        列出已注册的分发。
+        /all - (可选)列出所有分发，包括
+               当前安装或未安装的分发。
 
-        /running - 仅列出当前正在运行的分发版。
+        /running - 仅列出当前正在运行的分发。
 
     /s, /setdefault &lt;DistributionName&gt;
-        将分发版设置为默认值。
+        将分发设置为默认值。
 
     /t, /terminate &lt;DistributionName&gt;
-        终止分发版。
+        终止分发。
 
     /u, /unregister &lt;DistributionName&gt;
-        取消注册分发版并删除根文件系统。</value>
+        取消注册分发并删除根文件系统。</value>
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
@@ -426,16 +420,16 @@
         否则，该值必须是绝对 Windows 路径。
 
     --distribution, -d &lt;DistroName&gt;
-        运行指定的发行版。
+        运行指定的分发。
 
     --distribution-id &lt;DistroGuid&gt;
-        运行指定的发行版 ID。
+        运行指定的分发 ID。
 
     --user, -u &lt;UserName&gt;
         以指定用户身份运行。
 
     --system
-        为系统发行版启动 shell。
+        为系统分发启动 shell。
 
 用于管理适用于 Linux 的 Windows 子系统的参数:
 
@@ -446,65 +440,65 @@
         出于诊断目的打开 WSL2 调试 shell。
 
     --install [Distro] [Options...]
-        安装适用于 Linux 的 Windows 子系统发行版。
-        有关有效发行版的列表，请使用 'wsl.exe --list --online'。
+        安装适用于 Linux 的 Windows 子系统分发。
+        有关有效分发的列表，请使用 'wsl.exe --list --online'。
 
         选项:
             --enable-wsl1
                 启用 WSL1 支持。
 
             --fixed-vhd
-                创建固定大小的磁盘来存储发行版。
+                创建固定大小的磁盘来存储分发。
 
             --from-file &lt;Path&gt;
-                从本地文件安装发行版。
+                从本地文件安装分发。
 
             --legacy
-                使用旧发行版清单。
+                使用旧分发清单。
 
             --location &lt;Location&gt;
-                设置发行版的安装路径。
+                设置分发的安装路径。
 
             --name &lt;Name&gt;
-                设置发行版的名称。
+                设置分发的名称。
 
             --no-distribution
-                仅安装所需的可选组件，不安装发行版。
+                仅安装所需的可选组件，不安装分发。
 
             --no-launch, -n
-                安装后不要启动发行版。
+                安装后不要启动分发。
 
             --version &lt;Version&gt;
                 指定要用于新分发的版本。
 
             --vhd-size &lt;MemoryString&gt;
-                指定用于存储发行版的磁盘的大小。
+                指定用于存储分发的磁盘的大小。
 
             --web-download
-                从 Internet 而不是 Microsoft Store 下载发行版。
+                从 Internet 而不是 Microsoft Store 下载分发。
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
         更改发行版特定选项。
 
         选项:
             --move &lt;Location&gt;
-                将发行版移到新位置。
+                将分发移到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
                 将发行版的 VHD 设置为稀疏，从而允许自动回收磁盘空间。
 
             --set-default-user &lt;Username&gt;
-                设置发行版的默认用户。
+                设置分发的默认用户。
 
             --resize &lt;MemoryString&gt;
-                将发行版的磁盘大小调整为指定大小。
+                将分发的磁盘大小调整为指定大小。
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 发行版中附加和装载物理磁盘或虚拟磁盘。
+        在所有 WSL 2 分发中附加和装载物理磁盘或虚拟磁盘。
 
         选项:
             --vhd
-                指定 &lt;Disk&gt; 引用虚拟硬盘。
+                指定 &lt;Disk&gt; 是指虚拟硬盘。
 
             --bare
                 将磁盘附加到 WSL2，但不要装载它。
@@ -536,7 +530,7 @@
         显示适用于 Linux 的 Windows 子系统状态。
 
     --unmount [磁盘]
-        从所有 WSL2 发行版中卸载和分离磁盘。
+        从所有 WSL2 分发中卸载和分离磁盘。
         如果在没有参数的情况下调用，则卸载和分离所有磁盘。
 
     --uninstall
@@ -552,10 +546,10 @@
     --version, -v
         显示版本信息。
 
-用于在适用于 Linux 的 Windows 子系统中管理发行版的参数:
+用于在适用于 Linux 的 Windows 子系统中管理分发的参数:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [选项]
-        将发行版导出到 tar 文件。
+        将分发导出到 tar 文件。
         文件名可以是 - for stdout。
 
         选项:
@@ -563,7 +557,7 @@
                 指定导出格式。支持的值: tar、tar.gz、tar.xz、vhd。
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [选项]
-        将指定的 tar 文件作为新发行版导入。
+        将指定的 tar 文件作为新分发导入。
         文件名可以是 - for stdin。
 
         选项:
@@ -575,40 +569,40 @@
                 此操作在指定的安装位置创建 VHD 文件的副本。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        将指定的 VHD 文件作为新发行版导入。
+        将指定的 VHD 文件作为新分发导入。
         必须使用 ext4 文件系统类型设置此虚拟硬盘的格式。
 
     --list, -l [选项]
-        列出发行版。
+        列出分发。
 
         选项:
             --all
-                列出所有发行版，包括当前
-                正在安装或卸载的发行版。
+                列出所有分发，包括当前
+                正在安装或卸载的分发。
 
             --running
-                仅列出当前正在运行的发行版。
+                仅列出当前正在运行的分发。
 
             --quiet, -q
-                仅显示发行版名称。
+                仅显示分发名称。
 
             --verbose, -v
-                显示有关所有发行版的详细信息。
+                显示有关所有分发的详细信息。
 
             --online, -o
-                显示适合通过 'wsl --install' 安装的可用发行版列表。
+                显示适合通过 'wsl --install' 安装的可用分发列表。
 
     --set-default, -s &lt;Distro&gt;
-        将分布版设置为默认值。
+        将分发设置为默认值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        更改指定发行版的版本。
+        更改指定分发的版本。
 
     --terminate, -t &lt;Distro&gt;
-        终止指定的发行版。
+        终止指定的分发。
 
     --unregister &lt;Distro&gt;
-        取消注册发行版并删除根文件系统。</value>
+        取消注册分发并删除根文件系统。</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -637,7 +631,7 @@ WSLg 版本: {}
 MSRDC 版本: {}
 Direct3D 版本: {}
 DXCore 版本: {}
-Windows: {}</value>
+Windows 版本: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageBuildInfo" xml:space="preserve">
@@ -662,7 +656,7 @@ Windows: {}</value>
     <value>版权所有(c) Microsoft Corporation。保留所有权利。
 有关此产品的隐私信息，请访问 https://aka.ms/privacy。
 
-用法: wslg.exe [参数] [选项...][命令行]
+用法: wslg.exe [Argument] [Options...] [CommandLine]
 
 参数:
    --cd &lt;Directory&gt;
@@ -709,7 +703,7 @@ Windows: {}</value>
     <value>正在检查更新。</value>
   </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
-    <value>此分发版仅在Microsoft Store中可用。</value>
+    <value>此分发仅可从 Microsoft Store 获得。</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>在 ARM64 上 wsl.exe --mount 需要 Windows 版本 27653 或更高版本。</value>
@@ -719,7 +713,7 @@ Windows: {}</value>
     <value>已安装最新版本的适用于 Linux 的 Windows 子系统。</value>
   </data>
   <data name="MessageUpdatingToVersion" xml:space="preserve">
-    <value>正在更新适用于 Linux 的 Windows 子系统: {}。</value>
+    <value>正在将适用于 Linux 的 Windows 子系统更新到以下版本: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
@@ -745,7 +739,7 @@ Windows: {}</value>
     <value>桥接网络需要设置 wsl2.vmSwitch。</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>无法从 '{}' 提取通讯组列表。{}</value>
+    <value>未能从“{}”提取分发列表。{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -759,8 +753,8 @@ Windows: {}</value>
     <value>找不到值。</value>
   </data>
   <data name="MessageOsNotSupported" xml:space="preserve">
-    <value>Windows 版本 {} 不支持打包版本的 适用于 Linux 的 Windows 子系统。
-通过 Windows 更新或通过以下方式安装所需的更新： {}
+    <value>Windows 版本 {} 不支持适用于 Linux 的 Windows 子系统的打包版本。
+通过 Windows 更新或通过以下方式安装所需的更新: {}
 有关信息，请访问 https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -824,7 +818,7 @@ Windows: {}</value>
     <value>WSL 启动期间出错</value>
   </data>
   <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
-    <value>无法启动“{}”的系统用户会话。有关详细信息，请参阅 journalctl。</value>
+    <value>未能为“{}”启动系统用户会话。有关详细信息，请参阅 journalctl。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
@@ -871,7 +865,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionInstalled" xml:space="preserve">
-    <value>已成功安装分发。可以通过 “wsl.exe -d {}” 启动它</value>
+    <value>已成功安装分发。可以通过“wsl.exe -d {}”启动它</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidNumberString" xml:space="preserve">
@@ -910,7 +904,7 @@ Windows: {}</value>
     <value>需要 Linux 内核版本 5.10 或更高版本</value>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
-    <value>Windows 版本 {}。{} 没有所需的功能</value>
+    <value>Windows 版本 {}.{} 没有所需的功能</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
@@ -1099,7 +1093,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionFailedToStart" xml:space="preserve">
-    <value>无法启动分发。错误代码： {}，失败步骤： {}</value>
+    <value>无法启动分发。错误代码: {}，失败步骤: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDiskCorrupted" xml:space="preserve">
@@ -1118,7 +1112,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>未能从分发内容 {} 读取属性“{}”</value>
+    <value>未能从分发 {} 读取属性“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1151,7 +1145,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
-    <value>注册分发时无法分析终端配置文件： {}</value>
+    <value>注册分发时无法分析终端配置文件: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidSize" xml:space="preserve">
@@ -1197,7 +1191,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>装载分发磁盘时出错，该磁盘作为回退以只读方式装载。
-请参阅以下位置的恢复说明： https://aka.ms/wsldiskmountrecovery</value>
+请参阅以下位置的恢复说明: https://aka.ms/wsldiskmountrecovery</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
@@ -1217,7 +1211,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>© Microsoft。保留所有权利。</value>
   </data>
   <data name="Settings_AppDisplayName" xml:space="preserve">
-    <value>适用于 Linux 设置的 Windows 子系统</value>
+    <value>适用于 Linux 的 Windows 子系统设置</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>适用于 Linux 的 Windows 子系统设置允许开发人员使用基于 GUI 的应用程序管理 .wslconfig 文件。</value>
@@ -1306,7 +1300,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>浏览发行版</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>指定一个 VHD 路径，该 VHD 将作为自定义系统发行版加载，主要用于在 WSL 中运行 GUI 应用。[在此处详细了解系统发行]。</value>
+    <value>指定一个 VHD 路径，该 VHD 将作为自定义系统发行版加载，主要用于在 WSL 中运行 GUI 应用。[在此处详细了解系统发行版]。</value>
     <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1337,7 +1331,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
-    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
+    <value>为可扩展的 WSL 虚拟硬盘(VHD)指定的默认最大大小，仅用于新创建的分发。</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
@@ -1348,7 +1342,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
+    <value>为可扩展的 WSL 虚拟硬盘(VHD)指定的默认最大大小(MB)，仅用于新创建的分发。</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
@@ -1459,7 +1453,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>忽略的端口</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如：3000,9000,9090。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如: 3000,9000,9090。</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -1592,7 +1586,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>从 Windows 访问 Linux 网络应用</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
-    <value>如果要在 Linux 分发版中生成网络应用(例如在 NodeJS 或 SQL Server 上运行的应用)，则可以(像通常那样)使用 localhost 从 Windows 应用(如 Edge 或 Chrome Internet 浏览器)访问它。这意味着，如果启动了侦听端口 3000 的 Linux 服务器，则可以在 Windows 上的 Edge 中转到 [http://localhost:3000] 来访问它。</value>
+    <value>如果要在 Linux 分发中生成网络应用(例如在 NodeJS 或 SQL Server 上运行的应用)，则可以(像通常那样)使用 localhost 从 Windows 应用(像 Edge 或 Chrome Internet 浏览器)访问它。这意味着，如果启动了侦听端口 3000 的 Linux 服务器，则可以在 Windows 上的 Edge 中转到 [http://localhost:3000] 来访问它。</value>
     <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
@@ -2072,6 +2066,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>OpenSessionByName('{}') 失败</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>未能启动命令 {}。Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>找不到 WSLC 会话。</value>
   </data>
@@ -2085,9 +2083,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>未找到默认会话</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>打开默认会话失败</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>默认会话终止失败</value>
@@ -2124,6 +2119,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>容器“{}”正在运行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>尚不支持 ContainerIpAddress。</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器网络模式不支持端口映射；端口由目标容器拥有。</value>
@@ -2189,6 +2188,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>以下参数可用：</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>如需特定命令的更多详细信息，请向其传递帮助参数。</value>
@@ -2336,6 +2338,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>不受支持的网络模式: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>当主网络模式为 'host' 或 'none' 时，不允许添加其他网络。</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>重复的网络:“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2343,6 +2349,17 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
     <value>终结点设置尚不支持（网络 '{}'）。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>网络别名不能为空。</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>网络别名需要用户定义的网络。使用 --network 指定一个。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>当请求多个网络时，无法指定网络别名。使用单个 --network 参数。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>无法创建卷“{}”: {}</value>
@@ -2378,6 +2395,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>正在保存。</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>正在导出。</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC 是适用于 Linux 的 Windows 子系统容器 CLI 工具。</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2411,6 +2431,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>在正在运行的容器中执行命令。</value>
   </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>将容器的文件系统导出为 tar 存档。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>将容器的文件系统导出为 tar 存档。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>写入文件，而不是 STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>检查容器。</value>
   </data>
@@ -2442,9 +2472,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>移除所有已停止的容器。</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>总回收空间: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>移除容器。</value>
@@ -2535,9 +2565,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>删除所有悬空映像。如果指定 --all ，则删除任何容器未使用的所有映像。</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>总回收空间: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>已取消标记: {}</value>
@@ -2658,6 +2688,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>附加到活动会话。如果未提供会话 ID，将使用 wslc 默认会话。</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>在会话中运行命令。</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>在没有 TTY 的活动会话中运行命令。命令及其参数直接转发到会话。如果未指定会话，则将使用 wslc 默认会话。</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>传递给正在运行的命令的参数</value>
+  </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>终止会话。</value>
   </data>
@@ -2713,6 +2753,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>要运行的命令</value>
+  </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>CPU 数(例如 0.5、1、2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>{} 参数值无效：“{}”。应为正数的 CPU (，例如 0.5、1、2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>删除容器，即使它们正在运行</value>
@@ -2783,11 +2831,32 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>显示最新创建的容器 (包括所有状态)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>内存限制(例如 512M、1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>容器主机名</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>容器的名称</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>将容器连接到网络</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>{} 值无效： 网络名称不能为空或空白</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>不支持主机模式网络</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>为容器添加网络范围的别名</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>{} 值无效： 网络别名不能为空或空白</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>生成映像时不要使用缓存</value>
@@ -2872,6 +2941,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器内的工作目录</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>{} 值无效： 工作目录不能为空或空白</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>将容器 ID 写入提供的路径</value>
   </data>
@@ -2915,6 +2988,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>将 tmpfs 装载到给定路径处的容器</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit 选项 (格式： &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]，使用 -1 无限制)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>{} 参数值无效：“{}”。预期 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (使用 -1 获取无限)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>进程的用户 ID (name|uid|uid:gid)</value>
@@ -3015,6 +3096,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>仅输出网络名称</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>移除所有未使用的网络。</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>删除所有未使用的网络。当网络未被任何容器引用时，视为未使用。</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>已删除: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>管理卷。</value>
   </data>
@@ -3046,6 +3137,24 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>列出会话中的所有卷。</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>移除未使用的本地卷。</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>删除所有未使用的匿名本地卷。如果指定 --all ，则还会删除未使用的命名卷。当卷未被任何容器引用时，该卷被视为未使用。</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>移除所有未使用的卷，而不仅仅是匿名卷。</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>已删除: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>总回收空间: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>卷名称</value>
   </data>
@@ -3061,6 +3170,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>无法将图像写入终端。请使用 -o 标志或重定向标准输出。</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>无法将容器导出到终端。请使用 -o 标志或重定向标准输出。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>预期格式: &lt;主机路径|命名卷&gt;:&lt;容器路径&gt;[:模式]</value>
@@ -3182,6 +3294,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>未能恢复卷 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>无法启动容器，因为以下卷不可用: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>卷 '{}' 不可用： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>未能初始化交换</value>
   </data>
@@ -3202,6 +3322,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>无法释放卷“{}”的主机资源</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>由于证书编码失败，已跳过从本地计算机受信任的根存储导入 {} 证书</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>由于证书编码失败，已跳过从当前用户信任的根存储导入 {} 证书</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>未能将主机受信任的根证书安装到 VM 中： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

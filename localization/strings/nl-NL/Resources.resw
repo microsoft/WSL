@@ -2066,6 +2066,10 @@ Gebruik:
     <value>OpenSessionByName({}) is mislukt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Failed to launch command {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Er zijn geen WSLC-sessies gevonden.</value>
   </data>
@@ -2079,9 +2083,6 @@ Gebruik:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Standaardsessie niet gevonden</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Kan standaardsessie niet openen</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Beëindigen van standaardsessie is mislukt</value>
@@ -2118,6 +2119,10 @@ Gebruik:
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Container {} wordt uitgevoerd.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress wordt nog niet ondersteund.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Poorttoewijzingen worden niet ondersteund met de containernetwerkmodus; poorten behoren toe aan de doelcontainer.</value>
@@ -2183,6 +2188,9 @@ Gebruik:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>De volgende argumenten zijn beschikbaar:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Geef het Help-argument door voor meer informatie over een specifieke opdracht.</value>
@@ -2330,6 +2338,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Niet-ondersteunde netwerkmodus: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
+    <value>Extra netwerken zijn niet toegestaan als de primaire netwerkmodus 'host' of 'none' is.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Netwerk dupliceren: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2337,6 +2349,17 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
     <value>Eindpuntinstellingen worden nog niet ondersteund (netwerk {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Netwerkalias mag niet leeg zijn.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Netwerkaliassen vereisen een door de gebruiker gedefinieerd netwerk. Gebruik --network om er een op te geven.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Netwerkaliassen kunnen niet worden opgegeven als er meerdere netwerken worden aangevraagd. Gebruik één --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Kan volume '{}' niet maken: {}</value>
@@ -2372,6 +2395,9 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Opslaan in voortgang.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Exporteren wordt uitgevoerd.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC is het Windows-subsysteem voor Linux Container CCLI-hulpprogramma.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2405,6 +2431,16 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Voert een opdracht uit in een draaiende container.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exporteer het bestandssysteem van een container als een tar-archief.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exporteert het bestandssysteem van een container als een tar-archief.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Schrijf naar een bestand, in plaats van STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Een container inspecteren.</value>
   </data>
@@ -2436,9 +2472,9 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Verwijdert alle gestopte containers.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Totale opnieuw vrijgemaakt ruimte: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Verwijdert containers.</value>
@@ -2529,9 +2565,9 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Verwijdert alle zwevende installatiekopieën. Als --all is opgegeven, verwijder je alle installatiekopieën die niet door een container worden gebruikt.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Totale opnieuw vrijgemaakt ruimte: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Total reclaimed space: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Zonder label: {}</value>
@@ -2652,6 +2688,16 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Wordt gekoppeld aan een actieve sessie. Als er geen sessie-id is opgegeven, wordt de wslc standaardsessie gebruikt.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Run a command in a session.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Hiermee wordt een opdracht in een actieve sessie uitgevoerd zonder TTY. De opdracht en de argumenten worden direct doorgestuurd naar de sessie. Als er geen sessie is opgegeven, wordt de wslc standaardsessie gebruikt.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Arguments to pass to the command being run</value>
+  </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Beëindig een sessie.</value>
   </data>
@@ -2707,6 +2753,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>De opdracht om uit te voeren</value>
+  </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>Aantal CPU's (bijvoorbeeld 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Er wordt een positief aantal CPU's verwacht (bijvoorbeeld 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Containers verwijderen, zelfs als ze worden uitgevoerd</value>
@@ -2777,11 +2831,32 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>Toon de laatst aangemaakte container (inclusief alle statussen)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Geheugenlimiet (bijvoorbeeld 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Hostnaam van container</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Naam van de container</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Een container verbinden met een netwerk</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: de netwerknaam mag niet leeg zijn of een spatie bevatten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>Netwerken in hostmodus worden niet ondersteund</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Voeg een netwerkgebonden alias toe voor de container</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: de netwerkalias mag niet leeg zijn of een witruimte bevatten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Gebruik geen cache bij het bouwen van de image</value>
@@ -2866,6 +2941,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Werkmap binnen de container</value>
   </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: werkmap mag niet leeg of een witruimte zijn</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>De container-id naar het opgegeven pad schrijven</value>
   </data>
@@ -2909,6 +2988,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
     <value>Koppel tmpfs naar de container op het opgegeven pad</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Onbeperkte opties (indeling: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], gebruik -1 voor onbeperkt)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Verwachte &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (gebruik -1 voor onbeperkt)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>Gebruikers-id voor het proces (name|uid|uid:gid)</value>
@@ -3009,6 +3096,16 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Hiermee worden alleen de netwerknamen weergegeven</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Remove all unused networks.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Verwijdert alle ongebruikte netwerken. Een netwerk wordt als ongebruikt beschouwd wanneer er door geen enkele container naar wordt verwezen.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Deleted: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes beheren.</value>
   </data>
@@ -3040,6 +3137,24 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Toont alle volumes in de sessie.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Ongebruikte lokale volumes verwijderen.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Verwijdert alle ongebruikte anonieme lokale volumes. Als --all is opgegeven, worden ook ongebruikte benoemde volumes verwijderd. Een volume wordt als ongebruikt beschouwd wanneer er door geen enkele container naar wordt verwezen.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Verwijder alle ongebruikte volumes, niet alleen de anonieme.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Verwijderd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Totale teruggewonnen ruimte: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volumenaam</value>
   </data>
@@ -3055,6 +3170,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Kan de installatiekopieën niet naar de terminal schrijven. Gebruik de -o-vlag of omleidings-stdout.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-vlag of omleidings-stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>
@@ -3176,6 +3294,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan volume '{}' niet herstellen</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Kan de container niet starten omdat de volgende volumes niet beschikbaar zijn: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Volume {} is niet beschikbaar: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Kan wisselen niet initialiseren</value>
   </data>
@@ -3196,6 +3322,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Kan de hostresources voor volume '{}' niet vrijgeven</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Het importeren van {} certificaten uit de Trusted Root-opslag van de lokale computer is overgeslagen vanwege fouten bij de codering van certificaten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Het importeren van {} certificaten uit de Trusted Root-opslag van de huidige gebruiker is overgeslagen vanwege fouten bij de codering van certificaten</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

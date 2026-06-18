@@ -1,4 +1,5 @@
 set(SOURCES
+    APICompat.cpp
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
@@ -35,6 +36,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     VirtioNetworking.cpp
@@ -48,6 +50,7 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
@@ -56,6 +59,7 @@ set(SOURCES
 
 set(HEADERS
     ../../../generated/Localization.h
+    APICompat.h
     ../inc/docker_schema.h
     ../inc/wslc_schema.h
     ../inc/lxssbusclient.h
@@ -119,6 +123,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
     VirtioNetworking.h
@@ -133,6 +138,7 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
     EnumVariantMap.h

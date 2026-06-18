@@ -529,7 +529,10 @@ class WSLCE2EContainerRunTests
             std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
+
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt, true);
         session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
@@ -565,6 +568,21 @@ class WSLCE2EContainerRunTests
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
         session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_TerminalSize)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        constexpr SHORT columns = 42;
+        constexpr SHORT rows = 43;
+        const auto commandLine = std::format(
+            L"container run --rm -it --name {} {} /bin/sh -c \"while true; do stty size; sleep 1; done\"",
+            WslcContainerName,
+            DebianImage.NameAndTag());
+
+        auto session = RunWslcInteractive(commandLine, ElevationType::Elevated, PseudoConsole{columns, rows});
+        VerifyPseudoConsoleTtySize(session, columns, rows);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
@@ -693,6 +711,59 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(
             L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_Success)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --name {} --network {} --network-alias db {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoNetwork_Rejected)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr =
+                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoneMode_Rejected)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr =
+                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_MultipleNetworks_Rejected)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --network bridge --network bridge --network-alias db --name {} {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_EmptyValue_Rejected)
+    {
+        auto result = RunWslc(
+            std::format(L"container run --rm --network-alias \"\" --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid network-alias value: network alias cannot be empty or whitespace\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
@@ -955,10 +1026,10 @@ private:
                 << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  --network         Connect a container to a network\r\n"
+                << L"  --network-alias   Add a network-scoped alias for the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --session         Specify the session to use\r\n"
                 << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

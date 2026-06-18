@@ -157,7 +157,7 @@ void VMPortMapping::Release()
 
 bool VMPortMapping::IsLocalhost() const
 {
-    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    if (BindAddress.si_family == AF_INET6)
     {
         return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
     }
@@ -248,12 +248,14 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
     return *this;
 }
 
-WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent) :
+WSLCVirtualMachine::WSLCVirtualMachine(
+    _In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLCFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
+    m_onCrashDump(std::move(OnCrashDump)),
     m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
@@ -386,7 +388,7 @@ void WSLCVirtualMachine::ConfigureNetworking()
         options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
     };
 
-    auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
+    auto process = CreateLinuxProcessImpl("/init", options, fds, 0, 0, nullptr, prepareCommandLine);
 
     // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
@@ -639,7 +641,7 @@ std::string WSLCVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     std::vector<WSLCProcessFd> fds;
@@ -659,11 +661,11 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
         fds.emplace_back(WSLCProcessFd{.Fd = WSLCFDStderr, .Type = WSLCFdType::WSLCFdTypeDefault});
     }
 
-    return CreateLinuxProcessImpl(Executable, Options, fds, Errno, PrepareCommandLine);
+    return CreateLinuxProcessImpl(Executable, Options, fds, TtyRows, TtyColumns, Errno, PrepareCommandLine);
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
-    LPCSTR Executable, const WSLCProcessOptions& Options, const std::vector<WSLCProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    LPCSTR Executable, const WSLCProcessOptions& Options, const std::vector<WSLCProcessFd>& Fds, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
@@ -729,7 +731,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     // If this is an interactive tty, we need a relay process
     if (tty != nullptr)
     {
-        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLC_FORK::Pty, Options.TtyRows, Options.TtyColumns);
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLC_FORK::Pty, TtyRows, TtyColumns);
         WSLC_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.Socket = tty->Fd;
@@ -1208,12 +1210,13 @@ std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, i
 {
     std::lock_guard lock{m_lock};
 
-    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
+    for (uint32_t i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
-        if (!m_allocatedPorts.contains(i))
+        uint16_t port = static_cast<uint16_t>(i);
+        if (!m_allocatedPorts.contains(port))
         {
-            WI_VERIFY(m_allocatedPorts.insert(i).second);
-            return std::make_shared<VmPortAllocation>(i, Family, Protocol, *this);
+            WI_VERIFY(m_allocatedPorts.insert(port).second);
+            return std::make_shared<VmPortAllocation>(port, Family, Protocol, *this);
         }
     }
 
@@ -1249,13 +1252,15 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
 
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
     const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-crashes";
 
     while (!m_vmTerminatingEvent.is_signaled())
     {
         try
         {
-            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
             if (!socket)
             {
                 // VM is exiting.
@@ -1275,10 +1280,14 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
             const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
+            const auto crashPid = message.Pid;
+            const auto crashSignal = message.Signal;
+            const auto crashTimestamp = message.Timestamp;
+
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
-            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, crashTimestamp, crashPid, process, crashSignal, dumpExtension);
 
             std::replace_if(
                 filename.begin(),
@@ -1291,8 +1300,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             WSL_LOG(
                 "WSLCLinuxCrash",
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
-                TraceLoggingValue(message.Pid, "Pid"),
-                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(crashPid, "Pid"),
+                TraceLoggingValue(crashSignal, "Signal"),
                 TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
@@ -1316,6 +1325,15 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            file.reset();
+
+            // Notify the session that a crash dump has been fully written. The session fans out
+            // to any registered ICrashDumpCallback subscribers. Failures are caller-handled.
+            if (m_onCrashDump)
+            {
+                m_onCrashDump(fullPath.wstring(), process, crashPid, crashSignal, crashTimestamp);
+            }
         }
         CATCH_LOG()
     }

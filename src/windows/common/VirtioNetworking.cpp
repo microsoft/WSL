@@ -156,15 +156,8 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
             portString += L";udp";
         }
 
-        if (!isOpen)
-        {
-            portString += L";allocate=false";
-        }
-        else
-        {
-            const auto addrStr = wsl::windows::common::string::SockAddrInetToWstring(addr);
-            portString += std::format(L";listen_addr={}", addrStr);
-        }
+        const auto addrStr = wsl::windows::common::string::SockAddrInetToWstring(addr);
+        portString += std::format(L";listen_addr={};allocate={}", addrStr, isOpen ? L"true" : L"false");
 
         LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
     }

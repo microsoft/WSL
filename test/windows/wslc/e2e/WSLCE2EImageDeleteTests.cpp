@@ -28,6 +28,7 @@ class WSLCE2EImageDeleteTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(AlpineImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
         return true;
     }
 
@@ -36,6 +37,7 @@ class WSLCE2EImageDeleteTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(AlpineImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
         return true;
     }
 
@@ -119,8 +121,27 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
     {
-        // TODO: Implement once 'image tag' is implemented
-        SKIP_TEST_NOT_IMPL();
+        // Tag debian a second time, then remove via the alias with --no-prune.
+        // The alias must disappear while the original tag stays resolvable.
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsDeleted(NoPruneTaggedImage);
+
+        auto tagResult = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), NoPruneTaggedImage.NameAndTag()));
+        tagResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto removeResult = RunWslc(std::format(L"image delete --no-prune {}", NoPruneTaggedImage.NameAndTag()));
+        removeResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyImageIsListed(DebianImage);
+
+        auto listAfter = RunWslc(L"image list -q");
+        listAfter.Verify({.Stderr = L"", .ExitCode = 0});
+        for (const auto& line : listAfter.GetStdoutLines())
+        {
+            VERIFY_IS_TRUE(
+                line.find(NoPruneTaggedImage.NameAndTag()) == std::wstring::npos,
+                L"Secondary tag should have been removed by `image delete --no-prune`");
+        }
     }
 
 private:
@@ -128,6 +149,7 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+    const TestImage NoPruneTaggedImage{L"wslc-test-noprune", L"alias", L""};
 
     std::wstring GetHelpMessage() const
     {
@@ -171,7 +193,6 @@ private:
         options << L"The following options are available:\r\n"                    //
                 << L"  -f,--force  Delete images even if they are being used\r\n" //
                 << L"  --no-prune  Do not delete untagged parents\r\n"            //
-                << L"  --session   Specify the session to use\r\n"                //
                 << L"  -?,--help   Shows help about the selected command\r\n"     //
                 << L"\r\n";
         return options.str();

@@ -37,18 +37,6 @@ void InitializeWildcardSocketAddress(_Out_ PSOCKADDR_HV Address)
 }
 } // namespace
 
-std::optional<wil::unique_socket> wsl::windows::common::hvsocket::CancellableAccept(
-    _In_ SOCKET ListenSocket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
-{
-    wil::unique_socket Socket = Create();
-    if (!socket::CancellableAccept(ListenSocket, Socket.get(), Timeout, ExitHandle, Location))
-    {
-        return {};
-    }
-
-    return Socket;
-}
-
 wil::unique_socket wsl::windows::common::hvsocket::Connect(
     _In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle, _In_opt_ ULONG Timeout, _In_ const std::source_location& Location)
 {
