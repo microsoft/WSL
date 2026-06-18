@@ -2072,6 +2072,10 @@ Verwendung:
     <value>Fehler bei OpenSessionByName('{}')</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Fehler beim Starten des Befehls {}. Fehler = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Keine WSLA-Sitzungen gefunden.</value>
   </data>
@@ -2085,9 +2089,6 @@ Verwendung:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Standard-Session nicht gefunden</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Die Standard-Session konnte nicht geöffnet werden</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Beenden der Standard-Session fehlgeschlagen</value>
@@ -2193,6 +2194,9 @@ Verwendung:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Die folgenden Argumente sind verfügbar:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Farbausgabe deaktivieren.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Wenn Sie weitere Details zu einem bestimmten Befehl erfahren möchten, übergeben Sie ihm das Hilfe-Argument.</value>
@@ -2397,6 +2401,9 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Speichern wird ausgeführt.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Export wird durchgeführt.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC ist das Windows-Subsystem für Linux Container-CLI-Tool.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2430,6 +2437,16 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Führt einen Befehl in einem laufenden Container aus.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Exportieren Sie das Dateisystem eines Containers als Tar-Archiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Exportiert das Dateisystem eines Containers als Tar-Archiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>In eine Datei schreiben, anstatt STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Einen Container überprüfen.</value>
   </data>
@@ -2461,9 +2478,9 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Entfernt alle beendeten Container.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Insgesamt zurückgewonnener Speicherplatz: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Insgesamt zurückgewonnener Speicherplatz: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Container entfernen.</value>
@@ -2554,9 +2571,9 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Entfernt alle nicht zugeordneten Bilder. Wenn --all angegeben wird, werden alle Images entfernt, die von keinem Container verwendet werden.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Insgesamt zurückgewonnener Speicherplatz: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Insgesamt zurückgewonnener Speicherplatz: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Ohne Tag: {}</value>
@@ -2676,6 +2693,16 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Fügt eine aktive Sitzung an. Wenn keine Sitzungs-ID angegeben wird, wird die wslc Standardsitzung verwendet.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Führen Sie einen Befehl in einer Sitzung aus.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Führt einen Befehl in einer aktiven Sitzung ohne TTY aus. Der Befehl und seine Argumente werden direkt an die Sitzung weitergeleitet. Wenn keine Sitzung angegeben ist, wird die wslc Standardsitzung verwendet.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argumente, die an den auszuführenden Befehl übergeben werden</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Eine Sitzung beenden.</value>
@@ -3075,6 +3102,16 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Gibt nur die Netzwerknamen aus</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Entfernen Sie alle ungenutzten Netzwerke.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Entfernt alle nicht verwendeten Netzwerke. Ein Netzwerk gilt als nicht verwendet, wenn von keinem Container darauf verwiesen wird.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Gelöscht: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes verwalten.</value>
   </data>
@@ -3106,6 +3143,24 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Listet alle Volumes in der Sitzung auf.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Nicht verwendete lokale Volumes entfernen.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Entfernt alle nicht verwendeten anonymen lokalen Volumes. Bei Angabe --all werden auch nicht verwendete benannte Volumes entfernt. Ein Volume gilt als nicht verwendet, wenn von keinem Container darauf verwiesen wird.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Entfernen Sie alle nicht verwendeten Volumes, nicht nur anonyme.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Gelöscht: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Gesamter freigegebener Speicherplatz: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Volumename</value>
   </data>
@@ -3121,6 +3176,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Das Image kann nicht auf das Terminal geschrieben werden. Kennzeichen -o verwenden oder StdOut umleiten.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Der Container kann nicht auf das Terminal exportiert werden. Kennzeichen -o verwenden oder StdOut umleiten.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Erwartetes Format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
@@ -3242,6 +3300,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Fehler beim Wiederherstellen des Volumes „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Der Container kann nicht gestartet werden, da die folgenden Volumen nicht verfügbar sind: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Volume „{}“ ist nicht verfügbar: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Fehler beim Initialisieren der Swap-Datei</value>
   </data>
@@ -3262,6 +3328,18 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Fehler beim Freigeben der Hostressourcen für Volume '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Der Import von {} Zertifikaten aus dem vertrauenswürdigen Stammzertifikatspeicher des lokalen Computers wurde aufgrund von Zertifikatcodierungsfehlern übersprungen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Der Import von {} Zertifikaten aus dem vertrauenswürdigen Stammzertifikatspeicher des aktuellen Benutzers wurde aufgrund von Zertifikatcodierungsfehlern übersprungen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Fehler beim Installieren der vertrauenswürdigen Hoststammzertifikate auf der VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

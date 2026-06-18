@@ -28,7 +28,6 @@ std::vector<Argument> NetworkRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::NetworkName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 

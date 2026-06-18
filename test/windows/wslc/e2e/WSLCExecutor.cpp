@@ -160,6 +160,11 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType eleva
         process.SetToken(nonElevatedToken.get());
     }
 
+    auto nul = wsl::windows::common::filesystem::OpenNulDevice(GENERIC_READ);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(nul.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    process.SetStdHandles(nul.get(), nullptr, nullptr);
+
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
 }

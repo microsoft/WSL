@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslc.h"
+#include "wslccompat.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
@@ -235,23 +236,23 @@ class WSLCTests
 
     WSLC_TEST_METHOD(IsClientVersionSupported)
     {
-        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        wil::com_ptr<IWSLCCompatSessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
         BOOL isSupported = FALSE;
 
         // The current version should always be supported.
-        const WSLCVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        const WSLCCompatVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&currentVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
 
         // A very old version should not be supported.
-        const WSLCVersion oldVersion{1, 0, 0};
+        const WSLCCompatVersion oldVersion{1, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&oldVersion, &isSupported));
         VERIFY_IS_FALSE(isSupported);
 
         // A very high version should be supported.
-        const WSLCVersion futureVersion{99, 0, 0};
+        const WSLCCompatVersion futureVersion{99, 0, 0};
         VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&futureVersion, &isSupported));
         VERIFY_IS_TRUE(isSupported);
     }
@@ -2876,46 +2877,26 @@ class WSLCTests
         }
     }
 
-    WSLC_TEST_METHOD(TerminationCallback)
+    WSLC_TEST_METHOD(TerminationEvent)
     {
-        class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
-        {
+        auto session = CreateSession(GetDefaultSessionSettings(L"termination-event-test"));
 
-        public:
-            CallbackInstance(std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)>&& callback) :
-                m_callback(std::move(callback))
-            {
-            }
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_IS_NOT_NULL(terminationEvent.get());
 
-            HRESULT OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details) override
-            {
-                m_callback(Reason, Details);
-                return S_OK;
-            }
+        // The reason is unavailable until the session has terminated.
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_ARE_EQUAL(session->GetTerminationReason(&reason, &details), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
-        private:
-            std::function<void(WSLCVirtualMachineTerminationReason, LPCWSTR)> m_callback;
-        };
+        // Terminating the session should signal the event and record a graceful shutdown reason.
+        VERIFY_SUCCEEDED(session->Terminate());
 
-        std::promise<std::pair<WSLCVirtualMachineTerminationReason, std::wstring>> promise;
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
 
-        CallbackInstance callback{[&](WSLCVirtualMachineTerminationReason reason, LPCWSTR details) {
-            promise.set_value(std::make_pair(reason, details));
-        }};
-
-        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
-        sessionSettings.TerminationCallback = &callback;
-
-        auto session = CreateSession(sessionSettings);
-
-        session.reset();
-        auto future = promise.get_future();
-        auto result = future.wait_for(std::chrono::seconds(30));
-        VERIFY_ARE_EQUAL(result, std::future_status::ready);
-        auto [reason, details] = future.get();
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
-        VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
     WSLC_TEST_METHOD(CrashDumpCallback)
@@ -4901,6 +4882,123 @@ class WSLCTests
 
         // Delete non-existent should fail.
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
+    }
+
+    void CreateNamedNetwork(const std::string& Name, const std::vector<WSLCLabel>& Labels = {})
+    {
+        WSLCNetworkOptions options{};
+        options.Name = Name.c_str();
+        options.Driver = "bridge";
+        options.Labels = Labels.empty() ? nullptr : Labels.data();
+        options.LabelsCount = static_cast<ULONG>(Labels.size());
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+    }
+
+    WSLC_TEST_METHOD(PruneNetworksTest)
+    {
+        auto expectPrune = [&](const std::vector<std::string>& expected,
+                               const std::vector<WSLCFilter>& filters = {},
+                               const std::source_location& source = std::source_location::current()) {
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(filtersPtr, filtersCount, deleted.addressof(), deleted.size_address<ULONG>()));
+
+            std::vector<std::string> names;
+            for (const auto& n : deleted)
+            {
+                names.emplace_back(n);
+            }
+
+            VerifyAreEqualUnordered(expected, names, source);
+        };
+
+        // Prune with no managed networks present returns empty.
+        expectPrune({});
+
+        // Prune removes unused managed networks.
+        {
+            const std::string a = "wslc-prune-net-a";
+            const std::string b = "wslc-prune-net-b";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(a.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(b.c_str()));
+            });
+
+            CreateNamedNetwork(a);
+            CreateNamedNetwork(b);
+
+            expectPrune({a, b});
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+            for (const auto& n : networks)
+            {
+                VERIFY_ARE_NOT_EQUAL(a, std::string(n.Name));
+                VERIFY_ARE_NOT_EQUAL(b, std::string(n.Name));
+            }
+
+            cleanup.release();
+        }
+
+        // Label filter (key=value).
+        {
+            const std::string labeled = "wslc-prune-net-labeled";
+            const std::string unlabeled = "wslc-prune-net-unlabeled";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(labeled.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            });
+
+            CreateNamedNetwork(labeled, {{"wslc-prune-net-test", "yes"}});
+            CreateNamedNetwork(unlabeled);
+
+            expectPrune({labeled}, {{"label", "wslc-prune-net-test=yes"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(unlabeled.c_str()));
+            cleanup.release();
+        }
+
+        // Label filter (negation).
+        {
+            const std::string keep = "wslc-prune-net-keep";
+            const std::string drop = "wslc-prune-net-drop";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(drop.c_str()));
+            });
+
+            CreateNamedNetwork(keep, {{"wslc-prune-net-keep", "yes"}});
+            CreateNamedNetwork(drop);
+
+            expectPrune({drop}, {{"label!", "wslc-prune-net-keep"}});
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(keep.c_str()));
+            cleanup.release();
+        }
+
+        // Filter with null Key rejected.
+        {
+            WSLCFilter filters[] = {{nullptr, "true"}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
+
+        // Filter with null Value rejected.
+        {
+            WSLCFilter filters[] = {{"label", nullptr}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+            VERIFY_ARE_EQUAL(
+                E_POINTER, m_defaultSession->PruneNetworks(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>()));
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)

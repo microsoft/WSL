@@ -97,6 +97,11 @@ struct TestSession
         return m_storagePath;
     }
 
+    IWSLCSession& Session() const
+    {
+        return *m_session;
+    }
+
 private:
     std::wstring m_name;
     std::filesystem::path m_storagePath;
@@ -128,6 +133,24 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
 void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content);
+
+// Sets up a clean test directory and returns a scope_exit to remove it.
+inline auto SetupTestDirectory(const std::filesystem::path& directory)
+{
+    std::error_code ec;
+    std::filesystem::remove_all(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    std::filesystem::create_directories(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directory]() {
+        std::error_code removeError;
+        std::filesystem::remove_all(directory, removeError);
+    });
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port);
 
 // Default timeout of 0 will execute once.
@@ -180,10 +203,14 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
-// Starts a local registry container with host networking using the COM API.
-// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+// Starts a local registry container using the COM API and returns the running container (holds it
+// alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+    IWSLCSession& session,
+    const std::string& username = "",
+    const std::string& password = "",
+    USHORT port = 5000,
+    const std::wstring& tlsCertDir = L"");
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
