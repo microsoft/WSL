@@ -2377,16 +2377,13 @@ try
     static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
     for (const auto& [key, _] : driverOpts)
     {
-        const bool supported = std::any_of(c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) {
-            return key == opt;
-        });
+        const bool supported = std::any_of(
+            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
     }
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        Localization::MessageWslcGatewayRequiresSubnet(),
-        driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
