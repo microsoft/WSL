@@ -255,7 +255,7 @@ private:
     void StartDockerd();
 
     using ScopeGuard = decltype(wil::scope_exit(std::function<void()>{}));
-    [[nodiscard]] ScopeGuard ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme);
+    [[nodiscard]] std::optional<ScopeGuard> ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme);
     void ApplyInsecureRegistries();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
@@ -296,6 +296,7 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
+    std::mutex m_insecureRegistriesMutex;
     std::map<std::string, int> m_insecureRegistries;
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;

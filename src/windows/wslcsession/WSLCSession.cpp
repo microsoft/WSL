@@ -601,50 +601,62 @@ void WSLCSession::StartDockerd()
     WSL_LOG("DockerdStarted");
 }
 
-[[nodiscard]] WSLCSession::ScopeGuard WSLCSession::ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme)
+[[nodiscard]] std::optional<WSLCSession::ScopeGuard> WSLCSession::ConfigureInsecureRegistry(const std::string& registry, LPCSTR scheme)
 {
     if (scheme == nullptr || strcmp(scheme, "http") != 0)
     {
-        return wil::scope_exit(std::function<void()>{[] {}});
+        return std::nullopt;
     }
 
     auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(registry);
-    m_insecureRegistries[server]++;
+
+    {
+        auto lock = std::lock_guard(m_insecureRegistriesMutex);
+        m_insecureRegistries[server]++;
+    }
 
     WSL_LOG("ConfigureInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
     ApplyInsecureRegistries();
 
     return wil::scope_exit(std::function<void()>{[this, server = std::move(server)]
     {
-        auto it = m_insecureRegistries.find(server);
-        if (it != m_insecureRegistries.end())
         {
+            auto lock = std::lock_guard(m_insecureRegistriesMutex);
+            auto it = m_insecureRegistries.find(server);
+            if (it == m_insecureRegistries.end())
+            {
+                return;
+            }
+
             if (--it->second == 0)
             {
                 m_insecureRegistries.erase(it);
             }
-
-            WSL_LOG("RemoveInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
-            try
-            {
-                ApplyInsecureRegistries();
-            }
-            CATCH_LOG();
         }
+
+        WSL_LOG("RemoveInsecureRegistry", TraceLoggingValue(server.c_str(), "Registry"));
+        try
+        {
+            ApplyInsecureRegistries();
+        }
+        CATCH_LOG();
     }});
 }
 
 void WSLCSession::ApplyInsecureRegistries()
 {
     std::string registriesJson;
-    for (const auto& [reg, count] : m_insecureRegistries)
     {
-        if (!registriesJson.empty())
+        auto lock = std::lock_guard(m_insecureRegistriesMutex);
+        for (const auto& [reg, count] : m_insecureRegistries)
         {
-            registriesJson += ", ";
-        }
+            if (!registriesJson.empty())
+            {
+                registriesJson += ", ";
+            }
 
-        registriesJson += std::format("\"{}\"", reg);
+            registriesJson += std::format("\"{}\"", reg);
+        }
     }
 
     auto daemonJson = std::format(R"({{"insecure-registries": [{}]}})", registriesJson);
