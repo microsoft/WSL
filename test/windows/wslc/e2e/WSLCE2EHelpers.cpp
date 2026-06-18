@@ -338,11 +338,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     }
 }
 
-std::wstring StartMockDnsServer(
-    const TestImage& image,
-    const std::wstring& containerName,
-    const std::wstring& probeDomain,
-    const std::wstring& probeAnswer)
+std::wstring StartMockDnsServer(const TestImage& image, const std::wstring& containerName, const std::wstring& probeDomain, const std::wstring& probeAnswer)
 {
     EnsureContainerDoesNotExist(containerName);
 
@@ -353,7 +349,10 @@ std::wstring StartMockDnsServer(
         L"container run -d --name {} {} sh -c "
         L"\"apk add --no-cache dnsmasq >/dev/null && "
         L"exec dnsmasq --no-daemon -k --address=/{}/{}\"",
-        containerName, image.NameAndTag(), probeDomain, probeAnswer));
+        containerName,
+        image.NameAndTag(),
+        probeDomain,
+        probeAnswer));
     start.Verify({.Stderr = L"", .ExitCode = 0});
 
     // Poll for dnsmasq readiness — apk add takes a few seconds on first run,
@@ -362,8 +361,7 @@ std::wstring StartMockDnsServer(
     for (int i = 0; i < 60 && !ready; ++i)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        auto check = RunWslc(std::format(
-            L"container exec {} sh -c \"pgrep dnsmasq >/dev/null\"", containerName));
+        auto check = RunWslc(std::format(L"container exec {} sh -c \"pgrep dnsmasq >/dev/null\"", containerName));
         if (check.ExitCode.has_value() && check.ExitCode.value() == 0)
         {
             ready = true;
@@ -378,8 +376,7 @@ std::wstring StartMockDnsServer(
     std::wsmatch match;
     std::wregex re(LR"RX("IPAddress"\s*:\s*"([0-9.]+)")RX");
     VERIFY_IS_TRUE(
-        std::regex_search(*inspect.Stdout, match, re),
-        L"Could not extract IPAddress from mock DNS container inspect output");
+        std::regex_search(*inspect.Stdout, match, re), L"Could not extract IPAddress from mock DNS container inspect output");
     return match[1].str();
 }
 

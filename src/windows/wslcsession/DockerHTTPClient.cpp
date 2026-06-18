@@ -413,9 +413,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, cons
                 while (totalRead < expectedLen)
                 {
                     auto bytesRead = common::socket::Receive(
-                        socket.get(),
-                        gsl::span(reinterpret_cast<gsl::byte*>(body.data() + totalRead), expectedLen - totalRead),
-                        m_exitingEvent);
+                        socket.get(), gsl::span(reinterpret_cast<gsl::byte*>(body.data() + totalRead), expectedLen - totalRead), m_exitingEvent);
                     if (bytesRead == 0)
                     {
                         break;
@@ -859,12 +857,10 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendStre
             // A body source that closes before ContentLength bytes (e.g. ERROR_BROKEN_PIPE on a
             // closed pipe) is a truncated upload; surface it as a generic failure rather than
             // leaking the raw pipe error code to the caller.
-            THROW_HR_IF_MSG(
-                E_FAIL, readError == ERROR_BROKEN_PIPE, "Body source closed before %llu of %llu bytes were read", totalSent, ContentLength);
+            THROW_HR_IF_MSG(E_FAIL, readError == ERROR_BROKEN_PIPE, "Body source closed before %llu of %llu bytes were read", totalSent, ContentLength);
             THROW_WIN32(readError);
         }
-        THROW_HR_IF_MSG(
-            E_FAIL, bytesRead == 0, "Premature EOF on body source at %llu of %llu bytes", totalSent, ContentLength);
+        THROW_HR_IF_MSG(E_FAIL, bytesRead == 0, "Premature EOF on body source at %llu of %llu bytes", totalSent, ContentLength);
 
         totalSent += bytesRead;
         const bool lastChunk = (totalSent >= ContentLength);

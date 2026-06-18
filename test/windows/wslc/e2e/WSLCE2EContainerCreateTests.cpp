@@ -634,9 +634,7 @@ class WSLCE2EContainerCreateTests
         // Verify failure + some "empty"/"directory" indicator.
         VERIFY_ARE_EQUAL(1, result.ExitCode.value_or(0));
         auto stderrText = result.Stderr.value_or(L"");
-        VERIFY_IS_TRUE(
-            stderrText.find(L"empty") != std::wstring::npos ||
-            stderrText.find(L"absolute") != std::wstring::npos);
+        VERIFY_IS_TRUE(stderrText.find(L"empty") != std::wstring::npos || stderrText.find(L"absolute") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir)
@@ -692,17 +690,11 @@ class WSLCE2EContainerCreateTests
         auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(kMockDnsName); });
 
         auto result = RunWslc(std::format(
-            L"container create --name {} --dns {} {} getent hosts {}",
-            WslcContainerName,
-            mockIp,
-            AlpineImage.NameAndTag(),
-            kProbeDomain));
+            L"container create --name {} --dns {} {} getent hosts {}", WslcContainerName, mockIp, AlpineImage.NameAndTag(), kProbeDomain));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        VERIFY_IS_TRUE(
-            result.Stdout.has_value() &&
-            result.Stdout->find(kProbeAnswer) != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->find(kProbeAnswer) != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSSearch)

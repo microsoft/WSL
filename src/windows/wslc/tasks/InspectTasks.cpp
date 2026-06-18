@@ -38,8 +38,7 @@ using namespace wsl::windows::wslc::models;
 // the error and continue with the next type lookup.
 static bool IsPodmanNameValidationError(const std::wstring& message)
 {
-    return message.find(L"parsing reference") != std::wstring::npos ||
-           message.find(L"normalizing name") != std::wstring::npos ||
+    return message.find(L"parsing reference") != std::wstring::npos || message.find(L"normalizing name") != std::wstring::npos ||
            message.find(L"must be lowercase") != std::wstring::npos;
 }
 
@@ -86,8 +85,7 @@ static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
             if (auto* context = wsl::windows::common::ExecutionContext::Current())
             {
                 const auto& reported = context->ReportedError();
-                if (reported.has_value() && reported->Message.has_value() &&
-                    IsPodmanNameValidationError(*reported->Message))
+                if (reported.has_value() && reported->Message.has_value() && IsPodmanNameValidationError(*reported->Message))
                 {
                     LOG_HR_MSG(errorCode, "Tolerating podman name-validation error in inspect");
                     return false;

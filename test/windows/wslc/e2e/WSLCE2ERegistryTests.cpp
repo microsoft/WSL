@@ -39,8 +39,7 @@ namespace {
         VERIFY_IS_TRUE(result.Stderr.has_value());
         const auto& stderr_ = *result.Stderr;
         VERIFY_IS_TRUE(
-            stderr_.find(L"no basic auth credentials") != std::wstring::npos ||
-            stderr_.find(L"authentication required") != std::wstring::npos);
+            stderr_.find(L"no basic auth credentials") != std::wstring::npos || stderr_.find(L"authentication required") != std::wstring::npos);
     }
 
     void VerifyLogoutSucceeds(const std::wstring& registryAddress)

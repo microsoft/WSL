@@ -94,9 +94,18 @@ static std::string StripPodmanRegistryPrefix(std::string_view name)
     constexpr std::string_view kDockerLibrary = "docker.io/library/";
     constexpr std::string_view kDockerIo = "docker.io/";
 
-    if (name.starts_with(kLocalhost)) { return std::string(name.substr(kLocalhost.size())); }
-    if (name.starts_with(kDockerLibrary)) { return std::string(name.substr(kDockerLibrary.size())); }
-    if (name.starts_with(kDockerIo)) { return std::string(name.substr(kDockerIo.size())); }
+    if (name.starts_with(kLocalhost))
+    {
+        return std::string(name.substr(kLocalhost.size()));
+    }
+    if (name.starts_with(kDockerLibrary))
+    {
+        return std::string(name.substr(kDockerLibrary.size()));
+    }
+    if (name.starts_with(kDockerIo))
+    {
+        return std::string(name.substr(kDockerIo.size()));
+    }
     return std::string(name);
 }
 
@@ -113,8 +122,7 @@ static std::string StripPodmanRegistryPrefixFromDigest(std::string_view repoDige
 }
 
 template <typename TransformFn>
-static std::optional<std::vector<std::string>> TransformImageRefs(
-    const std::optional<std::vector<std::string>>& source, TransformFn&& fn)
+static std::optional<std::vector<std::string>> TransformImageRefs(const std::optional<std::vector<std::string>>& source, TransformFn&& fn)
 {
     if (!source.has_value())
     {
@@ -122,7 +130,10 @@ static std::optional<std::vector<std::string>> TransformImageRefs(
     }
     std::vector<std::string> result;
     result.reserve(source->size());
-    for (const auto& ref : *source) { result.push_back(fn(ref)); }
+    for (const auto& ref : *source)
+    {
+        result.push_back(fn(ref));
+    }
     return result;
 }
 
@@ -134,12 +145,10 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     wslcInspect.Id = dockerInspect.Id;
     // Strip podman registry prefixes (localhost/, docker.io/library/, docker.io/)
     // so users see docker-style short names rather than fully-qualified refs.
-    wslcInspect.RepoTags = TransformImageRefs(dockerInspect.RepoTags, [](const std::string& tag) {
-        return StripPodmanRegistryPrefix(tag);
-    });
-    wslcInspect.RepoDigests = TransformImageRefs(dockerInspect.RepoDigests, [](const std::string& d) {
-        return StripPodmanRegistryPrefixFromDigest(d);
-    });
+    wslcInspect.RepoTags =
+        TransformImageRefs(dockerInspect.RepoTags, [](const std::string& tag) { return StripPodmanRegistryPrefix(tag); });
+    wslcInspect.RepoDigests =
+        TransformImageRefs(dockerInspect.RepoDigests, [](const std::string& d) { return StripPodmanRegistryPrefixFromDigest(d); });
     wslcInspect.Parent = dockerInspect.Parent;
     wslcInspect.Comment = dockerInspect.Comment;
     wslcInspect.Created = dockerInspect.Created;
@@ -560,8 +569,7 @@ void WSLCSession::PersistNetworkConfig()
 
     try
     {
-        ServiceProcessLauncher launcher(
-            "/bin/sh", {"/bin/sh", "-c", script}, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}});
+        ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", script}, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}});
         auto process = launcher.Launch(*m_virtualMachine);
         const auto code = process.Wait(c_networkConfigSetupTimeoutMs);
         THROW_HR_IF_MSG(E_FAIL, code != 0, "Network config persistence setup exited with code %d", code);
@@ -978,8 +986,8 @@ try
     // file. We do this synchronously on the wslcsession thread — Dockerfiles
     // are tiny (KBs) and the IO is local, so there's no value in async here.
     {
-        wil::unique_hfile out(::CreateFileW(
-            stagedDockerfileHost.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        wil::unique_hfile out(
+            ::CreateFileW(stagedDockerfileHost.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!out.is_valid());
 
         char buf[64 * 1024];
@@ -1007,12 +1015,7 @@ try
 
             DWORD bytesWritten = 0;
             THROW_LAST_ERROR_IF(!::WriteFile(out.get(), buf, bytesRead, &bytesWritten, nullptr));
-            THROW_HR_IF_MSG(
-                E_FAIL,
-                bytesWritten != bytesRead,
-                "Short write staging Dockerfile (wrote %lu of %lu bytes)",
-                bytesWritten,
-                bytesRead);
+            THROW_HR_IF_MSG(E_FAIL, bytesWritten != bytesRead, "Short write staging Dockerfile (wrote %lu of %lu bytes)", bytesWritten, bytesRead);
         }
     }
 
@@ -1022,8 +1025,8 @@ try
     // outside the context (a requirement, as explained above).
     const auto stageMountPath = std::format("/mnt/wslc-build-{}", wsl::shared::string::GuidToString<char>(stageId));
     THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(stageDirHost.c_str(), stageMountPath.c_str(), TRUE));
-    auto unmountStage = wil::scope_exit_log(
-        WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(stageMountPath.c_str()); });
+    auto unmountStage =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(stageMountPath.c_str()); });
 
     const auto stagedDockerfile = std::format("{}/Containerfile", stageMountPath);
 
@@ -1035,19 +1038,29 @@ try
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsNone);
+    const auto buildTmpDir = std::format("{}/tmp", c_containerdStorage);
+    {
+        ServiceProcessLauncher mkdirLauncher("/bin/mkdir", {"/bin/mkdir", "-p", buildTmpDir});
+        const int mkdirExit = mkdirLauncher.Launch(*m_virtualMachine).Wait();
+        THROW_HR_IF_MSG(E_FAIL, mkdirExit != 0, "Failed to create build temp dir %hs (exit %i)", buildTmpDir.c_str(), mkdirExit);
+    }
+
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {std::format("TMPDIR={}", buildTmpDir)}, WSLCProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();
 
-    // Podman emits human-readable build output on stderr (e.g. "STEP 1/3: FROM ...", "--> abcd...", per-step logs,
-    // including the final "Error: ..." line on failure). Echo each line straight to the client so the user sees both
-    // progress and any error message in real time.
+    std::string allOutput;
     auto captureOutput = [&](const gsl::span<char>& content) {
+        allOutput.append(content.begin(), content.end());
+        allOutput.push_back('\n');
+
         if (ProgressCallback != nullptr)
         {
             std::string line{content.begin(), content.end()};
-            THROW_IF_FAILED(ProgressCallback->OnProgress(line.c_str(), "log", 0, 0));
+            line += '\n';
+            bool isStep = line.find("STEP ") == 0;
+            THROW_IF_FAILED(ProgressCallback->OnProgress(line.c_str(), isStep ? "step" : "log", 0, 0));
         }
     };
 
@@ -1056,10 +1069,9 @@ try
     // otherwise the per-step RUN output is silently dropped. EOF on stdout still signals build
     // completion (CancelOnCompleted). stderr is captured too so output is surfaced regardless of which
     // stream a given podman version writes to (e.g. the final "Error: ..." line on failure).
-    io.AddHandle(
-        std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(1), captureOutput, false),
-        io::MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(1), captureOutput, false), io::MultiHandleWait::CancelOnCompleted);
 
+    // stderr carries the failure diagnostics; forward it so build errors reach the client.
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
     // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
@@ -1120,9 +1132,12 @@ try
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
-    // Podman has already streamed any error message to the client via ProgressCallback above, so just signal failure
-    // here without re-surfacing the build log.
-    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "podman build exited with code %i", exitCode);
+
+    if (exitCode != 0)
+    {
+        std::erase(allOutput, '\r');
+        THROW_HR_WITH_USER_ERROR(E_FAIL, allOutput.empty() ? std::format("podman build exited with code {}", exitCode) : allOutput);
+    }
 
     return S_OK;
 }
@@ -1217,9 +1232,7 @@ try
 CATCH_RETURN();
 
 void WSLCSession::ImportImageImpl(
-    DockerHTTPClient::HTTPRequestContext& Request,
-    std::function<void(const gsl::span<char>&)>&& OnResponseChunk,
-    std::function<void()>&& OnResponseComplete)
+    DockerHTTPClient::HTTPRequestContext& Request, std::function<void(const gsl::span<char>&)>&& OnResponseChunk, std::function<void()>&& OnResponseComplete)
 {
     // Upload was completed synchronously by DockerHTTPClient::LoadImage / ImportImage
     // (via SendStreamRequest). Here we only consume the HTTP response.
@@ -1962,9 +1975,9 @@ try
             // 400 for ambiguous), distinguishable only by the message ("more than one result for
             // container ..." vs "no such container"). Check ambiguity first, then fall back to
             // not-found.
-            const bool ambiguous = e.StatusCode() == 400 ||
-                (e.HasErrorMessage() &&
-                 e.DockerMessage<docker_schema::ErrorResponse>().message.find("more than one result") != std::string::npos);
+            const bool ambiguous =
+                e.StatusCode() == 400 || (e.HasErrorMessage() && e.DockerMessage<docker_schema::ErrorResponse>().message.find(
+                                                                     "more than one result") != std::string::npos);
             RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, ambiguous, "Ambiguous prefix: '%hs'", Id);
             THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), e.StatusCode() == 404);
 
@@ -2407,7 +2420,11 @@ static void ValidateSubnetOption(const std::string& subnet)
         bool prefixOk = !prefix.empty();
         for (char c : prefix)
         {
-            if (c < '0' || c > '9') { prefixOk = false; break; }
+            if (c < '0' || c > '9')
+            {
+                prefixOk = false;
+                break;
+            }
         }
         valid = ipOk && prefixOk;
     }
@@ -2575,11 +2592,10 @@ try
         // while podman returns 500 with a "network is being used" message ("<name> has associated
         // containers with it..."). 500 is too generic to map blindly, so for podman we match the
         // message; dockerd's 403 is mapped directly.
-        const bool networkInUse = e.StatusCode() == 403 ||
-            (e.HasErrorMessage() &&
-             e.DockerMessage<docker_schema::ErrorResponse>().message.find("is being used") != std::string::npos);
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), networkInUse);
+        const bool networkInUse =
+            e.StatusCode() == 403 ||
+            (e.HasErrorMessage() && e.DockerMessage<docker_schema::ErrorResponse>().message.find("is being used") != std::string::npos);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), networkInUse);
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
     }

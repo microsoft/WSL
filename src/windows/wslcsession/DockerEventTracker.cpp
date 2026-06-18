@@ -275,8 +275,7 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainer
     return EventTrackingReference{this, id};
 }
 
-DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(
-    const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
     std::lock_guard lock{m_lock};
 

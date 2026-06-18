@@ -103,7 +103,8 @@ try
 
     const std::string_view idView = (id != nullptr) ? id : std::string_view{};
     const bool isLog = (idView == "log");
-    const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
+    const bool isPullProgress = (idView == "pullProgress");
+    const bool isStep = (idView == "step");
 
     if (m_verbose || !m_isConsole)
     {
@@ -177,14 +178,18 @@ try
         return S_OK;
     }
 
-    // Else is a build step
-    CollapseWindow();
-    auto wide = MultiByteToWide(status);
-    const auto bodyLength = wide.find_last_not_of(L"\r\n") + 1;
-    const auto newlines = wide.substr(bodyLength);
-    wide.resize(bodyLength);
+    if (isStep)
+    {
+        CollapseWindow();
+        auto wide = MultiByteToWide(status);
+        const auto bodyLength = wide.find_last_not_of(L"\r\n") + 1;
+        const auto newlines = wide.substr(bodyLength);
+        wide.resize(bodyLength);
 
-    WriteTerminal(std::format(L"{}{}{}{}", c_escapeBrightGreen, wide, c_escapeResetAttributes, newlines));
+        WriteTerminal(std::format(L"{}{}{}{}", c_escapeBrightGreen, wide, c_escapeResetAttributes, newlines));
+        return S_OK;
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

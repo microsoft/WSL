@@ -339,11 +339,12 @@ struct PortRelay
     OVERLAPPED Overlapped{};
     bool Pending = false;
     wil::unique_socket PendingSocket;
-    int Family;
+    int ListenFamily;
+    int ConnectFamily;
     CHAR AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
 
-    PortRelay(wil::unique_socket&& ListenSocket, uint32_t LinuxPort, uint32_t RelayPort, int Family) :
-        ListenSocket(std::move(ListenSocket)), LinuxPort(LinuxPort), RelayPort(RelayPort), Family(Family)
+    PortRelay(wil::unique_socket&& ListenSocket, uint32_t LinuxPort, uint32_t RelayPort, int ListenFamily, int ConnectFamily) :
+        ListenSocket(std::move(ListenSocket)), LinuxPort(LinuxPort), RelayPort(RelayPort), ListenFamily(ListenFamily), ConnectFamily(ConnectFamily)
     {
         Overlapped.hEvent = AcceptEvent.get();
     }
@@ -364,16 +365,16 @@ struct PortRelay
         WI_VERIFY(PendingSocket);
 
         std::thread thread{
-            [WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, Family = Family, VmId = VmId]() {
+            [WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, ConnectFamily = ConnectFamily, VmId = VmId]() {
                 try
                 {
                     WSL_LOG(
                         "StartPortRelay",
                         TraceLoggingValue(LinuxPort, "LinuxPort"),
                         TraceLoggingValue(WindowsSocket.get(), "Socket"),
-                        TraceLoggingValue(Family, "Family"));
+                        TraceLoggingValue(ConnectFamily, "Family"));
 
-                    RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, Family);
+                    RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, ConnectFamily);
                 }
                 CATCH_LOG();
 
@@ -381,7 +382,7 @@ struct PortRelay
                     "StopPortRelay",
                     TraceLoggingValue(LinuxPort, "LinuxPort"),
                     TraceLoggingValue(WindowsSocket.get(), "Socket"),
-                    TraceLoggingValue(Family, "Family"));
+                    TraceLoggingValue(ConnectFamily, "Family"));
             }};
 
         thread.detach();
@@ -422,7 +423,7 @@ struct PortRelay
     {
         WI_VERIFY(!Pending);
 
-        PendingSocket.reset(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
+        PendingSocket.reset(WSASocket(ListenFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         memset(AcceptBuffer, 0, sizeof(AcceptBuffer));
         DWORD BytesReturned{};
         if (!AcceptEx(ListenSocket.get(), PendingSocket.get(), AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &BytesReturned, &Overlapped))
@@ -440,9 +441,9 @@ struct PortRelay
     }
 };
 
-std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t LinuxPort, uint32_t RelayPort, int Family)
+std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t LinuxPort, uint32_t RelayPort, int ListenFamily, int ConnectFamily)
 {
-    wil::unique_socket ListenSocket(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
+    wil::unique_socket ListenSocket(WSASocket(ListenFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
 
     THROW_LAST_ERROR_IF(!ListenSocket);
 
@@ -453,7 +454,7 @@ std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t Lin
     sockaddr_in InetAddress{};
     sockaddr_in6 Inet6Address{};
     DWORD AddressSize{};
-    if (Family == AF_INET)
+    if (ListenFamily == AF_INET)
     {
         InetAddress.sin_family = AF_INET;
         InetAddress.sin_port = htons(WindowsPort);
@@ -473,7 +474,7 @@ std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t Lin
     THROW_LAST_ERROR_IF(bind(ListenSocket.get(), Address, AddressSize) == SOCKET_ERROR);
     THROW_LAST_ERROR_IF(listen(ListenSocket.get(), -1) == SOCKET_ERROR);
 
-    return std::make_shared<PortRelay>(std::move(ListenSocket), LinuxPort, RelayPort, Family);
+    return std::make_shared<PortRelay>(std::move(ListenSocket), LinuxPort, RelayPort, ListenFamily, ConnectFamily);
 }
 
 void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& VmId, HANDLE ExitEvent)
@@ -613,7 +614,10 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
 
                 try
                 {
-                    ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));
+                    ports.emplace(
+                        key,
+                        CreatePortListener(
+                            message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily, message->ConnectAddressFamily));
                     update = true;
                 }
                 catch (...)

@@ -145,11 +145,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 // package install). Blocks up to 30s waiting for dnsmasq to be listening.
 // Returns the mock's container IP (use as --dns value).
 // Caller must call EnsureContainerDoesNotExist(containerName) when done.
-std::wstring StartMockDnsServer(
-    const TestImage& image,
-    const std::wstring& containerName,
-    const std::wstring& probeDomain,
-    const std::wstring& probeAnswer);
+std::wstring StartMockDnsServer(const TestImage& image, const std::wstring& containerName, const std::wstring& probeDomain, const std::wstring& probeAnswer);
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
