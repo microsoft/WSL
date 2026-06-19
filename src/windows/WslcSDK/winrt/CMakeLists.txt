@@ -11,12 +11,12 @@ set(SOURCES
     ImageProgress.cpp
     InstallProgress.cpp
     Process.cpp
+    ProcessCrashDumpInformation.cpp
     ProcessSettings.cpp
     PullImageOptions.cpp
     PushImageOptions.cpp
     ServiceVersion.cpp
     Session.cpp
-    SessionCrashDumpInformation.cpp
     SessionSettings.cpp
     Streams.cpp
     TagImageOptions.cpp
@@ -35,12 +35,12 @@ set(HEADERS
     ImageProgress.h
     InstallProgress.h
     Process.h
+    ProcessCrashDumpInformation.h
     ProcessSettings.h
     PullImageOptions.h
     PushImageOptions.h
     ServiceVersion.h
     Session.h
-    SessionCrashDumpInformation.h
     SessionSettings.h
     Streams.h
     TagImageOptions.h

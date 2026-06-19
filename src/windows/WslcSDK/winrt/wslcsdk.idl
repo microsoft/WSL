@@ -30,7 +30,7 @@ namespace Microsoft.WSL.Containers
 
     delegate void SessionTerminationHandler(SessionTerminationReason reason);
 
-    runtimeclass SessionCrashDumpInformation
+    runtimeclass ProcessCrashDumpInformation
     {
         String DumpPath { get; };
         String ProcessName { get; };
@@ -39,7 +39,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.DateTime Timestamp { get; };
     };
 
-    delegate void SessionCrashDumpHandler(SessionCrashDumpInformation information);
+    delegate void ProcessCrashDumpHandler(ProcessCrashDumpInformation information);
 
     runtimeclass SessionSettings
     {
@@ -81,7 +81,7 @@ namespace Microsoft.WSL.Containers
         IVectorView<ImageInfo> Images { get; };
 
         event SessionTerminationHandler Terminated;
-        event SessionCrashDumpHandler ProcessCrashed;
+        event ProcessCrashDumpHandler ProcessCrashed;
     };
 
 
@@ -347,7 +347,7 @@ namespace Microsoft.WSL.Containers
     };
 
     // Ensure wslcsdk.h and wslc.idl are also updated.
-    enum Errors
+    enum Error
     {
         ImageNotFound = 0x80040601,
         ContainerPrefixAmbiguous = 0x80040602,

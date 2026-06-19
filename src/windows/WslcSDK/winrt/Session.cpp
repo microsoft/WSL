@@ -14,7 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Session.h"
-#include "SessionCrashDumpInformation.h"
+#include "ProcessCrashDumpInformation.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
@@ -285,7 +285,7 @@ void Session::Terminated(winrt::event_token const& token) noexcept
     m_terminatedEvent.remove(token);
 }
 
-winrt::event_token Session::ProcessCrashed(winrt::Microsoft::WSL::Containers::SessionCrashDumpHandler const& handler)
+winrt::event_token Session::ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashDumpHandler const& handler)
 {
     return m_crashDumpEvent.add(handler);
 }
@@ -338,7 +338,7 @@ void CALLBACK Session::OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID c
     {
         auto session = static_cast<Session*>(context);
 
-        auto information = winrt::make_self<implementation::SessionCrashDumpInformation>(info);
+        auto information = winrt::make_self<implementation::ProcessCrashDumpInformation>(info);
 
         session->m_crashDumpEvent(*information);
     }
