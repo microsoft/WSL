@@ -461,7 +461,6 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName2);
     }
 
-    // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral)
     {
         // Start a container with an ephemeral host port mapping (-p 8080 means host picks a random port)
@@ -487,7 +486,6 @@ class WSLCE2EContainerRunTests
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), HTTP_STATUS_OK, true);
     }
 
-    // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_UDP)
     {
         // Start a container with a UDP echo server listening on a port.
