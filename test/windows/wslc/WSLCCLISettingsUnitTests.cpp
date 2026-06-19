@@ -294,6 +294,8 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: default\n"
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
+            "experimental:\n"
+            "  portRelay: default\n"
             "credentialStore: default\n");
 
         UserSettingsTest s{dir};
@@ -306,6 +308,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -521,11 +524,27 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: nat\n"
             "  hostFileShareMode: virtiofs\n"
             "  dnsTunneling: true\n"
+            "experimental:\n"
+            "  portRelay: wslrelay\n"
             "credentialStore: wincred\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+    }
+
+    TEST_METHOD(Validation_PortRelay_ExplicitValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "experimental:\n"
+            "  portRelay: wslrelay\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::WslRelay), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
     }
 };
 

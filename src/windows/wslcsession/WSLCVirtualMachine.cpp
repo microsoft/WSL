@@ -452,6 +452,12 @@ WSLCNetworkingMode WSLCVirtualMachine::NetworkingMode() const
     return m_networkingMode;
 }
 
+bool WSLCVirtualMachine::UseWslRelayPortForwarding() const
+{
+    return m_networkingMode == WSLCNetworkingModeNAT ||
+           (m_networkingMode == WSLCNetworkingModeVirtioProxy && FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
+}
+
 void WSLCVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
 try
 {
@@ -959,12 +965,12 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for NAT mode: %hs, protocol: %i",
+            "Unsupported port mapping for the wslrelay port relay: %hs, protocol: %i",
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
@@ -1010,7 +1016,7 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }

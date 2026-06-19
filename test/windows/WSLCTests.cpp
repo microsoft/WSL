@@ -462,7 +462,7 @@ class WSLCTests
         // Reject invalid feature flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
-            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x20);
+            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x40);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
         }
@@ -7832,11 +7832,13 @@ class WSLCTests
         }
     }
 
-    auto SetupPortMappingsTest(WSLCNetworkingMode networkingMode)
+    auto SetupPortMappingsTest(WSLCNetworkingMode networkingMode, WSLCFeatureFlags featureFlags = WslcFeatureFlagsNone)
     {
         auto settings = GetDefaultSessionSettings(L"networking-session", true, networkingMode);
+        settings.FeatureFlags = featureFlags;
 
-        auto createNewSession = settings.NetworkingMode != m_defaultSessionSettings.NetworkingMode;
+        auto createNewSession = settings.NetworkingMode != m_defaultSessionSettings.NetworkingMode ||
+                                settings.FeatureFlags != m_defaultSessionSettings.FeatureFlags;
         auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
@@ -7857,6 +7859,14 @@ class WSLCTests
 
         RunPortMappingsTest(*session, "bridge", true);
         RunPortMappingsTest(*session, "host", true);
+    }
+
+    WSLC_TEST_METHOD(PortMappingsVirtioProxyWslRelay)
+    {
+        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy, WslcFeatureFlagsPortRelayWslRelay);
+
+        RunPortMappingsTest(*session, "bridge", false);
+        RunPortMappingsTest(*session, "host", false);
     }
 
     WSLC_TEST_METHOD(PortMappingsAdvanced)

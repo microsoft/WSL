@@ -189,6 +189,8 @@ public:
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 
+    bool UseWslRelayPortForwarding() const;
+
     // Initial setup during Connect()
     void ConfigureNetworking();
 
