@@ -1728,7 +1728,7 @@ try
             if (callback)
             {
                 callback(100);
-            };
+            }
         }
     }
 

@@ -108,7 +108,7 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
         auto clearLogs =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile.c_str())); });
 
-        const auto exitCode = UpgradeViaMsi(downloadPath.c_str(), L"", logFile.c_str(), &MsiMessageCallback);
+        const auto exitCode = UpgradeViaMsi(downloadPath.c_str(), L"", logFile.c_str(), callerOwnsProcess ? &MsiMessageCallback : nullptr);
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
