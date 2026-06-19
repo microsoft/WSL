@@ -2368,9 +2368,7 @@ try
     for (const auto& [key, _] : driverOpts)
     {
         const bool caseMismatch = std::any_of(c_reservedDriverOpts.begin(), c_reservedDriverOpts.end(), [&](std::string_view opt) {
-            return key != opt && key.size() == opt.size() && std::equal(key.begin(), key.end(), opt.begin(), [](char a, char b) {
-                       return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-                   });
+            return key != opt && wsl::shared::string::IsEqual(key, opt, true);
         });
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), caseMismatch);
     }
