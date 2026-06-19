@@ -71,7 +71,8 @@ class WSLCE2EImageListTests
         std::string fullDebianId;
         for (const auto& image : images)
         {
-            if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name))
+            if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name) &&
+                image.Tag == wsl::shared::string::WideToMultiByte(DebianImage.Tag))
             {
                 fullDebianId = TruncateId(image.Id, false);
                 break;
