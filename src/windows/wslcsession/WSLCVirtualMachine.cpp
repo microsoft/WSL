@@ -536,6 +536,40 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 }
 
+void WSLCVirtualMachine::RemoveDirectory(const std::string& Path)
+{
+    // rmdir only removes an empty directory, so callers can rely on it to leave
+    // a non-empty directory untouched.
+    constexpr auto rmdirPath = "/bin/rmdir";
+
+    std::vector<std::string> args = {rmdirPath, Path};
+
+    ServiceProcessLauncher launcher(rmdirPath, args);
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Path)
+{
+    constexpr auto lsPath = "/bin/ls";
+
+    std::vector<std::string> args = {lsPath, "-A", Path};
+
+    ServiceProcessLauncher launcher(lsPath, args);
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    auto stdOut = result.Output.find(1);
+    if (stdOut == result.Output.end())
+    {
+        return {};
+    }
+
+    return wsl::shared::string::Split(stdOut->second, '\n');
+}
+
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
 {
     auto [pid, _, subChannel] = Fork(WSLC_FORK::Thread);
