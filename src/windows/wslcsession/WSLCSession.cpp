@@ -1218,6 +1218,10 @@ try
     {
         OnImageCreated(ImageName);
     }
+    else if (!imageId.empty())
+    {
+        OnImageCreated(imageId.c_str());
+    }
 
     *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId.c_str()).release();
     return S_OK;
@@ -1279,12 +1283,14 @@ std::string WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& R
         else if (parsed.stream.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
-            imageId = *parsed.stream;
         }
         else if (parsed.status.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.status->c_str(), "Status"));
-            imageId = *parsed.status;
+            if (parsed.status->starts_with("sha256:"))
+            {
+                imageId = *parsed.status;
+            }
         }
         else
         {
