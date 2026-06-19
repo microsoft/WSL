@@ -44,8 +44,8 @@ std::wstring ImageImportCommand::LongDescription() const
 
 void ImageImportCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ImportImage;
 }
 } // namespace wsl::windows::wslc

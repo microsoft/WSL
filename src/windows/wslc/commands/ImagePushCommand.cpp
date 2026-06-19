@@ -43,8 +43,8 @@ std::wstring ImagePushCommand::LongDescription() const
 
 void ImagePushCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PushImage;
 }
 } // namespace wsl::windows::wslc

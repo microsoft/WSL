@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of a type that implements IProgressCallback.
+    Implementation of a type that implements IWSLCCompatProgressCallback.
 
 --*/
 #include "precomp.h"

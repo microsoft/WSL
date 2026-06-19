@@ -37,6 +37,8 @@ Abstract:
 #include "helpers.hpp"
 #include "wslutil.h"
 #include "filesystem.hpp"
+#include "APICompat.h"
+#include "Localization.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -47,6 +49,7 @@ using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
+namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
 
 namespace {
@@ -359,7 +362,7 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
+    THROW_IF_FAILED_MSG(result.value_or(WSLC_E_SESSION_NOT_FOUND), "Session '%lu' not found", Id);
 }
 
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
@@ -389,7 +392,10 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_SESSION_NOT_FOUND, wsl::shared::Localization::MessageWslcSessionNotFound(DisplayName), !result.has_value());
+
+    THROW_IF_FAILED_MSG(result.value(), "Failed to open session '%ls'", DisplayName);
 }
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
@@ -541,7 +547,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported)
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported)
 try
 {
     RETURN_HR_IF(E_POINTER, ClientVersion == nullptr || IsSupported == nullptr);
@@ -601,6 +607,45 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
+HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Version);
+
+    WSLCVersion version{};
+    RETURN_IF_FAILED(GetVersion(&version));
+
+    *Version = apicompat::Convert(version);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    if (Settings == nullptr)
+    {
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, warning.Get(), &session));
+    }
+    else
+    {
+        const auto settings = apicompat::Convert(*Settings);
+        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+    }
+
+    RETURN_HR_IF_NULL(E_UNEXPECTED, session);
+
+    return session.CopyTo(Session);
+}
+CATCH_RETURN();
+
 namespace wsl::windows::service::wslc {
 
 WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
@@ -622,7 +667,7 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
         return S_OK;
     });
 
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !result, "WSLC session %lu not found", Id);
+    THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, !result, "WSLC session %lu not found", Id);
     return result;
 }
 

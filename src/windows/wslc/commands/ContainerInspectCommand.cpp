@@ -45,7 +45,7 @@ std::wstring ContainerInspectCommand::LongDescription() const
 void ContainerInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << InspectContainers;
 }
 // clang-format on

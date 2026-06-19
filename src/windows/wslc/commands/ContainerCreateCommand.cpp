@@ -83,7 +83,7 @@ std::wstring ContainerCreateCommand::LongDescription() const
 void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << CreateContainer;
 }

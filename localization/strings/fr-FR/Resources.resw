@@ -2197,7 +2197,7 @@ Utilisation :
     <value>Les arguments suivants sont disponibles :</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Désactiver l'affichage en couleur.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Pour en savoir plus sur une commande spécifique, passez-la à l’argument aide.</value>
@@ -2332,6 +2332,14 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Pilote réseau non pris en charge : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>L’option de pilote réseau 'Gateway' nécessite que 'Subnet' soit également spécifié.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Le réseau « {} » a des points de terminaison actifs.</value>
@@ -2480,7 +2488,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Supprime tous les conteneurs arrêtés.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Espace total récupéré : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2573,7 +2581,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Espace total récupéré : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2851,6 +2859,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Connectez un conteneur à un réseau</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Do not error if the network does not exist</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2944,6 +2955,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Lier le montage d’un volume sur le conteneur</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Répertoire de travail à l’intérieur du conteneur</value>
@@ -3104,13 +3118,13 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Affiche uniquement les noms des réseaux</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Supprimez tous les réseaux inutilisés.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Supprime tous les réseaux inutilisés. Un réseau est considéré comme inutilisé lorsqu’il n’est référencé par aucun conteneur.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Supprimé : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

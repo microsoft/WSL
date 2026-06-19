@@ -2073,7 +2073,7 @@ Verwendung:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
-    <value>Failed to launch command {}. Errno = {}</value>
+    <value>Fehler beim Starten des Befehls {}. Fehler = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
@@ -2196,7 +2196,7 @@ Verwendung:
     <value>Die folgenden Argumente sind verfügbar:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Farbausgabe deaktivieren.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Wenn Sie weitere Details zu einem bestimmten Befehl erfahren möchten, übergeben Sie ihm das Hilfe-Argument.</value>
@@ -2331,6 +2331,14 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nicht unterstützter Netzwerktreiber: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Die Netzwerktreiberoption 'Gateway' erfordert, dass auch 'Subnet' angegeben wird.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Das Netzwerk „{}“ hat aktive Endpunkte.</value>
@@ -2479,7 +2487,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Entfernt alle beendeten Container.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Insgesamt zurückgewonnener Speicherplatz: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2572,7 +2580,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Insgesamt zurückgewonnener Speicherplatz: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2695,14 +2703,14 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Führen Sie einen Befehl in einer Sitzung aus.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
     <value>Führt einen Befehl in einer aktiven Sitzung ohne TTY aus. Der Befehl und seine Argumente werden direkt an die Sitzung weitergeleitet. Wenn keine Sitzung angegeben ist, wird die wslc Standardsitzung verwendet.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>Argumente, die an den auszuführenden Befehl übergeben werden</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Eine Sitzung beenden.</value>
@@ -2850,6 +2858,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Verbinden eines Containers mit einem Netzwerk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Kein Fehler, wenn das Netzwerk nicht vorhanden ist</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ungültiger {}-Wert: Der Netzwerkname darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2943,6 +2954,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Ein Volume an den Container binden</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeitsverzeichnis im Container</value>
@@ -3103,13 +3117,13 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Gibt nur die Netzwerknamen aus</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Entfernen Sie alle ungenutzten Netzwerke.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Entfernt alle nicht verwendeten Netzwerke. Ein Netzwerk gilt als nicht verwendet, wenn von keinem Container darauf verwiesen wird.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Gelöscht: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

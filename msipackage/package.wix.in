@@ -221,7 +221,7 @@
                 </RegistryKey>
 
                 <!-- WslDeviceHost_VirtioNet -->
-                <RegistryKey Root="HKCR" Key="CLSID\{16479D2E-F0C3-4DBA-BF7A-04FFF0892B07}">
+                <RegistryKey Root="HKCR" Key="CLSID\{9E0D1898-CA63-424E-8D49-9D6067A36BCE}">
                     <RegistryValue Value="WslDeviceHost_Net" Type="string" />
                     <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string" />
 
@@ -373,6 +373,62 @@
                 <!-- IWSLCPluginNotifier-->
                 <RegistryKey Root="HKCR" Key="Interface\{F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2}">
                     <RegistryValue Value="IWSLCPluginNotifier" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatCrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{EAA15E20-7FCC-485B-B798-ED4095DBACA5}">
+                    <RegistryValue Value="IWSLCCompatCrashDumpCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatProgressCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{06154F2A-ACA7-461E-94FC-92781BA1F6F6}">
+                    <RegistryValue Value="IWSLCCompatProgressCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatWarningCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{290C58A1-328C-4E90-B09B-0A9D32C40074}">
+                    <RegistryValue Value="IWSLCCompatWarningCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatProcess-->
+                <RegistryKey Root="HKCR" Key="Interface\{AC69DD0D-6616-4C4F-91F2-C39D6034EA82}">
+                    <RegistryValue Value="IWSLCCompatProcess" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatContainer-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C3C91FA-D550-41B9-AD9D-23DCBF96F549}">
+                    <RegistryValue Value="IWSLCCompatContainer" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatSession-->
+                <RegistryKey Root="HKCR" Key="Interface\{DD7B2EF9-AA01-4F21-8A3A-29D394CBB579}">
+                    <RegistryValue Value="IWSLCCompatSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatSessionManager-->
+                <RegistryKey Root="HKCR" Key="Interface\{279F2047-DA35-45A3-B671-AFD2302D5D16}">
+                    <RegistryValue Value="IWSLCCompatSessionManager" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>

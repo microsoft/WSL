@@ -45,6 +45,6 @@ std::wstring ContainerStartCommand::LongDescription() const
 
 void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << StartContainer;
+    context << ResolveSession << StartContainer;
 }
 } // namespace wsl::windows::wslc

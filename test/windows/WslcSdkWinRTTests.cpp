@@ -174,8 +174,9 @@ class WslcSdkWinRtTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session;
-        return WSLCE2ETests::StartLocalRegistry(comSession, username, password, port);
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        return WSLCE2ETests::StartLocalRegistry(*comSession, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.

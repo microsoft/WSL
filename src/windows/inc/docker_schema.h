@@ -20,6 +20,8 @@ Abstract:
 
 namespace wsl::windows::common::docker_schema {
 
+using wsl::shared::EmptyObject;
+
 struct CreatedContainer
 {
     std::string Id;
@@ -169,23 +171,6 @@ struct ContainerNetworkRequest
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
 };
-
-struct EmptyObject
-{
-};
-
-inline void to_json(nlohmann::json& j, const EmptyObject& memory)
-{
-    UNREFERENCED_PARAMETER(memory);
-    j = nlohmann::json::object();
-}
-
-inline void from_json(const nlohmann::json& j, EmptyObject& obj)
-{
-    // EmptyObject has no fields, so nothing to deserialize
-    UNREFERENCED_PARAMETER(j);
-    UNREFERENCED_PARAMETER(obj);
-}
 
 struct Mount
 {

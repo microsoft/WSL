@@ -2190,7 +2190,7 @@ Bruk:
     <value>Følgende argumenter er tilgjengelige:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Deaktiver fargeutdata.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Hvis du vil ha mer informasjon om en bestemt kommando, må du angi hjelp-argumentet.</value>
@@ -2325,6 +2325,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nettverksdriver støttes ikke: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Nettverk {} har aktive endepunkter.</value>
@@ -2473,7 +2481,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Fjerner alle beholdere som er stoppet.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt gjenvunnet plass: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2566,7 +2574,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt gjenvunnet plass: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2689,14 +2697,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Kjøre en kommando i en økt.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
     <value>Kjører en kommando i en aktiv økt uten TTY. Kommandoen og argumentene videresendes direkte til økten. Hvis ingen økt er angitt, brukes den wslc standardøkten.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>Argumenter som skal sendes til kommandoen som kjøres</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Avslutt en økt.</value>
@@ -2844,6 +2852,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Koble containeren til et nettverk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Ikke ta feil hvis nettverket ikke finnes</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ugyldig {}-verdi: nettverksnavnet kan ikke være tomt eller inneholde mellomrom</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2937,6 +2948,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bindemonter et volum til beholderen</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeidsmappe i beholderen</value>

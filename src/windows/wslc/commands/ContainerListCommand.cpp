@@ -52,7 +52,7 @@ std::wstring ContainerListCommand::LongDescription() const
 void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << GetContainers
         << ListContainers;
 }
