@@ -35,6 +35,26 @@ constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
 namespace {
 
+SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
+{
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(Address));
+
+    if (listenAddr.si_family == AF_INET)
+    {
+        listenAddr.Ipv4.sin_port = HostPort;
+    }
+    else if (listenAddr.si_family == AF_INET6)
+    {
+        listenAddr.Ipv6.sin6_port = HostPort;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
+    }
+
+    return listenAddr;
+}
+
 // Replace any character outside the conservative ASCII allowlist with '_' so the
 // result is safe to use as the HCS HostingProcessNameSuffix (which becomes the
 // vmmem-XXX process name visible in Task Manager and parsed by various tooling).
@@ -692,27 +712,12 @@ try
 
     *AllocatedHostPort = 0;
 
-    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
-
-    if (listenAddr.si_family == AF_INET)
-    {
-        listenAddr.Ipv4.sin_port = HostPort;
-    }
-    else if (listenAddr.si_family == AF_INET6)
-    {
-        listenAddr.Ipv6.sin6_port = HostPort;
-    }
-    else
-    {
-        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
-    }
-
     std::lock_guard lock(m_lock);
 
     auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
-    return virtioNet->MapPort(listenAddr, GuestPort, Protocol, AllocatedHostPort);
+    return virtioNet->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
 }
 CATCH_RETURN()
 
@@ -721,27 +726,12 @@ try
 {
     RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
 
-    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
-
-    if (listenAddr.si_family == AF_INET)
-    {
-        listenAddr.Ipv4.sin_port = HostPort;
-    }
-    else if (listenAddr.si_family == AF_INET6)
-    {
-        listenAddr.Ipv6.sin6_port = HostPort;
-    }
-    else
-    {
-        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
-    }
-
     std::lock_guard lock(m_lock);
 
     auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
-    return virtioNet->UnmapPort(listenAddr, GuestPort, Protocol);
+    return virtioNet->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
 }
 CATCH_RETURN()
 

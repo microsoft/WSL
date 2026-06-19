@@ -107,12 +107,19 @@ uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
             return 0;
         }
     }
+    SOCKADDR_INET localAddr = addr;
+    std::function<void()> removePort;
 
     auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&removePort]() {
+        if (removePort)
+        {
+            removePort();
+        }
+    });
 
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
     {
-        SOCKADDR_INET localAddr = addr;
         if (!loopback)
         {
             INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&localAddr));
@@ -127,12 +134,17 @@ uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
         }
 
         hostPort = ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, allocate);
+
+        // Revert the change on failure.
+        removePort = [&]() { ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, !allocate); };
     }
 
     if (!loopback)
     {
         hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
+
+    cleanup.release();
 
     return hostPort;
 }

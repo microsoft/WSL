@@ -1678,6 +1678,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         // In that networking mode, the host port always matches the vm port.
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
+        // Use catch-all binding address based on the address family. :: binds all ipv6 interfaces, and 0:0:0:0 binds all ipv4 interfaces.
         portEntry.emplace_back(common::docker_schema::PortMapping{
             .HostIp = e.VmMapping.IsIPv6() ? "::" : "0.0.0.0", .HostPort = std::to_string(hostPort)});
     }
