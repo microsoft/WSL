@@ -74,7 +74,9 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
         [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
-            return HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+            return wil::ResultFromException([&]() {
+                HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+            });
         },
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
