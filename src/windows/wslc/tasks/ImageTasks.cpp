@@ -118,10 +118,9 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
-        // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
+            PrintMessage(MultiByteToWide(TruncateId(image.Id, true)));
         }
 
         return;

@@ -61,15 +61,31 @@ class WSLCE2EImageListTests
         VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsIdsOnly)
     {
+        // Get the expected image ID from JSON output.
+        auto jsonResult = RunWslc(L"image list --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
+
+        std::string debianId;
+        for (const auto& image : images)
+        {
+            if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name))
+            {
+                debianId = wsl::windows::common::string::TruncateId(image.Id, true);
+                break;
+            }
+        }
+        VERIFY_ARE_NOT_EQUAL(std::string{}, debianId, L"Debian image was not present in `image list --format json` output");
+
         const auto result = RunWslc(L"image list --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         bool imageFound = false;
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line == DebianImage.NameAndTag())
+            if (line == wsl::shared::string::MultiByteToWide(debianId))
             {
                 imageFound = true;
                 break;
