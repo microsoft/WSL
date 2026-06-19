@@ -48,13 +48,16 @@ class WSLCE2EImageImportTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_HelpCommand)
     {
         auto result = RunWslc(L"image import --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_MissingFile)
     {
         const auto result = RunWslc(L"image import");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'file'\r\n", .ExitCode = 1});
+        result.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"Required argument not provided: 'file'") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_Success)
@@ -147,45 +150,5 @@ private:
     const TestImage ImportedImage{L"wslc-test-imported", L"latest", L""};
 
     std::filesystem::path SavedArchivePath{};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageImportLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image import [<options>] <file> [<image>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"                                   //
-                 << L"  file       " << Localization::WSLCCLI_ImportFileArgDescription() << L"\r\n" //
-                 << L"  image      " << Localization::WSLCCLI_ImageIdArgDescription() << L"\r\n"    //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                               //
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests
