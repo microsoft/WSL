@@ -2328,7 +2328,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
     <value>Network driver option '{}' is case-sensitive. Use the exact casing: Internal, Subnet, or Gateway.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="Internal"}{Locked="Subnet"}{Locked="Gateway"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="Internal"}{Locked="Subnet"}{Locked="Gateway"}</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
