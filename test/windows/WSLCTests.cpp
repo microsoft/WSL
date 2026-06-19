@@ -5111,7 +5111,7 @@ class WSLCTests
                 WSLCDriverOption opt{key, "true"};
                 options.DriverOpts = &opt;
                 options.DriverOptsCount = 1;
-                verifyInvalid(wsl::shared::string::MultiByteToWide(key).c_str());
+                verifyInvalid(L"case-sensitive");
             }
         }
 
