@@ -145,7 +145,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"--session {} container list --no-trunc --all", sessionName);
+        command = std::format(L"--session \"{}\" container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -429,7 +429,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         // Check if the line ends with the target session name
         if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
         {
-            auto result = RunWslc(std::format(L"system session terminate \"{}\"", targetSession));
+            auto result = RunWslc(std::format(L"--session \"{}\" system session terminate", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }

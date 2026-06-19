@@ -45,8 +45,8 @@ std::wstring ImagePruneCommand::LongDescription() const
 
 void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneImages;
 }
 } // namespace wsl::windows::wslc

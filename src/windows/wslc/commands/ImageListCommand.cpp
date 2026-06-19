@@ -47,9 +47,9 @@ std::wstring ImageListCommand::LongDescription() const
 
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
-        << GetImages     //
+    context               //
+        << ResolveSession //
+        << GetImages      //
         << ListImages;
 }
 } // namespace wsl::windows::wslc

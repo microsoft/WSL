@@ -46,7 +46,7 @@ std::wstring VolumeCreateCommand::LongDescription() const
 
 void VolumeCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << CreateVolume;
 }
 } // namespace wsl::windows::wslc

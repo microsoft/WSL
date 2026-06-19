@@ -403,10 +403,10 @@ class WSLCTests
         VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(c_testSessionName, &opened));
         VERIFY_IS_NOT_NULL(opened.get());
 
-        // And verify we get ERROR_NOT_FOUND for a nonexistent name
+        // And verify we get WSLC_E_SESSION_NOT_FOUND for a nonexistent name
         wil::com_ptr<IWSLCSession> notFound;
         auto hr = sessionManager->OpenSessionByName(L"this-name-does-not-exist", &notFound);
-        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_NOT_FOUND);
     }
 
     WSLC_TEST_METHOD(CreateSessionValidation)
