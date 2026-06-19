@@ -2332,6 +2332,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>不支援的網路驅動程式: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>網路 '{}' 有作用中的端點。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2850,6 +2858,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>將容器連線到網路</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Do not error if the network does not exist</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>{} 值無效： 網路名稱不可為空白或空白字元</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2943,6 +2954,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>將磁碟區繫結掛接至容器</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器內的工作目錄</value>

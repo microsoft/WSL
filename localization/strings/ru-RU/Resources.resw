@@ -2333,6 +2333,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Неподдерживаемый сетевой драйвер: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Сеть "{}" содержит активные конечные точки.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2851,6 +2859,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Подключите контейнер к сети</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Не выдавать ошибку, если сеть не существует</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Недопустимое значение {}: имя сети не может быть пустым или состоять только из пробелов</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2944,6 +2955,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Привязать том к контейнеру.</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Не выдавать ошибку, если том не существует</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Рабочий каталог внутри контейнера</value>
