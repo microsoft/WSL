@@ -134,7 +134,7 @@ class WSLCE2EImageDeleteTests
 
         VerifyImageIsListed(DebianImage);
 
-        auto listAfter = RunWslc(L"image list -q");
+        auto listAfter = RunWslc(L"image list");
         listAfter.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : listAfter.GetStdoutLines())
         {
