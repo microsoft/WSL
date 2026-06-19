@@ -5102,10 +5102,11 @@ class WSLCTests
             }
         }
 
-        // Invalid driver options (wrong case and unknown keys)
+        // Reserved driver-option keys must be spelled exactly; case-mismatches are rejected
+        // so users don't silently fall through to opaque pass-through.
         {
             options.Driver = "bridge";
-            for (const char* key : {"internal", "subnet", "gateway", "foo"})
+            for (const char* key : {"internal", "subnet", "gateway"})
             {
                 WSLCDriverOption opt{key, "true"};
                 options.DriverOpts = &opt;
@@ -5250,17 +5251,49 @@ class WSLCTests
         VERIFY_ARE_EQUAL(std::string("172.31.0.1"), inspect.IPAM.Config->at(0).Gateway);
     }
 
+    WSLC_TEST_METHOD(NetworkCreateWithArbitraryDriverOptsTest)
+    {
+        const std::string networkName = "arbitrary-opts-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"my.abc.key", "mygod"}, {"com.example.flag", "1"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = opts;
+        options.DriverOptsCount = ARRAYSIZE(opts);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.Options.has_value());
+        VERIFY_IS_TRUE(inspect.Options->contains("my.abc.key"));
+        VERIFY_IS_TRUE(inspect.Options->contains("com.example.flag"));
+        VERIFY_ARE_EQUAL(std::string("mygod"), inspect.Options->at("my.abc.key"));
+        VERIFY_ARE_EQUAL(std::string("1"), inspect.Options->at("com.example.flag"));
+    }
+
     WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
     {
         const std::string networkName = "recovery-test-net";
 
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
+        WSLCDriverOption recoveryOpts[] = {{"recovery.test.key", "preserved"}};
+
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.DriverOpts = nullptr;
-        options.DriverOptsCount = 0;
+        options.DriverOpts = recoveryOpts;
+        options.DriverOptsCount = ARRAYSIZE(recoveryOpts);
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
@@ -5274,6 +5307,14 @@ class WSLCTests
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
         VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
+
+        // Verify arbitrary driver options survive session recovery.
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.Options.has_value());
+        VERIFY_IS_TRUE(inspect.Options->contains("recovery.test.key"));
+        VERIFY_ARE_EQUAL(std::string("preserved"), inspect.Options->at("recovery.test.key"));
     }
 
     WSLC_TEST_METHOD(NetworkMultipleCreateListDeleteTest)
