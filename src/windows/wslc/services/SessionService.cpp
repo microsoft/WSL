@@ -35,29 +35,15 @@ static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
 Session SessionService::OpenSessionByName(const wil::com_ptr<IWSLCSessionManager>& manager, LPCWSTR displayName)
 {
     wil::com_ptr<IWSLCSession> session;
-    HRESULT hr = manager->OpenSessionByName(displayName, &session);
-    if (FAILED(hr))
-    {
-        if (hr == WSLC_E_SESSION_NOT_FOUND)
-        {
-            if (displayName)
-            {
-                THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcSessionNotFound(displayName));
-            }
-            else
-            {
-                THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcDefaultSessionNotFound());
-            }
-        }
-
-        // Let well-known errors propagate with their system message.
-        THROW_HR_IF(hr, hr == HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED));
-
-        THROW_HR_WITH_USER_ERROR(hr, Localization::MessageWslcOpenSessionFailed(displayName ? displayName : L""));
-    }
+    THROW_IF_FAILED(manager->OpenSessionByName(displayName, &session));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-    return Session(std::move(session));
+    Session result(std::move(session));
+    if (displayName)
+    {
+        result.SetDisplayName(displayName);
+    }
+    return result;
 }
 
 Session SessionService::OpenSession(const std::wstring& sessionName)
@@ -202,12 +188,16 @@ int SessionService::TerminateSession(const Session& session)
     HRESULT hr = session.Get()->Terminate();
     if (FAILED(hr))
     {
-        ULONG sessionId{};
-        LOG_IF_FAILED(session.Get()->GetId(&sessionId));
-
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-        wslutil::PrintMessage(
-            Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(std::to_wstring(sessionId)), errorString), stderr);
+        if (session.DisplayName().has_value())
+        {
+            wslutil::PrintMessage(
+                Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(session.DisplayName().value()), errorString), stderr);
+        }
+        else
+        {
+            wslutil::PrintMessage(Localization::MessageErrorCode(Localization::MessageWslcTerminateDefaultSessionFailed(), errorString), stderr);
+        }
         return 1;
     }
 

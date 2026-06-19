@@ -38,6 +38,7 @@ Abstract:
 #include "wslutil.h"
 #include "filesystem.hpp"
 #include "APICompat.h"
+#include "Localization.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -391,7 +392,10 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(WSLC_E_SESSION_NOT_FOUND), "Session '%ls' not found", DisplayName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_SESSION_NOT_FOUND, wsl::shared::Localization::MessageWslcSessionNotFound(DisplayName), !result.has_value());
+
+    THROW_IF_FAILED_MSG(result.value(), "Session '%ls' not found", DisplayName);
 }
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
