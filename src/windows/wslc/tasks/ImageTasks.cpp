@@ -118,9 +118,10 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(TruncateId(image.Id, true)));
+            PrintMessage(MultiByteToWide(TruncateId(image.Id, trunc)));
         }
 
         return;
