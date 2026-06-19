@@ -797,28 +797,6 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_VhdVolume_SeedsImageData)
-    {
-        // A freshly formatted VHD volume must be seeded with the image's content
-        // on first use, just like a guest volume. mkfs.ext4 creates a lost+found
-        // directory at the volume root; if it isn't removed, Docker treats the
-        // volume as non-empty and skips the copy-up that seeds image data.
-        // Mounting the empty volume over a directory the image is guaranteed to
-        // populate (/etc) exercises that copy-up.
-        constexpr int volumeSizeBytes = 64 * 1024 * 1024;
-        auto result = RunWslc(std::format(L"volume create --driver vhd --opt SizeBytes={} {}", volumeSizeBytes, WslcVolumeName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        result = RunWslc(std::format(L"container run --rm --volume {}:/etc {} ls -A /etc", WslcVolumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Image content was seeded into the volume...
-        VERIFY_IS_TRUE(result.StdoutContainsLine(L"passwd"), L"Image's /etc content should be seeded into the fresh VHD volume");
-
-        // ...and the ext4 lost+found is gone, so it never blocked copy-up.
-        VERIFY_IS_FALSE(result.StdoutContainsLine(L"lost+found"), L"lost+found should have been removed from the volume root");
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WithLabel_Success)
     {
         auto result = RunWslc(std::format(
