@@ -593,15 +593,22 @@ try
     else
     {
         std::wstring options = ReadOnly ? L"ro" : L"";
-        if (!m_swiotlbOption.empty())
-        {
+        auto appendOption = [&options](const std::wstring& option) {
+            if (option.empty())
+            {
+                return;
+            }
+
             if (!options.empty())
             {
                 options += L";";
             }
 
-            options += m_swiotlbOption;
-        }
+            options += option;
+        };
+
+        appendOption(m_swiotlbOption);
+        appendOption(c_vcpusOption);
 
         it->second = m_guestDeviceManager->AddGuestDevice(
             VIRTIO_FS_DEVICE_ID,

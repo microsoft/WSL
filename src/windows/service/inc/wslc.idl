@@ -528,7 +528,7 @@ typedef struct _WSLCVolumeInformation
 typedef struct _WSLCNetworkOptions
 {
     LPCSTR Name;
-    LPCSTR Driver;
+    [unique] LPCSTR Driver;
     [unique, size_is(DriverOptsCount)] const WSLCDriverOption* DriverOpts;
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;

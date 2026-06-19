@@ -5088,19 +5088,73 @@ class WSLCTests
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
 
-    WSLC_TEST_METHOD(NetworkCreateInvalidDriverTest)
+    WSLC_TEST_METHOD(NetworkCreateInvalidDriverAndOptionTest)
     {
         WSLCNetworkOptions options{};
-        options.Name = "bad-driver-net";
+        options.Name = "bad-network-create-input";
+        options.Driver = "bridge";
         options.DriverOpts = nullptr;
         options.DriverOptsCount = 0;
 
-        for (const char* driver : {"overlay", "Bridge", ""})
-        {
-            options.Driver = driver;
+        auto verifyInvalid = [&](PCWSTR expectedMessage) {
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
-            ValidateCOMErrorMessageContains(L"Unsupported network driver:");
+            ValidateCOMErrorMessageContains(expectedMessage);
+        };
+
+        // Invalid drivers (unknown, wrong case, empty)
+        {
+            options.DriverOpts = nullptr;
+            options.DriverOptsCount = 0;
+            for (const char* driver : {"overlay", "Bridge", ""})
+            {
+                options.Driver = driver;
+                verifyInvalid(L"Unsupported network driver:");
+            }
         }
+
+        // Invalid driver options (wrong case and unknown keys)
+        {
+            options.Driver = "bridge";
+            for (const char* key : {"internal", "subnet", "gateway", "foo"})
+            {
+                WSLCDriverOption opt{key, "true"};
+                options.DriverOpts = &opt;
+                options.DriverOptsCount = 1;
+                verifyInvalid(wsl::shared::string::MultiByteToWide(key).c_str());
+            }
+        }
+
+        // Gateway specified without Subnet
+        {
+            options.Driver = "bridge";
+            WSLCDriverOption opt{"Gateway", "172.44.0.1"};
+            options.DriverOpts = &opt;
+            options.DriverOptsCount = 1;
+            verifyInvalid(L"requires 'Subnet'");
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateDefaultDriverTest)
+    {
+        const std::string networkName = "default-driver-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
