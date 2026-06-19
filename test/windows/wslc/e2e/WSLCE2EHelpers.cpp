@@ -621,11 +621,9 @@ std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, con
         THROW_LAST_ERROR_IF(!sock);
 
         DWORD timeout = 1000;
-        THROW_LAST_ERROR_IF(
-            setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
 
-        if (sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) !=
-            SOCKET_ERROR)
+        if (sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR)
         {
             char buf[1024];
             const int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
