@@ -916,10 +916,18 @@ try
 
     auto io = CreateIOContext();
 
-    // Do not wait for the input relay to complete since it might not complete if the build fails.
     io.AddHandle(
         std::make_unique<io::RelayHandle<io::ReadHandle>>(buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
-        MultiHandleWait::NeedNotComplete);
+        MultiHandleWait::NeedNotComplete,
+        [&buildProcess]() {
+            // If we receive an error relaying stdin, it could be because the process exited.
+            // Wait up to one second for the process to exit so errors in this relay don't override the actual build result.
+            if (!buildProcess.GetExitEvent().wait(1000))
+            {
+                // Otherwise, throw the error and cancel the build.
+                throw;
+            }
+        });
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
