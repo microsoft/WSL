@@ -1089,7 +1089,11 @@ class WSLCE2EContainerCreateTests
     {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
         auto result = RunWslc(std::format(
-            L"container create --name {} -p {}:{}/udp {} sleep 5", WslcContainerName, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+            L"container create --name {} -p {}:{}/udp {} sleep 5",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
@@ -1111,7 +1115,11 @@ class WSLCE2EContainerCreateTests
     {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
         auto result = RunWslc(std::format(
-            L"container create --name {} -p 127.0.0.1:{}:{} {} sleep 5", WslcContainerName, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+            L"container create --name {} -p 127.0.0.1:{}:{} {} sleep 5",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
