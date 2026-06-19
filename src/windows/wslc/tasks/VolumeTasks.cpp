@@ -49,7 +49,7 @@ static bool TryInspectVolume(Session& session, const std::string& volumeName, st
     }
 }
 
-static bool TryDeleteVolume(Session& session, const std::string& volumeName)
+static bool TryDeleteVolume(Session& session, const std::string& volumeName, bool force)
 {
     try
     {
@@ -60,7 +60,11 @@ static bool TryDeleteVolume(Session& session, const std::string& volumeName)
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
+            if (!force)
+            {
+                PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
+            }
+
             return false;
         }
 
@@ -104,13 +108,14 @@ void DeleteVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
+    const bool force = context.Args.Contains(ArgType::Force);
     for (const auto& name : volumeNames)
     {
-        if (TryDeleteVolume(session, WideToMultiByte(name)))
+        if (TryDeleteVolume(session, WideToMultiByte(name), force))
         {
             PrintMessage(name);
         }
-        else
+        else if (!force)
         {
             context.ExitCode = 1;
         }

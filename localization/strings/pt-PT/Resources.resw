@@ -2066,6 +2066,10 @@ Utilização:
     <value>OpenSessionByName('{}') falhou</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Falha ao iniciar o comando {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Não foram encontradas sessões WSLC.</value>
   </data>
@@ -2079,9 +2083,6 @@ Utilização:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Sessão predefinida não encontrada</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Falha ao abrir a sessão predefinida</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Falha ao terminar a sessão predefinida</value>
@@ -2187,6 +2188,9 @@ Utilização:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Estão disponíveis os seguintes argumentos:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Desative a saída a cores.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Para obter mais detalhes sobre um comando específico, transmita o argumento de ajuda para o mesmo.</value>
@@ -2468,9 +2472,9 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Remove todos os contentores parados.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Espaço total recuperado: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Espaço total recuperado: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Contentores ativos</value>
@@ -2561,9 +2565,9 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Remove todas as imagens pendentes. Se --all for especificado, remove todas as imagens não utilizadas por nenhum contentor.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Espaço total recuperado: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Espaço total recuperado: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Etiqueta removida: {}</value>
@@ -2683,6 +2687,16 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Anexa a uma sessão ativa. Se não for fornecido nenhum ID de sessão, será utilizada a wslc sessão predefinida.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Executar um comando numa sessão.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Executa um comando numa sessão ativa sem um TTY. O comando e seus argumentos são encaminhados diretamente para a sessão. Se não for especificada nenhuma sessão, será utilizada a wslc sessão predefinida.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argumentos a transmitir ao comando que está a ser executado</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Terminar uma sessão.</value>
@@ -3082,6 +3096,16 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Produz apenas os nomes das redes</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Remover todas as redes não utilizadas.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Remove todas as redes não utilizadas. Uma rede é considerada não utilizada quando não é referenciada por nenhum contentor.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Eliminado: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Gira volumes.</value>
   </data>
@@ -3301,11 +3325,11 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
-    <value>Skipped importing {} certificates from Local Machine Trusted Root store due to certificate encoding failures</value>
+    <value>Foi ignorada a importação de {} certificados do repositório de Raiz Fidedignas do Computador Local devido a falhas na codificação dos certificados</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
-    <value>Skipped importing {} certificates from Current User Trusted Root store due to certificate encoding failures</value>
+    <value>Foi ignorada a importação de {} certificados do repositório de Raiz Fidedignas do Utilizador Atual devido a falhas na codificação dos certificados</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">

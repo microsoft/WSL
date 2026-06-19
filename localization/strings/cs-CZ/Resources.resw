@@ -2066,6 +2066,10 @@ Využití:
     <value>OpenSessionByName('{}') selhalo</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Nepodařilo se spustit příkaz {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Nebyly nalezeny žádné relace WSLC.</value>
   </data>
@@ -2079,9 +2083,6 @@ Využití:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Výchozí relace nebyla nalezena</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Nepodařilo se otevřít výchozí relaci</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Nepodařilo se ukončit výchozí relaci</value>
@@ -2187,6 +2188,9 @@ Využití:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>K dispozici jsou následující argumenty:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Pokud chcete získat podrobnosti o konkrétním příkazu, předejte ho do argumentu help.</value>
@@ -2468,9 +2472,9 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Odebere všechny zastavené kontejnery.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Celkové uvolněné místo: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Celkové uvolněné místo: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Odstranit kontejnery.</value>
@@ -2561,9 +2565,9 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Removes all dangling images. If --all is specified, removes all images not used by any container.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Celkové uvolněné místo: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Celkové uvolněné místo: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Neoznačeno: {}</value>
@@ -2683,6 +2687,16 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Připojí se k aktivní relaci. Pokud není zadáno ID relace, použije se výchozí relace wslc.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Spusťte příkaz v relaci.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Spustí příkaz v aktivní relaci bez TTY. Příkaz a jeho argumenty jsou přímo předány do relace. Pokud není zadána žádná relace, použije se výchozí relace wslc.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argumenty, které se mají předat příkazu, který se spouští</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Ukončit relaci.</value>
@@ -3081,6 +3095,16 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Vypíše pouze názvy sítí</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Odstraňte všechny nepoužívané sítě.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Odstraní všechny nepoužívané sítě. Síť se považuje za nepoužívanou, pokud na ni neodkazuje žádný kontejner.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Odstraněno: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Spravujte svazky.</value>

@@ -9,15 +9,20 @@ Module Name:
 Abstract:
 
     This file contains the WSLC-related COM object definitions.
+    // N.B. ABI breaking changes in this file are OK, since both client & server always ship together.
+    // The WSLC SDK must not use this file, and instead use WSLCCompat.idl
 
 --*/
 
 import "unknwn.idl";
 import "wtypes.idl";
 
+// Enums and flags shared with the SDK-facing API (WSLCCompat.idl).
+import "WSLCShared.idl";
+
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCSessionManager;")
-cpp_quote("class DECLSPEC_UUID(\"9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3\") WSLCSessionFactory;")
+cpp_quote("class DECLSPEC_UUID(\"9fcd2067-9fc6-4efa-9eb0-698169ebf7d3\") WSLCSessionFactory;")
 cpp_quote("#endif")
 
 #define WSLC_MAX_CONTAINER_NAME_LENGTH 255
@@ -45,59 +50,6 @@ struct _WSLCVersion {
     ULONG Minor;
     ULONG Revision;
 } WSLCVersion;
-
-typedef enum _WSLCVirtualMachineTerminationReason
-{
-    WSLCVirtualMachineTerminationReasonUnknown,
-    WSLCVirtualMachineTerminationReasonShutdown,
-    WSLCVirtualMachineTerminationReasonCrashed,
-} WSLCVirtualMachineTerminationReason;
-
-typedef enum _WSLCFD
-{
-    WSLCFDStdin = 0,
-    WSLCFDStdout = 1,
-    WSLCFDStderr = 2,
-    WSLCFDTty = 3,
-} WSLCFD;
-
-typedef enum _WSLCSignal
-{
-    WSLCSignalNone = 0,
-    WSLCSignalSIGHUP = 1,
-    WSLCSignalSIGINT = 2,
-    WSLCSignalSIGQUIT = 3,
-    WSLCSignalSIGILL = 4,
-    WSLCSignalSIGTRAP = 5,
-    WSLCSignalSIGABRT = 6,
-    WSLCSignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
-    WSLCSignalSIGBUS = 7,
-    WSLCSignalSIGFPE = 8,
-    WSLCSignalSIGKILL = 9,
-    WSLCSignalSIGUSR1 = 10,
-    WSLCSignalSIGSEGV = 11,
-    WSLCSignalSIGUSR2 = 12,
-    WSLCSignalSIGPIPE = 13,
-    WSLCSignalSIGALRM = 14,
-    WSLCSignalSIGTERM = 15,
-    WSLCSignalSIGTKFLT = 16,
-    WSLCSignalSIGCHLD = 17,
-    WSLCSignalSIGCONT = 18,
-    WSLCSignalSIGSTOP = 19,
-    WSLCSignalSIGTSTP = 20,
-    WSLCSignalSIGTTIN = 21,
-    WSLCSignalSIGTTOU = 22,
-    WSLCSignalSIGURG = 23,
-    WSLCSignalSIGXCPU = 24,
-    WSLCSignalSIGXFSZ = 25,
-    WSLCSignalSIGVTALRM = 26,
-    WSLCSignalSIGPROF = 27,
-    WSLCSignalSIGWINCH = 28,
-    WSLCSignalSIGIO = 29,
-    WSLCSignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
-    WSLCSignalSIGPWR = 30,
-    WSLCSignalSIGSYS = 31
-} WSLCSignal;
 
 [
     uuid(8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801),
@@ -165,17 +117,6 @@ typedef struct _WSLCImageInformation
     char ParentId[256];
 } WSLCImageInformation;
 
-typedef enum _WSLCListImagesFlags
-{
-    WSLCListImagesFlagsNone = 0,
-    WSLCListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
-    WSLCListImagesFlagsDigests = 2, // Include digest information
-} WSLCListImagesFlags;
-
-cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
-
 typedef struct _KeyValuePairInformation
 {
     [string] LPSTR Key;
@@ -201,17 +142,6 @@ typedef struct _WSLCListImagesOptions
     [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
     ULONG FiltersCount;
 } WSLCListImagesOptions;
-
-typedef enum _WSLCProcessFlags
-{
-    WSLCProcessFlagsNone = 0,
-    WSLCProcessFlagsStdin = 1,
-    WSLCProcessFlagsTty = 2
-} WSLCProcessFlags;
-
-cpp_quote("#define WSLCProcessFlagsValid (WSLCProcessFlagsStdin | WSLCProcessFlagsTty)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCProcessFlags);")
 
 typedef struct _WSLCStringArray
 {
@@ -298,30 +228,6 @@ typedef struct _WSLCContainerNetwork
     ULONG SettingsCount;
 } WSLCContainerNetwork;
 
-typedef enum _WSLCContainerFlags
-{
-    WSLCContainerFlagsNone = 0,
-    WSLCContainerFlagsRm = 1, // Delete the container when it exits.
-    WSLCContainerFlagsGpu = 2, // Enable GPU access.
-    WSLCContainerFlagsInit = 4, // Run the container under an init process.
-    WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
-} WSLCContainerFlags;
-
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
-
-
-typedef enum _WSLCContainerStartFlags
-{
-    WSLCContainerStartFlagsNone = 0,
-    WSLCContainerStartFlagsAttach = 1, // Attach stdio handles on start.
-} WSLCContainerStartFlags;
-
-cpp_quote("#define WSLCContainerStartFlagsValid (WSLCContainerStartFlagsAttach)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerStartFlags);")
-
 typedef struct _WSLCContainerOptions
 {
     LPCSTR Image;
@@ -358,15 +264,6 @@ typedef struct _WSLCContainerOptions
     ULONG UlimitsCount;
 } WSLCContainerOptions;
 
-typedef enum _WSLCContainerState
-{
-    WslcContainerStateInvalid = 0,
-    WslcContainerStateCreated = 1,
-    WslcContainerStateRunning = 2,
-    WslcContainerStateExited = 3,
-    WslcContainerStateDeleted = 4,
-} WSLCContainerState;
-
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
 
 typedef struct _WSLCContainerEntry
@@ -389,14 +286,6 @@ typedef [system_handle(sh_file)] HANDLE FILE_HANDLE;
 typedef [system_handle(sh_pipe)] HANDLE PIPE_HANDLE;
 typedef [system_handle(sh_socket)] HANDLE SOCKET_HANDLE;
 
-typedef enum _WSLCHandleType
-{
-    WSLCHandleTypeUnknown = 0,
-    WSLCHandleTypeFile = 1,
-    WSLCHandleTypePipe = 2,
-    WSLCHandleTypeSocket = 3
-} WSLCHandleType;
-
 typedef struct _WSLCHandle
 {
     WSLCHandleType Type;
@@ -413,14 +302,6 @@ typedef struct _WSLCHandle
         [default];
     } Handle;
 } WSLCHandle;
-
-typedef enum _WSLCProcessState
-{
-    WslcProcessStateUnknown = 0,
-    WslcProcessStateRunning = 1,
-    WslcProcessStateExited = 2,
-    WslcProcessStateSignalled = 3
-} WSLCProcessState;
 
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
@@ -439,27 +320,6 @@ interface IWSLCProcess : IUnknown
 
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
 }
-
-typedef enum _WSLCNetworkingMode
-{
-    WSLCNetworkingModeNone,
-    WSLCNetworkingModeNAT,
-    WSLCNetworkingModeVirtioProxy
-} WSLCNetworkingMode;
-
-typedef enum _WSLCFeatureFlags
-{
-    WslcFeatureFlagsNone = 0,
-    WslcFeatureFlagsDnsTunneling = 1,
-    WslcFeatureFlagsEarlyBootDmesg = 2,
-    WslcFeatureFlagsGPU = 4,
-    WslcFeatureFlagsVirtioFs = 8,
-    WslcFeatureFlagsDebug = 16,
-} WSLCFeatureFlags;
-
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
 //
 // Values discovered from the guest kernel after the VM has booted, forwarded
@@ -552,15 +412,6 @@ interface IWSLCVirtualMachineFactory : IUnknown
     HRESULT CreateVirtualMachine([out] IWSLCVirtualMachine** Vm);
 }
 
-typedef enum _WSLCSessionStorageFlags
-{
-    WSLCSessionStorageFlagsNone = 0,
-    WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
-    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate
-} WSLCSessionStorageFlags;
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")
-
 // Settings for IWSLCSessionManager::CreateSession - full session configuration
 typedef struct _WSLCSessionSettings {
     LPCWSTR DisplayName;
@@ -578,29 +429,6 @@ typedef struct _WSLCSessionSettings {
     [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
 } WSLCSessionSettings;
-
-typedef enum _WSLCLogsFlags
-{
-    WSLCLogsFlagsNone = 0,
-    WSLCLogsFlagsFollow = 1,
-    WSLCLogsFlagsTimestamps = 2,
-} WSLCLogsFlags;
-
-cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);")
-
-typedef enum _WSLCDeleteFlags
-{
-    WSLCDeleteFlagsNone = 0,
-    WSLCDeleteFlagsForce = 1,
-    WSLCDeleteFlagsDeleteVolumes = 2,
-    // TODO: Flags to remove bridge links, etc.
-} WSLCDeleteFlags;
-
-cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteFlags);")
 
 
 [
@@ -629,28 +457,11 @@ interface IWSLCContainer : IUnknown
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
 }
 
-typedef enum _WSLCDeletedImageType
-{
-    WSLCDeletedImageTypeDeleted = 0,
-    WSLCDeletedImageTypeUntagged = 1
-} WSLCDeletedImageType;
-
 typedef struct _WSLCDeletedImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     WSLCDeletedImageType Type;
 } WSLCDeletedImageInformation;
-
-typedef enum _WSLCDeleteImageFlags
-{
-    WSLCDeleteImageFlagsNone = 0,
-    WSLCDeleteImageFlagsForce = 1,
-    WSLCDeleteImageFlagsNoPrune = 2,
-} WSLCDeleteImageFlags;
-
-cpp_quote("#define WSLCDeleteImageFlagsValid (WSLCDeleteImageFlagsForce | WSLCDeleteImageFlagsNoPrune)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteImageFlags);")
 
 typedef struct _WSLCDeleteImageOptions
 {
@@ -658,18 +469,6 @@ typedef struct _WSLCDeleteImageOptions
     DWORD Flags; // WSLCDeleteImageFlags
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLCDeleteImageOptions;
-
-typedef enum _WSLCBuildImageFlags
-{
-    WSLCBuildImageFlagsNone = 0,
-    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
-    WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
-    WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
-} WSLCBuildImageFlags;
-
-cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
 
 typedef struct _WSLCBuildImageOptions
 {
@@ -709,7 +508,7 @@ typedef struct _WSLCVolumeInformation
 typedef struct _WSLCNetworkOptions
 {
     LPCSTR Name;
-    LPCSTR Driver;
+    [unique] LPCSTR Driver;
     [unique, size_is(DriverOptsCount)] const WSLCDriverOption* DriverOpts;
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
@@ -732,16 +531,6 @@ typedef struct _WSLCPruneContainersResults
     ULONGLONG SpaceReclaimed;
 } WSLCPruneContainersResults;
 
-typedef enum _WSLCListContainersFlags
-{
-    WSLCListContainersFlagsNone = 0,
-    WSLCListContainersFlagsAll = 1,
-} WSLCListContainersFlags;
-
-cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
-
 typedef struct _WSLCListContainersOptions
 {
     DWORD Flags; // WSLCListContainersFlags
@@ -750,12 +539,6 @@ typedef struct _WSLCListContainersOptions
     [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
     ULONG FiltersCount;
 } WSLCListContainersOptions;
-
-typedef enum _WSLCSessionState
-{
-    WSLCSessionStateRunning = 0,
-    WSLCSessionStateTerminated = 1
-} WSLCSessionState;
 
 // Settings for IWSLCSession::Initialize - passed from service to per-user process
 typedef struct _WSLCSessionInitSettings
@@ -911,16 +694,6 @@ typedef struct _WSLCSessionListEntry
     wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
 } WSLCSessionListEntry;
 
-typedef enum _WSLCSessionFlags
-{
-    WSLCSessionFlagsNone = 0,
-    WSLCSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
-    WSLCSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
-} WSLCSessionFlags;
-
-cpp_quote("#define WSLCSessionFlagsValid (WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting)")
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
-
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
     pointer_default(unique),
@@ -929,8 +702,6 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
 interface IWSLCSessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLCVersion* Version);
-    HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
-
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);
     HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCSession** Session);

@@ -2066,6 +2066,10 @@ Användning:
     <value>OpenSessionByName('{}') misslyckades</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Det gick inte att starta kommandot {}. Fel = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Inga WSLC-sessioner hittades.</value>
   </data>
@@ -2079,9 +2083,6 @@ Användning:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Standardsessionen hittades inte</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Det gick inte att öppna standardsessionen</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Det gick inte att avsluta standardsessionen</value>
@@ -2187,6 +2188,9 @@ Användning:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Följande argument är tillgängliga:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Disable color output.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Om du vill ha mer information om ett speciellt kommando kan du skicka den till hjälpargumentet.</value>
@@ -2468,9 +2472,9 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Tar bort alla stoppade containrar.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Totalt frigjort utrymme: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Totalt frigör utrymme: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Ta bort containrar.</value>
@@ -2561,9 +2565,9 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Tar bort alla dangling-bilder. Om --all anges tas alla bilder som inte används av någon behållare bort.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Totalt frigjort utrymme: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Totalt frigör utrymme: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Otaggad: {}</value>
@@ -2683,6 +2687,16 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Ansluter till en aktiv session. Om inget sessions-ID anges används wslc standardsession.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Kör ett kommando i en session.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Kör ett kommando i en aktiv session utan TTY. Kommandot och dess argument vidarebefordras direkt till sessionen. Om ingen session har angetts används den wslc standardsessionen.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argument som ska skickas till kommandot som körs</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Avsluta en session.</value>
@@ -3081,6 +3095,16 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Matar endast ut nätverksnamnen</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Ta bort alla oanvända nätverk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Tar bort alla oanvända nätverk. Ett nätverk anses vara oanvänt när det inte refereras till av någon container.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Borttagen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Hantera volymer.</value>

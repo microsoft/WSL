@@ -2066,6 +2066,10 @@ Bruk:
     <value>OpenSessionByName({}) mislyktes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Kan ikke starte kommandoen {}. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Finner ingen WSLC-økter.</value>
   </data>
@@ -2079,9 +2083,6 @@ Bruk:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Finner ikke standardøkt</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Kan ikke åpne standard økt</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Kunne ikke avslutte standard økten</value>
@@ -2187,6 +2188,9 @@ Bruk:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Følgende argumenter er tilgjengelige:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Deaktiver fargeutdata.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Hvis du vil ha mer informasjon om en bestemt kommando, må du angi hjelp-argumentet.</value>
@@ -2468,9 +2472,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Fjerner alle beholdere som er stoppet.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Total frigjort plass: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Totalt gjenvunnet plass: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern beholdere.</value>
@@ -2561,9 +2565,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Fjerner alle etterfølgende bilder. Hvis --all er angitt, fjernes alle bilder som ikke brukes av en beholder.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total frigjort plass: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Totalt gjenvunnet plass: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Ikke merket: {}</value>
@@ -2683,6 +2687,16 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Kobler til en aktiv økt. Hvis ingen økt-ID er angitt, brukes wslc standardøkten.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Kjøre en kommando i en økt.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Kjører en kommando i en aktiv økt uten TTY. Kommandoen og argumentene videresendes direkte til økten. Hvis ingen økt er angitt, brukes den wslc standardøkten.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argumenter som skal sendes til kommandoen som kjøres</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Avslutt en økt.</value>
@@ -3081,6 +3095,16 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Sender bare nettverksnavn</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Fjern alle nettverk som ikke brukes.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle ubrukte nettverk. Et nettverk regnes som ubrukt når det ikke refereres til av en beholder.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Slettet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Administrer volumer.</value>

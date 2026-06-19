@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgumentTypes.h"
 #include "ExecutionContextData.h"
+#include "Reporter.h"
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -26,8 +27,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     ~CLIExecutionContext() override = default;
 
     NON_COPYABLE(CLIExecutionContext);
-    CLIExecutionContext(CLIExecutionContext&&) = default;
-    CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
+    NON_MOVABLE(CLIExecutionContext);
 
     // Per-subcommand arguments parsed by the resolved leaf Command.
     argument::ArgMap Args;
@@ -38,6 +38,9 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Map of data stored in the context.
     DataMap Data;
+
+    // Central output reporter for all user-facing status messages.
+    Reporter Reporter;
 
     // Process exit code set by tasks like Run/Exec.
     std::optional<int> ExitCode;

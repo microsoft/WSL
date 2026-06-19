@@ -1043,7 +1043,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
         static_assert((RTL_NUMBER_OF(current->DistroName) - 1) == LX_INIT_DISTRO_NAME_MAX);
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
-        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName) - 1, configuration.Name.c_str());
+        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
     }
 
     *DistributionCount = numberOfDistributions;
