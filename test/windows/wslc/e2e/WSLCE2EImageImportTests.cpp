@@ -15,7 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include <ImageModel.h>
+#include "ImageModel.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
