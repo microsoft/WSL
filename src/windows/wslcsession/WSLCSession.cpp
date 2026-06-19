@@ -1223,7 +1223,11 @@ try
         OnImageCreated(imageId.c_str());
     }
 
-    *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId.c_str()).release();
+    if (!imageId.empty())
+    {
+        *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId.c_str()).release();
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

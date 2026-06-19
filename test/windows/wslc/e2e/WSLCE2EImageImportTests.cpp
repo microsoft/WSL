@@ -70,7 +70,7 @@ class WSLCE2EImageImportTests
         auto importResult = RunWslc(std::format(L"image import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VerifyIdOutput(importResult.Stdout, true);
+        VerifyIdOutput(importResult.GetStdoutOneLine(), true);
 
         // Verify the imported image is listed
         VerifyImageIsListed(ImportedImage);
@@ -87,7 +87,7 @@ class WSLCE2EImageImportTests
             RunWslc(std::format(L"image import --no-trunc \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VerifyIdOutput(importResult.Stdout, false);
+        VerifyIdOutput(importResult.GetStdoutOneLine(), false);
 
         // Verify the imported image is listed
         VerifyImageIsListed(ImportedImage);
@@ -120,12 +120,16 @@ class WSLCE2EImageImportTests
         auto importResult = RunWslc(std::format(L"image import \"{}\"", SavedArchivePath.wstring()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Verify the import outputs an image ID
-        VERIFY_IS_TRUE(importResult.Stdout.has_value());
-        VERIFY_IS_FALSE(importResult.Stdout->empty());
+        // Extract the returned ID, validate its format, and use it for cleanup
+        auto imageId = importResult.GetStdoutOneLine();
+        VerifyIdOutput(imageId, true);
 
         // Verify that there is now one more untagged image
         VERIFY_ARE_EQUAL(countUntaggedImages(), untaggedBefore + 1);
+
+        // Clean up the untagged image using the returned ID
+        auto deleteResult = RunWslc(std::format(L"image rm {}", imageId));
+        deleteResult.Verify({.ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromStdin_Success)

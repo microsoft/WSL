@@ -217,33 +217,21 @@ std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstri
 
 // Verifies that a string is a valid hex ID output.
 // truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.
-// The ID must be followed by whitespace or end-of-string.
-inline void VerifyIdOutput(const std::optional<std::wstring>& output, bool truncated)
+inline void VerifyIdOutput(const std::wstring& id, bool truncated)
 {
     constexpr size_t c_truncatedLength = 12;
     constexpr size_t c_fullLength = 64;
 
-    const size_t expectedIdLength = truncated ? c_truncatedLength : c_fullLength;
+    const size_t expectedLength = truncated ? c_truncatedLength : c_fullLength;
 
-    VERIFY_IS_TRUE(output.has_value());
-    VERIFY_IS_TRUE(output->size() >= expectedIdLength);
+    VERIFY_ARE_EQUAL(id.size(), expectedLength);
 
-    // Verify all ID characters are lowercase hex
-    for (size_t i = 0; i < expectedIdLength; i++)
+    for (size_t i = 0; i < expectedLength; i++)
     {
-        const auto ch = (*output)[i];
+        const auto ch = id[i];
         VERIFY_IS_TRUE(
             (ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f'),
             WEX::Common::String().Format(L"Character at index %zu is not hex: '%c'", i, ch));
-    }
-
-    // Verify the ID is terminated by whitespace or end-of-string
-    if (output->size() > expectedIdLength)
-    {
-        const auto ch = (*output)[expectedIdLength];
-        VERIFY_IS_TRUE(
-            ch == L'\r' || ch == L'\n' || ch == L' ' || ch == L'\t' || ch == L'\0',
-            WEX::Common::String().Format(L"Character after ID is not whitespace/null: '%c'", ch));
     }
 }
 
