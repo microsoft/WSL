@@ -984,8 +984,11 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
 
         if (FAILED(result))
         {
-            auto portString =
-                std::format("{}:{}/{}", Mapping.BindingAddressString(), Mapping.HostPort(), Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
+            auto portString = std::format(
+                "{}:{}/{}",
+                Mapping.IsIPv6() ? std::format("[{}]", Mapping.BindingAddressString()) : Mapping.BindingAddressString(),
+                Mapping.HostPort(),
+                Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
 
             THROW_HR_WITH_USER_ERROR(result, shared::Localization::MessageFailedToMapPort(portString, common::wslutil::GetErrorString(result)));
         }

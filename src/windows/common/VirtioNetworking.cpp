@@ -313,7 +313,7 @@ void VirtioNetworking::SetupLoopbackDevice()
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
     endpointProperties.IPAddress = L"169.254.73.250";
-    endpointProperties.PrefixLength = 29;
+    endpointProperties.PrefixLength = 30;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 

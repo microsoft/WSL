@@ -125,7 +125,7 @@ class WslcSdkWinRtTests
         {
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
 
-            auto read = stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::None);
+            auto read = stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
             if (read.wait_for(remaining) != winrt::Windows::Foundation::AsyncStatus::Completed)
             {
                 break;

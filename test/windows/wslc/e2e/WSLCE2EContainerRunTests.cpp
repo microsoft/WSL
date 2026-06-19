@@ -459,6 +459,35 @@ class WSLCE2EContainerRunTests
         runResult.Verify({.ExitCode = 1});
 
         VerifyContainerIsNotListed(WslcContainerName2);
+
+        // Repeat the conflict scenario for an IPv6 loopback ([::1]) binding to validate the IPv6 error message.
+        auto ipv6Server = RunWslc(std::format(
+            L"container run -d --name {} -p [::1]:{}:{} {} {}",
+            WslcContainerName2,
+            HostTestPort2,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        ipv6Server.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create a second container mapping the same IPv6 address/port to validate the full error message.
+        auto ipv6CreateResult =
+            RunWslc(std::format(L"container create -p [::1]:{}:{} {}", HostTestPort2, ContainerTestPort, DebianImage.NameAndTag()));
+        ipv6CreateResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto ipv6ContainerId = ipv6CreateResult.GetStdoutOneLine();
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunWslc(std::format(L"container rm {}", ipv6ContainerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        });
+
+        // Attempt to start — should fail with a port conflict, with the IPv6 address bracketed in the message.
+        auto ipv6StartResult = RunWslc(std::format(L"container start {}", ipv6ContainerId));
+        ipv6StartResult.Verify(
+            {.Stderr = std::format(
+                 L"Failed to map port '[::1]:{}/tcp', Only one usage of each socket address (protocol/network "
+                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
+                 HostTestPort2),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral)
