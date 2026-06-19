@@ -388,11 +388,6 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
-    // Maps a port via VirtioNetworking.
-    // For anonymous binds (HostPort == WSLC_EPHEMERAL_PORT), the networking engine allocates a host port
-    // and returns it in AllocatedHostPort.
-    // Protocol must be IPPROTO_TCP or IPPROTO_UDP.
-    // ListenAddress is the IP address to bind on (e.g. "127.0.0.1", "0.0.0.0", "::1").
     HRESULT MapVirtioNetPort(
         [in] USHORT HostPort,
         [in] USHORT GuestPort,

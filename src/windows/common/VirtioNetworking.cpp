@@ -146,7 +146,7 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
 
     auto lock = m_lock.lock_exclusive();
     const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
-    THROW_HR_IF(E_NOT_SET, !server);
+    THROW_HR_IF(E_UNEXPECTED, !server);
 
     const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
 

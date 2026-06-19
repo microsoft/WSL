@@ -2212,10 +2212,16 @@ class WslcSdkTests
     // Authentication helpers
     // -----------------------------------------------------------------------
 
-    // Extracts the underlying IWSLCSession COM object from the SDK session handle.
-    IWSLCSession& DefaultComSession()
+    // Starts a local registry container with host-mode networking and returns [container, registryAddress].
+    // Uses the COM API (via GetInternalType) with WSLCContainerLauncher to get host-mode networking,
+    // which the SDK doesn't expose. Host networking shares the VM's network namespace, so the registry
+    // is reachable at 127.0.0.1:<port> from both dockerd (inside the VM) and the host.
+    std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+        const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
-        return *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
+        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        return WSLCE2ETests::StartLocalRegistry(*session, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.
@@ -2269,7 +2275,8 @@ class WslcSdkTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession(), c_username, c_password);
+        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
+
         // Negative: wrong password must fail.
         {
             wil::unique_cotaskmem_ansistring token;
@@ -2337,7 +2344,7 @@ class WslcSdkTests
     WSLC_TEST_METHOD(PullImage)
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
-        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession());
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
         auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         {
@@ -2681,7 +2688,7 @@ class WslcSdkTests
 
     WSLC_TEST_METHOD(ImageProgressCallback)
     {
-        auto [registryContainer, registryAddress] = ::StartLocalRegistry(DefaultComSession());
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
         auto registryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         struct ProgressContext

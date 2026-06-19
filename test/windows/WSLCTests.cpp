@@ -33,6 +33,7 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;

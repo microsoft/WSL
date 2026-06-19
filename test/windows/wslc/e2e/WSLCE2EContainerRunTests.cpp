@@ -416,7 +416,6 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Wait for the in-container HTTP server to start listening before connecting.
         WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
         // From the host side, verify we can connect to both ports
@@ -528,13 +527,10 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Wait for the in-container HTTP server to start listening before connecting.
         WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
-        // Verify we can connect to the server via the specified host IP.
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
 
-        // Verify the port mapping reflects the specific host IP binding.
         auto inspectContainer = InspectContainer(WslcContainerName);
         auto portKey = std::to_string(ContainerTestPort) + "/tcp";
         VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));

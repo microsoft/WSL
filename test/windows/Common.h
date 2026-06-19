@@ -26,7 +26,6 @@ Abstract:
 #include "lxsstest.h"
 #include "wslutil.h"
 #include "WslCoreConfig.h"
-#include "WSLCContainerLauncher.h"
 
 using namespace std::chrono_literals;
 
@@ -653,13 +652,6 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
 void LoadTestImage(IWSLCSession& session, std::string_view imageName);
-
-std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session,
-    const std::string& username = "",
-    const std::string& password = "",
-    USHORT port = 5000,
-    const std::wstring& tlsCertDir = L"");
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
