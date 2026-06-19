@@ -96,7 +96,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"abc", L"ok"});
         cap.table.Complete();
 
-        const std::wstring& dataLine = cap.lines()[1];
+        auto lines = cap.lines();
+        const auto& dataLine = lines[1];
         VERIFY_IS_TRUE(dataLine.find(L"abc") != std::wstring::npos);
         VERIFY_IS_TRUE(dataLine.find(L"ok") != std::wstring::npos);
 
@@ -114,7 +115,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"x", L"y"});
         cap.table.Complete();
 
-        const std::wstring& dataLine = cap.lines()[1];
+        auto lines = cap.lines();
+        const auto& dataLine = lines[1];
         auto posX = dataLine.find(L'x');
         auto posY = dataLine.find(L'y');
         VERIFY_IS_TRUE(posX != std::wstring::npos);
@@ -140,7 +142,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"abc", L"ok"});
         cap.table.Complete();
 
-        const std::wstring& dataLine = cap.lines()[1];
+        auto lines = cap.lines();
+        const auto& dataLine = lines[1];
         auto posOk = dataLine.find(L"ok");
         VERIFY_IS_TRUE(posOk != std::wstring::npos);
         VERIFY_IS_TRUE(posOk >= static_cast<size_t>(14 + TableOutput<2>::DefaultColumnPadding));
@@ -157,7 +160,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"a-very-long-name", L"running"});
         cap.table.Complete();
 
-        const std::wstring& dataLine = cap.lines()[1];
+        auto lines = cap.lines();
+        const auto& dataLine = lines[1];
         VERIFY_IS_TRUE(dataLine.find(L"\x2026") != std::wstring::npos);
         VERIFY_IS_TRUE(dataLine.find(L"a-very-long-name") == std::wstring::npos);
     }
@@ -173,7 +177,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"short", L"running"});
         cap.table.Complete();
 
-        const std::wstring& dataLine = cap.lines()[1];
+        auto lines = cap.lines();
+        const auto& dataLine = lines[1];
         VERIFY_IS_TRUE(dataLine.find(L"short") != std::wstring::npos);
         VERIFY_IS_TRUE(dataLine.find(L"\x2026") == std::wstring::npos);
     }
@@ -194,7 +199,8 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"abc123", L"this-is-a-long-description-value"});
         cap.table.Complete();
 
-        for (const auto& line : cap.lines())
+        auto lines = cap.lines();
+        for (const auto& line : lines)
         {
             VERIFY_IS_TRUE(line.size() <= static_cast<size_t>(20));
         }
@@ -839,8 +845,9 @@ class WSLCCLITableOutputUnitTests
         cap.table.Complete();
 
         // Should produce multiple wrap lines, each with sequences
-        VERIFY_IS_GREATER_THAN(cap.lines().size(), static_cast<size_t>(1));
-        for (const auto& line : cap.lines())
+        auto lines = cap.lines();
+        VERIFY_IS_GREATER_THAN(lines.size(), static_cast<size_t>(1));
+        for (const auto& line : lines)
         {
             // Every line that has content should have the escape sequence reapplied
             if (!line.empty())
@@ -870,8 +877,9 @@ class WSLCCLITableOutputUnitTests
         cap.table.WriteRow({L"link", FormattedCell(L"{}click here now{}", {&hyperlinkOpen, &hyperlinkClose})});
         cap.table.Complete();
 
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), cap.lines().size());
-        const auto& line = cap.lines()[0];
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), lines.size());
+        const auto& line = lines[0];
 
         // The hyperlink open sequence must be present (starts the clickable region)
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(L"\x1b]8;;https://example.com\x1b\\"));

@@ -141,7 +141,8 @@ struct FormattedCell
         result.reserve(fmt.size());
         size_t seqIdx = 0;
         size_t visibleChars = 0;
-        bool truncated = false;
+        bool truncated = (maxWidth == 0);
+        const size_t truncateAt = maxWidth > 1 ? maxWidth - 1 : 0;
 
         for (size_t i = 0; i < fmt.size(); ++i)
         {
@@ -157,7 +158,7 @@ struct FormattedCell
             }
             else if (!truncated)
             {
-                if (visibleChars < maxWidth - 1)
+                if (visibleChars < truncateAt)
                 {
                     result += fmt[i];
                     ++visibleChars;
@@ -491,6 +492,12 @@ private:
             }
             return result;
         }
+
+        // Wrapping only supports single-style cells (open + reset). Complex cells with
+        // multiple sequences (e.g., hyperlinks with distinct open/close pairs) cannot be
+        // reliably split across wrapped lines. Callers needing rich formatting in a wrapped
+        // column should use a single constructed Sequence that combines all escape codes.
+        THROW_HR_IF(E_INVALIDARG, cell.sequences.size() > 2);
 
         // For formatted cells, extract visible text, wrap it, then re-apply formatting.
         std::wstring visibleText;

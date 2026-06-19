@@ -237,11 +237,6 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
     return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
 }
 
-std::wstring GetWslcHeader()
-{
-    return wsl::shared::Localization::WSLCCLI_CopyrightHeader();
-}
-
 WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
