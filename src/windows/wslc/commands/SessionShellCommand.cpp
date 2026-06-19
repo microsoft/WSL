@@ -26,7 +26,6 @@ std::vector<Argument> SessionShellCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::SessionId),
-        Argument::Create(ArgType::Raw),
     };
 }
 

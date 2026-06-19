@@ -379,43 +379,37 @@ try
     // Get an event from the service that is signaled when the VM exits.
     THROW_IF_FAILED(vm->GetTerminationEvent(&m_vmExitedEvent));
 
-    const bool raw = WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsRaw);
-
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    if (!raw)
-    {
-        // Mirror the host's trusted root CAs into the VM before dockerd starts.
-        InstallTrustedRootCertificates();
+    // Mirror the host's trusted root CAs into the VM before dockerd starts.
+    InstallTrustedRootCertificates();
 
-        // Launch containerd first
-        StartContainerd();
+    // Launch containerd first
+    StartContainerd();
 
-        // Launch dockerd with external containerd socket
-        StartDockerd();
+    // Launch dockerd with external containerd socket
+    StartDockerd();
 
-        // Wait for dockerd to be ready before starting the event tracker.
-        THROW_WIN32_IF_MSG(
-            ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+    // Wait for dockerd to be ready before starting the event tracker.
+    THROW_WIN32_IF_MSG(
+        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
-        auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
+    auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-        m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-        //  Start the event tracker.
-        m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
+    //  Start the event tracker.
+    m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
 
-        m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
+    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
 
-        // Monitor for unexpected VM exit.
-        m_ioRelay.AddHandle(
-            std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
+    // Monitor for unexpected VM exit.
+    m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
-        // Recover any existing resources from storage.
-        RecoverExistingNetworks();
-        RecoverExistingContainers();
-    }
+    // Recover any existing resources from storage.
+    RecoverExistingNetworks();
+    RecoverExistingContainers();
 
     errorCleanup.release();
     return S_OK;

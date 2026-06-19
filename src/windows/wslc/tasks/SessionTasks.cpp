@@ -35,9 +35,7 @@ void AttachToSession(CLIExecutionContext& context)
         sessionId = context.Args.Get<ArgType::SessionId>();
     }
 
-    const bool raw = context.Args.Contains(ArgType::Raw) && context.Args.Get<ArgType::Raw>();
-
-    context.ExitCode = SessionService::Attach(sessionId, raw);
+    context.ExitCode = SessionService::Attach(sessionId);
 }
 
 void CreateSession(CLIExecutionContext& context)

@@ -58,7 +58,7 @@ namespace {
 
 } // namespace
 
-int SessionService::Attach(const std::wstring& sessionName, bool raw)
+int SessionService::Attach(const std::wstring& sessionName)
 {
     auto session = OpenOrCreateSession(sessionName);
 

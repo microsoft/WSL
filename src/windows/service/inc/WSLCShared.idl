@@ -154,7 +154,6 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsGPU = 4,
     WslcFeatureFlagsVirtioFs = 8,
     WslcFeatureFlagsDebug = 16,
-    WslcFeatureFlagsRaw = 32,
 } WSLCFeatureFlags;
 
 cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug)")
