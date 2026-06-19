@@ -70,9 +70,7 @@ class WSLCE2EImageImportTests
         auto importResult = RunWslc(std::format(L"image import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Verify the import outputs a truncated image ID (12 chars + \r\n)
-        VERIFY_IS_TRUE(importResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(importResult.Stdout->size(), static_cast<size_t>(12 + 2));
+        VerifyIdOutput(importResult.Stdout, true);
 
         // Verify the imported image is listed
         VerifyImageIsListed(ImportedImage);
@@ -89,9 +87,7 @@ class WSLCE2EImageImportTests
             RunWslc(std::format(L"image import --no-trunc \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Verify the import outputs a full-length image ID (> 12 chars)
-        VERIFY_IS_TRUE(importResult.Stdout.has_value());
-        VERIFY_IS_TRUE(importResult.Stdout->size() > 14);
+        VerifyIdOutput(importResult.Stdout, false);
 
         // Verify the imported image is listed
         VerifyImageIsListed(ImportedImage);
