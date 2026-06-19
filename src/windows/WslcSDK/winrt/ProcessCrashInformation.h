@@ -4,22 +4,22 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ProcessCrashDumpInformation.h
+    ProcessCrashInformation.h
 
 Abstract:
 
-    This file contains the definition of the WinRT wrapper for the WSLC SDK ProcessCrashDumpInformation class.
+    This file contains the definition of the WinRT wrapper for the WSLC SDK ProcessCrashInformation class.
 
 --*/
 
 #pragma once
-#include "Microsoft.WSL.Containers.ProcessCrashDumpInformation.g.h"
+#include "Microsoft.WSL.Containers.ProcessCrashInformation.g.h"
 #include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-struct ProcessCrashDumpInformation : ProcessCrashDumpInformationT<ProcessCrashDumpInformation>
+struct ProcessCrashInformation : ProcessCrashInformationT<ProcessCrashInformation>
 {
-    ProcessCrashDumpInformation(const WslcSessionCrashDumpInfo* info);
+    ProcessCrashInformation(const WslcSessionCrashDumpInfo* info);
 
     hstring DumpPath() const;
     hstring ProcessName() const;
@@ -36,4 +36,4 @@ private:
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
-DEFINE_TYPE_HELPERS(ProcessCrashDumpInformation);
+DEFINE_TYPE_HELPERS(ProcessCrashInformation);

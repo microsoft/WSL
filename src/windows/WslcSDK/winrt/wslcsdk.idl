@@ -30,7 +30,7 @@ namespace Microsoft.WSL.Containers
 
     delegate void SessionTerminationHandler(SessionTerminationReason reason);
 
-    runtimeclass ProcessCrashDumpInformation
+    runtimeclass ProcessCrashInformation
     {
         String DumpPath { get; };
         String ProcessName { get; };
@@ -39,7 +39,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.DateTime Timestamp { get; };
     };
 
-    delegate void ProcessCrashDumpHandler(ProcessCrashDumpInformation information);
+    delegate void ProcessCrashHandler(ProcessCrashInformation information);
 
     runtimeclass SessionSettings
     {
@@ -81,7 +81,7 @@ namespace Microsoft.WSL.Containers
         IVectorView<ImageInfo> Images { get; };
 
         event SessionTerminationHandler Terminated;
-        event ProcessCrashDumpHandler ProcessCrashed;
+        event ProcessCrashHandler ProcessCrashed;
     };
 
 

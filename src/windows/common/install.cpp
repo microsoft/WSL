@@ -77,9 +77,9 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
-int UpdatePackageImpl(bool preRelease, bool repair, bool CallerOwnsProcess)
+int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 {
-    if (!repair && CallerOwnsProcess)
+    if (!repair && callerOwnsProcess)
     {
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
@@ -88,14 +88,14 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool CallerOwnsProcess)
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
-        if (CallerOwnsProcess)
+        if (callerOwnsProcess)
         {
             PrintMessage(Localization::MessageUpdateNotNeeded());
         }
         return 0;
     }
 
-    if (CallerOwnsProcess)
+    if (callerOwnsProcess)
     {
         PrintMessage(Localization::MessageUpdatingToVersion(version.c_str()));
     }
@@ -112,7 +112,7 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool CallerOwnsProcess)
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
-            if (CallerOwnsProcess)
+            if (callerOwnsProcess)
             {
                 PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
             }

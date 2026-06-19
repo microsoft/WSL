@@ -38,7 +38,7 @@ struct Session : SessionT<Session>
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
-    winrt::event_token ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashDumpHandler const& handler);
+    winrt::event_token ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler);
     void ProcessCrashed(winrt::event_token const& token) noexcept;
 
     WslcSession ToHandle();
@@ -52,7 +52,7 @@ private:
     static void CALLBACK OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID context) noexcept;
 
     winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;
-    winrt::event<winrt::Microsoft::WSL::Containers::ProcessCrashDumpHandler> m_crashDumpEvent;
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessCrashHandler> m_crashDumpEvent;
     wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
 
     // Bridges the one-off termination event surfaced by the SDK to the WinRT Terminated event.

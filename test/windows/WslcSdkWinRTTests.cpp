@@ -22,7 +22,7 @@ Abstract:
 
 #include "winrt/Session.h"
 #include "winrt/Helpers.h"
-#include "winrt/ProcessCrashDumpInformation.h"
+#include "winrt/ProcessCrashInformation.h"
 
 #include <winrt/Microsoft.WSL.Containers.h>
 #include <winrt/Windows.Foundation.h>
@@ -325,9 +325,9 @@ class WslcSdkWinRtTests
 
         // Positive: A crashing exec process must fire the ProcessCrashed event with correctly populated info.
         {
-            std::promise<WSLCSDK::ProcessCrashDumpInformation> promise;
+            std::promise<WSLCSDK::ProcessCrashInformation> promise;
 
-            auto revoker = m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashDumpInformation info) {
+            auto revoker = m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashInformation info) {
                 // Guard against multiple firings from concurrently running tests.
                 try
                 {
@@ -366,7 +366,7 @@ class WslcSdkWinRtTests
             std::atomic<int> callCount{0};
             {
                 auto revoker =
-                    m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashDumpInformation) { ++callCount; });
+                    m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashInformation) { ++callCount; });
                 // revoker goes out of scope here — handler is unsubscribed before any crash is triggered.
             }
 
@@ -381,9 +381,9 @@ class WslcSdkWinRtTests
         }
     }
 
-    WSLC_TEST_METHOD(ProcessCrashDumpInformationProperties)
+    WSLC_TEST_METHOD(ProcessCrashInformationProperties)
     {
-        // Verify that ProcessCrashDumpInformation correctly maps all fields from WslcSessionCrashDumpInfo.
+        // Verify that ProcessCrashInformation correctly maps all fields from WslcSessionCrashDumpInfo.
         constexpr PCWSTR c_dumpPath = L"C:\\test\\dump.dmp";
         constexpr PCSTR c_processName = "test-process";
         constexpr uint64_t c_pid = 42;
@@ -397,7 +397,7 @@ class WslcSdkWinRtTests
         info.signal = c_signal;
         info.timestamp = c_timestamp;
 
-        auto impl = winrt::make_self<WSLCSDK::implementation::ProcessCrashDumpInformation>(&info);
+        auto impl = winrt::make_self<WSLCSDK::implementation::ProcessCrashInformation>(&info);
 
         VERIFY_ARE_EQUAL(impl->DumpPath(), winrt::hstring(c_dumpPath));
         VERIFY_ARE_EQUAL(impl->ProcessName(), winrt::to_hstring(c_processName));

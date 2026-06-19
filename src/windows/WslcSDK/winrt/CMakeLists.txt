@@ -11,7 +11,7 @@ set(SOURCES
     ImageProgress.cpp
     InstallProgress.cpp
     Process.cpp
-    ProcessCrashDumpInformation.cpp
+    ProcessCrashInformation.cpp
     ProcessSettings.cpp
     PullImageOptions.cpp
     PushImageOptions.cpp
@@ -35,7 +35,7 @@ set(HEADERS
     ImageProgress.h
     InstallProgress.h
     Process.h
-    ProcessCrashDumpInformation.h
+    ProcessCrashInformation.h
     ProcessSettings.h
     PullImageOptions.h
     PushImageOptions.h
