@@ -364,7 +364,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (line.find(image.Name) != std::wstring::npos && line.find(image.Tag) != std::wstring::npos)
         {
             EnsureImageContainersAreDeleted(image);
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
@@ -388,7 +388,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (line.find(image.Name) != std::wstring::npos && line.find(image.Tag) != std::wstring::npos)
         {
             return;
         }

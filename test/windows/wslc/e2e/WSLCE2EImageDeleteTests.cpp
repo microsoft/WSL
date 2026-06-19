@@ -138,8 +138,8 @@ class WSLCE2EImageDeleteTests
         listAfter.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : listAfter.GetStdoutLines())
         {
-            VERIFY_IS_TRUE(
-                line.find(NoPruneTaggedImage.NameAndTag()) == std::wstring::npos,
+            VERIFY_IS_FALSE(
+                line.find(NoPruneTaggedImage.Name) != std::wstring::npos && line.find(NoPruneTaggedImage.Tag) != std::wstring::npos,
                 L"Secondary tag should have been removed by `image delete --no-prune`");
         }
     }
