@@ -395,7 +395,7 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_SESSION_NOT_FOUND, wsl::shared::Localization::MessageWslcSessionNotFound(DisplayName), !result.has_value());
 
-    THROW_IF_FAILED_MSG(result.value(), "Session '%ls' not found", DisplayName);
+    THROW_IF_FAILED_MSG(result.value(), "Failed to open session '%ls'", DisplayName);
 }
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
