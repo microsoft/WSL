@@ -208,7 +208,6 @@ struct ColumnDefinition
     ColumnWidthConfig Config;
 };
 
-// TODO: Improve for use with sparse data.
 template <size_t FieldCount>
 struct TableOutput
 {
@@ -226,7 +225,12 @@ struct TableOutput
     static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
 
     TableOutput(Reporter& reporter, header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding, Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding)
+        m_reporter(reporter),
+        m_outputLevel(level),
+        m_vtEnabled(reporter.IsVTEnabled(level)),
+        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_sizingBuffer(sizingBuffer),
+        m_columnPadding(columnPadding)
     {
         InitializeColumns(std::move(header));
     }
@@ -238,7 +242,13 @@ struct TableOutput
         size_t sizingBuffer = 50,
         size_t columnPadding = DefaultColumnPadding,
         Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding), m_columnConfigs(std::move(config))
+        m_reporter(reporter),
+        m_outputLevel(level),
+        m_vtEnabled(reporter.IsVTEnabled(level)),
+        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_sizingBuffer(sizingBuffer),
+        m_columnPadding(columnPadding),
+        m_columnConfigs(std::move(config))
     {
         InitializeColumns(std::move(header));
     }
@@ -249,7 +259,12 @@ struct TableOutput
         size_t sizingBuffer = 50,
         size_t columnPadding = DefaultColumnPadding,
         Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter), m_outputLevel(level), m_sizingBuffer(sizingBuffer), m_columnPadding(columnPadding)
+        m_reporter(reporter),
+        m_outputLevel(level),
+        m_vtEnabled(reporter.IsVTEnabled(level)),
+        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_sizingBuffer(sizingBuffer),
+        m_columnPadding(columnPadding)
     {
         header_t headers;
         for (size_t i = 0; i < FieldCount; ++i)
@@ -369,6 +384,8 @@ private:
 
     Reporter& m_reporter;
     Reporter::Level m_outputLevel;
+    const bool m_vtEnabled;
+    const bool m_colorEnabled;
     std::array<Column, FieldCount> m_columns;
     column_config_t m_columnConfigs;
     size_t m_sizingBuffer;
@@ -708,17 +725,12 @@ private:
 
     void OutputCellLineToStream(const FormattedCell& cell)
     {
-        const bool vtEnabled = m_reporter.IsVTEnabled(m_outputLevel);
-        const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
-        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(vtEnabled, colorEnabled));
+        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(m_vtEnabled, m_colorEnabled));
     }
 
     // Renders a logical row, emitting multiple physical rows for word-wrapping columns.
     void OutputLineToStream(const line_t& line)
     {
-        const bool vtEnabled = m_reporter.IsVTEnabled(m_outputLevel);
-        const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
-
         size_t physicalRows = 1;
         std::array<std::vector<FormattedCell>, FieldCount> wrappedCells;
         for (size_t i = 0; i < FieldCount; ++i)
@@ -752,7 +764,7 @@ private:
                 if (col.Overflow != ColumnOverflow::Wrap && valueLength > col.MaxLength)
                 {
                     // Truncate and append ellipsis.
-                    rowStr.append(cell.RenderTruncated(col.MaxLength, vtEnabled, colorEnabled));
+                    rowStr.append(cell.RenderTruncated(col.MaxLength, m_vtEnabled, m_colorEnabled));
 
                     if (col.SpaceAfter)
                     {
@@ -761,7 +773,7 @@ private:
                 }
                 else
                 {
-                    rowStr.append(cell.Render(vtEnabled, colorEnabled));
+                    rowStr.append(cell.Render(m_vtEnabled, m_colorEnabled));
 
                     if (col.SpaceAfter)
                     {
