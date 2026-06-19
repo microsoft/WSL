@@ -47,6 +47,6 @@ std::wstring VolumeCommand::LongDescription() const
 
 void VolumeCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

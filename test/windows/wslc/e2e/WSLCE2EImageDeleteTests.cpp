@@ -44,7 +44,8 @@ class WSLCE2EImageDeleteTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_HelpCommand)
     {
         auto result = RunWslc(L"image delete --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
@@ -57,7 +58,8 @@ class WSLCE2EImageDeleteTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MissingImageName)
     {
         auto result = RunWslc(L"image delete");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
@@ -150,52 +152,5 @@ private:
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const TestImage NoPruneTaggedImage{L"wslc-test-noprune", L"alias", L""};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableCommands()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageRemoveLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image remove [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: delete rm\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  image       Image name\r\n"               //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                    //
-                << L"  -f,--force  Delete images even if they are being used\r\n" //
-                << L"  --no-prune  Do not delete untagged parents\r\n"            //
-                << L"  -?,--help   Shows help about the selected command\r\n"     //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

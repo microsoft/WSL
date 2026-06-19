@@ -317,13 +317,15 @@ void ListContainers(CLIExecutionContext& context)
 
         // Create table with or without column limits based on --no-trunc flag
         auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
-                                   {Localization::WSLCCLI_TableHeaderImage(), {Config::NoLimit, 20, false}},
-                                   {Localization::WSLCCLI_TableHeaderCreated(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderStatus(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {Config::NoLimit, Config::NoLimit, false}}}})
+                                 context.Reporter,
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20}},
+                                   {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20}},
+                                   {Localization::WSLCCLI_TableHeaderCreated(), {}},
+                                   {Localization::WSLCCLI_TableHeaderStatus(), {}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {}}}})
                            : wsl::windows::wslc::TableOutput<6>(
+                                 context.Reporter,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderImage(),
@@ -334,7 +336,7 @@ void ListContainers(CLIExecutionContext& context)
         // Add each container as a row
         for (const auto& container : containers)
         {
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
@@ -684,15 +686,17 @@ void ShowContainerStats(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
-                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderNetIo(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {Config::NoLimit, Config::NoLimit, false}},
-                                   {Localization::WSLCCLI_TableHeaderPids(), {Config::NoLimit, Config::NoLimit, false}}}})
+                                 context.Reporter,
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20}},
+                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {}},
+                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {}},
+                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {}},
+                                   {Localization::WSLCCLI_TableHeaderNetIo(), {}},
+                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {}},
+                                   {Localization::WSLCCLI_TableHeaderPids(), {}}}})
                            : wsl::windows::wslc::TableOutput<8>(
+                                 context.Reporter,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderCpuPercent(),
@@ -705,7 +709,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         for (const auto& entry : statsJson)
         {
             const auto id = entry["ID"].get<std::string>();
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(trunc ? TruncateId(id) : id),
                 MultiByteToWide(entry["Name"].get<std::string>()),
                 MultiByteToWide(entry["CPUPerc"].get<std::string>()),

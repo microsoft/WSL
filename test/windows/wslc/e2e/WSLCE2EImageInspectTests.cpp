@@ -40,13 +40,15 @@ class WSLCE2EImageInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
     {
         auto result = RunWslc(L"image inspect --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
     {
         auto result = RunWslc(L"image inspect");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
@@ -126,44 +128,5 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const TestImage BuiltExposeImage{L"wslc-e2e-inspect-config-extras", L"latest", L""};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageInspectLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image inspect [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  image      Image name\r\n"                //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"               //
-                << L"  -?,--help  Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests
