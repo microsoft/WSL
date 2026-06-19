@@ -67,11 +67,11 @@ class WSLCE2EAliasTests
 
         // Help output should be identical except the executable name in the usage line.
         auto wslcOutput = wslcResult.Stdout.value();
-        const std::wstring wslcName = L"wslc";
-        const std::wstring containerName = L"container";
-        auto pos = wslcOutput.find(wslcName);
+        const std::wstring usageNeedle = L"Usage: wslc";
+        const std::wstring usageReplacement = L"Usage: container";
+        auto pos = wslcOutput.find(usageNeedle);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, pos);
-        wslcOutput.replace(pos, wslcName.size(), containerName);
+        wslcOutput.replace(pos, usageNeedle.size(), usageReplacement);
 
         VERIFY_ARE_EQUAL(wslcOutput, containerResult.Stdout.value());
     }
