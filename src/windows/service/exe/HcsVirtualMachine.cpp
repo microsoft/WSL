@@ -463,10 +463,15 @@ try
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6 | wsl::core::VirtioNetworkingFlags::LocalhostRelay;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
             WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling);
+        }
+
+        if (!FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay))
+        {
+            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay);
         }
 
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
