@@ -682,7 +682,18 @@ try
 
     auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
 
-    listenAddr.Ipv4.sin_port = HostPort;
+    if (listenAddr.si_family == AF_INET)
+    {
+        listenAddr.Ipv4.sin_port = HostPort;
+    }
+    else if (listenAddr.si_family == AF_INET6)
+    {
+        listenAddr.Ipv6.sin6_port = HostPort;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
+    }
 
     std::lock_guard lock(m_lock);
 
@@ -700,7 +711,18 @@ try
 
     auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
 
-    listenAddr.Ipv4.sin_port = HostPort;
+    if (listenAddr.si_family == AF_INET)
+    {
+        listenAddr.Ipv4.sin_port = HostPort;
+    }
+    else if (listenAddr.si_family == AF_INET6)
+    {
+        listenAddr.Ipv6.sin6_port = HostPort;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
+    }
 
     std::lock_guard lock(m_lock);
 

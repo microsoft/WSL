@@ -150,7 +150,6 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
 
     const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
 
-    // format: tag={tag}[;host_port={port}];guest_port={port}[;listen_addr={addr}|;allocate=false][;udp]
     std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddressStr.c_str());
 
     if (HostPort != WSLC_EPHEMERAL_PORT)
@@ -200,7 +199,6 @@ try
 {
     RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
 
-    const auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&ListenAddress));
     HandlePortNotification(ListenAddress, Protocol, GuestPort, false);
 
     return S_OK;
@@ -313,7 +311,7 @@ void VirtioNetworking::SetupLoopbackDevice()
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
     endpointProperties.IPAddress = L"169.254.73.250";
-    endpointProperties.PrefixLength = 28;
+    endpointProperties.PrefixLength = 29;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 

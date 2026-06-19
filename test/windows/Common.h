@@ -654,11 +654,6 @@ std::filesystem::path GetTestImagePath(std::string_view imageName);
 
 void LoadTestImage(IWSLCSession& session, std::string_view imageName);
 
-// Starts a local wslc-registry container and returns [container, registryAddress]. Loads the
-// wslc-registry:latest image into the session if it isn't already present, waits for the registry to
-// bind the port, and probes the v2 endpoint to verify readiness (and the auth gate when credentials
-// are supplied). Plain HTTP uses host networking with a published loopback port; when a tlsCertDir is
-// supplied the registry is served over TLS using bridge networking and reached by its bridge IP.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
     IWSLCSession& session,
     const std::string& username = "",
