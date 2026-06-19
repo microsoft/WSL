@@ -239,7 +239,12 @@ void ImportImage(CLIExecutionContext& context)
     }
 
     auto& input = context.Args.Get<ArgType::ImportFile>();
-    services::ImageService::Import(session, input, imageName);
+    auto imageId = services::ImageService::Import(session, input, imageName);
+    if (!imageId.empty())
+    {
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
+    }
 }
 
 void InspectImages(CLIExecutionContext& context)
