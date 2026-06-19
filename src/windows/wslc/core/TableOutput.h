@@ -90,9 +90,10 @@ struct FormattedCell
     }
 
     // Renders the cell with or without sequences.
-    // When colorEnabled, {} placeholders are replaced with sequence bytes.
-    // When !colorEnabled, {} placeholders are replaced with empty.
-    std::wstring Render(bool colorEnabled) const
+    // When vtEnabled is false, all {} placeholders are skipped (no VT output).
+    // When vtEnabled is true but colorEnabled is false, only non-color sequences are emitted.
+    // When both are true, all sequences are emitted.
+    std::wstring Render(bool vtEnabled, bool colorEnabled) const
     {
         if (sequences.empty())
         {
@@ -100,14 +101,14 @@ struct FormattedCell
         }
 
         std::wstring result;
-        result.reserve(fmt.size() + (colorEnabled ? sequences.size() * 8 : 0));
+        result.reserve(fmt.size() + (vtEnabled ? sequences.size() * 8 : 0));
         size_t seqIdx = 0;
 
         for (size_t i = 0; i < fmt.size(); ++i)
         {
             if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
             {
-                if (colorEnabled && seqIdx < sequences.size())
+                if (vtEnabled && seqIdx < sequences.size() && (colorEnabled || !sequences[seqIdx]->IsColor()))
                 {
                     result.append(sequences[seqIdx]->Get());
                 }
@@ -125,7 +126,7 @@ struct FormattedCell
 
     // Renders with visible text truncated to maxWidth characters, appending ellipsis.
     // Sequences after the truncation point are still emitted (for resets).
-    std::wstring RenderTruncated(size_t maxWidth, bool colorEnabled) const
+    std::wstring RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEnabled) const
     {
         if (sequences.empty())
         {
@@ -149,7 +150,7 @@ struct FormattedCell
             if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
             {
                 // Always emit sequences (they're invisible); they handle resets after truncation.
-                if (colorEnabled && seqIdx < sequences.size())
+                if (vtEnabled && seqIdx < sequences.size() && (colorEnabled || !sequences[seqIdx]->IsColor()))
                 {
                     result.append(sequences[seqIdx]->Get());
                 }
@@ -707,13 +708,15 @@ private:
 
     void OutputCellLineToStream(const FormattedCell& cell)
     {
+        const bool vtEnabled = m_reporter.IsVTEnabled(m_outputLevel);
         const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
-        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(colorEnabled));
+        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(vtEnabled, colorEnabled));
     }
 
     // Renders a logical row, emitting multiple physical rows for word-wrapping columns.
     void OutputLineToStream(const line_t& line)
     {
+        const bool vtEnabled = m_reporter.IsVTEnabled(m_outputLevel);
         const bool colorEnabled = m_reporter.IsColorEnabled(m_outputLevel);
 
         size_t physicalRows = 1;
@@ -749,7 +752,7 @@ private:
                 if (col.Overflow != ColumnOverflow::Wrap && valueLength > col.MaxLength)
                 {
                     // Truncate and append ellipsis.
-                    rowStr.append(cell.RenderTruncated(col.MaxLength, colorEnabled));
+                    rowStr.append(cell.RenderTruncated(col.MaxLength, vtEnabled, colorEnabled));
 
                     if (col.SpaceAfter)
                     {
@@ -758,7 +761,7 @@ private:
                 }
                 else
                 {
-                    rowStr.append(cell.Render(colorEnabled));
+                    rowStr.append(cell.Render(vtEnabled, colorEnabled));
 
                     if (col.SpaceAfter)
                     {

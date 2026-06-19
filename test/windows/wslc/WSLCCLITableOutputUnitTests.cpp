@@ -640,7 +640,7 @@ class WSLCCLITableOutputUnitTests
     TEST_METHOD(FormattedCell_Render_ColorEnabled)
     {
         FormattedCell cell = FormattedCell(L"hello", Format::Fg::BrightRed);
-        const auto result = cell.Render(true);
+        const auto result = cell.Render(true, true);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L"hello"));
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L'\x1b'));
     }
@@ -648,14 +648,23 @@ class WSLCCLITableOutputUnitTests
     TEST_METHOD(FormattedCell_Render_ColorDisabled)
     {
         FormattedCell cell = FormattedCell(L"hello", Format::Fg::BrightRed);
-        const auto result = cell.Render(false);
+        const auto result = cell.Render(false, false);
         VERIFY_ARE_EQUAL(std::wstring{L"hello"}, result);
+    }
+
+    TEST_METHOD(FormattedCell_Render_VTEnabled_ColorDisabled_StripsColorSequences)
+    {
+        FormattedCell cell = FormattedCell(L"hello", Format::Fg::BrightRed);
+        // VT on but color off: color sequences should be stripped
+        const auto result = cell.Render(true, false);
+        VERIFY_ARE_EQUAL(std::wstring{L"hello"}, result);
+        VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L'\x1b'));
     }
 
     TEST_METHOD(FormattedCell_RenderTruncated_TruncatesVisibleText)
     {
         FormattedCell cell = FormattedCell(L"hello world", Format::Fg::BrightRed);
-        const auto result = cell.RenderTruncated(5, true);
+        const auto result = cell.RenderTruncated(5, true, true);
         // Should contain truncated visible text + ellipsis + sequences
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L'\x1b'));
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L"world"));
@@ -710,8 +719,8 @@ class WSLCCLITableOutputUnitTests
     {
         FormattedCell cell;
         VERIFY_ARE_EQUAL(static_cast<size_t>(0), cell.VisibleWidth());
-        VERIFY_ARE_EQUAL(std::wstring{L""}, cell.Render(true));
-        VERIFY_ARE_EQUAL(std::wstring{L""}, cell.Render(false));
+        VERIFY_ARE_EQUAL(std::wstring{L""}, cell.Render(true, true));
+        VERIFY_ARE_EQUAL(std::wstring{L""}, cell.Render(false, false));
     }
 
     TEST_METHOD(FormattedCell_SingleSequenceCtor_BuildsFormatWithReset)
@@ -721,12 +730,12 @@ class WSLCCLITableOutputUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), cell.sequences.size());
 
         // Color enabled: sequences emitted
-        const auto rendered = cell.Render(true);
+        const auto rendered = cell.Render(true, true);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, rendered.find(L"bold"));
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, rendered.find(L'\x1b'));
 
         // Color disabled: plain text only
-        VERIFY_ARE_EQUAL(std::wstring{L"bold"}, cell.Render(false));
+        VERIFY_ARE_EQUAL(std::wstring{L"bold"}, cell.Render(false, false));
     }
 
     TEST_METHOD(FormattedCell_VisibleWidth_MultiplePlaceholders)
@@ -751,14 +760,14 @@ class WSLCCLITableOutputUnitTests
     TEST_METHOD(FormattedCell_Render_PlainTextNoSequences)
     {
         FormattedCell cell{L"plain text"};
-        VERIFY_ARE_EQUAL(std::wstring{L"plain text"}, cell.Render(true));
-        VERIFY_ARE_EQUAL(std::wstring{L"plain text"}, cell.Render(false));
+        VERIFY_ARE_EQUAL(std::wstring{L"plain text"}, cell.Render(true, true));
+        VERIFY_ARE_EQUAL(std::wstring{L"plain text"}, cell.Render(false, false));
     }
 
     TEST_METHOD(FormattedCell_RenderTruncated_TextFitsNoTruncation)
     {
         FormattedCell cell(L"hello", Format::Fg::BrightRed);
-        const auto result = cell.RenderTruncated(10, true);
+        const auto result = cell.RenderTruncated(10, true, true);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L"hello"));
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L'\u2026')); // no ellipsis
     }
@@ -766,7 +775,7 @@ class WSLCCLITableOutputUnitTests
     TEST_METHOD(FormattedCell_RenderTruncated_ColorDisabled_StillTruncates)
     {
         FormattedCell cell(L"hello world", Format::Fg::BrightRed);
-        const auto result = cell.RenderTruncated(5, false);
+        const auto result = cell.RenderTruncated(5, false, false);
         // Sequences stripped, but truncation still occurs
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L'\x1b'));
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L"world"));
@@ -776,7 +785,7 @@ class WSLCCLITableOutputUnitTests
     TEST_METHOD(FormattedCell_RenderTruncated_PlainText)
     {
         FormattedCell cell{L"abcdefghij"};
-        const auto result = cell.RenderTruncated(5, false);
+        const auto result = cell.RenderTruncated(5, false, false);
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(L"fghij"));
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L'\u2026'));
     }
