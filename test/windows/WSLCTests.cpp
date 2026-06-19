@@ -409,6 +409,14 @@ class WSLCTests
         VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_NOT_FOUND);
     }
 
+    WSLC_TEST_METHOD(GetDisplayNameReturnsSessionName)
+    {
+        wil::unique_cotaskmem_string displayName;
+        VERIFY_SUCCEEDED(m_defaultSession->GetDisplayName(&displayName));
+        VERIFY_IS_NOT_NULL(displayName.get());
+        VERIFY_ARE_EQUAL(std::wstring(displayName.get()), c_testSessionName);
+    }
+
     WSLC_TEST_METHOD(CreateSessionValidation)
     {
         auto sessionManager = OpenSessionManager();
@@ -484,6 +492,7 @@ class WSLCTests
 
         // The session object must reject NULL output pointers.
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
     }
 

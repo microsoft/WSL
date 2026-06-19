@@ -38,12 +38,7 @@ Session SessionService::OpenSessionByName(const wil::com_ptr<IWSLCSessionManager
     THROW_IF_FAILED(manager->OpenSessionByName(displayName, &session));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-    Session result(std::move(session));
-    if (displayName)
-    {
-        result.SetDisplayName(displayName);
-    }
-    return result;
+    return Session(std::move(session));
 }
 
 Session SessionService::OpenSession(const std::wstring& sessionName)
@@ -189,10 +184,12 @@ int SessionService::TerminateSession(const Session& session)
     if (FAILED(hr))
     {
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-        if (session.DisplayName().has_value())
+
+        wil::unique_cotaskmem_string displayName;
+        if (SUCCEEDED(session.Get()->GetDisplayName(&displayName)) && displayName)
         {
             wslutil::PrintMessage(
-                Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(session.DisplayName().value()), errorString), stderr);
+                Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString), stderr);
         }
         else
         {
