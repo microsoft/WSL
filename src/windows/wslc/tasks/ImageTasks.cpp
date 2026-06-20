@@ -121,7 +121,7 @@ void ListImages(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(image.Id, trunc)));
+            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
         }
 
         return;

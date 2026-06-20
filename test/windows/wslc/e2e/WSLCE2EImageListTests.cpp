@@ -68,20 +68,20 @@ class WSLCE2EImageListTests
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
 
-        std::string fullDebianId;
+        std::string debianId;
         for (const auto& image : images)
         {
             if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name) &&
                 image.Tag == wsl::shared::string::WideToMultiByte(DebianImage.Tag))
             {
-                fullDebianId = TruncateId(image.Id, false);
+                debianId = image.Id;
                 break;
             }
         }
-        VERIFY_ARE_NOT_EQUAL(std::string{}, fullDebianId, L"Debian image was not present in `image list --format json` output");
+        VERIFY_ARE_NOT_EQUAL(std::string{}, debianId, L"Debian image was not present in `image list --format json` output");
 
-        const auto truncatedDebianId = wsl::shared::string::MultiByteToWide(TruncateId(fullDebianId, true));
-        const auto fullDebianIdW = wsl::shared::string::MultiByteToWide(fullDebianId);
+        const auto truncatedDebianId = wsl::shared::string::MultiByteToWide(TruncateId(debianId, true));
+        const auto fullDebianIdW = wsl::shared::string::MultiByteToWide(debianId);
 
         // Default --quiet truncates to 12 chars.
         auto truncResult = RunWslc(L"image list --quiet");
@@ -98,7 +98,7 @@ class WSLCE2EImageListTests
         }
         VERIFY_IS_TRUE(truncatedFound, L"Truncated image ID not found in --quiet output");
 
-        // --quiet --no-trunc shows the full id.
+        // --quiet --no-trunc shows the full id with sha256: prefix.
         auto noTruncResult = RunWslc(L"image list --quiet --no-trunc");
         noTruncResult.Verify({.Stderr = L"", .ExitCode = 0});
 
