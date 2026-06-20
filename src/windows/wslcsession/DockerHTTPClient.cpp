@@ -798,8 +798,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
     // Parse the response header
     constexpr auto bufferSize = 16 * 1024;
     // Docker response header max size.
-    constexpr size_t maxHeaderSize = 64 * 1024;
-    constexpr DWORD headerReceiveTimeoutMs = 30 * 1000;
+    constexpr size_t maxHeaderSize = _1MB;
     size_t Offset = 0;
     std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
@@ -817,7 +816,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK, headerReceiveTimeoutMs);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK);
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
@@ -840,7 +839,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0, headerReceiveTimeoutMs);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0);
         THROW_HR_IF(E_ABORT, bytesRead == 0); // E_ABORT case after peek but before consume
         THROW_HR_IF_MSG(
             E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);
