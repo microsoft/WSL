@@ -2072,6 +2072,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>OpenSessionByName('{}') 失敗</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>此命令不能使用 --session 選項。</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>無法啟動命令 {}。錯誤碼 = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2333,11 +2337,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>不支援的網路驅動程式選項: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>網路驅動程式選項 'Gateway' 也必須指定 'Subnet'。</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2859,7 +2863,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>將容器連線到網路</value>
   </data>
   <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
-    <value>Do not error if the network does not exist</value>
+    <value>如果此網路不存在，請勿顯示錯誤</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>{} 值無效： 網路名稱不可為空白或空白字元</value>
@@ -2909,9 +2913,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>/dev/shm 的大小 (例如 64M、1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>工作階段識別碼</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>工作階段儲存路徑</value>
   </data>
@@ -2956,7 +2957,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>將磁碟區繫結掛接至容器</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>如果此磁碟區不存在，請勿顯示錯誤</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器內的工作目錄</value>
@@ -3045,6 +3046,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>無效的 {} 引數值: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>無效的 {} 值：{} 超出有效範圍 ({}-{})。</value>
