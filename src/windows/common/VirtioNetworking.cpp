@@ -319,13 +319,13 @@ void VirtioNetworking::SetupLoopbackDevice()
         m_userToken.get());
 
     // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.152, so assign loopback0 an
-    // address of 169.254.73.153 with a netmask of 30 so that the only addresses associated with this adapter are
+    // address of 169.254.73.153 with a netmask of 29 so that the only addresses associated with this adapter are
     // itself and the gateway.
     // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
     endpointProperties.IPAddress = L"169.254.73.250";
-    endpointProperties.PrefixLength = 30;
+    endpointProperties.PrefixLength = 29;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 
