@@ -56,3 +56,12 @@ endif()
 # #   error - block the commit when formatting issues are found
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
+
+# # Uncomment to build fuzzing targets with ASAN and SanitizerCoverage for OneFuzz.
+# # Harness binaries are written to bin/<platform>/<config>/ alongside OneFuzzConfig.json.
+# # See src/windows/fuzzing/README.md for details.
+# set(WSL_BUILD_FUZZING true)
+#
+# # Enable fuzzing replay mode: builds harnesses without libFuzzer so they can be run standalone
+# # with a corpus file as argument. Useful for reproducing crashes locally.
+# set(WSL_ENABLE_FUZZING_REPLAY true)

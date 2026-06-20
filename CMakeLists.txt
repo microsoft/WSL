@@ -179,6 +179,10 @@ if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
     set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
+if (NOT DEFINED WSL_BUILD_FUZZING)
+    set(WSL_BUILD_FUZZING false)
+endif ()
+
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
@@ -314,18 +318,48 @@ endif ()
 string(REPLACE "/Zi" "" CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})  # make sure /Zi is removed from the debug flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /W3 /WX /ZH:SHA_256")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7 -DDEBUG -DDBG")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf /Qspectre")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+
+if (WSL_BUILD_FUZZING)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
+    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION)
+
+    # All instrumented binaries import the dynamic ASAN runtime.
+    # We resolve its path so that we can include it in the MSI; we can find it next to the compiler.
+    # We also export its path as a pipeline variable so we can find it there.
+    if (${TARGET_PLATFORM} STREQUAL "arm64")
+        set(ASAN_ARCH "aarch64")
+    else()
+        set(ASAN_ARCH "x86_64")
+    endif()
+    get_filename_component(MSVC_BIN_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
+    set(ASAN_RUNTIME_DLL ${MSVC_BIN_DIR}/clang_rt.asan_dynamic-${ASAN_ARCH}.dll)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E echo "##vso[task.setvariable variable=asanRuntimeDll]${ASAN_RUNTIME_DLL}")
+endif ()
+
+if (WSL_ENABLE_FUZZING_REPLAY)
+    add_compile_definitions(WSL_ENABLE_FUZZING_REPLAY)
+endif ()
 
 # Linker flags
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /DYNAMICBASE")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /DYNAMICBASE")
 if (DEFINED SOURCELINK_JSON)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SOURCELINK:\"${SOURCELINK_JSON}\"")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SOURCELINK:\"${SOURCELINK_JSON}\"")
 endif()
-if (${TARGET_PLATFORM} STREQUAL "x64")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
+
+# When WSL_BUILD_FUZZING is enabled, the entire build is compiled with ASAN.
+# /fsanitize=address is incompatible with /guard:cf, /Qspectre, and /CETCOMPAT,
+# so those are omitted for fuzzing builds.
+if (NOT WSL_BUILD_FUZZING)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /guard:cf /Qspectre")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /guard:cf")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /guard:cf")
+    if (${TARGET_PLATFORM} STREQUAL "x64")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
+    endif()
 endif()
 
 # Common link libraries
@@ -552,6 +586,10 @@ add_subdirectory(src/windows/WslcSDK)
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
     add_subdirectory(src/windows/wslsettings)
+endif()
+
+if (WSL_BUILD_FUZZING)
+    add_subdirectory(src/windows/fuzzing)
 endif()
 
 add_subdirectory(src/linux/netlinkutil)

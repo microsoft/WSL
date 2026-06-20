@@ -1,0 +1,30 @@
+    {
+      "JobNotificationEmail": "florch@microsoft.com",
+      "Skip": false,
+      "RebootAfterSetup": true,
+      "Fuzzer": {
+        "$type": "libfuzzer",
+        "FuzzingHarnessExecutableName": "${TARGET}.exe"
+      },
+      "OneFuzzJobs": [
+        {
+          "ProjectName": "wslc-fuzzing",
+          "TargetName": "${TARGET_NAME}"
+        }
+      ],
+      "JobDependencies": [
+        "${TARGET}.exe",
+        "${TARGET}.pdb",
+        "clang_rt.asan_dynamic*.dll",
+        "setup.ps1",
+        "wsl.msi"
+        ${EXTRA_DEPENDENCIES_JSON}
+      ],
+      "AdoTemplate": {
+        "Org": "microsoft",
+        "Project": "OS",
+        "AssignedTo": "florch@microsoft.com",
+        "AreaPath": "OS\\Windows Client and Services\\WinPD\\DFX-Developer Fundamentals and Experiences\\DEFT\\InstaDev",
+        "IterationPath": "OS"
+      }
+    }

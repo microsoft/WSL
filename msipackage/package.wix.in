@@ -38,6 +38,10 @@
                     <File Id="libwsl.dll" Name="libwsl.dll" Source="${PACKAGE_INPUT_DIR}/libwsl.dll" />
                 <?endif?>
 
+                <?if "${WSL_BUILD_FUZZING}" = "true" ?>
+                    <File Id="asan_runtime" Source="${ASAN_RUNTIME_DLL}" />
+                <?endif?>
+
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>

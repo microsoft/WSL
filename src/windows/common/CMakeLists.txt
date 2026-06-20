@@ -144,14 +144,29 @@ set(HEADERS
     WSLCSessionDefaults.h
     )
 
-add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
+# Adds a target for the common static library.
+# This is factored into a function so that we can have multiple variants with different options.
+function(add_common_library TARGET_NAME)
+    add_library(${TARGET_NAME} STATIC ${SOURCES} ${HEADERS})
+    add_dependencies(${TARGET_NAME} wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
+    target_precompile_headers(${TARGET_NAME} PRIVATE precomp.h)
+    set_target_properties(${TARGET_NAME} PROPERTIES FOLDER windows)
+    target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+endfunction()
 
-target_precompile_headers(common PRIVATE precomp.h)
-set_target_properties(common PROPERTIES FOLDER windows)
-target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+add_common_library(common)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
     COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
+
+# For Fuzzing builds, there are some targets that cannot be built with ASAN instrumentation.
+# These targets use a non-instrumented copy of the common library.
+if (WSL_BUILD_FUZZING)
+    # Remove ASAN from all targets in this directory, then add it back only for the base variant.
+    string(REPLACE "/fsanitize=address" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    target_compile_options(common PRIVATE /fsanitize=address)
+
+    add_common_library(common_noasan)
+endif()
