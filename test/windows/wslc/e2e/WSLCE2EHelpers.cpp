@@ -358,13 +358,14 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list -q");
+    auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             EnsureImageContainersAreDeleted(image);
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
@@ -376,19 +377,20 @@ void EnsureImageIsDeleted(const TestImage& image)
 
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list -q";
+    std::wstring listCommand = L"image list --format json";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list --format json", sessionName);
     }
 
     auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             return;
         }
