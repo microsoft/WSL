@@ -2074,7 +2074,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
-    <value>The --session option cannot be used with this command.</value>
+    <value>Параметр --session нельзя использовать с этой командой.</value>
     <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
@@ -2338,11 +2338,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>Неподдерживаемый параметр сетевого драйвера: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>Для параметра сетевого драйвера "Gateway" также требуется указать "Subnet".</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2933,7 +2933,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Показывать метки времени в выводе журнала</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Показать журналы с метки времени (например, секунды эпохи Unix)</value>
+    <value>Показывать журналы, начиная с отметки времени (в секундах Unix или RFC3339, например, 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
     <value>Показать журналы до отметки времени (в секундах эпохи Unix или RFC3339, например, 2024-01-15T10:30:00Z)</value>
