@@ -2761,9 +2761,10 @@ try
                 // However, in some rare cases, systemctl poweroff can block.
                 // Run it in a separate thread to avoid blocking the timeout.
                 //
-                if (UtilExecCommandLine("systemctl poweroff", nullptr) < 0)
+                int rc = UtilExecCommandLine("systemctl poweroff", nullptr);
+                if (rc < 0)
                 {
-                    LOG_ERROR("systemctl poweroff failed {}, calling reboot(RB_POWER_OFF)", errno);
+                    LOG_ERROR("systemctl poweroff failed {}, calling reboot(RB_POWER_OFF)", rc);
                     reboot(RB_POWER_OFF);
                     FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
                 }
