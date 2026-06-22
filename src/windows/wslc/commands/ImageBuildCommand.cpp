@@ -50,8 +50,8 @@ std::wstring ImageBuildCommand::LongDescription() const
 
 void ImageBuildCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << BuildImage;
 }
 } // namespace wsl::windows::wslc

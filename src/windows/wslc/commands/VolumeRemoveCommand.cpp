@@ -44,7 +44,7 @@ std::wstring VolumeRemoveCommand::LongDescription() const
 
 void VolumeRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << DeleteVolumes;
 }
 } // namespace wsl::windows::wslc

@@ -403,10 +403,18 @@ class WSLCTests
         VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(c_testSessionName, &opened));
         VERIFY_IS_NOT_NULL(opened.get());
 
-        // And verify we get ERROR_NOT_FOUND for a nonexistent name
+        // And verify we get WSLC_E_SESSION_NOT_FOUND for a nonexistent name
         wil::com_ptr<IWSLCSession> notFound;
         auto hr = sessionManager->OpenSessionByName(L"this-name-does-not-exist", &notFound);
-        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_NOT_FOUND);
+    }
+
+    WSLC_TEST_METHOD(GetDisplayNameReturnsSessionName)
+    {
+        wil::unique_cotaskmem_string displayName;
+        VERIFY_SUCCEEDED(m_defaultSession->GetDisplayName(&displayName));
+        VERIFY_IS_NOT_NULL(displayName.get());
+        VERIFY_ARE_EQUAL(std::wstring(displayName.get()), c_testSessionName);
     }
 
     WSLC_TEST_METHOD(CreateSessionValidation)
@@ -453,6 +461,44 @@ class WSLCTests
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
 
+        // Reject non-empty storage directory that doesn't contain a session VHD.
+        {
+            const auto storagePath = std::filesystem::temp_directory_path() /
+                                     std::format(L"wslc-test-storage-{}-{}", GetCurrentProcessId(), GetTickCount64());
+            std::filesystem::create_directories(storagePath);
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ignored;
+                std::filesystem::remove_all(storagePath, ignored);
+            });
+
+            std::ofstream{storagePath / L"userfile.txt"} << "data";
+
+            auto settings = GetDefaultSessionSettings(L"storage-not-empty");
+            const auto storagePathString = storagePath.wstring();
+            settings.StoragePath = storagePathString.c_str();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the directory is not empty", storagePathString));
+        }
+
+        // Reject storage path that exists but is not a directory.
+        {
+            const auto storagePath = std::filesystem::temp_directory_path() /
+                                     std::format(L"wslc-test-storage-file-{}-{}", GetCurrentProcessId(), GetTickCount64());
+            std::ofstream{storagePath} << "data";
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ignored;
+                std::filesystem::remove(storagePath, ignored);
+            });
+
+            auto settings = GetDefaultSessionSettings(L"storage-not-directory");
+            const auto storagePathString = storagePath.wstring();
+            settings.StoragePath = storagePathString.c_str();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because it is not a directory", storagePathString));
+        }
+
         // Reject invalid session flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-session-flags");
@@ -484,6 +530,7 @@ class WSLCTests
 
         // The session object must reject NULL output pointers.
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
     }
 
@@ -2905,7 +2952,7 @@ class WSLCTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            ULONGLONG Pid;
+            ULONG Pid;
             ULONG Signal;
             ULONGLONG Timestamp;
         };
@@ -2919,7 +2966,7 @@ class WSLCTests
             {
             }
 
-            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
                 m_promise.set_value(Invocation{
                     DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
@@ -2957,7 +3004,7 @@ class WSLCTests
         VERIFY_IS_FALSE(invocation.DumpPath.empty());
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
 
         // The dump file should be readable and non-empty.
@@ -5078,19 +5125,73 @@ class WSLCTests
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
 
-    WSLC_TEST_METHOD(NetworkCreateInvalidDriverTest)
+    WSLC_TEST_METHOD(NetworkCreateInvalidDriverAndOptionTest)
     {
         WSLCNetworkOptions options{};
-        options.Name = "bad-driver-net";
+        options.Name = "bad-network-create-input";
+        options.Driver = "bridge";
         options.DriverOpts = nullptr;
         options.DriverOptsCount = 0;
 
-        for (const char* driver : {"overlay", "Bridge", ""})
-        {
-            options.Driver = driver;
+        auto verifyInvalid = [&](PCWSTR expectedMessage) {
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
-            ValidateCOMErrorMessageContains(L"Unsupported network driver:");
+            ValidateCOMErrorMessageContains(expectedMessage);
+        };
+
+        // Invalid drivers (unknown, wrong case, empty)
+        {
+            options.DriverOpts = nullptr;
+            options.DriverOptsCount = 0;
+            for (const char* driver : {"overlay", "Bridge", ""})
+            {
+                options.Driver = driver;
+                verifyInvalid(L"Unsupported network driver:");
+            }
         }
+
+        // Invalid driver options (wrong case and unknown keys)
+        {
+            options.Driver = "bridge";
+            for (const char* key : {"internal", "subnet", "gateway", "foo"})
+            {
+                WSLCDriverOption opt{key, "true"};
+                options.DriverOpts = &opt;
+                options.DriverOptsCount = 1;
+                verifyInvalid(wsl::shared::string::MultiByteToWide(key).c_str());
+            }
+        }
+
+        // Gateway specified without Subnet
+        {
+            options.Driver = "bridge";
+            WSLCDriverOption opt{"Gateway", "172.44.0.1"};
+            options.DriverOpts = &opt;
+            options.DriverOptsCount = 1;
+            verifyInvalid(L"requires 'Subnet'");
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateDefaultDriverTest)
+    {
+        const std::string networkName = "default-driver-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)

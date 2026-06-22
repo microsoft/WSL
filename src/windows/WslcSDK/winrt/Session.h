@@ -42,6 +42,8 @@ struct Session : SessionT<Session>
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> GetImages();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
+    winrt::event_token ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler);
+    void ProcessCrashed(winrt::event_token const& token) noexcept;
 
     void Close();
     static void final_release(std::unique_ptr<Session> self);
@@ -54,13 +56,17 @@ private:
 
     // Threadpool callback that raises the Terminated event once the session's termination handle is signaled.
     static void CALLBACK OnTerminated(PTP_CALLBACK_INSTANCE instance, PVOID context, PTP_WAIT wait, TP_WAIT_RESULT waitResult) noexcept;
+    static void CALLBACK OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID context) noexcept;
 
     winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessCrashHandler> m_crashDumpEvent;
     wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
 
     // Bridges the one-off termination event surfaced by the SDK to the WinRT Terminated event.
     wil::unique_handle m_terminationEvent;
     wil::unique_threadpool_wait m_terminationWait;
+
+    wil::unique_any<WslcCrashDumpSubscription, decltype(&WslcReleaseCrashDumpSubscription), &WslcReleaseCrashDumpSubscription> m_crashDumpSubscription;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {

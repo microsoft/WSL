@@ -43,7 +43,7 @@ std::wstring VolumeInspectCommand::LongDescription() const
 
 void VolumeInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << InspectVolumes;
 }
 } // namespace wsl::windows::wslc

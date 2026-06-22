@@ -73,8 +73,13 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"hello"));
         auto lines = result.GetStdoutLines();
         VERIFY_IS_TRUE(!lines.empty());
-        // A timestamp line should have at least a 'T' character (ISO 8601 separator)
-        VERIFY_IS_TRUE(lines[0].find(L'T') != std::wstring::npos);
+        // Validate RFC3339 structure: YYYY-MM-DDTHH:MM:SS at the start of the line
+        VERIFY_IS_TRUE(lines[0].size() >= 20);
+        VERIFY_ARE_EQUAL(lines[0][4], L'-');
+        VERIFY_ARE_EQUAL(lines[0][7], L'-');
+        VERIFY_ARE_EQUAL(lines[0][10], L'T');
+        VERIFY_ARE_EQUAL(lines[0][13], L':');
+        VERIFY_ARE_EQUAL(lines[0][16], L':');
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_TimestampsShortFlag)
@@ -91,7 +96,12 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"world"));
         auto lines = result.GetStdoutLines();
         VERIFY_IS_TRUE(!lines.empty());
-        VERIFY_IS_TRUE(lines[0].find(L'T') != std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].size() >= 20);
+        VERIFY_ARE_EQUAL(lines[0][4], L'-');
+        VERIFY_ARE_EQUAL(lines[0][7], L'-');
+        VERIFY_ARE_EQUAL(lines[0][10], L'T');
+        VERIFY_ARE_EQUAL(lines[0][13], L':');
+        VERIFY_ARE_EQUAL(lines[0][16], L':');
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Since)
@@ -109,6 +119,28 @@ class WSLCE2EContainerLogsTests
         // Using --since with a far-future timestamp should return no logs
         result = RunWslc(std::format(L"container logs --since 9999999999 {}", WslcContainerName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_SinceRfc3339)
+    {
+        // Run a container that outputs a line
+        auto result =
+            RunWslc(std::format(L"container run --name {} {} sh -c \"echo rfc3339test\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Using --since with an RFC3339 timestamp in the past should return all logs
+        result = RunWslc(std::format(L"container logs --since 2000-01-01T00:00:00Z {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"rfc3339test"));
+
+        // Using --since with an RFC3339 timestamp far in the future should return no logs
+        result = RunWslc(std::format(L"container logs --since 2099-12-31T23:59:59Z {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Using --since with an RFC3339 timestamp with timezone offset
+        result = RunWslc(std::format(L"container logs --since 2000-01-01T00:00:00+00:00 {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"rfc3339test"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Until)
@@ -163,7 +195,13 @@ class WSLCE2EContainerLogsTests
         {
             if (!line.empty())
             {
-                VERIFY_IS_TRUE(line.find(L'T') != std::wstring::npos);
+                // Validate RFC3339 structure: YYYY-MM-DDTHH:MM:SS at the start of the line
+                VERIFY_IS_TRUE(line.size() >= 20);
+                VERIFY_ARE_EQUAL(line[4], L'-');
+                VERIFY_ARE_EQUAL(line[7], L'-');
+                VERIFY_ARE_EQUAL(line[10], L'T');
+                VERIFY_ARE_EQUAL(line[13], L':');
+                VERIFY_ARE_EQUAL(line[16], L':');
             }
         }
     }

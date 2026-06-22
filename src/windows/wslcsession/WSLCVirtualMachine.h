@@ -125,7 +125,7 @@ public:
     // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
     // fanning them out to any registered COM callbacks.
     using TOnCrashDump =
-        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
 
     WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();

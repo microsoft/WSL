@@ -222,5 +222,66 @@ class WSLCCLIArgumentUnitTests
         argsContainer.Remove(ArgType::ForwardArgs);
         VERIFY_ARE_EQUAL(argsContainer.GetCount(), 0);
     }
+    // Timestamp parsing unit tests (exercises TryParseRfc3339 and integer path via GetTimestampFromString)
+
+    TEST_METHOD(ValidateTimestamp_ValidUnixEpochSeconds)
+    {
+        // Integer timestamps should parse directly
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0"), 0ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1700000000"), 1700000000ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1"), 1ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999999999"), 9999999999ULL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidRfc3339_UTC)
+    {
+        // Basic UTC timestamps with Z suffix
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00Z"), 1705314600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1970-01-01T00:00:00Z"), 0ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00z"), 1705314600ULL); // lowercase z
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidRfc3339_WithOffset)
+    {
+        // Timestamps with timezone offsets (+HH:MM / -HH:MM)
+        // 2024-01-15T10:30:00+05:30 = 2024-01-15T05:00:00Z = 1705294800
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+05:30"), 1705294800ULL);
+        // 2024-01-15T10:30:00-05:00 = 2024-01-15T15:30:00Z = 1705332600
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00-05:00"), 1705332600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+00:00"), 1705314600ULL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidRfc3339_FractionalSeconds)
+    {
+        // Fractional seconds should be consumed (truncated to seconds)
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123Z"), 1705314600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123456789Z"), 1705314600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.1+05:30"), 1705294800ULL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_InvalidRfc3339_Rejected)
+    {
+        // Invalid month
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-13-15T10:30:00Z"), ArgumentException);
+        // Invalid hour
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T25:30:00Z"), ArgumentException);
+        // Invalid day (Feb 31)
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-02-31T10:30:00Z"), ArgumentException);
+        // Missing timezone
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00"), ArgumentException);
+        // Date only (no time)
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15"), ArgumentException);
+        // Trailing characters
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00Zextra"), ArgumentException);
+        // +HHMM without colon (not supported by %Ez)
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00+0530"), ArgumentException);
+        // Dot with no fractional digits
+        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00.Z"), ArgumentException);
+        // Random text
+        VERIFY_THROWS(validation::GetTimestampFromString(L"abc"), ArgumentException);
+        VERIFY_THROWS(validation::GetTimestampFromString(L"not-a-timestamp"), ArgumentException);
+        // Negative epoch (pre-1970)
+        VERIFY_THROWS(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), ArgumentException);
+    }
 };
 } // namespace WSLCCLIArgumentUnitTests
