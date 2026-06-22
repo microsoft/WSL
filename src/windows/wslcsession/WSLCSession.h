@@ -302,6 +302,7 @@ private:
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
+    bool m_storageMounted = false;
 
     // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
     // These locks protect m_containers without requiring an exclusive m_lock.

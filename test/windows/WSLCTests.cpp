@@ -461,6 +461,44 @@ class WSLCTests
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
 
+        // Reject non-empty storage directory that doesn't contain a session VHD.
+        {
+            const auto storagePath = std::filesystem::temp_directory_path() /
+                                     std::format(L"wslc-test-storage-{}-{}", GetCurrentProcessId(), GetTickCount64());
+            std::filesystem::create_directories(storagePath);
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ignored;
+                std::filesystem::remove_all(storagePath, ignored);
+            });
+
+            std::ofstream{storagePath / L"userfile.txt"} << "data";
+
+            auto settings = GetDefaultSessionSettings(L"storage-not-empty");
+            const auto storagePathString = storagePath.wstring();
+            settings.StoragePath = storagePathString.c_str();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the directory is not empty", storagePathString));
+        }
+
+        // Reject storage path that exists but is not a directory.
+        {
+            const auto storagePath = std::filesystem::temp_directory_path() /
+                                     std::format(L"wslc-test-storage-file-{}-{}", GetCurrentProcessId(), GetTickCount64());
+            std::ofstream{storagePath} << "data";
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ignored;
+                std::filesystem::remove(storagePath, ignored);
+            });
+
+            auto settings = GetDefaultSessionSettings(L"storage-not-directory");
+            const auto storagePathString = storagePath.wstring();
+            settings.StoragePath = storagePathString.c_str();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because it is not a directory", storagePathString));
+        }
+
         // Reject invalid session flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-session-flags");
