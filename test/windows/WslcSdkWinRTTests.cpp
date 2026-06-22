@@ -533,8 +533,8 @@ class WslcSdkWinRtTests
 
         // Positive: stdout and stderr are routed independently.
         {
-            auto output =
-                RunContainerAndWaitForExit(L"debian:latest", {.commandLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
+            auto output = RunContainerAndWaitForExit(
+                L"debian:latest", {.commandLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"stdout\n");
             VERIFY_ARE_EQUAL(output.StandardError, L"stderr\n");
