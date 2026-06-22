@@ -35,12 +35,12 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void HostName(hstring const& value);
     hstring DomainName();
     void DomainName(hstring const& value);
-    bool IsAutoRemoveEnabled();
-    void IsAutoRemoveEnabled(bool value);
-    bool IsGpuEnabled();
-    void IsGpuEnabled(bool value);
-    bool IsPrivileged();
-    void IsPrivileged(bool value);
+    bool EnableAutoRemove();
+    void EnableAutoRemove(bool value);
+    bool EnableGpu();
+    void EnableGpu(bool value);
+    bool Privileged();
+    void Privileged(bool value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> PortMappings();
     void PortMappings(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> Volumes();

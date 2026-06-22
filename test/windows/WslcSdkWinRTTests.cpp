@@ -117,7 +117,7 @@ class WslcSdkWinRtTests
     struct RunContainerOptions
     {
         std::vector<winrt::hstring> cmdLine = {};
-        bool isGpuEnabled = false;
+        bool enableGpu = false;
         std::optional<winrt::hstring> name = std::nullopt;
         std::chrono::milliseconds timeout = 2min;
         std::optional<WSLCSDK::ContainerNetworkingMode> networkingMode = std::nullopt;
@@ -137,7 +137,7 @@ class WslcSdkWinRtTests
 
         auto containerSettings = WSLCSDK::ContainerSettings(imageName);
         containerSettings.InitProcess(procSettings);
-        containerSettings.IsGpuEnabled(options.isGpuEnabled);
+        containerSettings.EnableGpu(options.enableGpu);
 
         if (options.name)
         {
@@ -1613,7 +1613,7 @@ class WslcSdkWinRtTests
         // Negative: creating a GPU container on a session without GPU support must fail.
         {
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.IsGpuEnabled(true);
+            containerSettings.EnableGpu(true);
 
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings).Start(), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
         }
@@ -1626,7 +1626,7 @@ class WslcSdkWinRtTests
         });
 
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-gpu-test", gpuStorage.wstring());
-        settings.IsGpuEnabled(true);
+        settings.EnableGpu(true);
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
         auto gpuSession = WSLCSDK::Session(settings);
@@ -1647,7 +1647,7 @@ class WslcSdkWinRtTests
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
-            containerSettings.IsGpuEnabled(true);
+            containerSettings.EnableGpu(true);
 
             auto container = gpuSession.CreateContainer(containerSettings);
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);

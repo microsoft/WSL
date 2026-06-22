@@ -35,8 +35,8 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void Timeout(winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan> const& value);
     winrt::Microsoft::WSL::Containers::VhdOptions VhdRequirements();
     void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
-    bool IsGpuEnabled();
-    void IsGpuEnabled(bool value);
+    bool EnableGpu();
+    void EnableGpu(bool value);
 
     WslcSessionSettings* ToStructPointer();
 

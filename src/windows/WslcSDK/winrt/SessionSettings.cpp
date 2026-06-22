@@ -168,12 +168,12 @@ void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOpti
     m_vhdRequirements = value;
 }
 
-bool SessionSettings::IsGpuEnabled()
+bool SessionSettings::EnableGpu()
 {
     return WI_IsFlagSet(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU);
 }
 
-void SessionSettings::IsGpuEnabled(bool value)
+void SessionSettings::EnableGpu(bool value)
 {
     if (m_sessionSettings)
     {

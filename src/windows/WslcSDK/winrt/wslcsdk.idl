@@ -34,7 +34,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<UInt32> MemorySizeInMB;
         Windows.Foundation.IReference<Windows.Foundation.TimeSpan> Timeout;
         VhdOptions VhdRequirements;
-        Boolean IsGpuEnabled;
+        Boolean EnableGpu;
     };
 
     runtimeclass Session : Windows.Foundation.IClosable
@@ -138,9 +138,9 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<ContainerNetworkingMode> NetworkingMode;
         String HostName;
         String DomainName;
-        Boolean IsAutoRemoveEnabled;
-        Boolean IsGpuEnabled;
-        Boolean IsPrivileged;
+        Boolean EnableAutoRemove;
+        Boolean EnableGpu;
+        Boolean Privileged;
         IVector<ContainerPortMapping> PortMappings;
         IVector<ContainerVolume> Volumes;
         IVector<ContainerNamedVolume> NamedVolumes;

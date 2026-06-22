@@ -126,12 +126,12 @@ void ContainerSettings::DomainName(hstring const& value)
     m_domainName = winrt::to_string(value);
 }
 
-bool ContainerSettings::IsAutoRemoveEnabled()
+bool ContainerSettings::EnableAutoRemove()
 {
     return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_AUTO_REMOVE);
 }
 
-void ContainerSettings::IsAutoRemoveEnabled(bool value)
+void ContainerSettings::EnableAutoRemove(bool value)
 {
     if (m_containerSettings)
     {
@@ -141,12 +141,12 @@ void ContainerSettings::IsAutoRemoveEnabled(bool value)
     WI_UpdateFlag(m_containerFlags, WSLC_CONTAINER_FLAG_AUTO_REMOVE, value);
 }
 
-bool ContainerSettings::IsGpuEnabled()
+bool ContainerSettings::EnableGpu()
 {
     return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_ENABLE_GPU);
 }
 
-void ContainerSettings::IsGpuEnabled(bool value)
+void ContainerSettings::EnableGpu(bool value)
 {
     if (m_containerSettings)
     {
@@ -156,12 +156,12 @@ void ContainerSettings::IsGpuEnabled(bool value)
     WI_UpdateFlag(m_containerFlags, WSLC_CONTAINER_FLAG_ENABLE_GPU, value);
 }
 
-bool ContainerSettings::IsPrivileged()
+bool ContainerSettings::Privileged()
 {
     return WI_IsFlagSet(m_containerFlags, WSLC_CONTAINER_FLAG_PRIVILEGED);
 }
 
-void ContainerSettings::IsPrivileged(bool value)
+void ContainerSettings::Privileged(bool value)
 {
     if (m_containerSettings)
     {
