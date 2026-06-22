@@ -606,7 +606,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
-                wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+                wsl::core::VirtioNetworkingFlags flags =
+                    wsl::core::VirtioNetworkingFlags::Ipv6 | wsl::core::VirtioNetworkingFlags::LoopbackClientIp;
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to virtio proxy after the early-config message; drop the unused DNS hvsocket.

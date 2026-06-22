@@ -309,12 +309,16 @@ void VirtioNetworking::RefreshGuestConnection()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
+    const auto* clientIp = WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
+    const auto deviceOptions =
+        std::format(L"client_ip={};client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248", clientIp);
+
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
         VIRTIO_NET_DEVICE_ID,
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
         m_swiotlbOption.c_str(),
-        L"client_ip=169.254.73.250;client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248",
+        deviceOptions.c_str(),
         0,
         m_userToken.get());
 

@@ -16,6 +16,7 @@ enum class VirtioNetworkingFlags
     LocalhostRelay = 0x1,
     DnsTunneling = 0x2,
     Ipv6 = 0x4,
+    LoopbackClientIp = 0x8,
 };
 DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 
