@@ -1207,7 +1207,7 @@ try
     std::string repo;
     std::string tag;
 
-    if (ImageName != nullptr && strlen(ImageName) > 0)
+    if (ImageName != nullptr)
     {
         RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
