@@ -50,6 +50,10 @@ winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Cont
     {
         result.Append(winrt::Microsoft::WSL::Containers::Component::WslPackage);
     }
+    if (WI_IsFlagSet(missing, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE))
+    {
+        result.Append(winrt::Microsoft::WSL::Containers::Component::SdkNeedsUpdate);
+    }
     return result.GetView();
 }
 
