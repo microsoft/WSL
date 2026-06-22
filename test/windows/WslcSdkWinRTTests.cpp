@@ -354,7 +354,7 @@ class WslcSdkWinRtTests
             VERIFY_IS_FALSE(info.DumpPath().empty());
             VERIFY_IS_TRUE(std::filesystem::exists(info.DumpPath().c_str()));
             VERIFY_IS_TRUE(std::wstring_view(info.ProcessName()).find(L"sh") != std::wstring_view::npos);
-            VERIFY_IS_GREATER_THAN(info.Pid(), 0ull);
+            VERIFY_IS_GREATER_THAN(info.Pid(), 0u);
             VERIFY_ARE_EQUAL(info.Signal(), 11u); // SIGSEGV = 11
 
             // Crash timestamps are second-granularity; allow some slack around the measured window.
@@ -387,7 +387,7 @@ class WslcSdkWinRtTests
         // Verify that ProcessCrashInformation correctly maps all fields from WslcSessionCrashDumpInfo.
         constexpr PCWSTR c_dumpPath = L"C:\\test\\dump.dmp";
         constexpr PCSTR c_processName = "test-process";
-        constexpr uint64_t c_pid = 42;
+        constexpr uint32_t c_pid = 42;
         constexpr uint32_t c_signal = 11;            // SIGSEGV
         constexpr uint64_t c_timestamp = 1700000000; // 2023-11-14 22:13:20 UTC
 

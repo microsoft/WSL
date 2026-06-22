@@ -34,7 +34,7 @@ namespace Microsoft.WSL.Containers
     {
         String DumpPath { get; };
         String ProcessName { get; };
-        UInt64 Pid { get; };
+        UInt32 Pid { get; };
         UInt32 Signal { get; };
         Windows.Foundation.DateTime Timestamp { get; };
     };

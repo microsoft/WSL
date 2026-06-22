@@ -36,7 +36,7 @@ hstring ProcessCrashInformation::ProcessName() const
     return m_processName;
 }
 
-uint64_t ProcessCrashInformation::Pid() const
+uint32_t ProcessCrashInformation::Pid() const
 {
     return m_pid;
 }

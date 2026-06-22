@@ -23,14 +23,14 @@ struct ProcessCrashInformation : ProcessCrashInformationT<ProcessCrashInformatio
 
     hstring DumpPath() const;
     hstring ProcessName() const;
-    uint64_t Pid() const;
+    uint32_t Pid() const;
     uint32_t Signal() const;
     winrt::Windows::Foundation::DateTime Timestamp() const;
 
 private:
     hstring m_dumpPath;
     hstring m_processName;
-    uint64_t m_pid{};
+    uint32_t m_pid{};
     uint32_t m_signal{};
     winrt::Windows::Foundation::DateTime m_timestamp{};
 };
