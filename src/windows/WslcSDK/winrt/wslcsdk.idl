@@ -164,7 +164,7 @@ namespace Microsoft.WSL.Containers
 
         Process CreateProcess(ProcessSettings newProcessSettings);
 
-        // TODO: This should return a structured type instead of raw JSON.
+        // JSON response schema at: https://docs.docker.com/reference/api/engine/version/v1.53/#tag/Container/operation/ContainerInspect
         String Inspect();
 
         String Id { get; };

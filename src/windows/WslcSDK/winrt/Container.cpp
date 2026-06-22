@@ -136,7 +136,7 @@ void Container::Close()
 {
     m_initProcess = nullptr;
 
-    // Methods called after Close() will fail due to EnsureNotClosedStarted().
+    // Methods called after Close() will fail due to EnsureNotClosed().
     m_container.reset();
 }
 
