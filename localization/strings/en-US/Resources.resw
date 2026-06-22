@@ -3317,8 +3317,8 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
-    <value>Volume '{}' has a non-empty lost+found directory. It was left in place and the volume may not be seeded with image contents.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Volume '{}' has a non-empty 'lost+found' directory. It was left in place and the volume may not be seeded with image contents.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="lost+found"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Failed to stop container '{}' after plugin rejection</value>

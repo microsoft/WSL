@@ -552,22 +552,15 @@ void WSLCVirtualMachine::RemoveDirectory(const std::string& Path)
 
 std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Path)
 {
-    constexpr auto lsPath = "/bin/ls";
+    wsl::shared::MessageWriter<WSLC_LISTDIR> message;
+    message.WriteString(Path);
 
-    std::vector<std::string> args = {lsPath, "-A", Path};
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
 
-    ServiceProcessLauncher launcher(lsPath, args);
-    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
 
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
-
-    auto stdOut = result.Output.find(1);
-    if (stdOut == result.Output.end())
-    {
-        return {};
-    }
-
-    return wsl::shared::string::Split(stdOut->second, '\n');
+    return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
