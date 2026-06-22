@@ -1213,26 +1213,24 @@ try
     auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
     auto imageId = ImportImageImpl(*requestContext, ImageHandle);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !imageId.has_value(), "Docker import succeeded but did not return an image ID");
 
     if (ImageName != nullptr && strlen(ImageName) > 0)
     {
         OnImageCreated(ImageName);
     }
-    else if (!imageId.empty())
+    else
     {
-        OnImageCreated(imageId.c_str());
+        OnImageCreated(imageId->c_str());
     }
 
-    if (!imageId.empty())
-    {
-        *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId.c_str()).release();
-    }
+    *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId->c_str()).release();
 
     return S_OK;
 }
 CATCH_RETURN();
 
-std::string WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1241,7 +1239,7 @@ std::string WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& R
     auto io = CreateIOContext();
 
     std::optional<std::string> pendingErrorJson;
-    std::string imageId;
+    std::optional<std::string> imageId;
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
@@ -1293,6 +1291,7 @@ std::string WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& R
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.status->c_str(), "Status"));
             if (parsed.status->starts_with("sha256:"))
             {
+                THROW_HR_IF_MSG(E_UNEXPECTED, imageId.has_value(), "Received duplicate image ID in import status");
                 imageId = *parsed.status;
             }
         }

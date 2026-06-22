@@ -28,6 +28,7 @@ class WSLCE2EImageImportTests
     {
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(ImportedImage);
+        EnsureNoUntaggedImages();
         return true;
     }
 
@@ -35,6 +36,7 @@ class WSLCE2EImageImportTests
     {
         EnsureImageIsLoaded(DebianImage);
         EnsureImageIsDeleted(ImportedImage);
+        EnsureNoUntaggedImages();
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;
     }
@@ -118,18 +120,23 @@ class WSLCE2EImageImportTests
 
         // Import without specifying an image name — creates an untagged image
         auto importResult = RunWslc(std::format(L"image import \"{}\"", SavedArchivePath.wstring()));
-        importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Extract the returned ID, validate its format, and use it for cleanup
         auto imageId = importResult.GetStdoutOneLine();
+
+        // As soon as we have the image ID, set up cleanup.
+        auto cleanup = wil::scope_exit([&] {
+            auto deleteResult = RunWslc(std::format(L"image rm {}", imageId));
+            deleteResult.Verify({.ExitCode = 0});
+        });
+
+        // Import and image id verification is intentionally after the scope exit is created
+        // for best-effort cleanup if verification fails.
+        importResult.Verify({.Stderr = L"", .ExitCode = 0});
         VerifyIdOutput(imageId, true);
 
         // Verify that there is now one more untagged image
         VERIFY_ARE_EQUAL(countUntaggedImages(), untaggedBefore + 1);
-
-        // Clean up the untagged image using the returned ID
-        auto deleteResult = RunWslc(std::format(L"image rm {}", imageId));
-        deleteResult.Verify({.ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromStdin_Success)

@@ -128,6 +128,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureNoUntaggedImages();
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
 void EnsureNetworkDoesNotExist(const std::wstring& networkName);
@@ -226,13 +227,18 @@ inline void VerifyIdOutput(const std::wstring& id, bool truncated)
 
     VERIFY_ARE_EQUAL(id.size(), expectedLength);
 
+    bool allHex = true;
     for (size_t i = 0; i < expectedLength; i++)
     {
         const auto ch = id[i];
-        VERIFY_IS_TRUE(
-            (ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f'),
-            WEX::Common::String().Format(L"Character at index %zu is not hex: '%c'", i, ch));
+        if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f')))
+        {
+            allHex = false;
+            break;
+        }
     }
+
+    VERIFY_IS_TRUE(allHex, WEX::Common::String().Format(L"ID is not a valid hex string: '%ls'", id.c_str()));
 }
 
 } // namespace WSLCE2ETests
