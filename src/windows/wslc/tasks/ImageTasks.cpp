@@ -118,10 +118,10 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
-        // Print only the image names.
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
+            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
         }
 
         return;
@@ -341,6 +341,6 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

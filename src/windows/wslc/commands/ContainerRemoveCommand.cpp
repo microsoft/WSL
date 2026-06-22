@@ -29,7 +29,6 @@ std::vector<Argument> ContainerRemoveCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
         Argument::Create(ArgType::Force),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -45,8 +44,8 @@ std::wstring ContainerRemoveCommand::LongDescription() const
 
 void ContainerRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << RemoveContainers;
 }
 } // namespace wsl::windows::wslc

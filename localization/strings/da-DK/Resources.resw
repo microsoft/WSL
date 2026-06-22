@@ -2066,6 +2066,14 @@ Brug:
     <value>OpenSessionByName('{}') mislykkedes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Indstillingen --session kan ikke bruges sammen med denne kommando.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>Kommandoen {} kunne ikke startes. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>Der blev ikke fundet nogen WSLA-sessioner.</value>
   </data>
@@ -2079,9 +2087,6 @@ Brug:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Standardsessionen blev ikke fundet</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Standardsessionen kunne ikke åbne</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Afslutning af standardsessionen mislykkedes</value>
@@ -2187,6 +2192,9 @@ Brug:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Følgende argumenter er tilgængelige:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Deaktiver farveoutput.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Du kan finde flere oplysninger om en bestemt kommando i hjælpeargumentet.</value>
@@ -2322,6 +2330,14 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Ikke-understøttet netværksdriver: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Netværksdriverindstillingen 'Gateway' kræver, at 'Subnet' også angives.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Netværket '{}' har aktive slutpunkter.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2345,6 +2361,17 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
     <value>Slutpunktsindstillinger understøttes endnu ikke (netværk '{}').</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Netværksaliaset må ikke være tomt.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Netværksaliasser kræver et brugerdefineret netværk. Brug --network til at angive en.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Der kan ikke angives netværksaliasser, når der anmodes om flere netværk. Brug et enkelt --network argument.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Enheden '{}' kunne ikke oprettes: {}</value>
@@ -2380,6 +2407,9 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcSaveInProgress" xml:space="preserve">
     <value>Lagring er i gag.</value>
   </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Eksport er igangværende.</value>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC er Windows-undersystem til Linux Container CLI-værktøjet.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
@@ -2413,6 +2443,16 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Udfører en kommando i en objektbeholder, der kører.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Eksportér en objektbeholders filsystem som et tar-arkiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Eksporterer en objektbeholders filsystem som et tar-arkiv.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>Skriv til en fil i stedet for STDOUT</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Undersøg en objektbeholder.</value>
   </data>
@@ -2444,9 +2484,9 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Fjerner alle stoppede objektbeholdere.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Samlet frigjort plads: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Samlet frigjort plads: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Fjern objektbeholdere.</value>
@@ -2537,9 +2577,9 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Fjerner alle dinglende billeder. Hvis --all er angivet, fjernes alle billeder, der ikke bruges af nogen objektbeholder.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Samlet frigjort plads: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Samlet frigjort plads: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Ikke-markeret: {}</value>
@@ -2659,6 +2699,16 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
     <value>Tilknyttes en aktiv session. Hvis der ikke er angivet et sessions-id, bruges den wslc standardsession.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Kør en kommando i en session.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>Kører en kommando i en aktiv session uden en TTY. Kommandoen og dens argumenter videresendes direkte til sessionen. Hvis der ikke er angivet en session, bruges den wslc standardsession.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Argumenter, der skal overføres til den kommando, der køres</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Afslut en session.</value>
@@ -2806,12 +2856,22 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Opret forbindelse mellem en objektbeholder og et netværk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Vis ikke en fejl, hvis netværket ikke findes</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ugyldig {}-værdi: Netværksnavnet må ikke være tomt eller indeholde mellemrum</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>netværk i værtstilstand understøttes ikke</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Tilføj et netværksomfattende alias til containeren</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Ugyldig {}-værdi: Netværksalias må ikke være tomt eller indeholde mellemrum</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Brug ikke cache, når du opretter billedet</value>
@@ -2847,9 +2907,6 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Størrelse på /dev/shm (f.eks. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Sessions-id</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sti til sessionslager</value>
   </data>
@@ -2869,10 +2926,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Vis tidsstempler i logoutput</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Vis logfiler siden tidsstempel (f.eks. unix epokesekunder)</value>
+    <value>Vis logfiler siden tidsstempel (Unix-epoke sekunder eller RFC3339, f.eks. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Vis logfiler før tidsstempel (f.eks. unix epoch-sekunder)</value>
+    <value>Vis logfiler før tidsstempel (Unix-epoke sekunder eller RFC3339, f.eks. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny billedreference i formatet image-name[:tag]</value>
@@ -2892,6 +2949,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bind en diskenhed til objektbeholderen</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Udfør ikke fejl, hvis diskenheden ikke findes</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbejdsmappe inde i objektbeholderen</value>
@@ -2981,6 +3041,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Ugyldig {} argumentværdi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ugyldig {}-argumentværdi: '{}'. Forventede et Unix-epoketidsstempel eller et RFC3339 dato/klokkeslæt (f.eks. 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ugyldig {} værdi: {} er uden for det gyldige område ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3051,6 +3115,16 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Skriver kun netværksnavnene</value>
   </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Fjern alle netværk, der ikke bruges.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle ubenyttede netværk. Et netværk anses for at være ubrugt, når ingen objektbeholder refererer til det.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Slettet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Administrer diskenheder.</value>
   </data>
@@ -3082,6 +3156,24 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Viser alle diskenheder i sessionen.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Fjern ubenyttede lokale diskenheder.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Fjerner alle ubenyttede anonyme lokale diskenheder. Hvis --all er angivet, fjernes også ubrugte navngivne diskenheder. En diskenhed anses for at være ubrugt, når ingen beholder refererer til den.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Fjern alle ubrugte diskenheder, ikke kun anonyme diskenheder.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Slettet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Samlet frigjort plads: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Navn på diskenhed</value>
   </data>
@@ -3097,6 +3189,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Billedet kan ikke skrives til terminalen. Brug flaget -o, eller omdiriger stdout.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Objektbeholderen kan ikke eksporteres til terminalen. Brug flaget -o, eller omdiriger stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Forventet format: &lt;værtssti | navngivet diskenhed&gt;:&lt;objektbeholdersti&gt;[:tilstand]</value>
@@ -3218,6 +3313,14 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Enheden '{}' kunne ikke genoprettes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Objektbeholderen kan ikke startes, fordi følgende diskenheder ikke er tilgængelige: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>Diskenheden "{}" er ikke tilgængelig: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Skift kunne ikke initialiseres</value>
   </data>
@@ -3238,6 +3341,18 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Værtsressourcer for diskenheden '{}' kunne ikke frigives</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Import af {} certifikater fra rodlageret for den lokale computers betroede rod blev sprunget over på grund af fejl i certifikatkodningen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Import af {} certifikater fra rodlageret for den aktuelle brugers betroede rod blev sprunget over på grund af fejl i certifikatkodningen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Værtens rodcertifikater, der er tillid til, blev ikke installeret i VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

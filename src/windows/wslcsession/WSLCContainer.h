@@ -22,6 +22,7 @@ Abstract:
 #include "IORelay.h"
 #include "COMImplClass.h"
 #include "wslc_schema.h"
+#include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
@@ -78,6 +79,8 @@ public:
         std::string&& Image,
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
+        std::vector<std::string>&& namedVolumes,
+        WSLCVolumes& Volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
@@ -117,8 +120,6 @@ public:
 
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
-    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
-
     const std::string& ID() const noexcept;
 
     // Returns the container flags used to decide whether to
@@ -135,6 +136,7 @@ public:
         WSLCVirtualMachine& virtualMachine,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
+        WSLCVolumes& Volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -183,7 +185,7 @@ private:
     WSLCProcessFlags m_initProcessFlags{};
     WSLCContainerFlags m_containerFlags{};
     mutable std::mutex m_processesLock;
-    __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
+    __guarded_by(m_processesLock) std::vector<std::weak_ptr<DockerExecProcessControl>> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
@@ -208,6 +210,10 @@ private:
     WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
+
+    std::vector<std::string> m_namedVolumes;
+    WSLCVolumes& m_volumes;
+
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
     DockerEventTracker& m_eventTracker;
@@ -217,7 +223,7 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IFastRundown, ISupportErrorInfo>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl>
 {
 
@@ -241,6 +247,11 @@ public:
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
     IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+
+    // IWSLCCompatContainer.
+    IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
+    IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
+    IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

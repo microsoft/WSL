@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCVolumes.h"
@@ -22,6 +23,7 @@ Abstract:
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include <list>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -72,7 +74,7 @@ private:
 // The SYSTEM service creates the VM and passes IWSLCVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLCSession() = default;
@@ -83,16 +85,23 @@ public:
     // Used by the COM server host to signal process exit.
     void SetDestructionCallback(std::function<void()>&& callback);
 
+    // Type of m_crashDumpCallbacks. Exposed so CrashDumpSubscription can hold an iterator into
+    // it as an O(1) registration handle.
+    using CrashDumpCallbackList = std::list<wil::com_ptr<ICrashDumpCallback>>;
+
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
     IFACEMETHOD(Initialize)(
         _In_ const WSLCSessionInitSettings* Settings,
-        _In_ IWSLCVirtualMachine* Vm,
+        _In_ IWSLCVirtualMachineFactory* VmFactory,
         _In_ IWSLCPluginNotifier* PluginNotifier,
         _In_opt_ IWarningCallback* WarningCallback) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
+    IFACEMETHOD(GetDisplayName)(_Out_ LPWSTR* DisplayName) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
+    IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -170,8 +179,17 @@ public:
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneNetworks)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
+        override;
 
     IFACEMETHOD(Terminate()) override;
+
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
+
+    // Called by CrashDumpSubscription when its last reference is released. The iterator must
+    // have been returned by RegisterCrashDumpCallback against this session.
+    void RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) noexcept;
 
     // ISupportErrorInfo
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
@@ -181,6 +199,40 @@ public:
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
+
+    // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
+    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(LoadImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_ LPCSTR ImageName,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLCCompatListImagesOptions* Options, _Out_ WSLCCompatImageInformation** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLCCompatDeleteImageOptions* Options, _Out_ WSLCCompatDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
+    IFACEMETHOD(TagImage)(_In_ const WSLCCompatTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(CreateContainer)(
+        _In_ const WSLCCompatContainerOptions* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -217,6 +269,8 @@ private:
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
+    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp);
+
     _Requires_shared_lock_held_(m_lock)
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
@@ -229,6 +283,7 @@ private:
     void OnVmExited();
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+    void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
@@ -258,7 +313,11 @@ private:
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmExitedEvent;
+
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
     wil::srwlock m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_containerdProcess;
@@ -266,7 +325,6 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
-    std::atomic<bool> m_terminated{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
@@ -277,6 +335,15 @@ private:
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
     std::recursive_mutex m_userCOMCallbacksLock;
     __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
+
+    // Callbacks registered via RegisterCrashDumpCallback. std::list gives stable iterators that
+    // survive insertions and unrelated erasures, so each CrashDumpSubscription stashes its own
+    // iterator and uses it as an O(1) removal handle when the last reference is released.
+    // The session's lifetime extends past Terminate() (the COM object outlives the VM), so this
+    // list may outlive m_virtualMachine; that's fine because dispatch only runs while the VM
+    // thread is alive.
+    mutable wil::srwlock m_crashDumpLock;
+    _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

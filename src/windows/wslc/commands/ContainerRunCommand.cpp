@@ -49,6 +49,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Memory),
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::Network, false, NO_LIMIT),
+        Argument::Create(ArgType::NetworkAlias, false, NO_LIMIT),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
@@ -56,7 +57,6 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         // Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
         // Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
         Argument::Create(ArgType::TMPFS, false, NO_LIMIT),
@@ -84,7 +84,7 @@ std::wstring ContainerRunCommand::LongDescription() const
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << RunContainer;
 }

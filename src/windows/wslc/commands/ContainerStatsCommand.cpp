@@ -31,7 +31,6 @@ std::vector<Argument> ContainerStatsCommand::GetArguments() const
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -59,8 +58,8 @@ void ContainerStatsCommand::ValidateArgumentsInternal(const ArgMap& execArgs) co
 
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ShowContainerStats;
 }
 } // namespace wsl::windows::wslc

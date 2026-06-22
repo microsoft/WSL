@@ -411,6 +411,24 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_Detach)
+    {
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        constexpr auto markerPath = L"/tmp/wslc-exec-detach-marker";
+        result = RunWslc(std::format(L"container exec -d {} sh -c \"sleep 1 && echo wslc-detach-ok > {}\"", WslcContainerName, markerPath));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
+                readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(10)));
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -466,7 +484,6 @@ private:
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"

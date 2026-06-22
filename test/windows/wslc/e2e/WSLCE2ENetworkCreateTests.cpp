@@ -49,9 +49,6 @@ class WSLCE2ENetworkCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_DefaultDriver_Success)
     {
-        // TODO: http://task.ms/62564313
-        SKIP_TEST_UNSTABLE();
-
         auto result = RunWslc(std::format(L"network create {}", TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
@@ -152,7 +149,6 @@ private:
                 << L"  -d,--driver     Specify network driver name (default: bridge)\r\n" //
                 << L"  -o,--opt        Set driver specific options\r\n"                   //
                 << L"  -l,--label      Network metadata setting\r\n"                      //
-                << L"  --session       Specify the session to use\r\n"                    //
                 << L"  -?,--help       Shows help about the selected command\r\n"         //
                 << L"\r\n";
         return options.str();

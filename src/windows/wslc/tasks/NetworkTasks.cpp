@@ -49,7 +49,7 @@ static bool TryInspectNetwork(Session& session, const std::string& networkName, 
     }
 }
 
-static bool TryDeleteNetwork(Session& session, const std::string& networkName)
+static bool TryDeleteNetwork(Session& session, const std::string& networkName, bool force)
 {
     try
     {
@@ -60,7 +60,11 @@ static bool TryDeleteNetwork(Session& session, const std::string& networkName)
     {
         if (ex.GetErrorCode() == WSLC_E_NETWORK_NOT_FOUND)
         {
-            PrintMessage(Localization::MessageWslcNetworkNotFound(networkName.c_str()), stderr);
+            if (!force)
+            {
+                PrintMessage(Localization::MessageWslcNetworkNotFound(networkName.c_str()), stderr);
+            }
+
             return false;
         }
 
@@ -100,13 +104,14 @@ void DeleteNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto networkNames = context.Args.GetAll<ArgType::NetworkName>();
+    const bool force = context.Args.Contains(ArgType::Force);
     for (const auto& name : networkNames)
     {
-        if (TryDeleteNetwork(session, WideToMultiByte(name)))
+        if (TryDeleteNetwork(session, WideToMultiByte(name), force))
         {
             PrintMessage(name);
         }
-        else
+        else if (!force)
         {
             context.ExitCode = 1;
         }
@@ -189,6 +194,25 @@ void ListNetworks(CLIExecutionContext& context)
     }
     default:
         THROW_HR(E_UNEXPECTED);
+    }
+}
+
+void PruneNetworks(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    std::vector<std::pair<std::string, std::string>> filters;
+    for (const auto& value : context.Args.GetAll<ArgType::Filter>())
+    {
+        filters.push_back(validation::ParseFilter(value));
+    }
+
+    auto result = NetworkService::Prune(session, filters);
+
+    for (const auto& networkName : result.PrunedNetworks)
+    {
+        PrintMessage(Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
     }
 }
 } // namespace wsl::windows::wslc::task

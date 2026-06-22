@@ -249,6 +249,31 @@ void KillContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Kill(session, WideToMultiByte(id), signal);
+        PrintMessage(id);
+    }
+}
+
+void ExportContainer(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        ContainerService::Export(session, containerId, output);
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ContainerExportStdoutIsTerminalError());
+        }
+
+        ContainerService::Export(session, containerId, stdoutHandle);
     }
 }
 
@@ -336,6 +361,7 @@ void RemoveContainers(CLIExecutionContext& context)
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
+        PrintMessage(id);
     }
 }
 
@@ -526,6 +552,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::NetworkAlias))
+    {
+        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        options.NetworkAliases.reserve(aliases.size());
+        for (const auto& value : aliases)
+        {
+            options.NetworkAliases.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
@@ -693,8 +729,14 @@ void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-    const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    const auto& containerId = context.Args.Get<ArgType::ContainerId>();
+    const bool attach = context.Args.Contains(ArgType::Attach);
+    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
+
+    if (!attach)
+    {
+        PrintMessage(containerId);
+    }
 }
 
 void StopContainers(CLIExecutionContext& context)
@@ -716,6 +758,7 @@ void StopContainers(CLIExecutionContext& context)
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
+        PrintMessage(id);
     }
 }
 
@@ -733,16 +776,19 @@ void ViewContainerLogs(CLIExecutionContext& context)
         tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
     }
 
+    // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
+    // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
+    // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
-        since = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Since>());
+        since = validation::GetTimestampFromString(context.Args.Get<ArgType::Since>());
     }
 
     ULONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
-        until = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Until>());
+        until = validation::GetTimestampFromString(context.Args.Get<ArgType::Until>());
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
@@ -761,6 +807,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

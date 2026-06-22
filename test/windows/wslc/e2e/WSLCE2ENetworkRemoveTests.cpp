@@ -99,6 +99,36 @@ class WSLCE2ENetworkRemoveTests
         VerifyNetworkIsNotListed(TestNetworkName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Network_Remove_Force_NotFound)
+    {
+        auto result = RunWslc(std::format(L"network remove --force {}", TestNetworkName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Remove_Force_Valid)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyNetworkIsListed(TestNetworkName);
+
+        result = RunWslc(std::format(L"network remove --force {}", TestNetworkName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestNetworkName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Remove_Force_MixedFoundNotFound)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyNetworkIsListed(TestNetworkName);
+
+        result = RunWslc(std::format(L"network remove --force {} {}", TestNetworkName, TestNetworkName2));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestNetworkName), .Stderr = L"", .ExitCode = 0});
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
 private:
     const std::wstring TestNetworkName = L"wslc-e2e-network-remove";
     const std::wstring TestNetworkName2 = L"wslc-e2e-network-remove-2";
@@ -142,9 +172,9 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                    //
-                << L"  --session       Specify the session to use\r\n"            //
-                << L"  -?,--help       Shows help about the selected command\r\n" //
+        options << L"The following options are available:\r\n"                         //
+                << L"  -f,--force      Do not error if the network does not exist\r\n" //
+                << L"  -?,--help       Shows help about the selected command\r\n"      //
                 << L"\r\n";
         return options.str();
     }
