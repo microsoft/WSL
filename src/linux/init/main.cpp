@@ -3740,7 +3740,7 @@ Routine Description:
     kills processes within wsl-user, leaving system processes unaffected.
 
     The cpu.max limit is set to (nproc * c_cpuPeriodMicros - c_systemReservedCpuMicros) per
-    c_cpuPeriodMicros period, reserving ~0.05 CPU for WSL system processes so they remain
+    c_cpuPeriodMicros period, reserving a small portion of the CPU for WSL system processes so they remain
     schedulable even when user workloads saturate every CPU.
 
 Arguments:
@@ -4027,7 +4027,7 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr))
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
     {
         Result = -1;
         LOG_ERROR("Failed to mount cgroup2: {}", errno);
