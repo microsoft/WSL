@@ -117,7 +117,7 @@ class WslcSdkWinRtTests
 
     struct RunContainerOptions
     {
-        std::vector<winrt::hstring> cmdLine = {};
+        std::vector<winrt::hstring> commandLine = {};
         bool enableGpu = false;
         std::optional<winrt::hstring> name = std::nullopt;
         std::chrono::milliseconds timeout = 2min;
@@ -129,9 +129,9 @@ class WslcSdkWinRtTests
     ProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        if (!options.cmdLine.empty())
+        if (!options.commandLine.empty())
         {
-            procSettings.CommandLine(winrt::single_threaded_vector(std::move(options.cmdLine)));
+            procSettings.CommandLine(winrt::single_threaded_vector(std::move(options.commandLine)));
         }
 
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
@@ -315,7 +315,7 @@ class WslcSdkWinRtTests
         // drops kill()-sent signals with default disposition when targeting PID 1 in a
         // PID namespace, so no core dump would be generated if we crash the init process.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        initProcSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -340,7 +340,7 @@ class WslcSdkWinRtTests
             });
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             const auto beforeCrash = winrt::clock::now();
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 30s);
@@ -372,7 +372,7 @@ class WslcSdkWinRtTests
             }
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 60s);
 
@@ -475,7 +475,7 @@ class WslcSdkWinRtTests
 
             VERIFY_IS_TRUE(HasImage(c_importedImageName));
 
-            auto output = RunContainerAndWaitForExit(c_importedImageName, {.cmdLine = {L"/hello"}});
+            auto output = RunContainerAndWaitForExit(c_importedImageName, {.commandLine = {L"/hello"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_IS_TRUE(output.StandardOutput.find(L"Hello from Docker!") != std::string::npos);
         }
@@ -525,7 +525,7 @@ class WslcSdkWinRtTests
     {
         // Positive: stdout is captured correctly.
         {
-            auto output = RunContainerAndWaitForExit(L"debian:latest", {.cmdLine = {L"/bin/echo", L"OK"}});
+            auto output = RunContainerAndWaitForExit(L"debian:latest", {.commandLine = {L"/bin/echo", L"OK"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"OK\n");
             VERIFY_ARE_EQUAL(output.StandardError, L"");
@@ -534,7 +534,7 @@ class WslcSdkWinRtTests
         // Positive: stdout and stderr are routed independently.
         {
             auto output =
-                RunContainerAndWaitForExit(L"debian:latest", {.cmdLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
+                RunContainerAndWaitForExit(L"debian:latest", {.commandLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"stdout\n");
             VERIFY_ARE_EQUAL(output.StandardError, L"stderr\n");
@@ -654,7 +654,7 @@ class WslcSdkWinRtTests
         {
             auto output = RunContainerAndWaitForExit(
                 L"debian:latest",
-                {.cmdLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
+                {.commandLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
                  .networkingMode = WSLCSDK::ContainerNetworkingMode::Bridged});
 
             VERIFY_ARE_EQUAL(output.StandardOutput, L"HAS_ETH0\n");
@@ -664,7 +664,7 @@ class WslcSdkWinRtTests
         {
             auto output = RunContainerAndWaitForExit(
                 L"debian:latest",
-                {.cmdLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
+                {.commandLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
                  .networkingMode = WSLCSDK::ContainerNetworkingMode::None});
 
             VERIFY_ARE_EQUAL(output.StandardOutput, L"NO_ETH0\n");
