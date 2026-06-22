@@ -375,6 +375,28 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
+void EnsureNoUntaggedImages()
+{
+    auto result = RunWslc(L"image list --format json --filter dangling=true");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+
+    for (const auto& image : images)
+    {
+        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.Id, true));
+        auto deleteResult = RunWslc(std::format(L"image delete --force {}", id));
+
+        // Tolerate WSLC_E_IMAGE_NOT_FOUND - an untagged image may already be gone if it was a
+        // parent/child of another untagged image deleted earlier in this loop.
+        if (deleteResult.ExitCode != 0 &&
+            (!deleteResult.Stderr.has_value() || deleteResult.Stderr.value().find(L"WSLC_E_IMAGE_NOT_FOUND") == std::wstring::npos))
+        {
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
     std::wstring listCommand = L"image list --format json";

@@ -128,6 +128,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureNoUntaggedImages();
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
 void EnsureNetworkDoesNotExist(const std::wstring& networkName);
@@ -214,5 +215,30 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
+// Verifies that a string is a valid hex ID output.
+// truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.
+inline void VerifyIdOutput(const std::wstring& id, bool truncated)
+{
+    constexpr size_t c_truncatedLength = 12;
+    constexpr size_t c_fullLength = 64;
+
+    const size_t expectedLength = truncated ? c_truncatedLength : c_fullLength;
+
+    VERIFY_ARE_EQUAL(id.size(), expectedLength);
+
+    bool allHex = true;
+    for (size_t i = 0; i < expectedLength; i++)
+    {
+        const auto ch = id[i];
+        if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f')))
+        {
+            allHex = false;
+            break;
+        }
+    }
+
+    VERIFY_IS_TRUE(allHex, WEX::Common::String().Format(L"ID is not a valid hex string: '%ls'", id.c_str()));
+}
 
 } // namespace WSLCE2ETests

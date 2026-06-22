@@ -1400,13 +1400,15 @@ static HRESULT WslcImportSessionImageImpl(
     WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
+    wil::unique_cotaskmem_ansistring imageId;
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
         wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())),
         imageName,
         progressCallback.get(),
         imageFile.Length(),
-        nullptr));
+        nullptr,
+        &imageId));
 }
 
 STDAPI WslcImportSessionImage(

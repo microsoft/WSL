@@ -113,10 +113,11 @@ public:
     IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
-        _In_ LPCSTR ImageName,
+        _In_opt_ LPCSTR ImageName,
         _In_ IProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+        _In_opt_ IWarningCallback* WarningCallback,
+        _Out_ LPSTR* ImageId) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(SaveImages)(_In_ WSLCHandle OutputHandle, _In_ const WSLCStringArray* ImageNames, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImagesOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
@@ -215,10 +216,11 @@ public:
         _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ WSLCCompatHandle ImageHandle,
-        _In_ LPCSTR ImageName,
+        _In_opt_ LPCSTR ImageName,
         _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
-        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ LPSTR* ImageId) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCCompatListImagesOptions* Options, _Out_ WSLCCompatImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCCompatDeleteImageOptions* Options, _Out_ WSLCCompatDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCCompatTagImageOptions* Options) override;
@@ -287,7 +289,7 @@ private:
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
+    std::optional<std::string> ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 

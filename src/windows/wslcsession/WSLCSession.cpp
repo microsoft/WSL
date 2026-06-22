@@ -1210,40 +1210,61 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    std::ignore = ImportImageImpl(*requestContext, ImageHandle);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::ImportImage(
+    const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     WSLCExecutionContext context(this, WarningCallback);
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageName);
-    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, ImageId);
+    *ImageId = nullptr;
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageName);
+    std::string repo;
+    std::string tag;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
+    if (ImageName != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
+
+        auto [parsedRepo, tagOrDigest] = wslutil::ParseImage(ImageName);
+        THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
+        repo = parsedRepo;
+        tag = tagOrDigest.value();
+    }
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    auto imageId = ImportImageImpl(*requestContext, ImageHandle);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !imageId.has_value(), "Docker import succeeded but did not return an image ID");
 
-    OnImageCreated(ImageName);
+    if (ImageName != nullptr && strlen(ImageName) > 0)
+    {
+        OnImageCreated(ImageName);
+    }
+    else
+    {
+        OnImageCreated(imageId->c_str());
+    }
+
+    *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId->c_str()).release();
+
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1252,6 +1273,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     auto io = CreateIOContext();
 
     std::optional<std::string> pendingErrorJson;
+    std::optional<std::string> imageId;
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
@@ -1301,6 +1323,11 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         else if (parsed.status.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.status->c_str(), "Status"));
+            if (parsed.status->starts_with("sha256:"))
+            {
+                THROW_HR_IF_MSG(E_UNEXPECTED, imageId.has_value(), "Received duplicate image ID in import status");
+                imageId = *parsed.status;
+            }
         }
         else
         {
@@ -1332,6 +1359,8 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
+
+    return imageId;
 }
 
 HRESULT WSLCSession::SaveImage(WSLCHandle OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
@@ -3050,13 +3079,18 @@ HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgress
 }
 
 HRESULT WSLCSession::ImportImage(
-    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+    WSLCCompatHandle ImageHandle,
+    LPCSTR ImageName,
+    IWSLCCompatProgressCallback* ProgressCallback,
+    ULONGLONG ContentLength,
+    IWSLCCompatWarningCallback* WarningCallback,
+    LPSTR* ImageId)
 {
     const auto handle = apicompat::Convert(ImageHandle);
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
+    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get(), ImageId);
 }
 
 HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
