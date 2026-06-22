@@ -315,7 +315,7 @@ class WslcSdkWinRtTests
         // drops kill()-sent signals with default disposition when targeting PID 1 in a
         // PID namespace, so no core dump would be generated if we crash the init process.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -340,7 +340,7 @@ class WslcSdkWinRtTests
             });
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             const auto beforeCrash = winrt::clock::now();
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 30s);
@@ -372,7 +372,7 @@ class WslcSdkWinRtTests
             }
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.commandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 60s);
 

@@ -393,8 +393,10 @@ void Session::Close()
 {
     m_terminationWait.reset();
     m_terminationEvent.reset();
+    m_crashDumpSubscription.reset();
 
     // Methods called after Close() will fail due to EnsureStarted().
+    m_settings = nullptr;
     m_session.reset();
 }
 
