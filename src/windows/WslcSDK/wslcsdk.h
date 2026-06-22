@@ -26,6 +26,7 @@ Abstract:
 EXTERN_C_START
 
 // WSLC specific error codes
+// Ensure wslc.idl and wslcsdk.idl are also updated.
 #define WSLC_E_BASE (0x0600)
 #define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)             /* 0x80040601 */
 #define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)  /* 0x80040602 */

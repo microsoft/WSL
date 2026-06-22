@@ -30,6 +30,17 @@ namespace Microsoft.WSL.Containers
 
     delegate void SessionTerminationHandler(SessionTerminationReason reason);
 
+    runtimeclass ProcessCrashInformation
+    {
+        String DumpPath { get; };
+        String ProcessName { get; };
+        UInt32 Pid { get; };
+        UInt32 Signal { get; };
+        Windows.Foundation.DateTime Timestamp { get; };
+    };
+
+    delegate void ProcessCrashHandler(ProcessCrashInformation information);
+
     runtimeclass SessionSettings
     {
         SessionSettings(String name, String storagePath);
@@ -70,6 +81,7 @@ namespace Microsoft.WSL.Containers
         IVectorView<ImageInfo> Images { get; };
 
         event SessionTerminationHandler Terminated;
+        event ProcessCrashHandler ProcessCrashed;
     };
 
 
@@ -238,6 +250,7 @@ namespace Microsoft.WSL.Containers
         None = 0,
         VirtualMachinePlatform = 1,
         WslPackage = 2,
+        SdkNeedsUpdate = 4,
     };
 
     runtimeclass ServiceVersion
@@ -331,5 +344,24 @@ namespace Microsoft.WSL.Containers
         Windows.Storage.Streams.IBuffer Sha256 { get; };
         UInt64 SizeBytes { get; };
         Windows.Foundation.DateTime CreatedTimestamp { get; };
+    };
+
+    // Ensure wslcsdk.h and wslc.idl are also updated.
+    enum Error
+    {
+        ImageNotFound = 0x80040601,
+        ContainerPrefixAmbiguous = 0x80040602,
+        ContainerNotFound = 0x80040603,
+        VolumeNotFound = 0x80040604,
+        ContainerNotRunning = 0x80040605,
+        ContainerIsRunning = 0x80040606,
+        SessionReserved = 0x80040607,
+        InvalidSessionName = 0x80040608,
+        NetworkNotFound = 0x80040609,
+        WindowsUpdateSearchFailed = 0x8004060A,
+        SdkUpdateNeeded = 0x8004060B,
+        ContainerDisabled = 0x8004060C,
+        RegistryBlockedByPolicy = 0x8004060D,
+        VolumeNotAvailable = 0x8004060E,
     };
 }

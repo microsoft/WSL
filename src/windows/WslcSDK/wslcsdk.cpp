@@ -18,6 +18,7 @@ Abstract:
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "CrashDumpCallback.h"
+#include "install.h"
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
@@ -1676,10 +1677,10 @@ try
     THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
 
     // Installing these components requires elevation.
-    auto token = wil::open_current_access_token();
     RETURN_HR_IF(
         HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        !wsl::windows::common::security::IsTokenElevated(token.get()) && !wsl::windows::common::security::IsTokenLocalSystem(token.get()));
+        !wsl::windows::common::security::IsTokenElevated(GetCurrentThreadEffectiveToken()) &&
+            !wsl::windows::common::security::IsTokenLocalSystem(nullptr));
 
     if (needsVirtualMachine)
     {
@@ -1718,6 +1719,22 @@ try
 
         wsl::windows::common::WindowsUpdateContext wuContext;
         wuContext.RunUpdateFlow(true, callback);
+
+        // Because we do a forced install here, we expect an update.
+        if (wuContext.GetUpdateCount() == 0)
+        {
+            // During the preview period, the package may not be published yet, so fall back to getting it from GH.
+            // When moving to GA, change this to a hard error to indicate a service configuration issue.
+            if (callback)
+            {
+                callback(0);
+            }
+            wsl::windows::common::install::UpdatePackage(true, false, false);
+            if (callback)
+            {
+                callback(100);
+            }
+        }
     }
 
     return result;

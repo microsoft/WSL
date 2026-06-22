@@ -22,6 +22,7 @@ Abstract:
 
 #include "winrt/Session.h"
 #include "winrt/Helpers.h"
+#include "winrt/ProcessCrashInformation.h"
 
 #include <winrt/Microsoft.WSL.Containers.h>
 #include <winrt/Windows.Foundation.h>
@@ -305,6 +306,105 @@ class WslcSdkWinRtTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(30s), std::future_status::ready);
         VERIFY_ARE_EQUAL(future.get(), WSLCSDK::SessionTerminationReason::Shutdown);
+    }
+
+    WSLC_TEST_METHOD(ProcessCrashedEvent)
+    {
+        // Start a long-running container so we can exec non-PID-1 processes into it.
+        // The crashing process must NOT be the container's init process: Linux silently
+        // drops kill()-sent signals with default disposition when targeting PID 1 in a
+        // PID namespace, so no core dump would be generated if we crash the init process.
+        auto initProcSettings = WSLCSDK::ProcessSettings();
+        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(initProcSettings);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+        container.Start();
+
+        // Positive: A crashing exec process must fire the ProcessCrashed event with correctly populated info.
+        {
+            std::promise<WSLCSDK::ProcessCrashInformation> promise;
+
+            auto revoker = m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashInformation info) {
+                // Guard against multiple firings from concurrently running tests.
+                try
+                {
+                    promise.set_value(info);
+                }
+                catch (...)
+                {
+                }
+            });
+
+            auto execSettings = WSLCSDK::ProcessSettings();
+            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+
+            const auto beforeCrash = winrt::clock::now();
+            StartProcessAndWaitForExit(container.CreateProcess(execSettings), 30s);
+
+            auto future = promise.get_future();
+            VERIFY_ARE_EQUAL(future.wait_for(60s), std::future_status::ready);
+            const auto afterCrash = winrt::clock::now();
+
+            auto info = future.get();
+
+            VERIFY_IS_FALSE(info.DumpPath().empty());
+            VERIFY_IS_TRUE(std::filesystem::exists(info.DumpPath().c_str()));
+            VERIFY_IS_TRUE(std::wstring_view(info.ProcessName()).find(L"sh") != std::wstring_view::npos);
+            VERIFY_IS_GREATER_THAN(info.Pid(), 0u);
+            VERIFY_ARE_EQUAL(info.Signal(), 11u); // SIGSEGV = 11
+
+            // Crash timestamps are second-granularity; allow some slack around the measured window.
+            VERIFY_IS_TRUE(info.Timestamp() >= beforeCrash - 1s);
+            VERIFY_IS_TRUE(info.Timestamp() <= afterCrash + 1s);
+        }
+
+        // Negative: After revoking the subscription token, the handler must no longer fire.
+        {
+            std::atomic<int> callCount{0};
+            {
+                auto revoker =
+                    m_defaultSession.ProcessCrashed(winrt::auto_revoke, [&](WSLCSDK::ProcessCrashInformation) { ++callCount; });
+                // revoker goes out of scope here — handler is unsubscribed before any crash is triggered.
+            }
+
+            auto execSettings = WSLCSDK::ProcessSettings();
+            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+
+            StartProcessAndWaitForExit(container.CreateProcess(execSettings), 60s);
+
+            // Allow the event system time to dispatch any pending callbacks.
+            Sleep(1000);
+            VERIFY_ARE_EQUAL(callCount.load(), 0);
+        }
+    }
+
+    WSLC_TEST_METHOD(ProcessCrashInformationProperties)
+    {
+        // Verify that ProcessCrashInformation correctly maps all fields from WslcSessionCrashDumpInfo.
+        constexpr PCWSTR c_dumpPath = L"C:\\test\\dump.dmp";
+        constexpr PCSTR c_processName = "test-process";
+        constexpr uint32_t c_pid = 42;
+        constexpr uint32_t c_signal = 11;            // SIGSEGV
+        constexpr uint64_t c_timestamp = 1700000000; // 2023-11-14 22:13:20 UTC
+
+        WslcSessionCrashDumpInfo info{};
+        info.dumpPath = c_dumpPath;
+        info.processName = c_processName;
+        info.pid = c_pid;
+        info.signal = c_signal;
+        info.timestamp = c_timestamp;
+
+        auto impl = winrt::make_self<WSLCSDK::implementation::ProcessCrashInformation>(&info);
+
+        VERIFY_ARE_EQUAL(impl->DumpPath(), winrt::hstring(c_dumpPath));
+        VERIFY_ARE_EQUAL(impl->ProcessName(), winrt::to_hstring(c_processName));
+        VERIFY_ARE_EQUAL(impl->Pid(), c_pid);
+        VERIFY_ARE_EQUAL(impl->Signal(), c_signal);
+        VERIFY_ARE_EQUAL(winrt::clock::to_time_t(impl->Timestamp()), static_cast<time_t>(c_timestamp));
     }
 
     // -----------------------------------------------------------------------

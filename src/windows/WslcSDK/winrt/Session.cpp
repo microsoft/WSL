@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Session.h"
+#include "ProcessCrashInformation.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
@@ -62,6 +63,9 @@ void Session::Start()
     m_terminationWait.reset(CreateThreadpoolWait(&Session::OnTerminated, this, nullptr));
     THROW_LAST_ERROR_IF_NULL(m_terminationWait);
     SetThreadpoolWait(m_terminationWait.get(), m_terminationEvent.get(), nullptr);
+
+    hr = WslcRegisterSessionCrashDumpCallback(m_session.get(), &Session::OnCrashDump, this, &m_crashDumpSubscription, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
 void Session::EnsureStarted() const
@@ -281,6 +285,16 @@ void Session::Terminated(winrt::event_token const& token) noexcept
     m_terminatedEvent.remove(token);
 }
 
+winrt::event_token Session::ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler)
+{
+    return m_crashDumpEvent.add(handler);
+}
+
+void Session::ProcessCrashed(winrt::event_token const& token) noexcept
+{
+    m_crashDumpEvent.remove(token);
+}
+
 IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
 {
     EnsureStarted();
@@ -314,6 +328,19 @@ void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID 
         LOG_IF_FAILED(WslcGetSessionTerminationReason(session->m_session.get(), &reason));
 
         session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
+    }
+    CATCH_LOG();
+}
+
+void CALLBACK Session::OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID context) noexcept
+{
+    try
+    {
+        auto session = static_cast<Session*>(context);
+
+        auto information = winrt::make_self<implementation::ProcessCrashInformation>(info);
+
+        session->m_crashDumpEvent(*information);
     }
     CATCH_LOG();
 }
