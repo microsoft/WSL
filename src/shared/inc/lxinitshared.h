@@ -649,7 +649,7 @@ typedef struct _LX_PROCESS_CRASH
     MESSAGE_HEADER Header;
     std::uint64_t Timestamp;
     std::uint32_t Signal;
-    std::uint64_t Pid;
+    std::uint32_t Pid;
 
     char Buffer[];
 

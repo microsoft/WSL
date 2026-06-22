@@ -410,7 +410,7 @@ try
     message.WriteString(Argv[2]);
     message->Timestamp = std::strtoull(Argv[1], nullptr, 10);
     message->Signal = std::strtoul(Argv[4], nullptr, 10);
-    message->Pid = std::strtoull(Argv[3], nullptr, 10);
+    message->Pid = std::strtoul(Argv[3], nullptr, 10);
 
     auto result = channel.Transaction<LX_PROCESS_CRASH>(message.Span()).Result;
     if (result != 0)

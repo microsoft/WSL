@@ -269,7 +269,7 @@ private:
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
-    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp);
+    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     _Requires_shared_lock_held_(m_lock)
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;

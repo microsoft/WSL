@@ -23,7 +23,7 @@ struct CrashDumpCallback : public winrt::implements<CrashDumpCallback, IWSLCComp
     CrashDumpCallback(WslcSessionCrashDumpCallback callback, PVOID context);
 
     // IWSLCCompatCrashDumpCallback
-    HRESULT STDMETHODCALLTYPE OnCrashDump(_In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONGLONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp) override;
+    HRESULT STDMETHODCALLTYPE OnCrashDump(_In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp) override;
 
 private:
     WslcSessionCrashDumpCallback m_callback = nullptr;

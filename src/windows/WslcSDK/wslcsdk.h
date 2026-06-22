@@ -129,7 +129,7 @@ typedef struct WslcSessionCrashDumpInfo
 {
     _Field_z_ PCWSTR dumpPath;
     _Field_z_ PCSTR processName;
-    uint64_t pid;
+    uint32_t pid;
     uint32_t signal;
     uint64_t timestamp;
 } WslcSessionCrashDumpInfo;

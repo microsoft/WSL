@@ -2871,7 +2871,7 @@ void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) no
     m_crashDumpCallbacks.erase(It);
 }
 
-void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)
 try
 {
     // Snapshot the callback list under the lock so that cross-process callback invocations don't

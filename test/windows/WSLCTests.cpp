@@ -2914,7 +2914,7 @@ class WSLCTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            ULONGLONG Pid;
+            ULONG Pid;
             ULONG Signal;
             ULONGLONG Timestamp;
         };
@@ -2928,7 +2928,7 @@ class WSLCTests
             {
             }
 
-            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
                 m_promise.set_value(Invocation{
                     DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
@@ -2966,7 +2966,7 @@ class WSLCTests
         VERIFY_IS_FALSE(invocation.DumpPath.empty());
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
 
         // The dump file should be readable and non-empty.
