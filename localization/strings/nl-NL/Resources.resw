@@ -2066,8 +2066,12 @@ Gebruik:
     <value>OpenSessionByName({}) is mislukt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>De optie --session kan niet worden gebruikt met deze opdracht.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
-    <value>Failed to launch command {}. Errno = {}</value>
+    <value>Opdracht {} kan niet worden gestart. Errno = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
@@ -2190,7 +2194,7 @@ Gebruik:
     <value>De volgende argumenten zijn beschikbaar:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Kleuruitvoer uitschakelen.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Geef het Help-argument door voor meer informatie over een specifieke opdracht.</value>
@@ -2325,6 +2329,14 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Niet-ondersteund netwerkstuurprogramma: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Het netwerk {} heeft actieve eindpunten.</value>
@@ -2473,7 +2485,7 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Verwijdert alle gestopte containers.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totale teruggewonnen ruimte: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2566,7 +2578,7 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totale teruggewonnen ruimte: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2689,14 +2701,14 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Voer een opdracht uit in een sessie.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
     <value>Hiermee wordt een opdracht in een actieve sessie uitgevoerd zonder TTY. De opdracht en de argumenten worden direct doorgestuurd naar de sessie. Als er geen sessie is opgegeven, wordt de wslc standaardsessie gebruikt.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>Argumenten om door te geven aan de opdracht die wordt uitgevoerd</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Beëindig een sessie.</value>
@@ -2844,6 +2856,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Een container verbinden met een netwerk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Geef geen foutmelding als het netwerk niet bestaat</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ongeldige {}-waarde: de netwerknaam mag niet leeg zijn of een spatie bevatten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2907,6 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Grootte van /dev/shm (bijv. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Sessie-id</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Pad naar sessieopslag</value>
   </data>
@@ -2914,10 +2926,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Tijdstempels weergeven in logboekuitvoer</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Logboeken sinds tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
+    <value>Logboeken weergeven vanaf tijdstempel (Unix-tijdvak, seconden of RFC3339, bijvoorbeeld 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Logboeken vóór tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
+    <value>Logboeken weergeven vóór tijdstempel (Unix-tijdvak, seconden of RFC3339, bijvoorbeeld 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>
@@ -2937,6 +2949,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Een volume koppelen aan de container</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Werkmap binnen de container</value>
@@ -3026,6 +3041,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {} parameterwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} valt buiten het geldige bereik ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3097,13 +3116,13 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Hiermee worden alleen de netwerknamen weergegeven</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Verwijder alle ongebruikte netwerken.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Verwijdert alle ongebruikte netwerken. Een netwerk wordt als ongebruikt beschouwd wanneer er door geen enkele container naar wordt verwezen.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Verwijderd: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

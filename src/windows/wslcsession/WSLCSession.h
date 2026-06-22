@@ -98,6 +98,7 @@ public:
         _In_opt_ IWarningCallback* WarningCallback) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
+    IFACEMETHOD(GetDisplayName)(_Out_ LPWSTR* DisplayName) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;

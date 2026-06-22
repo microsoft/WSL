@@ -48,8 +48,8 @@ std::wstring ContainerLogsCommand::LongDescription() const
 
 void ContainerLogsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ViewContainerLogs;
 }
 } // namespace wsl::windows::wslc

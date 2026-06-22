@@ -1225,9 +1225,8 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
+            HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.

@@ -19,7 +19,7 @@ Abstract:
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
-
+using namespace wsl::windows::common::string;
 using namespace wsl::windows::wslc::models;
 
 class WSLCE2EImageListTests
@@ -61,22 +61,57 @@ class WSLCE2EImageListTests
         VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsIdsOnly)
     {
-        const auto result = RunWslc(L"image list --quiet");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // Get the expected image ID from JSON output.
+        auto jsonResult = RunWslc(L"image list --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
 
-        bool imageFound = false;
-        for (const auto& line : result.GetStdoutLines())
+        std::string debianId;
+        for (const auto& image : images)
         {
-            if (line == DebianImage.NameAndTag())
+            if (image.Repository == wsl::shared::string::WideToMultiByte(DebianImage.Name) &&
+                image.Tag == wsl::shared::string::WideToMultiByte(DebianImage.Tag))
             {
-                imageFound = true;
+                debianId = image.Id;
                 break;
             }
         }
+        VERIFY_ARE_NOT_EQUAL(std::string{}, debianId, L"Debian image was not present in `image list --format json` output");
 
-        VERIFY_IS_TRUE(imageFound);
+        const auto truncatedDebianId = wsl::shared::string::MultiByteToWide(TruncateId(debianId, true));
+        const auto fullDebianIdW = wsl::shared::string::MultiByteToWide(debianId);
+
+        // Default --quiet truncates to 12 chars.
+        auto truncResult = RunWslc(L"image list --quiet");
+        truncResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        bool truncatedFound = false;
+        for (const auto& line : truncResult.GetStdoutLines())
+        {
+            if (line == truncatedDebianId)
+            {
+                truncatedFound = true;
+                break;
+            }
+        }
+        VERIFY_IS_TRUE(truncatedFound, L"Truncated image ID not found in --quiet output");
+
+        // --quiet --no-trunc shows the full id with sha256: prefix.
+        auto noTruncResult = RunWslc(L"image list --quiet --no-trunc");
+        noTruncResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        bool fullFound = false;
+        for (const auto& line : noTruncResult.GetStdoutLines())
+        {
+            if (line == fullDebianIdW)
+            {
+                fullFound = true;
+                break;
+            }
+        }
+        VERIFY_IS_TRUE(fullFound, L"Full image ID not found in --quiet --no-trunc output");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)

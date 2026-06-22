@@ -628,6 +628,17 @@ HRESULT WSLCSession::GetId(ULONG* Id)
     return S_OK;
 }
 
+HRESULT WSLCSession::GetDisplayName(_Out_ LPWSTR* DisplayName)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, DisplayName);
+    *DisplayName = nullptr;
+
+    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::OnDockerdExited()
 {
     if (!m_sessionTerminatingEvent.is_signaled())
@@ -826,10 +837,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         }
     };
 
-    auto onCompleted = [&]() { io.Cancel(); };
-
-    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(requestContext, std::move(onHttpResponse), std::move(onChunk)));
 
     io.Run({});
 
@@ -1345,8 +1353,7 @@ void WSLCSession::ImportImageImpl(
     };
 
     io.AddHandle(
-        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
-        MultiHandleWait::CancelOnCompleted);
+        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)));
 
     io.Run({});
 
@@ -1430,16 +1437,12 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
             errorJson.append(buffer.data(), buffer.size());
         };
 
-        io.AddHandle(
-            std::make_unique<io::ReadHandle>(common::io::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
-            MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::ReadHandle>(common::io::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
-                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+            common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     io.Run({});
@@ -2536,10 +2539,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Driver);
 
     std::string name = Options->Name;
-    std::string driver = Options->Driver;
+    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
@@ -2549,16 +2551,16 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
-    // Validate IPAM options client-side: podman returns HTTP 500 (-> E_FAIL) for a malformed
-    // subnet/gateway, but these are bad arguments and should fail fast with E_INVALIDARG.
-    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
+    for (const auto& [key, _] : driverOpts)
     {
-        ValidateSubnetOption(it->second);
+        const bool supported = std::any_of(
+            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
     }
-    if (auto it = driverOpts.find("Gateway"); it != driverOpts.end())
-    {
-        ValidateGatewayOption(it->second);
-    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -3377,17 +3379,22 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     io::MultiHandleWait io;
 
     // Cancel with E_ABORT if the session is terminating.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
+    io.AddHandle(
+        std::make_unique<io::EventHandle>(
+            m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }),
+        io::MultiHandleWait::NeedNotComplete);
 
     // Cancel with E_ABORT if the client process exits.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+    io.AddHandle(
+        std::make_unique<io::EventHandle>(
+            wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
+        io::MultiHandleWait::NeedNotComplete);
 
     if (CancelHandle != nullptr)
     {
         io.AddHandle(
-            std::make_unique<io::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+            std::make_unique<io::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }),
+            io::MultiHandleWait::NeedNotComplete);
     }
 
     return io;

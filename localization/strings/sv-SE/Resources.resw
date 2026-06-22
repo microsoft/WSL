@@ -2066,6 +2066,10 @@ Användning:
     <value>OpenSessionByName('{}') misslyckades</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Alternativet --session kan inte användas med detta kommando.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Det gick inte att starta kommandot {}. Fel = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2190,7 +2194,7 @@ Användning:
     <value>Följande argument är tillgängliga:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Inaktivera utmatningsfärg.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Om du vill ha mer information om ett speciellt kommando kan du skicka den till hjälpargumentet.</value>
@@ -2325,6 +2329,14 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nätverksdrivrutin som inte stöds: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Alternativ för nätverksdrivrutin som inte stöds: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Nätverket '{}' har aktiva slutpunkter.</value>
@@ -2473,7 +2485,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Tar bort alla stoppade containrar.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt frigör utrymme: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2566,7 +2578,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt frigör utrymme: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2844,6 +2856,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Ansluta en container till ett nätverk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Do not error if the network does not exist</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ogiltigt {}-värde: nätverksnamnet får inte vara tomt eller innehålla blanksteg</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2907,6 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Storlek på /dev/shm (t.ex. 64 M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Sessions-ID</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sökväg för sessionslagring</value>
   </data>
@@ -2937,6 +2949,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bindmontera en volym till containern</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Do not error if the volume does not exist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbetskatalog i containern</value>
@@ -3026,6 +3041,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Ogiltigt {} argumentvärde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ogiltigt {}-argumentvärde: '{}'. En Unix-epoktidsstämpel eller en RFC3339 datum/tid (t.ex. 2024-01-15T10:30:00Z) förväntades</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ogiltigt {}-värde: {} ligger utanför giltigt intervall ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3097,13 +3116,13 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Matar endast ut nätverksnamnen</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Ta bort alla oanvända nätverk.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Tar bort alla oanvända nätverk. Ett nätverk anses vara oanvänt när det inte refereras till av någon container.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Borttagen: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
