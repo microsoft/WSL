@@ -78,13 +78,22 @@ void BuildImage(CLIExecutionContext& context)
 
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
+    // Default to auto (TTY-aware) progress output, matching Docker's `--progress` default.
+    auto progress = models::ProgressType::Auto;
+    if (context.Args.Contains(ArgType::Progress))
+    {
+        progress = validation::GetProgressTypeFromString(context.Args.Get<ArgType::Progress>());
+    }
+
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
+    // Plain progress requests the full, uncollapsed build output (all internal steps),
+    // which is what the server's "verbose" flag controls.
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, progress == models::ProgressType::Plain);
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.Contains(ArgType::BuildPull));
 
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(cancelEvent, context.Args.Contains(ArgType::Verbose));
+    BuildImageCallback callback(cancelEvent, progress);
     services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 

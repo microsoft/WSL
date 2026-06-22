@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "SessionService.h"
+#include "ContainerModel.h"
 #include "VTSupport.h"
 #include <deque>
 #include <map>
@@ -23,7 +24,7 @@ class DECLSPEC_UUID("3EDD5DBF-CA6C-4CF7-923A-AD94B6A732E5") BuildImageCallback
 {
 public:
     // The cancel event handle must remain valid for the lifetime of this callback.
-    BuildImageCallback(HANDLE cancelEvent, bool verbose) : m_verbose(verbose), m_cancelEvent(cancelEvent)
+    BuildImageCallback(HANDLE cancelEvent, models::ProgressType progress) : m_progress(progress), m_cancelEvent(cancelEvent)
     {
     }
     ~BuildImageCallback();
@@ -42,7 +43,7 @@ private:
     void WriteTerminal(std::wstring_view content) const;
     bool IsCancelled() const;
 
-    const bool m_verbose;
+    const models::ProgressType m_progress;
     const HANDLE m_cancelEvent;
     HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
     bool m_isConsole = wsl::windows::common::wslutil::IsConsoleHandle(m_console);

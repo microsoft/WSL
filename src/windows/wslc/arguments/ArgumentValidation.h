@@ -77,6 +77,9 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
 
+void ValidateProgressTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+ProgressType GetProgressTypeFromString(const std::wstring& input, const std::wstring& argName = {});
+
 InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);

@@ -27,6 +27,15 @@ enum class FormatType
     Json,
 };
 
+// Progress output mode for pull/push/build operations.
+enum class ProgressType
+{
+    Auto,  // TTY-aware: interactive rendering when output is a console, plain otherwise.
+    Tty,   // Force interactive rendering (in-place updates), even if not a console.
+    Plain, // Plain line-by-line output, suitable for logs and CI.
+    Quiet, // Suppress progress output.
+};
+
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;

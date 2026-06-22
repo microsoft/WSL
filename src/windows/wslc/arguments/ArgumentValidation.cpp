@@ -40,6 +40,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateFormatTypeFromString(execArgs.GetAll<ArgType::Format>(), m_name);
         break;
 
+    case ArgType::Progress:
+        validation::ValidateProgressTypeFromString(execArgs.GetAll<ArgType::Progress>(), m_name);
+        break;
+
     case ArgType::Signal:
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
@@ -355,6 +359,39 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     {
         throw ArgumentException(std::format(
             L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+    }
+}
+
+void ValidateProgressTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetProgressTypeFromString(value, argName);
+    }
+}
+
+ProgressType GetProgressTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"auto"))
+    {
+        return ProgressType::Auto;
+    }
+    else if (IsEqual(input, L"tty"))
+    {
+        return ProgressType::Tty;
+    }
+    else if (IsEqual(input, L"plain"))
+    {
+        return ProgressType::Plain;
+    }
+    else if (IsEqual(input, L"quiet"))
+    {
+        return ProgressType::Quiet;
+    }
+    else
+    {
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized progress type. Supported progress types are: auto, tty, plain, quiet.", argName, input));
     }
 }
 

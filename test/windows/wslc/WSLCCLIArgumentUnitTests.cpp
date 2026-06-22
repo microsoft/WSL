@@ -145,6 +145,16 @@ class WSLCCLIArgumentUnitTests
         VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"table"}, L"formatArg"));
         VERIFY_THROWS(validation::ValidateFormatTypeFromString({L"JSON", L"TABLE", L"csv"}, L"formatArg"), ArgumentException);
 
+        // Verify progress type
+        VERIFY_ARE_EQUAL(validation::GetProgressTypeFromString(L"auto"), ProgressType::Auto);
+        VERIFY_ARE_EQUAL(validation::GetProgressTypeFromString(L"tty"), ProgressType::Tty);
+        VERIFY_ARE_EQUAL(validation::GetProgressTypeFromString(L"plain"), ProgressType::Plain);
+        VERIFY_ARE_EQUAL(validation::GetProgressTypeFromString(L"quiet"), ProgressType::Quiet);
+        VERIFY_ARE_EQUAL(validation::GetProgressTypeFromString(L"PLAIN"), ProgressType::Plain); // Case-insensitive
+        VERIFY_THROWS(validation::GetProgressTypeFromString(L"none"), ArgumentException);
+        VERIFY_NO_THROW(validation::ValidateProgressTypeFromString({L"auto", L"tty", L"plain", L"quiet"}, L"progressArg"));
+        VERIFY_THROWS(validation::ValidateProgressTypeFromString({L"auto", L"rawjson"}, L"progressArg"), ArgumentException);
+
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
         VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);

@@ -94,11 +94,22 @@ try
         return S_OK;
     }
 
+    // Quiet mode suppresses all live progress output. The server still reports build
+    // failures via a failed HRESULT, so errors are not lost.
+    if (m_progress == models::ProgressType::Quiet)
+    {
+        return S_OK;
+    }
+
     const std::string_view idView = (id != nullptr) ? id : std::string_view{};
     const bool isLog = (idView == "log");
     const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
 
-    if (m_verbose || !m_isConsole)
+    // Plain output: explicit plain mode, or auto mode when output isn't an interactive
+    // console. Renders major build steps line-by-line without the collapsing window.
+    const bool plain = (m_progress == models::ProgressType::Plain) || (m_progress == models::ProgressType::Auto && !m_isConsole);
+
+    if (plain)
     {
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)

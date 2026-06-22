@@ -135,11 +135,14 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
 
-        // Build with --pull --verbose. When --pull causes docker to resolve the base image
+        // Build with --pull --progress=plain. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
         // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
         auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
+            L"build \"{}\" -f \"{}\" -t {} --pull --progress plain",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImagePull.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(buildResult.Stdout.has_value());
