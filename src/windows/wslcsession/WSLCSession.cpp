@@ -531,6 +531,17 @@ HRESULT WSLCSession::GetId(ULONG* Id)
     return S_OK;
 }
 
+HRESULT WSLCSession::GetDisplayName(_Out_ LPWSTR* DisplayName)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, DisplayName);
+    *DisplayName = nullptr;
+
+    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::OnDockerdExited()
 {
     if (!m_sessionTerminatingEvent.is_signaled())

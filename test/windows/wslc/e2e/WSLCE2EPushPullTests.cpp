@@ -77,10 +77,11 @@ class WSLCE2EPushPullTests
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             // Verify the image is now present.
-            result = RunWslc(L"image list -q");
+            auto registryRepo = registryImage.substr(0, registryImage.rfind(L':'));
+            result = RunWslc(L"image list --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
             VERIFY_IS_TRUE(result.Stdout.has_value());
-            VERIFY_IS_TRUE(result.Stdout->find(registryImage) != std::wstring::npos);
+            VERIFY_IS_TRUE(result.Stdout->find(registryRepo) != std::wstring::npos);
         }
     }
 

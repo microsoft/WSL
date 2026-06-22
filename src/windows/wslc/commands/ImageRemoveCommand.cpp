@@ -46,8 +46,8 @@ std::wstring ImageRemoveCommand::LongDescription() const
 
 void ImageRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << DeleteImage;
 }
 } // namespace wsl::windows::wslc

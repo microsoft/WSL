@@ -2073,6 +2073,10 @@ Utilisation :
     <value>Échec de OpenSessionByName('{}')</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>L’option --session ne peut pas être utilisée avec cette commande.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Échec du lancement de la commande {}. Errno = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2334,7 +2338,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>Option de pilote réseau non prise en charge : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
@@ -2860,7 +2864,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Connectez un conteneur à un réseau</value>
   </data>
   <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
-    <value>Do not error if the network does not exist</value>
+    <value>Ne générez pas d’erreur si le réseau n’existe pas</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
@@ -2910,9 +2914,6 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Taille de /dev/shm (par exemple, 64 Mo, 1 G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>ID de session</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Chemin d’accès de stockage de session</value>
   </data>
@@ -2932,10 +2933,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Afficher les horodatages dans le résultat du journal</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Afficher les journaux depuis l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux depuis l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Afficher les journaux avant l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux antérieurs à l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nouvelle référence d’image au format image-name[:tag]</value>
@@ -2957,7 +2958,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Lier le montage d’un volume sur le conteneur</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>Ne générez pas d’erreur si le volume n’existe pas</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Répertoire de travail à l’intérieur du conteneur</value>
@@ -3046,6 +3047,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Valeur d’argument {} non valide : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Valeur de l’argument {} non valide : '{}'. Un horodatage Unix ou une date-heure RFC3339 est attendu (par exemple 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Valeur {} non valide : {} est en dehors de la plage valide ({}-{}).</value>

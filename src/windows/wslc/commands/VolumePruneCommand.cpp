@@ -44,8 +44,8 @@ std::wstring VolumePruneCommand::LongDescription() const
 
 void VolumePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneVolumes;
 }
 } // namespace wsl::windows::wslc
