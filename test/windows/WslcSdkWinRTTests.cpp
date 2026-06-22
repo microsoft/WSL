@@ -125,7 +125,8 @@ class WslcSdkWinRtTests
         {
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
 
-            auto read = stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
+            // N.B. InputStreamOptions::Partial is not supported.
+            auto read = stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::None);
             if (read.wait_for(remaining) != winrt::Windows::Foundation::AsyncStatus::Completed)
             {
                 break;
@@ -144,7 +145,7 @@ class WslcSdkWinRtTests
             }
         }
 
-        LogError("Timed out waiting for process output marker: '%hs'", std::string(marker).c_str());
+        LogError("Timed out waiting for process output marker: '%hs'. Output: '%hs'", std::string(marker).c_str(), accumulated.c_str());
         VERIFY_FAIL();
     }
 
