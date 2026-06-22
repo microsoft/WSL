@@ -54,7 +54,7 @@ class WSLCTests
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
         m_storagePath = std::filesystem::current_path() / "test-storage";
-        m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLCNetworkingModeVirtioProxy);
+        m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLCNetworkingModeConsomme);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
         wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -782,7 +782,7 @@ class WSLCTests
         // Validate that PullImage() fails appropriately when the session runs out of space.
         {
             auto settings = GetDefaultSessionSettings(L"wslc-pull-image-out-of-space", false);
-            settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+            settings.NetworkingMode = WSLCNetworkingModeConsomme;
             settings.MemoryMb = 1024;
             auto session = CreateSession(settings);
 
@@ -3169,7 +3169,7 @@ class WSLCTests
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
 
-            if (mode == WSLCNetworkingModeVirtioProxy)
+            if (mode == WSLCNetworkingModeConsomme)
             {
                 // Virtio proxy points resolv.conf at the eth0 gateway.
                 ExpectCommandResult(
@@ -3205,15 +3205,15 @@ class WSLCTests
         ValidateNetworking(WSLCNetworkingModeNAT, true);
     }
 
-    TEST_METHOD(VirtioProxyNetworking)
+    TEST_METHOD(ConsommeNetworking)
     {
-        ValidateNetworking(WSLCNetworkingModeVirtioProxy);
+        ValidateNetworking(WSLCNetworkingModeConsomme);
     }
 
-    TEST_METHOD(VirtioProxyNetworkingWithDnsTunneling)
+    TEST_METHOD(ConsommeNetworkingWithDnsTunneling)
     {
         WINDOWS_11_TEST_ONLY();
-        ValidateNetworking(WSLCNetworkingModeVirtioProxy, true);
+        ValidateNetworking(WSLCNetworkingModeConsomme, true);
     }
 
     // DNS test helpers
@@ -3399,9 +3399,9 @@ class WSLCTests
         ValidatePortMapping(WSLCNetworkingModeNAT);
     }
 
-    TEST_METHOD(PortMappingVirtioProxy)
+    TEST_METHOD(PortMappingConsomme)
     {
-        ValidatePortMapping(WSLCNetworkingModeVirtioProxy);
+        ValidatePortMapping(WSLCNetworkingModeConsomme);
     }
 
     WSLC_TEST_METHOD(StuckVmTermination)
@@ -7962,17 +7962,17 @@ class WSLCTests
         RunPortMappingsTest(*session, "host", false);
     }
 
-    WSLC_TEST_METHOD(PortMappingsVirtioProxy)
+    WSLC_TEST_METHOD(PortMappingsConsomme)
     {
-        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy);
+        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeConsomme);
 
         RunPortMappingsTest(*session, "bridge", true);
         RunPortMappingsTest(*session, "host", true);
     }
 
-    WSLC_TEST_METHOD(PortMappingsVirtioProxyWslRelay)
+    WSLC_TEST_METHOD(PortMappingsConsommeWslRelay)
     {
-        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy, WslcFeatureFlagsPortRelayWslRelay);
+        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeConsomme, WslcFeatureFlagsPortRelayWslRelay);
 
         RunPortMappingsTest(*session, "bridge", false);
         RunPortMappingsTest(*session, "host", false);
@@ -7980,7 +7980,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PortMappingsAdvanced)
     {
-        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy);
+        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeConsomme);
 
         // Helper to resolve the first non-loopback IPv4 address on an active host adapter.
         auto getHostAdapterIpv4 = []() -> std::optional<std::string> {
@@ -11137,7 +11137,7 @@ class WSLCTests
 
         // Phase 1: Create a session and inject a container with a corrupt WSLC metadata label via docker CLI.
         {
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
             auto session = CreateSession(settings);
 
@@ -11160,7 +11160,7 @@ class WSLCTests
             // Phase 2: Create a new session pointing to the same storage with a warning callback.
             auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
 
-            auto settings2 = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings2 = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings2.StoragePath = storagePath.c_str();
 
             const auto sessionManager2 = OpenSessionManager();
@@ -11195,7 +11195,7 @@ class WSLCTests
 
         // Phase 1: Create a session with a VHD volume, then get the VHD path.
         {
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
             auto session = CreateSession(settings);
 
@@ -11228,7 +11228,7 @@ class WSLCTests
         {
             auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
 
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
 
             const auto sessionManager = OpenSessionManager();
@@ -11266,7 +11266,7 @@ class WSLCTests
         // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
         // session recovers it.
         {
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
             auto session = CreateSession(settings);
 
@@ -11293,7 +11293,7 @@ class WSLCTests
         {
             auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
 
-            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeVirtioProxy);
+            auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
 
             const auto sessionManager = OpenSessionManager();

@@ -17,7 +17,7 @@ Abstract:
 #include <string>
 #include <string_view>
 #include "hcs_schema.h"
-#include "VirtioNetworking.h"
+#include "ConsommeNetworking.h"
 #include "NatNetworking.h"
 #include "wslsecurity.h"
 #include "wslutil.h"
@@ -156,10 +156,10 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 #endif
 
     // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
-    // command line, virtiofs shares, and the VirtioProxy virtio-net adapter.
+    // command line, virtiofs shares, and the Consomme virtio-net adapter.
     // Only needed when a virtio device that requires bounce buffers will be attached.
     ULONG64 swiotlbSizeBytes = 0;
-    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
     {
         swiotlbSizeBytes = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
     }
@@ -309,7 +309,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Create and start compute system
     m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
 
-    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
     {
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
@@ -481,20 +481,20 @@ try
             std::move(dnsSocketHandle),
             nullptr);
     }
-    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        wsl::core::ConsommeNetworkingFlags flags = wsl::core::ConsommeNetworkingFlags::Ipv6;
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
-            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling);
+            WI_SetFlag(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling);
         }
 
         if (!FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay))
         {
-            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay);
+            WI_SetFlag(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay);
         }
 
-        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
+        m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
     }
     else
@@ -714,7 +714,7 @@ try
 
     std::lock_guard lock(m_lock);
 
-    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    auto* virtioNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
     return virtioNet->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
@@ -728,7 +728,7 @@ try
 
     std::lock_guard lock(m_lock);
 
-    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    auto* virtioNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
     return virtioNet->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);

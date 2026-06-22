@@ -10,7 +10,7 @@
 
 namespace wsl::core {
 
-enum class VirtioNetworkingFlags
+enum class ConsommeNetworkingFlags
 {
     None = 0x0,
     LocalhostRelay = 0x1,
@@ -18,26 +18,26 @@ enum class VirtioNetworkingFlags
     Ipv6 = 0x4,
     LoopbackClientIp = 0x8,
 };
-DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
+DEFINE_ENUM_FLAG_OPERATORS(ConsommeNetworkingFlags);
 
-class VirtioNetworking : public INetworkingEngine
+class ConsommeNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
+    ConsommeNetworking(
         GnsChannel&& gnsChannel,
-        VirtioNetworkingFlags flags,
+        ConsommeNetworkingFlags flags,
         LPCWSTR dnsOptions,
         std::shared_ptr<GuestDeviceManager> guestDeviceManager,
         wil::shared_handle userToken,
         std::wstring swiotlbConfig);
 
-    ~VirtioNetworking();
+    ~ConsommeNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
-    VirtioNetworking(const VirtioNetworking&) = delete;
-    VirtioNetworking(VirtioNetworking&&) = delete;
-    VirtioNetworking& operator=(const VirtioNetworking&) = delete;
-    VirtioNetworking& operator=(VirtioNetworking&&) = delete;
+    ConsommeNetworking(const ConsommeNetworking&) = delete;
+    ConsommeNetworking(ConsommeNetworking&&) = delete;
+    ConsommeNetworking& operator=(const ConsommeNetworking&) = delete;
+    ConsommeNetworking& operator=(ConsommeNetworking&&) = delete;
 
     // INetworkingEngine
     void Initialize() override;
@@ -72,7 +72,7 @@ private:
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
-    VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
+    ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
     std::wstring m_swiotlbOption;
     std::optional<GUID> m_localhostAdapterId;

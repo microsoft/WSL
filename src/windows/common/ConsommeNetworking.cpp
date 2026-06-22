@@ -1,7 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
-#include "VirtioNetworking.h"
+#include "ConsommeNetworking.h"
 #include "GuestDeviceManager.h"
 #include "Stringify.h"
 #include "stringshared.h"
@@ -9,14 +9,14 @@
 using namespace wsl::core::networking;
 using namespace wsl::shared;
 using namespace wsl::windows::common::stringify;
-using wsl::core::VirtioNetworking;
+using wsl::core::ConsommeNetworking;
 
 static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
-VirtioNetworking::VirtioNetworking(
+ConsommeNetworking::ConsommeNetworking(
     GnsChannel&& gnsChannel,
-    VirtioNetworkingFlags flags,
+    ConsommeNetworkingFlags flags,
     LPCWSTR dnsOptions,
     std::shared_ptr<GuestDeviceManager> guestDeviceManager,
     wil::shared_handle userToken,
@@ -30,7 +30,7 @@ VirtioNetworking::VirtioNetworking(
 {
 }
 
-VirtioNetworking::~VirtioNetworking()
+ConsommeNetworking::~ConsommeNetworking()
 {
     // Unregister the network notification callback to prevent it from using the GNS channel.
     m_networkNotifyHandle.reset();
@@ -39,35 +39,35 @@ VirtioNetworking::~VirtioNetworking()
     m_gnsChannel.Stop();
 }
 
-void VirtioNetworking::Initialize()
+void ConsommeNetworking::Initialize()
 {
     // Initialize adapter state.
     RefreshGuestConnection();
 
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay))
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
         SetupLoopbackDevice();
     }
 
-    THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&VirtioNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
+    THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&ConsommeNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
 }
 
-void VirtioNetworking::TraceLoggingRundown() noexcept
+void ConsommeNetworking::TraceLoggingRundown() noexcept
 {
     auto lock = m_lock.lock_exclusive();
 
-    WSL_LOG("VirtioNetworking::TraceLoggingRundown", TRACE_NETWORKSETTINGS_OBJECT(m_networkSettings));
+    WSL_LOG("ConsommeNetworking::TraceLoggingRundown", TRACE_NETWORKSETTINGS_OBJECT(m_networkSettings));
 }
 
-void VirtioNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message)
+void ConsommeNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message)
 {
-    message.NetworkingMode = LxMiniInitNetworkingModeVirtioProxy;
-    message.DisableIpv6 = WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6);
+    message.NetworkingMode = LxMiniInitNetworkingModeConsomme;
+    message.DisableIpv6 = WI_IsFlagClear(m_flags, ConsommeNetworkingFlags::Ipv6);
     message.EnableDhcpClient = false;
     message.PortTrackerType = LX_MINI_INIT_PORT_TRACKER_TYPE::LxMiniInitPortTrackerTypeMirrored;
 }
 
-void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
+void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
 {
     WI_ASSERT(!m_gnsPortTrackerChannel.has_value());
 
@@ -81,16 +81,16 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
 
-void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+void NETIOAPI_API_ ConsommeNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
 try
 {
-    static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
+    static_cast<ConsommeNetworking*>(context)->RefreshGuestConnection();
 }
 CATCH_LOG()
 
-uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
+uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
 {
-    if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
+    if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         return 0;
     }
@@ -118,7 +118,7 @@ uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
         }
     });
 
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
     {
         if (!loopback)
         {
@@ -149,7 +149,7 @@ uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
     return hostPort;
 }
 
-uint16_t VirtioNetworking::ModifyOpenPorts(
+uint16_t ConsommeNetworking::ModifyOpenPorts(
     _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const
 {
     THROW_HR_IF_MSG(
@@ -194,7 +194,7 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
     return HostPort;
 }
 
-HRESULT VirtioNetworking::MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const
+HRESULT ConsommeNetworking::MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const
 try
 {
     RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr);
@@ -208,7 +208,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT VirtioNetworking::UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const
+HRESULT ConsommeNetworking::UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const
 try
 {
     RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
@@ -219,7 +219,7 @@ try
 }
 CATCH_RETURN()
 
-void VirtioNetworking::RefreshGuestConnection()
+void ConsommeNetworking::RefreshGuestConnection()
 {
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
@@ -243,20 +243,20 @@ void VirtioNetworking::RefreshGuestConnection()
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
     }
 
     networking::DnsInfo currentDns{};
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
     {
         currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
     }
     else
     {
         wsl::core::networking::DnsSettingsFlags dnsFlags = networking::DnsSettingsFlags::IncludeVpn;
-        WI_SetFlagIf(dnsFlags, networking::DnsSettingsFlags::IncludeIpv6Servers, WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+        WI_SetFlagIf(dnsFlags, networking::DnsSettingsFlags::IncludeIpv6Servers, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
         currentDns = networking::HostDnsInfo::GetDnsSettings(dnsFlags);
     }
 
@@ -294,7 +294,7 @@ void VirtioNetworking::RefreshGuestConnection()
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         UpdateIpv6Address(networkSettings->PreferredIpv6Address);
     }
@@ -307,9 +307,9 @@ void VirtioNetworking::RefreshGuestConnection()
     m_networkSettings = std::move(networkSettings);
 }
 
-void VirtioNetworking::SetupLoopbackDevice()
+void ConsommeNetworking::SetupLoopbackDevice()
 {
-    const auto* clientIp = WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
+    const auto* clientIp = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
     const auto deviceOptions =
         std::format(L"client_ip={};client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248", clientIp);
 
@@ -344,7 +344,7 @@ void VirtioNetworking::SetupLoopbackDevice()
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }
 
-void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
+void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
 {
     if (gateway.empty() || !m_adapterId.has_value())
     {
@@ -363,7 +363,7 @@ void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modify
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 
-void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
+void ConsommeNetworking::UpdateDefaultRoute(const std::wstring& gateway)
 {
     if (gateway == m_trackedDefaultRoute || !m_adapterId.has_value())
     {
@@ -375,7 +375,7 @@ void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
     SendDefaultRoute(gateway, hns::ModifyRequestType::Add);
 }
 
-void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
+void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
 {
     if (dns == m_trackedDnsSettings || !m_adapterId.has_value())
     {
@@ -391,7 +391,7 @@ void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
 }
 
-void VirtioNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
+void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
 {
     if (ipAddress == m_trackedIpv4Address || ipAddress.AddressString.empty() || !m_adapterId.has_value())
     {
@@ -409,9 +409,9 @@ void VirtioNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ip
     m_gnsChannel.SendEndpointState(endpointProperties);
 }
 
-void VirtioNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)
+void ConsommeNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)
 {
-    WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+    WI_ASSERT(WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
 
     if (ipAddress.AddressString.empty() || !m_adapterId.has_value())
     {
@@ -429,9 +429,9 @@ void VirtioNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAd
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 
-void VirtioNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ipAddress)
+void ConsommeNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ipAddress)
 {
-    WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+    WI_ASSERT(WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
 
     if (ipAddress == m_trackedIpv6Address || !m_adapterId.has_value())
     {
@@ -443,7 +443,7 @@ void VirtioNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ip
     SendIpv6Address(ipAddress, hns::ModifyRequestType::Add);
 }
 
-void VirtioNetworking::UpdateMtu(std::optional<ULONG> mtu)
+void ConsommeNetworking::UpdateMtu(std::optional<ULONG> mtu)
 {
     if (!mtu || mtu.value() == m_networkMtu || !m_adapterId.has_value())
     {

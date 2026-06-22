@@ -314,7 +314,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
-    // to the service so virtio device-options (virtiofs shares, VirtioProxy networking) can include
+    // to the service so virtio device-options (virtiofs shares, Consomme networking) can include
     // the swiotlb token.
     ReadGuestCapabilities();
 
@@ -368,7 +368,7 @@ void WSLCVirtualMachine::ConfigureNetworking()
     fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
 
     // Virtio proxy forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
-    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeVirtioProxy;
+    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeConsomme;
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
@@ -455,7 +455,7 @@ WSLCNetworkingMode WSLCVirtualMachine::NetworkingMode() const
 bool WSLCVirtualMachine::UseWslRelayPortForwarding() const
 {
     return m_networkingMode == WSLCNetworkingModeNAT ||
-           (m_networkingMode == WSLCNetworkingModeVirtioProxy && FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
+           (m_networkingMode == WSLCNetworkingModeConsomme && FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
 }
 
 void WSLCVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -976,7 +976,7 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
 
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
-    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
         USHORT allocatedHostPort = 0;
         auto result = m_vm->MapVirtioNetPort(
@@ -1023,7 +1023,7 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     {
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
-    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
         THROW_IF_FAILED(m_vm->UnmapVirtioNetPort(
             Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str()));

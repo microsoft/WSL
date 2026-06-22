@@ -89,9 +89,9 @@ namespace details {
         {
             return WSLCNetworkingModeNAT;
         }
-        if (value == "virtioproxy")
+        if (value == "consomme")
         {
-            return WSLCNetworkingModeVirtioProxy;
+            return WSLCNetworkingModeConsomme;
         }
 
         return std::nullopt;

@@ -435,7 +435,7 @@ try
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    runtimeSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+    runtimeSettings.NetworkingMode = WSLCNetworkingModeConsomme;
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
