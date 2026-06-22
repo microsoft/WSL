@@ -28,10 +28,10 @@ struct ImageInfo : ImageInfoT<ImageInfo>
     winrt::Windows::Foundation::DateTime CreatedTimestamp();
 
 private:
-    hstring m_name;
-    winrt::Windows::Storage::Streams::IBuffer m_sha256;
-    uint64_t m_size;
-    winrt::Windows::Foundation::DateTime m_createdTimestamp;
+    hstring m_name{};
+    winrt::Windows::Storage::Streams::IBuffer m_sha256{};
+    uint64_t m_size{};
+    winrt::Windows::Foundation::DateTime m_createdTimestamp{};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

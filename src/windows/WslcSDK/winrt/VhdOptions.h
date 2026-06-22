@@ -36,12 +36,12 @@ struct VhdOptions : VhdOptionsT<VhdOptions>
     WslcVhdRequirements* ToStructPointer();
 
 private:
-    std::string m_name;
-    uint64_t m_size = s_DefaultStorageSize;
-    winrt::Microsoft::WSL::Containers::VhdType m_type = winrt::Microsoft::WSL::Containers::VhdType::Dynamic;
+    std::string m_name{};
+    uint64_t m_size{s_DefaultStorageSize};
+    winrt::Microsoft::WSL::Containers::VhdType m_type{winrt::Microsoft::WSL::Containers::VhdType::Dynamic};
     winrt::Windows::Foundation::IReference<winrt::Microsoft::WSL::Containers::VhdOwner> m_owner{nullptr};
 
-    std::unique_ptr<WslcVhdRequirements> m_vhdOptions;
+    std::unique_ptr<WslcVhdRequirements> m_vhdOptions{nullptr};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
