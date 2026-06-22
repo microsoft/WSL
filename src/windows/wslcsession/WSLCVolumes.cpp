@@ -259,15 +259,12 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::st
 {
     auto lock = m_lock.lock_exclusive();
 
-    // podman's volume prune does not accept docker's "all" filter (it returns HTTP 500
-    // "all is an invalid volume filter") and unconditionally prunes every unused volume -
-    // it has no docker-style "anonymous-only" default mode. Drop "all" so callers passing
-    // all=true get podman's prune-all-unused behavior instead of a failure; all other
-    // filters (label, label!, ...) are forwarded unchanged.
-    auto effectiveFilters = Filters;
-    effectiveFilters.erase("all");
-
-    auto dockerResult = m_dockerClient.PruneVolumes(effectiveFilters);
+    // Forward filters (including docker's "all") unchanged. The system distro's
+    // podman is patched to give the compat /volumes/prune docker-compatible
+    // semantics: "all=true" prunes every unused volume, while no filter prunes
+    // only anonymous volumes (named volumes are preserved). See
+    // config/podman-volume-prune-anonymous.patch in the wslg image.
+    auto dockerResult = m_dockerClient.PruneVolumes(Filters);
 
     PruneVolumesResult result{};
     result.SpaceReclaimed = dockerResult.SpaceReclaimed;

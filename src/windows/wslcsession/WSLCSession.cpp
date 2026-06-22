@@ -2426,8 +2426,9 @@ try
 
     // Validate filter keys client-side: podman returns HTTP 500 (-> E_FAIL) for an unknown filter,
     // but an unknown filter key is a bad argument. podman's volume-prune endpoint
-    // (GeneratePruneVolumeFilters) supports after/since/label/label!/until; "all" is a WSLC-level
-    // filter that WSLCVolumes::PruneVolumes consumes (stripped before the request reaches podman).
+    // (GeneratePruneVolumeFilters) supports after/since/label/label!/until; "all" is the
+    // docker-compatible prune-everything flag, honored by our patched podman's compat
+    // /volumes/prune (see config/podman-volume-prune-anonymous.patch in the wslg image).
     for (const auto& [key, values] : filters)
     {
         THROW_HR_WITH_USER_ERROR_IF(
