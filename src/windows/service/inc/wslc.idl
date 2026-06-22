@@ -61,7 +61,7 @@ interface ICrashDumpCallback : IUnknown
     HRESULT OnCrashDump(
         [in, string] LPCWSTR DumpPath,
         [in, unique, string] LPCSTR ProcessName,
-        [in] ULONGLONG Pid,
+        [in] ULONG Pid,
         [in] ULONG Signal,
         [in] ULONGLONG Timestamp);
 };
@@ -564,6 +564,7 @@ typedef struct _WSLCSessionInitSettings
 interface IWSLCSession : IUnknown
 {
     HRESULT GetId([out] ULONG* Id);
+    HRESULT GetDisplayName([out] LPWSTR* DisplayName);
     HRESULT GetState([out] WSLCSessionState* State);
 
     // Returns a one-off event that is signaled when the session terminates, whether due to an

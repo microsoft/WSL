@@ -409,6 +409,14 @@ class WSLCTests
         VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_NOT_FOUND);
     }
 
+    WSLC_TEST_METHOD(GetDisplayNameReturnsSessionName)
+    {
+        wil::unique_cotaskmem_string displayName;
+        VERIFY_SUCCEEDED(m_defaultSession->GetDisplayName(&displayName));
+        VERIFY_IS_NOT_NULL(displayName.get());
+        VERIFY_ARE_EQUAL(std::wstring(displayName.get()), c_testSessionName);
+    }
+
     WSLC_TEST_METHOD(CreateSessionValidation)
     {
         auto sessionManager = OpenSessionManager();
@@ -484,6 +492,7 @@ class WSLCTests
 
         // The session object must reject NULL output pointers.
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
     }
 
@@ -2905,7 +2914,7 @@ class WSLCTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            ULONGLONG Pid;
+            ULONG Pid;
             ULONG Signal;
             ULONGLONG Timestamp;
         };
@@ -2919,7 +2928,7 @@ class WSLCTests
             {
             }
 
-            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+            HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
                 m_promise.set_value(Invocation{
                     DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
@@ -2957,7 +2966,7 @@ class WSLCTests
         VERIFY_IS_FALSE(invocation.DumpPath.empty());
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<ULONG>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
 
         // The dump file should be readable and non-empty.

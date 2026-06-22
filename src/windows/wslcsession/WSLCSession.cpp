@@ -531,6 +531,17 @@ HRESULT WSLCSession::GetId(ULONG* Id)
     return S_OK;
 }
 
+HRESULT WSLCSession::GetDisplayName(_Out_ LPWSTR* DisplayName)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, DisplayName);
+    *DisplayName = nullptr;
+
+    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::OnDockerdExited()
 {
     if (!m_sessionTerminatingEvent.is_signaled())
@@ -2860,7 +2871,7 @@ void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) no
     m_crashDumpCallbacks.erase(It);
 }
 
-void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)
 try
 {
     // Snapshot the callback list under the lock so that cross-process callback invocations don't

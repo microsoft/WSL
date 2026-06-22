@@ -2066,6 +2066,10 @@ Využití:
     <value>OpenSessionByName('{}') selhalo</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Možnost --session nelze použít s tímto příkazem.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Nepodařilo se spustit příkaz {}. Errno = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2327,11 +2331,11 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>Nepodporovaná možnost síťového ovladače: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>Možnost síťového ovladače Gateway vyžaduje, aby se zadala i 'Subnet.</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2853,7 +2857,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Připojte kontejner k síti</value>
   </data>
   <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
-    <value>Do not error if the network does not exist</value>
+    <value>Nechybová zpráva, pokud síť neexistuje</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Neplatná hodnota {}: název sítě nemůže být prázdný ani obsahovat prázdné znaky.</value>
@@ -2903,9 +2907,6 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Velikost /dev/shm (např. 64 mil., 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>ID relace</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Cesta k úložišti relace</value>
   </data>
@@ -2925,10 +2926,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Zobrazit časová razítka ve výstupu protokolu</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Zobrazit protokoly od časového razítka (např. unix epoch seconds)</value>
+    <value>Zobrazit protokoly od časového razítka (Unixové epochy sekund nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Zobrazit protokoly před časovým razítkem (např. unix epoch seconds)</value>
+    <value>Zobrazit protokoly před časovým razítkem (sekundy Unix epochy nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nový odkaz na obrázek ve formátu image-name[:tag]</value>
@@ -2950,7 +2951,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Připojit svazek ke kontejneru pomocí bind mount</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>Nechybová zpráva, pokud svazek neexistuje</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Pracovní adresář v kontejneru</value>
@@ -3039,6 +3040,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Neplatná hodnota argumentu {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Neplatná hodnota argumentu {}: '{}'. Očekávalo se časové razítko epochy systému Unix nebo datum a čas RFC3339 (např. 2024-01-15T10:30:00Z).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Neplatná hodnota {}: {} je mimo platný rozsah ({}-{}).</value>
