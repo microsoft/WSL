@@ -319,9 +319,12 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     if (it->State == WSLCContainerState::WslcContainerStateRunning)
     {
         auto result = RunWslc(std::format(L"container kill {}", containerName));
-        // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
-        if (result.ExitCode != 0 &&
-            (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+        // Tolerate WSLC_E_CONTAINER_NOT_FOUND (already removed) and WSLC_E_CONTAINER_NOT_RUNNING
+        // (the container exited on its own between the list snapshot above and this kill).
+        const auto tolerated = [&](const wchar_t* code) {
+            return result.Stderr.has_value() && result.Stderr.value().find(code) != std::wstring::npos;
+        };
+        if (result.ExitCode != 0 && !tolerated(L"WSLC_E_CONTAINER_NOT_FOUND") && !tolerated(L"WSLC_E_CONTAINER_NOT_RUNNING"))
         {
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
         }

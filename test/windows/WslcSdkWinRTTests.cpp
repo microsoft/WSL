@@ -1451,9 +1451,7 @@ class WslcSdkWinRtTests
 
         const auto image = winrt::to_hstring(std::format("{}/hello-world:latest", registryAddress));
 
-        // Remove the registry-tagged image pulled below so its (content-addressed) layers don't linger in the local
-        // content store and keep hello-world's layers cached for subsequent tests (e.g. ImageProgressCallback).
-        auto imageCleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
+        auto cleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
 
         // Positive: pulling with correct credentials must succeed.
         {
@@ -1487,8 +1485,6 @@ class WslcSdkWinRtTests
 
             const auto image = winrt::to_hstring(std::format("{}/hello-world:latest", registryAddress));
 
-            // Remove the registry-tagged image pulled below so its (content-addressed) layers don't linger in the local
-            // content store and keep hello-world's layers cached for subsequent tests (e.g. ImageProgressCallback).
             auto imageCleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
 
             // Delete the image locally so the pull is a real network pull.

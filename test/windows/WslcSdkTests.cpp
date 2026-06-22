@@ -2299,8 +2299,6 @@ class WslcSdkTests
 
         auto image = std::format("{}/hello-world:latest", registryAddress);
 
-        // Remove the registry-tagged image pulled below so its (content-addressed) layers don't linger in the local
-        // content store and keep hello-world's layers cached for subsequent tests (e.g. ImageProgressCallback).
         auto imageCleanup = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr)); });
 
@@ -2358,8 +2356,6 @@ class WslcSdkTests
 
             auto image = std::format("{}/hello-world:latest", registryAddress);
 
-            // Remove the registry-tagged image pulled below so its (content-addressed) layers don't linger in the local
-            // content store and keep hello-world's layers cached for subsequent tests (e.g. ImageProgressCallback).
             auto imageCleanup = wil::scope_exit_log(
                 WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr)); });
 
