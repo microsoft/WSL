@@ -2338,7 +2338,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>Option de pilote réseau non prise en charge : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
@@ -2933,10 +2933,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Afficher les horodatages dans le résultat du journal</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Afficher les journaux depuis l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux depuis l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Afficher les journaux avant l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux antérieurs à l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nouvelle référence d’image au format image-name[:tag]</value>
@@ -3049,7 +3049,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <value>Valeur de l’argument {} non valide : '{}'. Un horodatage Unix ou une date-heure RFC3339 est attendu (par exemple 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

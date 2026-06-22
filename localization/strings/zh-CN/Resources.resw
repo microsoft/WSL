@@ -2067,7 +2067,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
-    <value>The --session option cannot be used with this command.</value>
+    <value>此命令不能使用 --session 选项。</value>
     <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
@@ -2331,11 +2331,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>不支持的网络驱动程序选项: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>网络驱动程序选项 'Gateway' 还需要指定 'Subnet'。</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2951,7 +2951,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>将装载卷绑定到容器</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>如果卷不存在，则不要报错</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器内的工作目录</value>
@@ -3042,7 +3042,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <value>无效 {} 参数值: '{}'。预期为 Unix epoch 时间戳或 RFC3339 日期时间(例如 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

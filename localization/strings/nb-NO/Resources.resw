@@ -2926,10 +2926,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis timestamps i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Vis logger siden timestamp (f.eks. unix epoch-sekunder)</value>
+    <value>Vis logger siden timestamp (Unix epoch sekunder eller RFC3339, for eksempel 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Vis logger før timestamp (f.eks. unix epoch-sekunder)</value>
+    <value>Vis logger før timestamp (Unix epoch sekunder eller RFC3339, for eksempel 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildereferanse i bilde-navn[:merke]-format</value>
@@ -3042,7 +3042,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <value>Ugyldig {} argumentverdi: {}. Forventet et Unix epoch-timestamp eller et RFC3339 dato/klokkeslett (f.eks. 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
