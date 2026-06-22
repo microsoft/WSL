@@ -2932,10 +2932,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>在記錄輸出中顯示時間戳記</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>顯示時間戳記之後的記錄 (例如: Unix Epoch 秒數)</value>
+    <value>顯示在時間戳記後的記錄 (Unix Epoch 秒或 RFC3339，例如 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>顯示時間戳記之前的記錄 (例如: Unix Epoch 秒數)</value>
+    <value>顯示在時間戳記之前的記錄 (Unix Epoch 秒或 RFC3339，例如 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>影像名稱[:tag] 格式中的新影像參考</value>
@@ -3048,7 +3048,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <value>無效的 {} 引數值: '{}'。預期為 Unix Epoch 時間戳記或 RFC3339 日期時間 (例如 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
