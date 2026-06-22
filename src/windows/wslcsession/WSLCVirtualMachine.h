@@ -92,6 +92,7 @@ struct VMPortMapping
     void Attach(WSLCVirtualMachine& Vm);
     void Detach();
     uint16_t HostPort() const;
+    void SetHostPort(uint16_t port);
 
     static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
     static VMPortMapping FromWSLCPortMapping(const ::WSLCPortMapping& Mapping);
@@ -183,8 +184,12 @@ public:
 
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
+    WSLCNetworkingMode NetworkingMode() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
+
+    bool UseWslRelayPortForwarding() const;
 
     // Initial setup during Connect()
     void ConfigureNetworking();

@@ -1426,12 +1426,12 @@ class NetworkTests
 
         // Verify that the static neighbor entry was added for the gateway
         const bool gatewayArpEntryExists =
-            LxsstuLaunchWsl(L"ip neigh show dev eth0 | grep \"169\\.254\\.73\\.152 lladdr 00:11:22:33:44:55 PERMANENT\"") == (DWORD)0;
+            LxsstuLaunchWsl(L"ip neigh show dev eth0 | grep \"169\\.254\\.73\\.249 lladdr 00:11:22:33:44:55 PERMANENT\"") == (DWORD)0;
 
         // Verify route was added for destination 127.0.0.1, with preferred source 127.0.0.1
         const bool routeToLoopbackRangeExists =
             LxsstuLaunchWsl(
-                L"ip route show table 127 | grep \"127\\.0\\.0\\.1 via 169\\.254\\.73\\.152 dev eth0\" | grep "
+                L"ip route show table 127 | grep \"127\\.0\\.0\\.1 via 169\\.254\\.73\\.249 dev eth0\" | grep "
                 L"\"src 127\\.0\\.0\\.1\" | grep onlink") == (DWORD)0;
 
         const bool shutdownSuccessful = WslShutdown();
@@ -1464,16 +1464,16 @@ class NetworkTests
 
         const bool firstRouteExists =
             LxsstuLaunchWsl(
-                L"ip route show table 128 | grep \"127\\.0\\.0\\.1 via 169\\.254\\.73\\.152 dev eth0\" | grep \"src "
+                L"ip route show table 128 | grep \"127\\.0\\.0\\.1 via 169\\.254\\.73\\.249 dev eth0\" | grep \"src "
                 L"127\\.0\\.0\\.1\" | grep onlink") == (DWORD)0;
         const bool secondRouteExists =
             LxsstuLaunchWsl(
-                L"ip route show table 128 | grep \"127\\.0\\.0\\.2 via 169\\.254\\.73\\.152 dev eth0\" | grep \"src "
+                L"ip route show table 128 | grep \"127\\.0\\.0\\.2 via 169\\.254\\.73\\.249 dev eth0\" | grep \"src "
                 L"127\\.0\\.0\\.2\" | grep onlink") == (DWORD)0;
 
         // Verify that the static neighbor entry was added for the gateway
         const bool gatewayArpEntryExists =
-            LxsstuLaunchWsl(L"ip neigh show dev eth0 | grep \"169\\.254\\.73\\.152 lladdr 00:11:22:33:44:55 PERMANENT\"") == (DWORD)0;
+            LxsstuLaunchWsl(L"ip neigh show dev eth0 | grep \"169\\.254\\.73\\.249 lladdr 00:11:22:33:44:55 PERMANENT\"") == (DWORD)0;
 
         // Verify that the routes are deleted
         for (const auto address : ipAddresses)
@@ -1516,9 +1516,9 @@ class NetworkTests
 
         // Verify that after configurations are applied, the route chosen for 127.0.0.1 tcp/udp is the desired one
         const bool loopbackTcpUsesCustomTable =
-            LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep \"via 169\\.254\\.73\\.152 dev eth0\"") == (DWORD)0;
+            LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep \"via 169\\.254\\.73\\.249 dev eth0\"") == (DWORD)0;
         const bool loopbackUdpUsesCustomTable =
-            LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto udp | grep \"via 169\\.254\\.73\\.152 dev eth0\"") == (DWORD)0;
+            LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto udp | grep \"via 169\\.254\\.73\\.249 dev eth0\"") == (DWORD)0;
 
         const bool shutdownSuccessful = WslShutdown();
 

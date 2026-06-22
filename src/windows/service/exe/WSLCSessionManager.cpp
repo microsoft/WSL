@@ -122,6 +122,10 @@ private:
             Settings.FeatureFlags,
             WslcFeatureFlagsVirtioFs,
             userSettings.Get<settings::Setting::SessionHostFileShareMode>() == settings::HostFileShareMode::VirtioFs);
+        WI_SetFlagIf(
+            Settings.FeatureFlags,
+            WslcFeatureFlagsPortRelayWslRelay,
+            userSettings.Get<settings::Setting::SessionPortRelay>() == settings::PortRelayType::WslRelay);
         Settings.StorageFlags = storageFlags;
     }
 };

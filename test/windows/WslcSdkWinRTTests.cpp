@@ -115,6 +115,41 @@ class WslcSdkWinRtTests
         return output;
     }
 
+    void WaitForProcessOutput(WSLCSDK::Process const& process, std::string_view marker, std::chrono::seconds timeout = 60s)
+    {
+        auto stream = process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput);
+        Buffer buffer{1024};
+
+        std::string accumulated;
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        for (auto now = std::chrono::steady_clock::now(); now < deadline; now = std::chrono::steady_clock::now())
+        {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
+
+            // N.B. InputStreamOptions::Partial is not supported.
+            auto read = stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::None);
+            if (read.wait_for(remaining) != winrt::Windows::Foundation::AsyncStatus::Completed)
+            {
+                break;
+            }
+
+            const auto result = read.GetResults();
+            if (result.Length() == 0)
+            {
+                break;
+            }
+
+            accumulated.append(reinterpret_cast<const char*>(result.data()), result.Length());
+            if (accumulated.find(marker) != std::string::npos)
+            {
+                return;
+            }
+        }
+
+        LogError("Timed out waiting for process output marker: '%hs'. Output: '%hs'", std::string(marker).c_str(), accumulated.c_str());
+        VERIFY_FAIL();
+    }
+
     struct RunContainerOptions
     {
         std::vector<winrt::hstring> cmdLine = {};
@@ -697,6 +732,7 @@ class WslcSdkWinRtTests
             procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
+            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"python:3.12-alpine");
             containerSettings.InitProcess(procSettings);
@@ -709,6 +745,9 @@ class WslcSdkWinRtTests
 
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
+            // Wait for the in-container HTTP server to start listening before issuing a request.
+            WaitForProcessOutput(container.InitProcess(), "Serving HTTP on");
+
             ExpectHttpResponse(L"http://127.0.0.1:12341", 200, true);
         }
 
@@ -718,6 +757,7 @@ class WslcSdkWinRtTests
             procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
+            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto portMapping = WSLCSDK::ContainerPortMapping(12343, 8000, WSLCSDK::PortProtocol::TCP);
             portMapping.WindowsAddress(winrt::Windows::Networking::HostName(L"127.0.0.1"));
@@ -732,6 +772,9 @@ class WslcSdkWinRtTests
 
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
+            // Wait for the in-container HTTP server to start listening before issuing a request.
+            WaitForProcessOutput(container.InitProcess(), "Serving HTTP on");
+
             ExpectHttpResponse(L"http://127.0.0.1:12343", 200, true);
         }
 
@@ -742,6 +785,7 @@ class WslcSdkWinRtTests
                 winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"--bind", L"::", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
+            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto portMapping = WSLCSDK::ContainerPortMapping(12344, 8000, WSLCSDK::PortProtocol::TCP);
             portMapping.WindowsAddress(winrt::Windows::Networking::HostName(L"::1"));
@@ -755,6 +799,9 @@ class WslcSdkWinRtTests
             container.Start();
 
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            // Wait for the in-container HTTP server to start listening before issuing a request.
+            WaitForProcessOutput(container.InitProcess(), "Serving HTTP on");
 
             ExpectHttpResponse(L"http://[::1]:12344", 200, true);
         }

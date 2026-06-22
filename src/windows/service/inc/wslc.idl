@@ -32,6 +32,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
+#define WSLC_EPHEMERAL_PORT 0
 #define WSLC_MAX_SAVE_IMAGES_COUNT 256
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
@@ -386,6 +387,20 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    HRESULT MapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress,
+        [out, retval] USHORT* AllocatedHostPort);
+
+    // Unmaps a port previously mapped via MapVirtioNetPort.
+    HRESULT UnmapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress);
 
     // Returns the cached termination reason and details. These are only available after the
     // termination event has been signaled; before that the call fails.

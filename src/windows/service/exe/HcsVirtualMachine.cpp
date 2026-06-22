@@ -23,6 +23,7 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "string.hpp"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -33,6 +34,26 @@ constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
 namespace {
+
+SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
+{
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(Address));
+
+    if (listenAddr.si_family == AF_INET)
+    {
+        listenAddr.Ipv4.sin_port = HostPort;
+    }
+    else if (listenAddr.si_family == AF_INET6)
+    {
+        listenAddr.Ipv6.sin6_port = HostPort;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
+    }
+
+    return listenAddr;
+}
 
 // Replace any character outside the conservative ASCII allowlist with '_' so the
 // result is safe to use as the HCS HostingProcessNameSuffix (which becomes the
@@ -468,6 +489,11 @@ try
             WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling);
         }
 
+        if (!FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay))
+        {
+            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay);
+        }
+
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
     }
@@ -676,6 +702,36 @@ try
     *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
 
     return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::MapVirtioNetPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort)
+try
+{
+    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr || ListenAddress == nullptr);
+
+    *AllocatedHostPort = 0;
+
+    std::lock_guard lock(m_lock);
+
+    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+
+    return virtioNet->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::UnmapVirtioNetPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress)
+try
+{
+    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
+
+    std::lock_guard lock(m_lock);
+
+    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+
+    return virtioNet->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
 }
 CATCH_RETURN()
 
