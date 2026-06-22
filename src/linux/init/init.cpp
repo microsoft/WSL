@@ -2753,11 +2753,26 @@ try
     {
         THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
-        if (UtilExecCommandLine("systemctl poweroff", nullptr) == 0)
+        try
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
-            LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
+            std::thread([]() {
+                //
+                // systemctl poweroff is async after the operation is successfully enqueued.
+                // However, in some rare cases, systemctl poweroff can block.
+                // Run it in a separate thread to avoid blocking the timeout.
+                //
+                if (UtilExecCommandLine("systemctl poweroff", nullptr) < 0)
+                {
+                    LOG_ERROR("systemctl poweroff failed {}, calling reboot(RB_POWER_OFF)", errno);
+                    reboot(RB_POWER_OFF);
+                    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
+                }
+            }).detach();
         }
+        CATCH_LOG();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
+        LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
     }
 
     reboot(RB_POWER_OFF);
