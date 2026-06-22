@@ -1446,6 +1446,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, error.message, SocketCodePair.first == 404);
         THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
     }
 }
