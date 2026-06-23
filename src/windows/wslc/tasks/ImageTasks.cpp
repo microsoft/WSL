@@ -92,7 +92,22 @@ void GetImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto images = ImageService::List(session);
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    auto images = ImageService::List(session, filters);
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -103,10 +118,10 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
-        // Print only the image names.
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
+            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
         }
 
         return;
@@ -185,13 +200,14 @@ void PushImage(CLIExecutionContext& context)
 void DeleteImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
-
+    const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
     bool force = context.Args.Contains(ArgType::ImageForce);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
-    services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
+    for (const auto& id : imageIds)
+    {
+        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+    }
 }
 
 void LoadImage(CLIExecutionContext& context)
@@ -223,7 +239,12 @@ void ImportImage(CLIExecutionContext& context)
     }
 
     auto& input = context.Args.Get<ArgType::ImportFile>();
-    services::ImageService::Import(session, input, imageName);
+    auto imageId = services::ImageService::Import(session, input, imageName);
+    if (!imageId.empty())
+    {
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
+    }
 }
 
 void InspectImages(CLIExecutionContext& context)
@@ -256,12 +277,19 @@ void SaveImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto imageIds = context.Args.GetAll<ArgType::ImageId>();
+
+    std::vector<std::string> images;
+    images.reserve(imageIds.size());
+    for (const auto& id : imageIds)
+    {
+        images.push_back(WideToMultiByte(id));
+    }
 
     if (context.Args.Contains(ArgType::Output))
     {
         auto& output = context.Args.Get<ArgType::Output>();
-        services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+        services::ImageService::Save(session, images, output, context.CreateCancelEvent());
     }
     else
     {
@@ -271,7 +299,7 @@ void SaveImage(CLIExecutionContext& context)
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageSaveStdoutIsTerminalError());
         }
 
-        services::ImageService::Save(session, WideToMultiByte(imageId), stdoutHandle, context.CreateCancelEvent());
+        services::ImageService::Save(session, images, stdoutHandle, context.CreateCancelEvent());
     }
 }
 
@@ -290,7 +318,22 @@ void PruneImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
 
     bool all = context.Args.Contains(ArgType::All);
-    auto result = ImageService::Prune(session, all);
+
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
+    std::vector<std::pair<std::string, std::string>> filters;
+    if (context.Args.Contains(ArgType::Filter))
+    {
+        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
+        {
+            std::string raw = WideToMultiByte(wideValue);
+            const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
+            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
+        }
+    }
+
+    auto result = ImageService::Prune(session, all, filters);
 
     for (const auto& image : result.UntaggedImages)
     {
@@ -303,6 +346,6 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

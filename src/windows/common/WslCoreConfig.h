@@ -27,11 +27,11 @@ Abstract:
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), \
-        T_VALUE(c, KernelDebugPort), T_SET(c, KernelModulesPath), T_STRING(c, KernelModulesList), T_SET(c, KernelPath), \
-        T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), \
-        T_VALUE(c, MaximumProcessorCount), T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), \
-        T_ENUM(c, NetworkingMode), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
+        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
+        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
+        T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
+        T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
+        T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
         T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
@@ -88,7 +88,7 @@ enum NetworkingMode
     Nat = 1,
     Bridged = 2,
     Mirrored = 3,
-    VirtioProxy = 4
+    Consomme = 4
 };
 
 // Ensure the WslCoreConfig versions of the enum match the version that's used in mini init.
@@ -96,7 +96,7 @@ static_assert(static_cast<ULONG>(NetworkingMode::None) == LxMiniInitNetworkingMo
 static_assert(static_cast<ULONG>(NetworkingMode::Nat) == LxMiniInitNetworkingModeNat);
 static_assert(static_cast<ULONG>(NetworkingMode::Bridged) == LxMiniInitNetworkingModeBridged);
 static_assert(static_cast<ULONG>(NetworkingMode::Mirrored) == LxMiniInitNetworkingModeMirrored);
-static_assert(static_cast<ULONG>(NetworkingMode::VirtioProxy) == LxMiniInitNetworkingModeVirtioProxy);
+static_assert(static_cast<ULONG>(NetworkingMode::Consomme) == LxMiniInitNetworkingModeConsomme);
 
 constexpr auto ToString(NetworkingMode config) noexcept
 {
@@ -110,8 +110,8 @@ constexpr auto ToString(NetworkingMode config) noexcept
         return "Bridged";
     case NetworkingMode::Mirrored:
         return "Mirrored";
-    case NetworkingMode::VirtioProxy:
-        return "VirtioProxy";
+    case NetworkingMode::Consomme:
+        return "Consomme";
     default:
         return "Invalid";
     }
@@ -122,7 +122,9 @@ const std::map<std::string, wsl::core::NetworkingMode, shared::string::CaseInsen
     {ToString(NetworkingMode::Nat), NetworkingMode::Nat},
     {ToString(NetworkingMode::Bridged), NetworkingMode::Bridged},
     {ToString(NetworkingMode::Mirrored), NetworkingMode::Mirrored},
-    {ToString(NetworkingMode::VirtioProxy), NetworkingMode::VirtioProxy}};
+    {ToString(NetworkingMode::Consomme), NetworkingMode::Consomme},
+    // Legacy alias: the Consomme networking mode was previously named "VirtioProxy".
+    {"VirtioProxy", NetworkingMode::Consomme}};
 
 enum class FirewallAction
 {
@@ -289,6 +291,7 @@ namespace ConfigSetting {
         static constexpr auto IgnoredPorts = "experimental.ignoredPorts";
         static constexpr auto HostAddressLoopback = "experimental.hostAddressLoopback";
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
+        static constexpr auto Swiotlb = "experimental.swiotlb";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -375,6 +378,7 @@ struct Config
     bool EnableHostAddressLoopback = false;
     std::filesystem::path CrashDumpFolder;
     int MaxCrashDumpCount = 10;
+    UINT64 SwiotlbSizeBytes = 0;
 
     // Temporary config value to help root cause the truncated archive errors in SetVersion()
     bool SetVersionDebug = false;

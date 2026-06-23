@@ -19,22 +19,18 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-struct Label
-{
-    static std::pair<std::string, std::string> Parse(const std::wstring& value);
-};
-
-struct DriverOption
-{
-    static std::pair<std::string, std::string> Parse(const std::wstring& value);
-};
-
 struct CreateVolumeOptions
 {
     std::string Name;
     std::optional<std::string> Driver;
     std::vector<std::pair<std::string, std::string>> DriverOpts{};
     std::vector<std::pair<std::string, std::string>> Labels{};
+};
+
+struct PruneVolumesResult
+{
+    std::vector<std::string> PrunedVolumes;
+    ULONGLONG SpaceReclaimed{};
 };
 
 } // namespace wsl::windows::wslc::models

@@ -114,7 +114,9 @@ private:
     std::map<GUID, DeviceHostProxyEntry, wsl::windows::common::helpers::GuidLess> m_devices;
     bool m_devicesShutdown;
 
-    wil::unique_handle m_jobObject;
+    // A kill-on-close job per device host process, held for the proxy's lifetime so the
+    // processes are terminated when the VM shuts down. Guarded by m_devicesLock.
+    std::vector<wil::unique_handle> m_processJobs;
 
     static constexpr LPCWSTR c_hdvModuleName = L"vmdevicehost.dll";
     static constexpr LPCWSTR c_vmwpctrlModuleName = L"vmwpctrl.dll";

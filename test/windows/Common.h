@@ -188,6 +188,27 @@ private:
     std::optional<std::wstring> m_originalContent;
 };
 
+//
+// RAII wrapper for host file change.
+//
+
+class HostFileChange
+{
+public:
+    HostFileChange(const std::filesystem::path& Path, const std::string& NewContent);
+
+    ~HostFileChange();
+
+    NON_COPYABLE(HostFileChange);
+    NON_MOVABLE(HostFileChange);
+
+    void Update(const std::string& NewContent) const;
+
+private:
+    std::filesystem::path m_path;
+    std::optional<std::string> m_originalContent;
+};
+
 template <typename T>
 class RegistryKeyChange
 {
@@ -309,16 +330,27 @@ private:
 class ScopedEnvVariable
 {
 public:
+    // Captures any existing value and clears the variable.
+    explicit ScopedEnvVariable(const std::wstring& Name);
+
+    // Captures any existing value and sets the variable to Value.
     ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
+
+    // Restores the original value.
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const WslConfigChange&) = delete;
-    ScopedEnvVariable(WslConfigChange&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
+
+    // Sets the variable to a new value.
+    void Set(const std::wstring& Value);
+
+    // Clears (unsets) the variable.
+    void Clear();
 
 private:
     std::wstring m_name;
+    std::optional<std::wstring> m_originalValue;
 };
 
 class UniqueWebServer
@@ -520,6 +552,8 @@ struct TestConfigDefaults
     std::optional<size_t> vmIdleTimeout;
     std::optional<bool> safeMode;
     std::optional<bool> guiApplications;
+    std::optional<bool> earlyBootLogging;
+    std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;

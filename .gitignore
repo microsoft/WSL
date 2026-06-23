@@ -72,3 +72,4 @@ test-storage/
 *.tar
 *.etl
 *.lscache
+__pycache__

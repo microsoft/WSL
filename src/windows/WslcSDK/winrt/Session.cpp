@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Session.h"
+#include "ProcessCrashInformation.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
@@ -52,12 +53,19 @@ void Session::Start()
         throw winrt::hresult_illegal_method_call(L"Session has already been started");
     }
 
-    winrt::check_hresult(WslcSetSessionSettingsTerminationCallback(GetStructPointer(m_settings), TerminatedCallback, /* context */ this));
-
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateSession(GetStructPointer(m_settings), m_session.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
     m_settings = nullptr;
+
+    winrt::check_hresult(WslcGetSessionTerminationEvent(m_session.get(), m_terminationEvent.put()));
+
+    m_terminationWait.reset(CreateThreadpoolWait(&Session::OnTerminated, this, nullptr));
+    THROW_LAST_ERROR_IF_NULL(m_terminationWait);
+    SetThreadpoolWait(m_terminationWait.get(), m_terminationEvent.get(), nullptr);
+
+    hr = WslcRegisterSessionCrashDumpCallback(m_session.get(), &Session::OnCrashDump, this, &m_crashDumpSubscription, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
 void Session::EnsureStarted() const
@@ -85,6 +93,22 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
     return winrt::make<implementation::Container>(ToHandle(), containerSettings);
 }
 
+void Session::PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options)
+{
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for pull cannot be null");
+    }
+
+    EnsureStarted();
+
+    auto pullOptions = GetStruct(options);
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcPullSessionImage(ToHandle(), &pullOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(winrt::Microsoft::WSL::Containers::PullImageOptions options)
 {
     if (!options)
@@ -105,6 +129,29 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcPullSessionImage(ToHandle(), &pullOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Session::ImportImage(hstring const& path, hstring const& imageName)
+{
+    if (path.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
+    }
+
+    if (imageName.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Image name cannot be empty");
+    }
+
+    EnsureStarted();
+
+    auto name = winrt::to_string(imageName);
+
+    WslcImportImageOptions importOptions{};
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcImportSessionImageFromFile(ToHandle(), name.c_str(), path.c_str(), &importOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -138,6 +185,22 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
+void Session::LoadImage(hstring const& path)
+{
+    if (path.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Path cannot be empty");
+    }
+
+    EnsureStarted();
+
+    WslcLoadImageOptions loadOptions{};
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcLoadSessionImageFromFile(ToHandle(), path.c_str(), &loadOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::LoadImageAsync(hstring path)
 {
     if (path.empty())
@@ -158,6 +221,22 @@ IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Sessi
 
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcLoadSessionImageFromFile(ToHandle(), path.c_str(), &loadOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Session::PushImage(winrt::Microsoft::WSL::Containers::PushImageOptions const& options)
+{
+    if (!options)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Options for push cannot be null");
+    }
+
+    EnsureStarted();
+
+    auto pushOptions = GetStruct(options);
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcPushSessionImage(ToHandle(), &pushOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -277,7 +356,17 @@ void Session::Terminated(winrt::event_token const& token) noexcept
     m_terminatedEvent.remove(token);
 }
 
-IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
+winrt::event_token Session::ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler)
+{
+    return m_crashDumpEvent.add(handler);
+}
+
+void Session::ProcessCrashed(winrt::event_token const& token) noexcept
+{
+    m_crashDumpEvent.remove(token);
+}
+
+IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::GetImages()
 {
     EnsureStarted();
 
@@ -300,12 +389,46 @@ WslcSession Session::ToHandle()
     return m_session.get();
 }
 
-void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context) noexcept
+void Session::Close()
+{
+    m_terminationWait.reset();
+    m_terminationEvent.reset();
+    m_crashDumpSubscription.reset();
+
+    // Methods called after Close() will fail due to EnsureStarted().
+    m_settings = nullptr;
+    m_session.reset();
+}
+
+void Session::final_release(std::unique_ptr<Session> self)
+{
+    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    self->Close();
+}
+
+void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID context, PTP_WAIT /* wait */, TP_WAIT_RESULT /* waitResult */) noexcept
 {
     try
     {
         auto session = static_cast<Session*>(context);
+
+        WslcSessionTerminationReason reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
+        LOG_IF_FAILED(WslcGetSessionTerminationReason(session->m_session.get(), &reason));
+
         session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
+    }
+    CATCH_LOG();
+}
+
+void CALLBACK Session::OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID context) noexcept
+{
+    try
+    {
+        auto session = static_cast<Session*>(context);
+
+        auto information = winrt::make_self<implementation::ProcessCrashInformation>(info);
+
+        session->m_crashDumpEvent(*information);
     }
     CATCH_LOG();
 }

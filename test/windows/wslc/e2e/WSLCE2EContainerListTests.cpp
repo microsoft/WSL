@@ -527,7 +527,6 @@ private:
                 << L"  -l,--latest  " << Localization::WSLCCLI_LatestArgDescription() << L"\r\n"
                 << L"  --no-trunc   Do not truncate output\r\n"
                 << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  --session    Specify the session to use\r\n"
                 << L"  -?,--help    Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();

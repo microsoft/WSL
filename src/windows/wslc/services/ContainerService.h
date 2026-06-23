@@ -34,8 +34,10 @@ struct ContainerService
         models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
 
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
+    static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
+    static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
-    static void Logs(models::Session& session, const std::string& id, bool follow, ULONGLONG tail = 0);
+    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
     static models::PruneContainersResult Prune(models::Session& session);
 };

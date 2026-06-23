@@ -25,6 +25,15 @@ COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
+// Global options (RootCommand::GetGlobalArguments). These must be accepted by
+// the root-level options-only pass before any subcommand is resolved. A
+// non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.
+COMMAND_LINE_TEST_CASE(L"--session foo image list --verbose", L"list", true)
+// Cases that fail because the unknown/misplaced option falls through to a
+// command that doesn't accept it:
+COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false)     // Unknown option falls through to root, which rejects it
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --session is global; must come before the subcommand
+
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)
@@ -32,9 +41,18 @@ COMMAND_LINE_TEST_CASE(L"system session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"system session list extraarg", L"list", false)
-COMMAND_LINE_TEST_CASE(L"system session shell session1", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session shell", L"shell", true)
-COMMAND_LINE_TEST_CASE(L"system session terminate session1", L"terminate", true)
+COMMAND_LINE_TEST_CASE(L"system session run ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run echo foo", L"run", true) // Command with trailing arguments
+COMMAND_LINE_TEST_CASE(L"system session run ls -la", L"run", true)   // Flags after the command are forwarded
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run echo foo", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run \"ls -la /tmp\"", L"run", true)
+COMMAND_LINE_TEST_CASE(L"system session run", L"run", false)                    // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run", L"run", false) // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"system session run --notanarg ls", L"run", false)      // Invalid flag before command
+COMMAND_LINE_TEST_CASE(L"--session session1 system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage", L"enter", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage --name my-session", L"enter", true)
@@ -51,13 +69,13 @@ COMMAND_LINE_TEST_CASE(L"list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --no-trunc", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"container prune", L"prune", true)
-COMMAND_LINE_TEST_CASE(L"container prune --session foo", L"prune", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container prune", L"prune", true)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)
@@ -156,6 +174,13 @@ COMMAND_LINE_TEST_CASE(L"container stats cont1", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats cont1 cont2", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats --no-trunc cont1", L"stats", true)
 COMMAND_LINE_TEST_CASE(L"container stats --all", L"stats", true)
+// Export command tests
+COMMAND_LINE_TEST_CASE(L"export cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export --output foo cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export -o foo cont1", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
+COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
@@ -175,6 +200,26 @@ COMMAND_LINE_TEST_CASE(L"container logs -n abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs -n=abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --tail", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs -n", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --timestamps cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs -t cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1700000000 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --until 1700000000 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1700000000 --until 1700001000 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --until abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --until 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+05:30 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.123456789Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-13-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T25:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Zextra cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1960-01-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-02-31T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+0530 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --follow --timestamps --since 100 --tail 5 cont1", L"logs", true)
 
 // Image command
 COMMAND_LINE_TEST_CASE(L"image build C:\\context", L"build", true)
@@ -206,6 +251,8 @@ COMMAND_LINE_TEST_CASE(L"image list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"image rm cont1 --force --no-prune", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remove", true)
 
 // Version command tests
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)

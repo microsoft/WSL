@@ -54,7 +54,7 @@ class WSLCE2EContainerPruneTests
         const auto result = RunWslc(L"container prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ContainerPruneSpaceReclaimed(0.0)));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_StoppedContainer)
@@ -148,7 +148,6 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
                 << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
                 << L"\r\n";
         return options.str();

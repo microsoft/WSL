@@ -20,6 +20,8 @@ Abstract:
 
 namespace wsl::windows::common::docker_schema {
 
+using wsl::shared::EmptyObject;
+
 struct CreatedContainer
 {
     std::string Id;
@@ -38,9 +40,10 @@ struct ErrorResponse
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
+    std::optional<std::string> status;
     std::optional<ErrorResponse> errorDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, status, errorDetail);
 };
 
 struct EmptyRequest
@@ -161,22 +164,13 @@ struct Network
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
-struct EmptyObject
+struct ContainerNetworkRequest
 {
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
 };
-
-inline void to_json(nlohmann::json& j, const EmptyObject& memory)
-{
-    UNREFERENCED_PARAMETER(memory);
-    j = nlohmann::json::object();
-}
-
-inline void from_json(const nlohmann::json& j, EmptyObject& obj)
-{
-    // EmptyObject has no fields, so nothing to deserialize
-    UNREFERENCED_PARAMETER(j);
-    UNREFERENCED_PARAMETER(obj);
-}
 
 struct Mount
 {
@@ -215,6 +209,14 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct DeviceRequest
+{
+    std::string Driver;
+    std::vector<std::string> DeviceIDs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeviceRequest, Driver, DeviceIDs);
+};
+
 struct HostConfig
 {
     std::vector<Mount> Mounts;
@@ -230,6 +232,7 @@ struct HostConfig
     // the field — so we don't bother with std::optional here.
     std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
+    std::optional<std::vector<DeviceRequest>> DeviceRequests;
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
     std::int64_t Memory{};
@@ -237,7 +240,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct EndpointSettings
@@ -246,13 +249,28 @@ struct EndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::optional<std::vector<std::string>> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
+
+struct EndpointConfig
+{
+    std::optional<std::vector<std::string>> Aliases;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointConfig& v)
+{
+    j = nlohmann::json::object();
+    if (v.Aliases.has_value() && !v.Aliases->empty())
+    {
+        j["Aliases"] = *v.Aliases;
+    }
+}
 
 struct NetworkingConfig
 {
-    std::map<std::string, EmptyObject> EndpointsConfig;
+    std::map<std::string, EndpointConfig> EndpointsConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(NetworkingConfig, EndpointsConfig);
 };
@@ -392,6 +410,13 @@ struct PruneVolumeResult
     uint64_t SpaceReclaimed{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
+};
+
+struct PruneNetworkResult
+{
+    std::optional<std::vector<std::string>> NetworksDeleted;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneNetworkResult, NetworksDeleted);
 };
 
 struct ImportStatus
@@ -584,8 +609,10 @@ struct BuildKitStatus
 {
     std::string id;
     std::string vertex;
+    int64_t current{};
+    int64_t total{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex, current, total);
 };
 
 struct BuildKitLog

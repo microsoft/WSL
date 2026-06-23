@@ -33,7 +33,6 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::BuildTarget),
         Argument::Create(ArgType::File),
         Argument::Create(ArgType::NoCache),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Tag, false, NO_LIMIT),
         Argument::Create(ArgType::Verbose),
     };
@@ -51,8 +50,8 @@ std::wstring ImageBuildCommand::LongDescription() const
 
 void ImageBuildCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << BuildImage;
 }
 } // namespace wsl::windows::wslc

@@ -202,10 +202,10 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Dağıtım dışarı aktarılamadı.</value>
   </data>
   <data name="MessageFsUpgradeNeeded" xml:space="preserve">
-    <value>Bu dağıtım sistemi için Linux için Windows Alt Sistemi dosya sisteminin bir kez yükseltilemedi...</value>
+    <value>Bu dağıtım için Linux için Windows Alt Sistemi dosya sistemi tek seferliğine yükseltiliyor...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
-    <value>Başka bir örnek yükseltilmeyen olarak çalıştığından başlatılamıyor. Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
+    <value>Başka bir örnek yükseltilmemiş olarak çalıştığından başlatılamıyor. Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
   </data>
   <data name="MessageImportFailed" xml:space="preserve">
     <value>Dağıtım içeri aktarılamadı.</value>
@@ -265,11 +265,11 @@ Desteklenen bağımsız değişkenlerin listesini almak için lütfen '{} --help
     <value>Başka bir örnek yükseltilmiş olarak çalıştığından başlatılamıyor.  Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
-    <value>Linux için Windows Alt Sistemi yüklü dağıtımı yok.
-Aşağıdaki yönergeleri içeren bir dağıtım yükleyerek bu sorunu çözebilirsiniz:
+    <value>Linux için Windows Alt Sistemi'nde yüklü dağıtım yok.
+Aşağıdaki talimatları izleyip dağıtım yükkeyerek bu sorunu giderebilirsiniz:
 
-Kullanılabilir dağıtımları wsl.exe --list --online' için 'wsl.exe --list --online' 'i kullanın
-ve 'wsl.exe --install &lt;Distro&gt;' kullanın.</value>
+Kullanılabilir dağıtımları listelemek için 'wsl.exe --list --online' komutunu kullanın
+Dağıtımları yüklemek için 'wsl.exe --install &lt;Distro&gt;' komutunu kullanın.</value>
     <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
@@ -706,7 +706,7 @@ Bağımsız değişkenler:
     <value>Bu dağıtım yalnızca Microsoft Store’dan kullanılabilir.</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
-    <value>arm64 wsl.exe --mount , Windows sürüm 27653 veya daha yenisini gerektirir.</value>
+    <value>ARM64'te wsl.exe --mount Windows'un 27653 veya daha yeni sürümlerini gerektirir.</value>
     <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
@@ -759,7 +759,7 @@ Daha fazla bilgi için lütfen https://aka.ms/wslinstall adresini ziyaret edin.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
-    <value>Hata ayıklama kabuğu çalıştırmak için yönetici wsl.exe çalıştırmanız gerekir.</value>
+    <value>Hata ayıklama kabuğu çalıştırmak için yönetici olarak wsl.exe çalıştırmanız gerekir.</value>
   </data>
   <data name="MessageAdminProtectionEnabled" xml:space="preserve">
     <value>Windows Admin Protection etkinleştirildi ve dağıtımlarınız farklı bir hesap altında kayıtlı olabilir.
@@ -845,7 +845,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
-    <value>Eski dağıtım kayıtları bağımsız değişken --version desteklemez.</value>
+    <value>Eski dağıtım kayıtları --version bağımsız değişkenini desteklemez.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
@@ -918,6 +918,10 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>DNS Tüneli desteklenmiyor</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
+  <data name="MessageHostsFileTooLarge" xml:space="preserve">
+    <value>Windows hosts dosyası çok büyük ve WSL içinde yansıtılmayacaktır. %SystemRoot%\System32\drivers\etc\hosts dosyasının boyutunu küçültmeyi değerlendirin</value>
+    <comment>{Locked="%SystemRoot%\System32\drivers\etc\hosts"}{Locked="WSL"}</comment>
+  </data>
   <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
     <value>Yansıtılmış ağ modu kullanılırken wsl2.localhostForwarding ayarının etkisi yoktur</value>
   </data>
@@ -938,7 +942,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
-    <value>Proxy ayarları çözümlanmaya çalışılırken beklenmeyen bir hata oluştu, proxy ayarları WSL'ye yansıtılamadı.</value>
+    <value>Proxy ayarları çözümlenmeye çalışılırken beklenmeyen bir hata oluştu, proxy ayarları WSL'ye yansıtılamadı.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
@@ -1104,7 +1108,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWaitingForOobe" xml:space="preserve">
-    <value>"{}" dağıtımı için OOBE komutunun tamamlanması ...</value>
+    <value>"{}" dağıtımı için OOBE komutunun tamamlanması bekleniyor...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
@@ -1126,10 +1130,18 @@ Web'den indirme deneniyor...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p devre dışı bırakıldı, vsock aktarımıyla 9p'ye geri dönülüyor.</value>
   </data>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>wsl2.virtio devre dışı bırakıldığında Consomme ağı desteklenmez ve networkingMode {} kullanılır.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
+    <value>Çalışan çekirdekte virtio cihaz performansını önemli ölçüde iyileştiren bir yama eksik. Bu iyileştirmeyi etkinleştirmek için daha yeni bir WSL çekirdeğine güncelleştirin.</value>
+    <comment>{Locked="virtio"}</comment>
+  </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL yüklemesi bozulmuş gibi görünüyor (Hata kodu: {}).
-WSL'yi onarmak için herhangi bir tuşa basın veya CTRL-C tuşlarına basın.
-Bu istem 60 saniye içinde zaman aşımına uğradı.</value>
+WSL'yi onarmak için herhangi bir tuşa, iptal etmek için CTRL-C tuşlarına basın.
+Bu istem 60 saniye içinde zaman aşımına uğrayacak.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
@@ -1150,7 +1162,7 @@ Hata kodu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageTooManyProcessors" xml:space="preserve">
-    <value>wsl2.processors, sistemdeki mantıksal işlemci sayısını ({} veya {}) &gt; aşamıyor</value>
+    <value>wsl2.processors, sistemdeki mantıksal işlemci sayısını ({} &gt; {}) aşamıyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
@@ -1416,13 +1428,13 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <value>Hyper-V Güvenlik Duvarı etkin</value>
   </data>
   <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
-    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını sağlar.</value>
+    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını etkinleştirir.</value>
   </data>
   <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Hyper-V Güvenlik Duvarı etkin.</value>
   </data>
   <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını sağlar.</value>
+    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını etkinleştirir.</value>
   </data>
   <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
     <value>Ana Bilgisayar Adresi Geri Döngüsü</value>
@@ -1441,7 +1453,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <value>Yoksayılan bağlantı noktaları</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
+    <value>Yalnızca wsl2.networkingMode yansıtılmış olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000,9000,9090.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -2050,9 +2062,21 @@ Kullanım:
     <value>Geçersiz IP adresi '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>'{}' bağlantı noktası eşlenemedi, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') başarısız oldu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>--session seçeneği bu komutla kullanılamaz.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>{} komutu başlatılamadı. Hata = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>WSLA oturumu bulunamadı.</value>
@@ -2067,9 +2091,6 @@ Kullanım:
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>Varsayılan oturum bulunamadı</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>Varsayılan oturum açılamadı</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>Varsayılan oturum sonlandırılamadı</value>
@@ -2103,16 +2124,13 @@ Kullanım:
     <value>'{}' kapsayıcısı çalışmıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress henüz desteklenmiyor.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>'{}' kapsayıcısı çalışıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerModeNoAdditionalNetworks" xml:space="preserve">
-    <value>Kapsayıcı ağ modunda ek ağlara izin verilmiyor.</value>
+  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
+    <value>ContainerIpAddress henüz desteklenmiyor.</value>
+    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Bağlantı noktası eşlemeleri kapsayıcı ağ modunda desteklenmez; bağlantı noktalarının sahibi hedef kapsayıcıdır.</value>
@@ -2127,9 +2145,6 @@ Kullanım:
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
     <value>'{}' kapsayıcısı bulunamadı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Özel ağ türü için kapsayıcı ağ adı gereklidir.</value>
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Ağ adı boş olamaz.</value>
@@ -2181,6 +2196,9 @@ Kullanım:
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>Şu bağımsız değişkenler kullanılabilir:</value>
+  </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>Renkli çıktıyı devre dışı bırakın.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Belirli bir komut hakkında daha fazla ayrıntı için, ilgili komutu yardım bağımsız değişkenine geçirin.</value>
@@ -2316,12 +2334,24 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Desteklenmeyen ağ sürücüsü seçeneği: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Ağ sürücüsü seçeneği 'Gateway' için 'Subnet' de belirtilmelidir.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>'{}' ağının etkin uç noktaları var.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>'{}' ağı zaten var.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
+    <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2331,6 +2361,21 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Yinelenen ağ: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
+    <value>Uç nokta ayarları henüz desteklenmiyor (ağ '{}').</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasEmpty" xml:space="preserve">
+    <value>Ağ takma adı boş olamaz.</value>
+  </data>
+  <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Ağ diğer adları için kullanıcı tanımlı bir ağ gerekir. Bir ağ belirtmek için --network kullanın.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Birden çok ağ istendiğinde ağ diğer adları belirtilemez. Tek bir --network bağımsız değişkeni kullanın.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>'{}': {} disk birimi oluşturulamadı</value>
@@ -2359,9 +2404,23 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>'{}' içinde WSLC oturumu bulunamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Dizin boş olmadığından '{}' oturum depolama alanı olarak kullanılamıyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>'{}' bir dizin olmadığından oturum depolama alanı olarak kullanılamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Geçersiz resim etiketi biçimi: '{}'. Beklenen biçim: 'ad:etiket'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSaveInProgress" xml:space="preserve">
+    <value>Kaydetme devam ediyor.</value>
+  </data>
+  <data name="MessageWslcExportInProgress" xml:space="preserve">
+    <value>Dışarı aktarma işlemi devam ediyor.</value>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
     <value>WSLC, Linux için Windows Alt Sistemi Kapsayıcı CLI aracıdır.</value>
@@ -2396,6 +2455,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
     <value>Çalışan bir kapsayıcıda komut yürütür.</value>
   </data>
+  <data name="WSLCCLI_ContainerExportDesc" xml:space="preserve">
+    <value>Bir kapsayıcının dosya sistemini tar arşivi olarak dışa aktarın.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportLongDesc" xml:space="preserve">
+    <value>Bir kapsayıcının dosya sistemini tar arşivi olarak dışa aktarır.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
+    <value>STDOUT yerine bir dosyaya yazın</value>
+    <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Bir kapsayıcıyı incele.</value>
   </data>
@@ -2427,9 +2496,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>Durdurulmuş tüm kapsayıcıları kaldırır.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>Geri kazanılan toplam alan: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Kapsayıcılar kaldır.</value>
@@ -2520,9 +2589,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Tüm bağlantısız görüntüleri kaldırır. --all belirtilirse, herhangi bir kapsayıcı tarafından kullanılmayan tüm görüntüleri kaldırır.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Geri kazanılan toplam alan: {:.2f} MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>Etiketsiz: {}</value>
@@ -2643,6 +2712,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Etkin bir oturuma bağlanır. Oturum kimliği verilmezse varsayılan wslc oturumu kullanılır.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>Bir oturumda komut çalıştırın.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>TTY içermeyen etkin bir oturumda komut çalıştırır. Komut ve bağımsız değişkenleri doğrudan oturuma iletilir. Oturum belirtilmezse, varsayılan wslc oturumu kullanılır.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>Çalıştırılan komuta geçirilecek bağımsız değişkenler</value>
+  </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Bir oturumu sonlandır.</value>
   </data>
@@ -2698,6 +2777,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Çalıştırılacak komut</value>
+  </data>
+  <data name="WSLCCLI_CpusArgDescription" xml:space="preserve">
+    <value>CPU sayısı (ör. 0.5, 1, 2.5)</value>
+    <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Pozitif bir CPU sayısı bekleniyordu (ör. 0.5, 1, 2)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
     <value>Çalışıyor olsa bile kapsayıcıları sil</value>
@@ -2768,11 +2855,35 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_LatestArgDescription" xml:space="preserve">
     <value>En son oluşturulan kapsayıcıyı göster (tüm durumları içerir)</value>
   </data>
+  <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
+    <value>Bellek sınırı (ör. 512M, 1G)</value>
+    <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Kapsayıcı ana bilgisayar adı</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Kapsayıcının adı</value>
+  </data>
+  <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
+    <value>Bir bağlayıcıyı ağa bağlayın</value>
+  </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Ağ mevcut değilse hata verme</value>
+  </data>
+  <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: ağ adı boş veya boşluk olamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
+    <value>ana bilgisayar modu ağı desteklenmiyor</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
+    <value>Kapsayıcı için ağ kapsamlı bir diğer ad ekleyin</value>
+  </data>
+  <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: ağ diğer adı boş veya boşluk olamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Görüntüyü oluştururken önbelleği kullanma</value>
@@ -2808,9 +2919,6 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>/dev/shm klasörünün boyutu (örneğin 64 MB, 1 GB)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Oturum Kimliği</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Oturum depolama alanı yolu</value>
   </data>
@@ -2825,6 +2933,15 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
     <value>Günlüklerin sonundan itibaren gösterilecek satır sayısı</value>
+  </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Günlük çıktısında zaman damgalarını göster</value>
+  </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Zaman damgasından bu yana günlükleri göster (Unix dönemi saniye veya RFC3339, örneğin 2024-01-15T10:30:00Z)</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Zaman damgasından önceki günlükleri göster (Unix dönem saniyesi veya RFC3339, örneğin 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde yeni resim referansı</value>
@@ -2845,8 +2962,15 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bir birimi kapsayıcıya sabit olarak bağla</value>
   </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Birim mevcut değilse hata verme</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Kapsayıcı içindeki çalışma dizini</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirEmptyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: çalışma dizini boş veya boşluk olamaz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Kapsayıcı kimliğini verilen yola yazın</value>
@@ -2892,6 +3016,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Belirtilen yoldaki kapsayıcıya tmpfs bağla</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UlimitArgDescription" xml:space="preserve">
+    <value>Ulimit seçenekleri (biçim: &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;], sınırsız için -1 kullanın)</value>
+    <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Beklenen &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (sınırsız için -1 kullanın)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
+  </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
     <value>İşlemin kullanıcı kimliği (name|uid|uid:gid)</value>
     <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
@@ -2921,6 +3053,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz {} bağımsız değişken değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Unix dönemi zaman damgası veya RFC3339 bir tarih-saat (örneğin 2024-01-15T10:30:00Z) bekleniyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Geçersiz {} değeri: {} geçerli aralığın dışında ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2946,6 +3082,60 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Yükleme istendi ancak giriş sağlanmadı.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
+    <value>Ağları yönet.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
+    <value>Oluşturma, inceleme, listeleme ve silme işlemleri de dahil olmak üzere WSL ağlarının yaşam döngüsünü yönetin.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkCreateDesc" xml:space="preserve">
+    <value>Bir ağ oluşturun.</value>
+  </data>
+  <data name="WSLCCLI_NetworkCreateLongDesc" xml:space="preserve">
+    <value>Yeni bir ağ oluşturur.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDriverOptionDescription" xml:space="preserve">
+    <value>Ağ sürücüsü adını belirtin (varsayılan: bridge)</value>
+    <comment>{Locked="bridge"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
+    <value>Ağ meta verisi ayarı</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
+    <value>Bir veya birden fazla ağı kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_NetworkRemoveLongDesc" xml:space="preserve">
+    <value>Bir veya birden fazla ağı kaldırır.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectDesc" xml:space="preserve">
+    <value>Bir veya birden çok ağ üzerinde ayrıntılı bilgi görüntüle.</value>
+  </data>
+  <data name="WSLCCLI_NetworkInspectLongDesc" xml:space="preserve">
+    <value>Bir veya birden çok ağ üzerinde ayrıntılı bilgi görüntüle.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListDesc" xml:space="preserve">
+    <value>Ağları listeleyin.</value>
+  </data>
+  <data name="WSLCCLI_NetworkListLongDesc" xml:space="preserve">
+    <value>Oturumdaki tüm ağları listeler.</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
+    <value>Ağ adı</value>
+  </data>
+  <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
+    <value>Yalnızca ağ adlarının çıkışını oluşturur</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>Kullanılmayan tüm ağları kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>Kullanılmayan tüm ağları kaldırır. Bir ağ, herhangi bir kapsayıcı tarafından başvurulmadığında kullanılmıyor olarak kabul edilir.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>Silindi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Birimleri yönetin.</value>
@@ -2978,6 +3168,24 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
     <value>Oturumdaki tüm birimleri listeler.</value>
   </data>
+  <data name="WSLCCLI_VolumePruneDesc" xml:space="preserve">
+    <value>Kullanılmayan yerel birimleri kaldır.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneLongDesc" xml:space="preserve">
+    <value>Kullanılmayan tüm anonim yerel birimleri kaldırır. --all parametresi belirtilirse, kullanılmayan adlandırılmış birimleri de kaldırır. Bir birim, herhangi bir kapsayıcı tarafından başvurulmadığında kullanılmayan birim olarak kabul edilir.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
+    <value>Yalnızca anonim olanlar değil, tüm kullanılmayan birimleri kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
+    <value>Silindi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
     <value>Birim adı</value>
   </data>
@@ -2993,6 +3201,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Görüntü terminale yazılamıyor. -o bayrağını kullanın veya stdout'u yeniden yönlendirin.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
+    <value>Kapsayıcı terminale dışa aktarılamıyor. -o bayrağını kullanın veya stdout'a yönlendirin.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Beklenen biçim: &lt;ana bilgisayar yolu | adlandırılmış birim&gt;:&lt;kapsayıcı yolu&gt;[:mode]</value>
@@ -3100,6 +3311,60 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
     <value>Uyarı: {} konumundaki ayarlar dosyası boş veya dosyanın yapısı geçersiz. YAML eşlemesi bekleniyordu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverContainer" xml:space="preserve">
+    <value>'{}' kapsayıcısı kurtarılamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverNetwork" xml:space="preserve">
+    <value>'{}' ağı kurtarılamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToRecoverVolume" xml:space="preserve">
+    <value>'{}' birimi kurtarılamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailable" xml:space="preserve">
+    <value>Aşağıdaki disk birimleri kullanılamadığından kapsayıcı başlatılamıyor: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotAvailableReason" xml:space="preserve">
+    <value>'{}' disk birimi mevcut değil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSwapInitFailed" xml:space="preserve">
+    <value>Değiştirme başlatılamadı</value>
+  </data>
+  <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
+    <value>'{}' kapsayıcısı için zaman damgası geri yüklenemedi</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
+    <value>Görüntü içeri aktarma ilerleme durumu ayrıştırılamadı</value>
+  </data>
+  <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
+    <value>'{}' birimi çıkarılamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
+    <value>Eklenti reddedildikten sonra '{}' kapsayıcısı durdurulamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
+    <value>'{}' birimi için ana bilgisayar kaynakları serbest bırakılamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedComputer" xml:space="preserve">
+    <value>Sertifika kodlama hataları nedeniyle {} sertifikaları Yerel Makine Kullanıcı Güvenilen Kök deposundan içeri aktarma işlemi atlandı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImportCertsSkippedUser" xml:space="preserve">
+    <value>Sertifika kodlama hataları nedeniyle {} sertifikaları Geçerli Kullanıcı Güvenilen Kök deposundan içeri aktarma işlemi atlandı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
+    <value>Ana bilgisayar güvenilen kök sertifikaları sanal makineye yüklenemedi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

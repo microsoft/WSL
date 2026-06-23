@@ -74,7 +74,8 @@ DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSessi
             {
                 WSL_LOG(
                     "DockerEventParseError",
-                    TraceLoggingValue(buffer.data(), "Data"),
+                    TraceLoggingCountedString(
+                        buffer.data(), static_cast<UINT16>(std::min(buffer.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
                     TraceLoggingValue(m_session.Id(), "SessionId"));
             }
