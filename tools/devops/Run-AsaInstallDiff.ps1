@@ -138,39 +138,30 @@ if (-not (Test-Admin)) {
 }
 
 # --- Ensure the ASA CLI is available ---
-# ASA is distributed only as a .NET global tool (no prebuilt binaries), so this
-# bootstraps the .NET SDK on the fly when the agent/VM does not already have it.
-$AsaVersion = '2.3.331'
+# ASA ships a self-contained Windows build (no .NET SDK or NuGet feed required),
+# so download and unzip it here. This works on a clean VM image where only a
+# runtime-only 'dotnet' host (or none) is present. The self-contained zip is only
+# published up to 2.3.321; newer tags ship the dotnet global tool only.
+$AsaVersion = '2.3.321'
+$AsaUrl = "https://github.com/microsoft/AttackSurfaceAnalyzer/releases/download/v$AsaVersion/ASA_win_$AsaVersion.zip"
 
 function Resolve-Asa {
     $cmd = Get-Command asa -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
-    $toolPath = Join-Path $env:USERPROFILE '.dotnet\tools\asa.exe'
-    if (Test-Path $toolPath) { return $toolPath }
 
-    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-    if ($dotnet) {
-        $dotnetExe = $dotnet.Source
-    }
-    else {
-        Write-Host '=== dotnet not found; bootstrapping .NET 8 SDK ===' -ForegroundColor Cyan
-        $installDir = Join-Path $env:USERPROFILE '.dotnet'
-        $installer = Join-Path $env:TEMP 'dotnet-install.ps1'
-        Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installer -UseBasicParsing
-        & $installer -Channel 8.0 -InstallDir $installDir
-        if ($LASTEXITCODE -ne 0) { throw "dotnet bootstrap failed ($LASTEXITCODE)" }
-        $dotnetExe = Join-Path $installDir 'dotnet.exe'
-    }
-    $env:PATH = (Join-Path $env:USERPROFILE '.dotnet\tools') + ';' + $env:PATH
+    $toolsDir = Join-Path $WorkDir 'asa-cli'
+    $exe = Join-Path $toolsDir "ASA_win_$AsaVersion\Asa.exe"
+    if (Test-Path $exe) { return $exe }
 
-    Write-Host "=== Installing Attack Surface Analyzer CLI $AsaVersion ===" -ForegroundColor Cyan
-    & $dotnetExe tool install --global Microsoft.CST.AttackSurfaceAnalyzer.CLI --version $AsaVersion
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install ASA CLI ($LASTEXITCODE)" }
+    Write-Host "=== Downloading Attack Surface Analyzer CLI $AsaVersion ===" -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+    $zip = Join-Path $toolsDir "ASA_win_$AsaVersion.zip"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $AsaUrl -OutFile $zip -UseBasicParsing
+    Expand-Archive -Path $zip -DestinationPath $toolsDir -Force
 
-    if (Test-Path $toolPath) { return $toolPath }
-    $cmd = Get-Command asa -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    throw 'ASA CLI not found after install.'
+    if (Test-Path $exe) { return $exe }
+    throw "ASA CLI not found after download (expected $exe)."
 }
 
 $asa = Resolve-Asa
