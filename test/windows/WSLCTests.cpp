@@ -8015,15 +8015,43 @@ class WSLCTests
                 return container;
             };
 
+            auto validateInspectPortBinding = [&](auto& container,
+                                                uint16_t containerPort,
+                                                int protocol,
+                                                const std::string& expectedHostIp,
+                                                std::optional<uint16_t> expectedHostPort) -> std::string {
+                auto inspectData = container.Inspect();
+
+                auto portKey = std::format("{}/{}", containerPort, protocol == IPPROTO_UDP ? "udp" : "tcp");
+                VERIFY_IS_TRUE(inspectData.Ports.contains(portKey));
+
+                auto& bindings = inspectData.Ports[portKey];
+                VERIFY_ARE_EQUAL(1u, bindings.size());
+                VERIFY_ARE_EQUAL(expectedHostIp, bindings[0].HostIp);
+
+                if (expectedHostPort.has_value())
+                {
+                    VERIFY_ARE_EQUAL(std::to_string(expectedHostPort.value()), bindings[0].HostPort);
+                }
+                else
+                {
+                    VERIFY_IS_TRUE(std::stoi(bindings[0].HostPort) > 0);
+                }
+
+                return bindings[0].HostPort;
+            };
+
             // Explicit localhost (127.0.0.1) binding.
             {
                 auto container = createTcpContainer({{1260, 8000, AF_INET, IPPROTO_TCP, "127.0.0.1"}});
+                validateInspectPortBinding(container, 8000, IPPROTO_TCP, "127.0.0.1", 1260);
                 ExpectHttpResponse(L"http://127.0.0.1:1260", 200);
             }
 
             // 0.0.0.0 (all interfaces) binding.
             {
                 auto container = createTcpContainer({{1261, 8000, AF_INET, IPPROTO_TCP, "0.0.0.0"}});
+                validateInspectPortBinding(container, 8000, IPPROTO_TCP, "0.0.0.0", 1261);
 
                 // Verify reachable via loopback.
                 ExpectHttpResponse(L"http://127.0.0.1:1261", 200);
@@ -8045,6 +8073,7 @@ class WSLCTests
                 if (hostIp.has_value())
                 {
                     auto container = createTcpContainer({{1262, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
+                    validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIp.value(), 1262);
 
                     auto url = std::format(L"http://{}:1262", wsl::shared::string::MultiByteToWide(hostIp.value()));
                     ExpectHttpResponse(url.c_str(), 200);
@@ -8058,14 +8087,9 @@ class WSLCTests
             // Anonymous bind on localhost (ephemeral host port).
             {
                 auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, "127.0.0.1"}});
+                auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, "127.0.0.1", std::nullopt);
 
-                auto inspectData = container.Inspect();
-                VERIFY_IS_TRUE(inspectData.Ports.contains("8000/tcp"));
-
-                auto& bindings = inspectData.Ports["8000/tcp"];
-                VERIFY_ARE_EQUAL(1u, bindings.size());
-
-                ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", bindings[0].HostPort).c_str(), 200);
+                ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), 200);
             }
 
             // Anonymous bind on host ip (ephemeral host port).
@@ -8073,14 +8097,9 @@ class WSLCTests
                 if (hostIp.has_value())
                 {
                     auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
+                    auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIp.value(), std::nullopt);
 
-                    auto inspectData = container.Inspect();
-                    VERIFY_IS_TRUE(inspectData.Ports.contains("8000/tcp"));
-
-                    auto& bindings = inspectData.Ports["8000/tcp"];
-                    VERIFY_ARE_EQUAL(1u, bindings.size());
-
-                    ExpectHttpResponse(std::format(L"http://{}:{}", hostIp.value(), bindings[0].HostPort).c_str(), 200);
+                    ExpectHttpResponse(std::format(L"http://{}:{}", hostIp.value(), hostPort).c_str(), 200);
                 }
                 else
                 {
@@ -8091,12 +8110,14 @@ class WSLCTests
             // IPv6 loopback (::1) binding.
             {
                 auto container = createTcpContainer({{1263, 8000, AF_INET6, IPPROTO_TCP, "::1"}});
+                validateInspectPortBinding(container, 8000, IPPROTO_TCP, "::1", 1263);
                 ExpectHttpResponse(L"http://[::1]:1263", 200);
             }
 
             // IPv6 wildcard (::) binding.
             {
                 auto container = createTcpContainer({{1264, 8000, AF_INET6, IPPROTO_TCP, "::"}});
+                validateInspectPortBinding(container, 8000, IPPROTO_TCP, "::", 1264);
                 ExpectHttpResponse(L"http://[::1]:1264", 200);
             }
 
@@ -8124,6 +8145,7 @@ class WSLCTests
 
                 auto container = launcher.Launch(*session);
                 WaitForOutput(container.GetInitProcess().GetStdHandle(1), "UDP listening");
+                validateInspectPortBinding(container, 9000, IPPROTO_UDP, "127.0.0.1", 1265);
 
                 WSLCE2ETests::SendUdpAndReceive(1265, "hello", "HELLO");
             }
@@ -8136,6 +8158,8 @@ class WSLCTests
                     launcher.AddPort(1265, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
 
                     auto container = launcher.Create(*session);
+                    validateInspectPortBinding(container, 8000, IPPROTO_TCP, "1.1.1.1", 1265);
+
                     VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL));
                     ValidateCOMErrorMessage(
                         L"Failed to map port '1.1.1.1:1265/tcp', The requested address is not valid in its context. ");
