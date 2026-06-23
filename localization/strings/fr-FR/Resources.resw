@@ -1137,9 +1137,9 @@ Tentative d'... de téléchargement web</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p est désactivé et revient à 9p avec le transport vsock.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>La mise en réseau VirtioProxy n’est pas prise en charge lorsque wsl2.virtio est désactivé ; retour à networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>La mise en réseau Consomme n’est pas prise en charge lorsque wsl2.virtio est désactivé ; retour à networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Il manque un correctif qui améliore considérablement les performances de virtio appareil dans le noyau en cours d’exécution. Mettez à jour vers un noyau WSL plus récent pour activer cette optimisation.</value>
@@ -2069,9 +2069,17 @@ Utilisation :
     <value>Adresse IP non valide '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Échec du mappage du port « {} », {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>Échec de OpenSessionByName('{}')</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>L’option --session ne peut pas être utilisée avec cette commande.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Échec du lancement de la commande {}. Errno = {}</value>
@@ -2197,7 +2205,7 @@ Utilisation :
     <value>Les arguments suivants sont disponibles :</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Désactiver l'affichage en couleur.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Pour en savoir plus sur une commande spécifique, passez-la à l’argument aide.</value>
@@ -2333,6 +2341,14 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Pilote réseau non pris en charge : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Option de pilote réseau non prise en charge : « {} »</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>L’option de pilote réseau 'Gateway' nécessite que 'Subnet' soit également spécifié.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Le réseau « {} » a des points de terminaison actifs.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2393,6 +2409,14 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Aucune session WSLC trouvée dans '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Impossible d’utiliser « {} » comme stockage de session, car le répertoire n’est pas vide</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Impossible d’utiliser « {} » comme stockage de session, car il ne s’agit pas d’un répertoire</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2480,7 +2504,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Supprime tous les conteneurs arrêtés.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Espace total récupéré : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2573,7 +2597,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Espace total récupéré : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2851,6 +2875,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Connectez un conteneur à un réseau</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Ne générez pas d’erreur si le réseau n’existe pas</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2899,9 +2926,6 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Taille de /dev/shm (par exemple, 64 Mo, 1 G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>ID de session</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Chemin d’accès de stockage de session</value>
   </data>
@@ -2921,10 +2945,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Afficher les horodatages dans le résultat du journal</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Afficher les journaux depuis l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux depuis l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Afficher les journaux avant l’horodatage (par exemple, secondes depuis l’époque Unix)</value>
+    <value>Afficher les journaux antérieurs à l’horodatage (secondes d’époque Unix ou RFC3339, par exemple 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nouvelle référence d’image au format image-name[:tag]</value>
@@ -2944,6 +2968,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Lier le montage d’un volume sur le conteneur</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Ne générez pas d’erreur si le volume n’existe pas</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Répertoire de travail à l’intérieur du conteneur</value>
@@ -3033,6 +3060,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Valeur d’argument {} non valide : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Valeur de l’argument {} non valide : '{}'. Un horodatage Unix ou une date-heure RFC3339 est attendu (par exemple 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Valeur {} non valide : {} est en dehors de la plage valide ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3104,13 +3135,13 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Affiche uniquement les noms des réseaux</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Supprimez tous les réseaux inutilisés.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Supprime tous les réseaux inutilisés. Un réseau est considéré comme inutilisé lorsqu’il n’est référencé par aucun conteneur.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Supprimé : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

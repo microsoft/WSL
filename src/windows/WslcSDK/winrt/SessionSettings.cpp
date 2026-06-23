@@ -93,12 +93,12 @@ void SessionSettings::CpuCount(IReference<uint32_t> const& value)
     m_cpuCount = value;
 }
 
-IReference<uint32_t> SessionSettings::MemoryMB()
+IReference<uint32_t> SessionSettings::MemorySizeInMB()
 {
-    return m_memoryMB;
+    return m_memorySizeInMB;
 }
 
-void SessionSettings::MemoryMB(IReference<uint32_t> const& value)
+void SessionSettings::MemorySizeInMB(IReference<uint32_t> const& value)
 {
     if (m_sessionSettings)
     {
@@ -110,7 +110,7 @@ void SessionSettings::MemoryMB(IReference<uint32_t> const& value)
         throw hresult_invalid_argument(L"Memory size cannot be 0");
     }
 
-    m_memoryMB = value;
+    m_memorySizeInMB = value;
 }
 
 IReference<TimeSpan> SessionSettings::Timeout()
@@ -168,19 +168,19 @@ void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOpti
     m_vhdRequirements = value;
 }
 
-winrt::Microsoft::WSL::Containers::SessionFeatureFlags SessionSettings::FeatureFlags()
+bool SessionSettings::EnableGpu()
 {
-    return m_featureFlags;
+    return WI_IsFlagSet(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU);
 }
 
-void SessionSettings::FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value)
+void SessionSettings::EnableGpu(bool value)
 {
     if (m_sessionSettings)
     {
-        throw hresult_illegal_state_change(L"Cannot change feature flags after session has been initialized");
+        throw hresult_illegal_state_change(L"Cannot change GPU setting after session has been initialized");
     }
 
-    m_featureFlags = value;
+    WI_UpdateFlag(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, value);
 }
 
 WslcSessionSettings* SessionSettings::ToStructPointer()
@@ -198,9 +198,9 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
         winrt::check_hresult(WslcSetSessionSettingsCpuCount(m_sessionSettings.get(), m_cpuCount.Value()));
     }
 
-    if (m_memoryMB)
+    if (m_memorySizeInMB)
     {
-        winrt::check_hresult(WslcSetSessionSettingsMemory(m_sessionSettings.get(), m_memoryMB.Value()));
+        winrt::check_hresult(WslcSetSessionSettingsMemory(m_sessionSettings.get(), m_memorySizeInMB.Value()));
     }
 
     if (m_timeout)
@@ -214,7 +214,7 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
         winrt::check_hresult(WslcSetSessionSettingsVhd(m_sessionSettings.get(), GetStructPointer(m_vhdRequirements)));
     }
 
-    winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(m_sessionSettings.get(), static_cast<WslcSessionFeatureFlags>(m_featureFlags)));
+    winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(m_sessionSettings.get(), m_featureFlags));
 
     return m_sessionSettings.get();
 }

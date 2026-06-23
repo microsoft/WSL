@@ -34,6 +34,19 @@ namespace wsl::shared {
 
 constexpr int c_jsonPrettyPrintIndent = 2;
 
+struct EmptyObject
+{
+};
+
+inline void to_json(nlohmann::json& j, const EmptyObject&)
+{
+    j = nlohmann::json::object();
+}
+
+inline void from_json(const nlohmann::json&, EmptyObject&)
+{
+}
+
 template <typename T>
 std::string ToJson(const T& Value, int indent = -1)
 {

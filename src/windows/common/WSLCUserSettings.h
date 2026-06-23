@@ -42,6 +42,7 @@ enum class Setting : size_t
     SessionHostFileShareMode,
     SessionDnsTunneling,
     CredentialStore,
+    SessionPortRelay,
 
     Max
 };
@@ -56,6 +57,12 @@ enum class CredentialStoreType
 {
     WinCred,
     File
+};
+
+enum class PortRelayType
+{
+    VirtioNet,
+    WslRelay
 };
 
 namespace details {
@@ -85,10 +92,11 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionCpuCount,          uint32_t,    uint32_t,            0,                             "session.cpuCount")
     DEFINE_SETTING_MAPPING(SessionMemoryMb,          std::string, uint32_t,            0,                             "session.memorySize")
     DEFINE_SETTING_MAPPING(SessionStorageSizeMb,     std::string, uint32_t,            1048576,                       "session.maxStorageSize")
-    DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeVirtioProxy, "session.networkingMode")
+    DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeConsomme,    "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,   HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,                true,                          "session.dnsTunneling")
     DEFINE_SETTING_MAPPING(CredentialStore,          std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
+    DEFINE_SETTING_MAPPING(SessionPortRelay,         std::string, PortRelayType,       PortRelayType::VirtioNet,      "experimental.portRelay")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on

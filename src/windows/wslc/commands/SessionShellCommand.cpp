@@ -24,9 +24,7 @@ namespace wsl::windows::wslc {
 // Session Shell Command
 std::vector<Argument> SessionShellCommand::GetArguments() const
 {
-    return {
-        Argument::Create(ArgType::SessionId),
-    };
+    return {};
 }
 
 std::wstring SessionShellCommand::ShortDescription() const
@@ -41,6 +39,6 @@ std::wstring SessionShellCommand::LongDescription() const
 
 void SessionShellCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << AttachToSession;
+    context << ResolveSession << AttachToSession;
 }
 } // namespace wsl::windows::wslc

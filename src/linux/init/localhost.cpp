@@ -444,7 +444,7 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
-    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy)
+    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme)
     {
         std::cerr << "Invalid networking mode (" << NetworkingMode << ")\n";
         return 1;

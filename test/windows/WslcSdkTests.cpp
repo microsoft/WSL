@@ -323,7 +323,7 @@ class WslcSdkTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            uint64_t Pid;
+            uint32_t Pid;
             uint32_t Signal;
             uint64_t Timestamp;
         };
@@ -356,10 +356,10 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto& comSession = *reinterpret_cast<WslcSessionImpl*>(session.get())->session;
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
-        auto process = launcher.Launch(comSession);
+        auto process = launcher.Launch(*comSession);
         auto result = process.WaitAndCaptureOutput();
         VERIFY_ARE_EQUAL(result.Code, 128 + WSLCSignalSIGSEGV);
 
@@ -372,7 +372,7 @@ class WslcSdkTests
         VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<uint32_t>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
     }
 
@@ -2220,8 +2220,8 @@ class WslcSdkTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
-        return WSLCE2ETests::StartLocalRegistry(session, username, password, port);
+        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        return WSLCE2ETests::StartLocalRegistry(*session, username, password, port);
     }
 
     // Tags and pushes an image to a local registry via the SDK APIs.

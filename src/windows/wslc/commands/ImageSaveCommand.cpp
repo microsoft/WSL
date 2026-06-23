@@ -44,8 +44,8 @@ std::wstring ImageSaveCommand::LongDescription() const
 
 void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << SaveImage;
 }
 } // namespace wsl::windows::wslc
