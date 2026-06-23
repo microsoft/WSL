@@ -405,7 +405,8 @@ void ConfigHandleInteropMessage(
     bool Elevated,
     gsl::span<gsl::byte> Message,
     const MESSAGE_HEADER* Header,
-    const wsl::linux::WslDistributionConfig& Config);
+    const wsl::linux::WslDistributionConfig& Config,
+    uid_t PeerUid);
 
 void ConfigInitializeCgroups(wsl::linux::WslDistributionConfig& Config);
 

@@ -18,6 +18,7 @@ Abstract:
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/sysinfo.h>
+#include <sys/socket.h>
 #include <grp.h>
 #include <unistd.h>
 #include <sys/prctl.h>
@@ -438,6 +439,39 @@ Return Value:
 
 {
     Path.resize(UtilCanonicalisePathSeparator(Path.data(), Separator));
+}
+
+uid_t UtilGetPeerUid(int Socket)
+
+/*++
+
+Routine Description:
+
+    This routine queries the credentials of the peer connected to a Unix
+    domain socket so that privileged interop messages can be authorized
+    against the caller's user ID.
+
+Arguments:
+
+    Socket - Supplies the accepted socket file descriptor.
+
+Return Value:
+
+    The peer's user ID, or (uid_t)-1 on failure. Callers must fail closed
+    when the peer cannot be identified.
+
+--*/
+
+{
+    struct ucred Credentials{};
+    socklen_t Length = sizeof(Credentials);
+    if (getsockopt(Socket, SOL_SOCKET, SO_PEERCRED, &Credentials, &Length) < 0)
+    {
+        LOG_ERROR("getsockopt(SO_PEERCRED) failed {}", errno);
+        return static_cast<uid_t>(-1);
+    }
+
+    return Credentials.uid;
 }
 
 wil::unique_fd UtilConnectToInteropServer(std::optional<pid_t> Pid)

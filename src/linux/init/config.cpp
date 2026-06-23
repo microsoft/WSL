@@ -339,7 +339,8 @@ void ConfigHandleInteropMessage(
     bool Elevated,
     gsl::span<gsl::byte> Message,
     const MESSAGE_HEADER* Header,
-    const wsl::linux::WslDistributionConfig& Config)
+    const wsl::linux::WslDistributionConfig& Config,
+    uid_t PeerUid)
 
 /*++
 
@@ -361,6 +362,12 @@ Arguments:
 
     Header- Supplies the message Header.
 
+    Config - Supplies the distribution configuration.
+
+    PeerUid - Supplies the user ID of the connecting peer, as reported by
+        SO_PEERCRED, or (uid_t)-1 if the peer could not be identified. Used to
+        authorize privileged message types.
+
 Return Value:
 
     None.
@@ -372,6 +379,19 @@ try
     switch (Header->MessageType)
     {
     case LxInitMessageCreateProcessUtilityVm:
+
+        //
+        // This message is relayed to wslservice on the host, which creates a
+        // process in the Windows session owner's token. Only root inside the
+        // distribution may drive it from init's interop socket.
+        //
+
+        if (PeerUid != 0)
+        {
+            LOG_ERROR("LxInitMessageCreateProcessUtilityVm denied: peer uid {}", PeerUid);
+            break;
+        }
+
         if (InteropChannel.Socket() > 0)
         {
             InteropChannel.SendMessage<LX_INIT_CREATE_NT_PROCESS_UTILITY_VM>(Message);
@@ -974,6 +994,8 @@ try
                     continue;
                 }
 
+                const uid_t PeerUid = UtilGetPeerUid(ClientChannel.Socket());
+
                 auto transaction = ClientChannel.ReceiveTransaction();
                 auto [Message, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
                 if (Message == nullptr)
@@ -981,7 +1003,7 @@ try
                     continue;
                 }
 
-                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config);
+                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config, PeerUid);
             }
         });
 
