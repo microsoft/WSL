@@ -67,9 +67,13 @@ stages:
                 -AllowUnsignedWslBinaries:$${{ parameters.allowUnsignedWslBinaries }}
                 -FailOnNewFindings:$${{ parameters.failOnNewFindings }}
 
-          - task: PublishPipelineArtifact@1
-            displayName: Publish ASA report
-            condition: always()
-            inputs:
-              targetPath: $(ob_outputDirectory)\asa
-              artifactName: $(ob_artifactBaseName)$(ob_artifactSuffix)
+          # On the OneBranch managed pool, binaries in ob_outputDirectory are
+          # uploaded automatically; an explicit publish step is rejected. Only
+          # publish manually when running on a custom (non-managed) pool.
+          - ${{ if ne(parameters.pool, '') }}:
+            - task: PublishPipelineArtifact@1
+              displayName: Publish ASA report
+              condition: always()
+              inputs:
+                targetPath: $(ob_outputDirectory)\asa
+                artifactName: $(ob_artifactBaseName)$(ob_artifactSuffix)
