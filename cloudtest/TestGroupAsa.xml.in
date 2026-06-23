@@ -11,6 +11,6 @@
   </Setup>
 
   <TestJob Name="CloudTest.Asa" TimeoutMins="120">
-    <Execution Type="Console" Path="powershell.exe" Args="-NoProfile -ExecutionPolicy Bypass -File &quot;[WorkingDirectory]\devops\Run-AsaInstallDiff.ps1&quot; -MsiPath &quot;[WorkingDirectory]\wsl.${PACKAGE_VERSION}.${TARGET_PLATFORM}.msi&quot; -ExpectedFindingsPath &quot;[WorkingDirectory]\devops\asa-expected-findings.json&quot; -WorkDir &quot;[LoggingDirectory]\asa&quot; -AllowUnsignedWslBinaries:${ASA_ALLOW_UNSIGNED} -FailOnNewFindings:${ASA_FAIL_ON_NEW}" />
+    <Execution Type="Exe" Path="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" Args="-NoProfile -ExecutionPolicy Bypass -File &quot;[WorkingDirectory]\devops\Run-AsaInstallDiff.ps1&quot; -MsiPath &quot;[WorkingDirectory]\wsl.${PACKAGE_VERSION}.${TARGET_PLATFORM}.msi&quot; -ExpectedFindingsPath &quot;[WorkingDirectory]\devops\asa-expected-findings.json&quot; -WorkDir &quot;[LoggingDirectory]\asa&quot; -TrxPath &quot;[LoggingDirectory]\asa.trx&quot; -AllowUnsignedWslBinaries:${ASA_ALLOW_UNSIGNED} -FailOnNewFindings:${ASA_FAIL_ON_NEW}" Parser="TRX" />
   </TestJob>
 </TestJobGroup>

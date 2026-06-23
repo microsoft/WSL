@@ -36,11 +36,77 @@ param(
 
     # Exit non-zero when net-new (non-allowlisted) findings remain. Off by default
     # so the stage can be introduced as non-gating, then flipped on once clean.
-    [switch] $FailOnNewFindings
+    [switch] $FailOnNewFindings,
+
+    # When set, write a minimal TRX result file here so CloudTest's TRX parser can
+    # surface the ASA job as a single pass/fail test. Empty = skip (local runs).
+    [string] $TrxPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# Emit a minimal, well-formed TRX so CloudTest (Parser="TRX") reports the ASA job
+# as one pass/fail test. Job-level pass/fail is still driven by the process exit
+# code; this just gives a readable result row + stdout in the ADO test tab.
+function Write-AsaTrx {
+    param(
+        [ValidateSet('Passed', 'Failed')] [string] $Outcome,
+        [string] $Message = ''
+    )
+    if ([string]::IsNullOrEmpty($TrxPath)) { return }
+    try {
+        $dir = Split-Path -Parent $TrxPath
+        if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        $now = (Get-Date).ToString('o')
+        $comp = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { 'cloudtest' }
+        $g = { [guid]::NewGuid().ToString() }
+        $testId = & $g; $execId = & $g; $listId = & $g
+        $passed = if ($Outcome -eq 'Passed') { 1 } else { 0 }
+        $failed = if ($Outcome -eq 'Failed') { 1 } else { 0 }
+        $esc = [System.Security.SecurityElement]::Escape([string]$Message)
+        $xml = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<TestRun id="$(& $g)" name="ASA install-diff" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="$now" queuing="$now" start="$now" finish="$now" />
+  <ResultSummary outcome="Completed">
+    <Counters total="1" executed="1" passed="$passed" failed="$failed" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+  </ResultSummary>
+  <TestDefinitions>
+    <UnitTest name="Asa.InstallDiff" storage="run-asainstalldiff.ps1" id="$testId">
+      <Execution id="$execId" />
+      <TestMethod codeBase="Run-AsaInstallDiff.ps1" adapterTypeName="executor://mstestadapter/v2" className="Asa" name="Asa.InstallDiff" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="$testId" executionId="$execId" testListId="$listId" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="$listId" />
+    <TestList name="All Loaded Results" id="$(& $g)" />
+  </TestLists>
+  <Results>
+    <UnitTestResult executionId="$execId" testId="$testId" testName="Asa.InstallDiff" computerName="$comp" duration="00:00:00" startTime="$now" endTime="$now" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="$Outcome" testListId="$listId">
+      <Output><StdOut>$esc</StdOut></Output>
+    </UnitTestResult>
+  </Results>
+</TestRun>
+"@
+        Set-Content -Path $TrxPath -Value $xml -Encoding UTF8
+        Write-Host "TRX written: $TrxPath ($Outcome)"
+    }
+    catch {
+        Write-Host "WARNING: failed to write TRX: $_"
+    }
+}
+
+# Any uncaught terminating error (failed collect/install/export, gate failure,
+# missing prerequisites) lands here: record a failed TRX and exit non-zero.
+trap {
+    Write-Host "ERROR: $_"
+    Write-AsaTrx -Outcome 'Failed' -Message ("{0}`n{1}" -f $_, $_.ScriptStackTrace)
+    exit 1
+}
 
 if (-not (Test-Path $MsiPath)) { throw "MSI not found: $MsiPath" }
 $MsiPath = (Resolve-Path $MsiPath).Path
@@ -228,3 +294,7 @@ if ($netNew.Count -gt 0) {
 else {
     Write-Host 'No net-new attack-surface findings. Install-diff is clean against the allowlist.' -ForegroundColor Green
 }
+
+# Reached only on success (clean, or net-new while non-gating): report a passing TRX.
+Write-AsaTrx -Outcome 'Passed' -Message ("ASA install-diff: {0} total finding(s), {1} allowlisted, {2} net-new." -f $results.Count, $allowed.Count, $netNew.Count)
+exit 0
