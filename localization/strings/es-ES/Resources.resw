@@ -1136,9 +1136,9 @@ Intentando la descarga web...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p está deshabilitado, revirtiendo a 9p con el transporte de vsock.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>La red VirtioProxy no es compatible cuando wsl2.virtio está deshabilitado; se usará networkingMode {} como reserva.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme networking is not supported when wsl2.virtio is disabled; falling back to networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Falta una revisión en el kernel en ejecución que mejora significativamente virtio rendimiento del dispositivo. Actualice a un kernel de WSL más reciente para habilitar esta optimización.</value>
@@ -1300,13 +1300,13 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Examinar distribuciones</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
+    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
     <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1314,10 +1314,10 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
+    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
@@ -1352,7 +1352,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentación</value>
@@ -1850,7 +1850,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Acerca de</value>
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Administración de distribuciones</value>
@@ -2066,6 +2066,10 @@ Uso:
   </data>
   <data name="MessageInvalidIp" xml:space="preserve">
     <value>Dirección IP “{}” no válida</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Error al asignar el puerto "{}", {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
@@ -2404,6 +2408,14 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>No se encontró ninguna sesión WSLC en '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>No se puede usar "{}" como almacenamiento de sesión porque el directorio no está vacío</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>No se puede usar '{}' como almacenamiento de sesión porque no es un directorio</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
