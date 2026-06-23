@@ -45,8 +45,8 @@ std::wstring ImagePullCommand::LongDescription() const
 
 void ImagePullCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PullImage;
 }
 } // namespace wsl::windows::wslc

@@ -41,8 +41,8 @@ std::wstring ContainerPruneCommand::LongDescription() const
 
 void ContainerPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneContainers;
 }
 } // namespace wsl::windows::wslc

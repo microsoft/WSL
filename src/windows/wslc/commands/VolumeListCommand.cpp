@@ -57,8 +57,8 @@ void VolumeListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
 
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
-            << GetVolumes    //
+    context << ResolveSession //
+            << GetVolumes     //
             << ListVolumes;
 }
 } // namespace wsl::windows::wslc

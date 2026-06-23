@@ -73,7 +73,11 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
 
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
-        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) { return HandlePortNotification(addr, protocol, allocate); },
+        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
+            return wil::ResultFromException([&]() {
+                HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+            });
+        },
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
 
@@ -84,14 +88,13 @@ try
 }
 CATCH_LOG()
 
-HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
+uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
 {
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
     {
-        return S_OK;
+        return 0;
     }
 
-    int result = 0;
     const auto ipAddress = (addr.si_family == AF_INET) ? reinterpret_cast<const void*>(&addr.Ipv4.sin_addr)
                                                        : reinterpret_cast<const void*>(&addr.Ipv6.sin6_addr);
     const bool loopback = INET_IS_ADDR_LOOPBACK(addr.si_family, ipAddress);
@@ -101,13 +104,22 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         // Only intercepting 127.0.0.1; any other loopback address will remain on 'lo'.
         if (addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
         {
-            return result;
+            return 0;
         }
     }
+    SOCKADDR_INET localAddr = addr;
+    std::function<void()> removePort;
+
+    auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&removePort]() {
+        if (removePort)
+        {
+            removePort();
+        }
+    });
 
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
     {
-        SOCKADDR_INET localAddr = addr;
         if (!loopback)
         {
             INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&localAddr));
@@ -120,50 +132,92 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
                 localAddr.Ipv6.sin6_port = addr.Ipv6.sin6_port;
             }
         }
-        result = ModifyOpenPorts(c_loopbackDeviceName, localAddr, protocol, allocate);
-        LOG_HR_IF_MSG(
-            E_FAIL, result != S_OK, "Failure adding localhost relay port %d", INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&localAddr)));
+
+        hostPort = ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, allocate);
+
+        // Revert the change on failure.
+        removePort = [&]() { ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, !allocate); };
     }
 
     if (!loopback)
     {
-        const int localResult = ModifyOpenPorts(c_eth0DeviceName, addr, protocol, allocate);
-        LOG_HR_IF_MSG(E_FAIL, localResult != S_OK, "Failure adding relay port %d", INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)));
-        if (result == 0)
-        {
-            result = localResult;
-        }
+        hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
 
-    return result;
+    cleanup.release();
+
+    return hostPort;
 }
 
-int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const
+uint16_t VirtioNetworking::ModifyOpenPorts(
+    _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const
 {
-    if (protocol != IPPROTO_TCP && protocol != IPPROTO_UDP)
-    {
-        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", protocol);
-        return 0;
-    }
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        protocol != IPPROTO_TCP && protocol != IPPROTO_UDP,
+        "Unsupported bind protocol %d",
+        protocol);
 
     auto lock = m_lock.lock_exclusive();
     const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
-    if (server)
+    THROW_HR_IF(E_UNEXPECTED, !server);
+
+    const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
+
+    std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddressStr.c_str());
+
+    if (HostPort != WSLC_EPHEMERAL_PORT)
     {
-        std::wstring portString = std::format(L"tag={};port_number={}", tag, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)));
-        if (protocol == IPPROTO_UDP)
-        {
-            portString += L";udp";
-        }
-
-        const auto addrStr = wsl::windows::common::string::SockAddrInetToWstring(addr);
-        portString += std::format(L";listen_addr={};allocate={}", addrStr, isOpen ? L"true" : L"false");
-
-        LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
+        portString += std::format(L";host_port={}", HostPort);
     }
 
-    return 0;
+    if (!isOpen)
+    {
+        portString += L";allocate=false";
+    }
+
+    if (protocol == IPPROTO_UDP)
+    {
+        portString += L";udp";
+    }
+
+    const HRESULT addShareResult = server->AddShare(portString.c_str(), nullptr, 0);
+    WSL_LOG("MapVirtioPort", TraceLoggingValue(portString.c_str(), "PortString"), TraceLoggingValue(addShareResult, "Result"));
+
+    if (HostPort == WSLC_EPHEMERAL_PORT && isOpen && SUCCEEDED(addShareResult))
+    {
+        // For anonymous binds, the allocated host port is encoded in the return value.
+        return static_cast<uint16_t>(addShareResult - S_OK);
+    }
+
+    THROW_IF_FAILED_MSG(addShareResult, "Failed to set virtionet port mapping: %ls", portString.c_str());
+    return HostPort;
 }
+
+HRESULT VirtioNetworking::MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const
+try
+{
+    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr);
+    RETURN_HR_IF_MSG(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP, "Invalid protocol: %i", Protocol);
+
+    *AllocatedHostPort = 0;
+
+    *AllocatedHostPort = HandlePortNotification(ListenAddress, Protocol, GuestPort, true);
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT VirtioNetworking::UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
+
+    HandlePortNotification(ListenAddress, Protocol, GuestPort, false);
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 void VirtioNetworking::RefreshGuestConnection()
 {
@@ -177,6 +231,14 @@ void VirtioNetworking::RefreshGuestConnection()
             std::format_to(std::back_inserter(device_options), L"{}{}={}", device_options.empty() ? L"" : L";", key, value);
         }
     };
+
+    ULONG net_mask{};
+    if (ConvertLengthToIpv4Mask(networkSettings->PreferredIpAddress.PrefixLength, &net_mask) == 0)
+    {
+        auto net_mask_string =
+            std::format(L"{}.{}.{}.{}", net_mask & 0xFF, (net_mask >> 8) & 0xFF, (net_mask >> 16) & 0xFF, (net_mask >> 24) & 0xFF);
+        appendOption(L"netmask", net_mask_string);
+    }
 
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
@@ -206,6 +268,8 @@ void VirtioNetworking::RefreshGuestConnection()
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
+
+        WSL_LOG("RefreshVirtioNetConnection", TraceLoggingValue(device_options.c_str(), "DeviceOptions"));
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
@@ -245,23 +309,27 @@ void VirtioNetworking::RefreshGuestConnection()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
+    const auto* clientIp = WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
+    const auto deviceOptions =
+        std::format(L"client_ip={};client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248", clientIp);
+
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
         VIRTIO_NET_DEVICE_ID,
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
         m_swiotlbOption.c_str(),
-        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
+        deviceOptions.c_str(),
         0,
         m_userToken.get());
 
-    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.152, so assign loopback0 an
-    // address of 169.254.73.153 with a netmask of 30 so that the only addresses associated with this adapter are
+    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.249, so assign loopback0 an
+    // address of 169.254.73.153 with a netmask of 29 so that the only addresses associated with this adapter are
     // itself and the gateway.
     // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
-    endpointProperties.IPAddress = L"169.254.73.153";
-    endpointProperties.PrefixLength = 30;
+    endpointProperties.IPAddress = L"169.254.73.250";
+    endpointProperties.PrefixLength = 29;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 
@@ -269,6 +337,9 @@ void VirtioNetworking::SetupLoopbackDevice()
     createLoopbackDevice.deviceName = c_loopbackDeviceName;
     createLoopbackDevice.type = hns::DeviceType::Loopback;
     createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
+
+    // ipv6 duplicate address detection (DAD) breaks the ipv6 localhost relay since we can't predict the address before the guest tells us about it.
+    createLoopbackDevice.flags = hns::CreateDeviceFlags::DisableDAD;
     constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }

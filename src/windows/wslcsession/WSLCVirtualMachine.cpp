@@ -185,6 +185,19 @@ uint16_t VMPortMapping::HostPort() const
     }
 }
 
+void VMPortMapping::SetHostPort(uint16_t port)
+{
+    if (BindAddress.si_family == AF_INET6)
+    {
+        BindAddress.Ipv6.sin6_port = htons(port);
+    }
+    else
+    {
+        WI_ASSERT(BindAddress.si_family == AF_INET);
+        BindAddress.Ipv4.sin_port = htons(port);
+    }
+}
+
 std::string VMPortMapping::BindingAddressString() const
 {
     char buffer[INET6_ADDRSTRLEN]{};
@@ -432,6 +445,17 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
+}
+
+WSLCNetworkingMode WSLCVirtualMachine::NetworkingMode() const
+{
+    return m_networkingMode;
+}
+
+bool WSLCVirtualMachine::UseWslRelayPortForwarding() const
+{
+    return m_networkingMode == WSLCNetworkingModeNAT ||
+           (m_networkingMode == WSLCNetworkingModeVirtioProxy && FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
 }
 
 void WSLCVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -941,12 +965,12 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for NAT mode: %hs, protocol: %i",
+            "Unsupported port mapping for the wslrelay port relay: %hs, protocol: %i",
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
@@ -954,15 +978,30 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        // TODO: Switch to using the native virtionet relay.
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for virtionet mode: %hs, protocol: %i",
-            Mapping.BindingAddressString().c_str(),
-            Mapping.Protocol);
+        USHORT allocatedHostPort = 0;
+        auto result = m_vm->MapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str(), &allocatedHostPort);
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+        if (FAILED(result))
+        {
+            auto portString = std::format(
+                "{}:{}/{}",
+                Mapping.IsIPv6() ? std::format("[{}]", Mapping.BindingAddressString()) : Mapping.BindingAddressString(),
+                Mapping.HostPort(),
+                Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
+
+            THROW_HR_WITH_USER_ERROR(result, shared::Localization::MessageFailedToMapPort(portString, common::wslutil::GetErrorString(result)));
+        }
+
+        // For anonymous binds, write back the allocated host port.
+        if (Mapping.HostPort() == WSLC_EPHEMERAL_PORT)
+        {
+            WSL_LOG(
+                "AllocatedHostPort",
+                TraceLoggingValue(allocatedHostPort, "HostPort"),
+                TraceLoggingValue(Mapping.VmPort->Port(), "GuestPort"));
+            Mapping.SetHostPort(allocatedHostPort);
+        }
     }
     else
     {
@@ -980,14 +1019,14 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+        THROW_IF_FAILED(m_vm->UnmapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str()));
     }
     else
     {

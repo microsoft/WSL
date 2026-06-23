@@ -151,7 +151,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     }
 
     context //
-        << CreateSession << Login;
+        << ResolveSession << Login;
 }
 
 // Registry Logout Command
