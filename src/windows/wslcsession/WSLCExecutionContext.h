@@ -27,7 +27,19 @@ public:
 protected:
     bool CollectUserWarning(const std::wstring& warning) override
     {
-        if (m_warningCallback != nullptr)
+        IWarningCallback* callback = m_warningCallback;
+
+        // When the operation carries no explicit callback, fall back to the callback supplied when
+        // the session was created/entered. This routes warnings emitted outside a callback-bearing
+        // operation (e.g. resource recovery during the lazy VM start) back to the session creator.
+        wil::com_ptr<IWarningCallback> sessionCallback;
+        if (callback == nullptr && m_session != nullptr)
+        {
+            sessionCallback = m_session->AcquireWarningCallback();
+            callback = sessionCallback.get();
+        }
+
+        if (callback != nullptr)
         {
             std::unique_ptr<UserCOMCallback> comCallback;
             if (m_session != nullptr)
@@ -35,7 +47,7 @@ protected:
                 comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
             }
 
-            auto hr = m_warningCallback->OnWarning(warning.c_str());
+            auto hr = callback->OnWarning(warning.c_str());
             if (SUCCEEDED(hr) || hr == RPC_E_CALL_CANCELED || hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
             {
                 return true;

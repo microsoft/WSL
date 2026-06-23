@@ -43,7 +43,40 @@ constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
+// Grace period to keep an otherwise-idle VM running before tearing it down. This avoids
+// thrashing the VM (repeated teardown/recreate) when containers are created and destroyed,
+// or operations issued, in quick succession. The clock restarts whenever the VM is observed
+// to be non-idle, so a full grace period of continuous idleness is required before teardown.
+constexpr auto c_vmIdleGracePeriod = std::chrono::seconds(30);
+
 namespace {
+
+// Validates the target path for a NEW session (one with no existing storage VHD): if the path
+// already exists it must be an empty directory, so session storage is never mixed with unrelated
+// user files. A non-existent path is fine (it will be created). Enforced eagerly at session
+// creation and again when the storage VHD is lazily created.
+void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath)
+{
+    // status's error_code distinguishes "doesn't exist yet" (OK, we'll create it) from other I/O errors.
+    std::error_code ec;
+    const auto status = std::filesystem::status(StoragePath, ec);
+    if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+    {
+        THROW_IF_WIN32_ERROR_MSG(ec.value(), "status failed for %ls", StoragePath.c_str());
+    }
+
+    if (!std::filesystem::exists(status))
+    {
+        return;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeDirectory(StoragePath.c_str()), !std::filesystem::is_directory(status));
+
+    const bool empty = std::filesystem::is_empty(StoragePath, ec);
+    THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", StoragePath.c_str());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
+}
 
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
@@ -332,7 +365,7 @@ HRESULT WSLCSession::Initialize(
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_vmFactoryGitCookie != 0);
 
     THROW_HR_IF_MSG(
         E_INVALIDARG, WI_IsAnyFlagSet(Settings->FeatureFlags, ~WSLCFeatureFlagsValid), "Invalid feature flags: 0x%x", Settings->FeatureFlags);
@@ -343,8 +376,31 @@ try
         Settings->StorageFlags);
 
     // Set up a warning context for the duration of initialization so that non-fatal
-    // failures (e.g., container/volume/network recovery) are streamed to the CLI.
+    // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
+
+    // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
+    // configuration eagerly here so misconfiguration is reported at session creation rather than
+    // surfacing later on the first VM-starting operation.
+    if (Settings->StoragePath != nullptr)
+    {
+        const std::filesystem::path storagePath{Settings->StoragePath};
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings->StoragePath), !storagePath.is_absolute());
+
+        if (WI_IsFlagSet(Settings->StorageFlags, WSLCSessionStorageFlagsNoCreate))
+        {
+            // The storage VHD must already exist (ConfigureStorage will not create it).
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+                Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath),
+                !std::filesystem::exists(storagePath / c_storageVhdFilename));
+        }
+        else if (!std::filesystem::exists(storagePath / c_storageVhdFilename))
+        {
+            // New session: the target path (if it exists) must be an empty directory.
+            ValidateNewSessionStorageDirectory(storagePath);
+        }
+    }
 
     // N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
     m_id = Settings->SessionId;
@@ -353,8 +409,24 @@ try
     m_featureFlags = Settings->FeatureFlags;
     m_pluginNotifier = PluginNotifier;
 
-    // Get user token for the current process
+    // Park the VM factory in the Global Interface Table. It is supplied here (on the call that
+    // creates the session) but used on demand from other threads/apartments; storing the raw
+    // proxy and calling it later would raise RPC_E_WRONG_THREAD.
+    m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
+    THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(VmFactory, __uuidof(IWSLCVirtualMachineFactory), &m_vmFactoryGitCookie));
+
+    // Park the warning callback too. The VM (and resource recovery) is created lazily on the
+    // first operation, which may not carry its own warning callback, so recovery warnings are
+    // routed back to this callback via AcquireWarningCallback()/WSLCExecutionContext.
+    if (WarningCallback != nullptr)
+    {
+        THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(WarningCallback, __uuidof(IWarningCallback), &m_warningCallbackGitCookie));
+    }
+
+    // Persist a deep copy of the settings (and the creating user's SID) required to
+    // (re)create the VM on demand.
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+    PersistSettings(*Settings, tokenInfo->User.Sid);
 
     WSL_LOG(
         "SessionInitialized",
@@ -362,61 +434,430 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Create the VM through the factory. The VM produces crash events; the session multiplexes
-    // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
+    // The VM is created lazily on the first operation that requires it (see EnsureVmRunning) and
+    // torn down once the session has been continuously idle (activity count zero) for the grace
+    // period. Wire up the idle-teardown timer; IdleState arms it whenever the activity count drops
+    // to zero and cancels it when activity resumes, so no dedicated worker thread is needed.
+    m_idleState->Initialize(c_vmIdleGracePeriod, [this]() { OnIdleTimer(); });
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID UserSid)
+{
+    m_settings = Settings;
+
+    // Repoint the string fields at storage owned by the session so they outlive the caller's buffers.
+    m_settings.DisplayName = m_displayName.c_str();
+
+    if (Settings.CreatorProcessName != nullptr)
+    {
+        m_settingsCreatorProcessName = Settings.CreatorProcessName;
+        m_settings.CreatorProcessName = m_settingsCreatorProcessName->c_str();
+    }
+    else
+    {
+        m_settings.CreatorProcessName = nullptr;
+    }
+
+    if (Settings.StoragePath != nullptr)
+    {
+        m_settingsStoragePath = Settings.StoragePath;
+        m_settings.StoragePath = m_settingsStoragePath->c_str();
+    }
+    else
+    {
+        m_settings.StoragePath = nullptr;
+    }
+
+    if (Settings.RootVhdTypeOverride != nullptr)
+    {
+        m_settingsRootVhdTypeOverride = Settings.RootVhdTypeOverride;
+        m_settings.RootVhdTypeOverride = m_settingsRootVhdTypeOverride->c_str();
+    }
+    else
+    {
+        m_settings.RootVhdTypeOverride = nullptr;
+    }
+
+    if (UserSid != nullptr)
+    {
+        const auto length = GetLengthSid(UserSid);
+        const auto* bytes = reinterpret_cast<const BYTE*>(UserSid);
+        m_userSid.assign(bytes, bytes + length);
+    }
+    else
+    {
+        m_userSid.clear();
+    }
+}
+
+bool WSLCSession::IdleTerminationEnabled() const noexcept
+{
+    // Only tear the VM down when there is persistent storage to recover from. A tmpfs-backed
+    // session would lose all image/container state on teardown, so its VM is kept alive once started.
+    return m_settings.StoragePath != nullptr;
+}
+
+void WSLCSession::EnsureVmRunning()
+{
+    if (m_vmState.load() == VmState::Running)
+    {
+        return;
+    }
+
+    auto lock = m_lock.lock_exclusive();
+
+    // Do not (re)start the VM once the session is terminating or has terminated. This also
+    // bounds VmLease's retry loop: a lease that races with Terminate() fails here instead of
+    // restarting a VM that is being permanently torn down.
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating.load() || m_sessionTerminatedEvent.is_signaled());
+
+    if (m_vmState.load() == VmState::Running)
+    {
+        return;
+    }
+
+    StartVmLockHeld();
+}
+
+bool WSLCSession::TryClaimExpectedStop() noexcept
+{
+    auto expected = VmExitDisposition::Active;
+    return m_vmExitDisposition.compare_exchange_strong(expected, VmExitDisposition::StopRequested);
+}
+
+bool WSLCSession::TryClaimSpontaneousExit() noexcept
+{
+    auto expected = VmExitDisposition::Active;
+    return m_vmExitDisposition.compare_exchange_strong(expected, VmExitDisposition::ExitClaimed);
+}
+
+void WSLCSession::StartVmLockHeld()
+{
+    WI_ASSERT(m_vmState.load() != VmState::Running);
+
+    WSL_LOG("WslcVmStarting", TraceLoggingValue(m_id, "SessionId"));
+
+    m_vmState.store(VmState::Starting);
+    m_vmExitDisposition.store(VmExitDisposition::Active);
+
+    // Tear back down if bring-up fails partway. The VM may have exited on its own during bring-up,
+    // so claim the stop first and only tear down if we win it (TryClaimExpectedStop()); otherwise
+    // OnVmExited() owns the teardown and we just release the lock to let its Terminate() finish.
+    auto startCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (TryClaimExpectedStop())
+        {
+            TearDownVmLockHeld();
+            m_vmState.store(VmState::None);
+        }
+        else
+        {
+            WSL_LOG("WslcVmExitedDuringStart", TraceLoggingValue(m_id, "SessionId"));
+        }
+    });
+
+    // Create a fresh IO relay for this VM instance. The previous one (if any) was stopped
+    // during teardown and cannot be restarted.
+    m_ioRelay.emplace();
+
+    // Create the VM via the factory. Re-fetch the factory from the GIT so we call it through a
+    // proxy marshalled into this thread's apartment (see m_git). The VM produces crash events;
+    // the session multiplexes them out to any registered ICrashDumpCallback subscribers via
+    // OnCrashDumpWritten.
+    wil::com_ptr<IWSLCVirtualMachineFactory> vmFactory;
+    THROW_IF_FAILED(m_git->GetInterfaceFromGlobal(m_vmFactoryGitCookie, __uuidof(IWSLCVirtualMachineFactory), vmFactory.put_void()));
+
     wil::com_ptr<IWSLCVirtualMachine> vm;
-    THROW_IF_FAILED(VmFactory->CreateVirtualMachine(&vm));
+    THROW_IF_FAILED(vmFactory->CreateVirtualMachine(&vm));
 
     m_virtualMachine.emplace(
         vm.get(),
-        Settings,
+        &m_settings,
         m_sessionTerminatingEvent.get(),
         std::bind(&WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
-
-    // Make sure that everything is destroyed correctly if an exception is thrown.
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
-
     m_virtualMachine->Initialize();
 
     // Get an event from the service that is signaled when the VM exits.
+    m_vmExitedEvent.reset();
     THROW_IF_FAILED(vm->GetTerminationEvent(&m_vmExitedEvent));
 
     // Configure storage.
-    ConfigureStorage(*Settings, tokenInfo->User.Sid);
+    ConfigureStorage(m_settings, m_userSid.empty() ? nullptr : reinterpret_cast<PSID>(m_userSid.data()));
 
     // Mirror the host's trusted root CAs into the VM before dockerd starts.
     InstallTrustedRootCertificates();
 
-    // Launch containerd first
+    // Launch containerd first, then dockerd with the external containerd socket.
     StartContainerd();
 
-    // Launch dockerd with external containerd socket
+    // Reset the readiness event before (re)starting dockerd so a stale signal from a prior
+    // VM instance is not observed.
+    m_dockerdReadyEvent.ResetEvent();
     StartDockerd();
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(m_settings.BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
+    m_eventTracker.emplace(m_dockerClient.value(), *this, *m_ioRelay);
 
     m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
 
     // Monitor for unexpected VM exit.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
+    m_ioRelay->AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
     // Recover any existing resources from storage.
     RecoverExistingNetworks();
     RecoverExistingContainers();
 
-    errorCleanup.release();
-    return S_OK;
+    m_vmState.store(VmState::Running);
+    startCleanup.release();
+
+    WSL_LOG("WslcVmStarted", TraceLoggingValue(m_id, "SessionId"));
 }
-CATCH_RETURN()
+
+void WSLCSession::StopVmLockHeld()
+{
+    if (m_vmState.load() != VmState::Running)
+    {
+        return;
+    }
+
+    WSL_LOG("WslcVmIdleStop", TraceLoggingValue(m_id, "SessionId"));
+
+    // N.B. The caller has claimed StopRequested (via TryClaimExpectedStop), so VM/dockerd/containerd
+    // exit callbacks firing from the relay thread during teardown are treated as expected, not as a
+    // crash.
+    m_vmState.store(VmState::Stopping);
+
+    TearDownVmLockHeld();
+
+    m_vmState.store(VmState::None);
+}
+
+void WSLCSession::TearDownVmLockHeld(bool CaptureTerminationReason)
+{
+    std::lock_guard containersLock(m_containersLock);
+    std::lock_guard networksLock(m_networksLock);
+
+    m_containers.clear();
+    m_volumes.reset();
+    m_networks.clear();
+
+    // Stop the IO relay.
+    // This stops:
+    // - container state monitoring.
+    // - container init process relays
+    // - execs relays
+    // - container logs relays
+    if (m_ioRelay)
+    {
+        m_ioRelay->Stop();
+    }
+
+    {
+        std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+        m_allocatedPorts.clear();
+    }
+
+    m_eventTracker.reset();
+    m_dockerClient.reset();
+
+    if (CaptureTerminationReason)
+    {
+        // Default: an explicit/graceful teardown is a shutdown (the VM is still alive and we are
+        // bringing it down). Overridden below if the VM exited on its own and recorded a cause.
+        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+    }
+
+    // Check if the VM has already exited (e.g., killed externally).
+    // If so, skip operations that require a live VM to avoid unnecessary waits.
+    // N.B. m_vmExitedEvent may be uninitialized if teardown runs before GetTerminationEvent() succeeds.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+    {
+        WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
+
+        // The VM exited on its own, so it recorded the cause.
+        if (CaptureTerminationReason && m_virtualMachine)
+        {
+            wil::unique_cotaskmem_string details;
+            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
+            m_terminationDetails = details ? details.get() : L"";
+        }
+    }
+    else if (m_virtualMachine)
+    {
+        m_virtualMachine->OnSessionTerminated();
+
+        // Stop dockerd first, then containerd (dockerd is a client of containerd).
+        // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
+        if (m_dockerdProcess.has_value())
+        {
+            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
+        }
+
+        if (m_containerdProcess.has_value())
+        {
+            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+        }
+
+        // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+        try
+        {
+            m_virtualMachine->Unmount(c_containerdStorage);
+        }
+        CATCH_LOG();
+    }
+
+    m_dockerdProcess.reset();
+    m_containerdProcess.reset();
+    m_virtualMachine.reset();
+
+    // Destroy the relay unless we're on its own thread (~IORelay joins the thread, which would
+    // deadlock). On unexpected-VM-exit path (runs on relay thread), leave it for ~WSLCSession.
+    if (!m_ioRelay || !m_ioRelay->IsRelayThread())
+    {
+        m_ioRelay.reset();
+        m_vmExitedEvent.reset();
+    }
+
+    // Delete the ephemeral swap VHD now that the VM is gone.
+    if (!m_swapVhdPath.empty())
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_swapVhdPath.c_str()));
+        m_swapVhdPath.clear();
+    }
+}
+
+void WSLCSession::OnIdleTimer()
+try
+{
+    // Idle teardown releases cross-process COM proxies (the VM and its VM-scoped state), so this
+    // threadpool callback must join the process MTA; otherwise those Release/calls fail with
+    // RPC_E_WRONG_THREAD. The function-try-block keeps this (and everything below) under CATCH_LOG:
+    // the threadpool callback that invokes us is noexcept, so an escaping throw would terminate.
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
+    if (m_terminating.load() || !IdleTerminationEnabled())
+    {
+        return;
+    }
+
+    // Non-blocking acquire: a blocking exclusive would queue behind in-flight operations, and
+    // SRW locks favor waiting writers, stalling all new ops. If the lock is held, an operation
+    // is in flight; it holds an activity reference and will re-arm the timer (via the 1->0
+    // transition) when it releases, so there is nothing to do here.
+    auto lock = m_lock.try_lock_exclusive();
+    if (!lock)
+    {
+        return;
+    }
+
+    // Re-check every teardown precondition under the lock. The activity count is the single
+    // source of truth for "the VM is needed"; a 0->1 transition since the timer fired (cancel
+    // raced the callback) is caught here.
+    if (m_terminating.load() || m_vmState.load() != VmState::Running || m_idleState->ActivityCount() != 0)
+    {
+        return;
+    }
+
+    // Claim the stop. If we lose, OnVmExited() owns a spontaneous-exit teardown and is spinning for
+    // this lock, so release it and let that run instead of joining the relay ourselves.
+    if (!TryClaimExpectedStop())
+    {
+        return;
+    }
+
+    // Restore Active on completion (or early exit) so the next StartVmLockHeld starts clean; only
+    // clear our own claim.
+    auto dispositionCleanup = wil::scope_exit([this]() {
+        auto stopRequested = VmExitDisposition::StopRequested;
+        m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+    });
+
+    StopVmLockHeld();
+}
+CATCH_LOG();
+
+WSLCSession::VmLease WSLCSession::AcquireVmLease()
+{
+    return VmLease(*this);
+}
+
+WSLCSession::VmLease::VmLease(WSLCSession& Session) : m_session(&Session)
+{
+    // Record an in-flight operation before bringing the VM up so idle teardown cannot tear it down
+    // between EnsureVmRunning() and acquiring the shared lock. AddActivity cancels any pending idle
+    // timer.
+    m_session->m_idleState->AddActivity();
+
+    auto countCleanup = wil::scope_exit([this]() {
+        m_session->m_idleState->ReleaseActivity();
+        m_session = nullptr;
+    });
+
+    // Activity increment may race with idle teardown. Retry until we hold the lock with VM running.
+    for (;;)
+    {
+        m_session->EnsureVmRunning();
+
+        m_lock = m_session->m_lock.lock_shared();
+
+        if (m_session->m_vmState.load() == VmState::Running)
+        {
+            break;
+        }
+
+        m_lock.reset();
+    }
+
+    countCleanup.release();
+}
+
+WSLCSession::VmLease::VmLease(VmLease&& Other) noexcept :
+    m_session(std::exchange(Other.m_session, nullptr)), m_lock(std::move(Other.m_lock))
+{
+}
+
+WSLCSession::VmLease& WSLCSession::VmLease::operator=(VmLease&& Other) noexcept
+{
+    if (this != &Other)
+    {
+        if (m_session != nullptr)
+        {
+            // Release the shared lock before the activity reference so that, if this was the last
+            // activity, idle teardown can immediately take the exclusive lock.
+            m_lock.reset();
+            m_session->m_idleState->ReleaseActivity();
+        }
+
+        m_session = std::exchange(Other.m_session, nullptr);
+        m_lock = std::move(Other.m_lock);
+    }
+
+    return *this;
+}
+
+WSLCSession::VmLease::~VmLease()
+{
+    if (m_session != nullptr)
+    {
+        // Release the shared lock before the activity reference so that, if this was the last
+        // activity, idle teardown can immediately take the exclusive lock. ReleaseActivity arms the
+        // idle timer on the 1->0 transition.
+        m_lock.reset();
+        m_session->m_idleState->ReleaseActivity();
+    }
+}
 
 WSLCSession::~WSLCSession()
 {
@@ -484,23 +925,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
 
         // Reject any non-empty existing path so we don't mix user files with session storage.
-        // status's error_code distinguishes "doesn't exist yet" (OK, we'll create it) from other I/O errors.
-        std::error_code ec;
-        const auto status = std::filesystem::status(storagePath, ec);
-        if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
-        {
-            THROW_IF_WIN32_ERROR_MSG(ec.value(), "status failed for %ls", storagePath.c_str());
-        }
-
-        if (std::filesystem::exists(status))
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeDirectory(storagePath.c_str()), !std::filesystem::is_directory(status));
-
-            const bool empty = std::filesystem::is_empty(storagePath, ec);
-            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
-        }
+        ValidateNewSessionStorageDirectory(storagePath);
 
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
@@ -573,7 +998,7 @@ CATCH_RETURN();
 
 void WSLCSession::OnDockerdExited()
 {
-    if (!m_sessionTerminatingEvent.is_signaled())
+    if (!m_sessionTerminatingEvent.is_signaled() && m_vmExitDisposition.load() != VmExitDisposition::StopRequested)
     {
         WSL_LOG("UnexpectedDockerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
     }
@@ -581,7 +1006,7 @@ void WSLCSession::OnDockerdExited()
 
 void WSLCSession::OnContainerdExited()
 {
-    if (!m_sessionTerminatingEvent.is_signaled())
+    if (!m_sessionTerminatingEvent.is_signaled() && m_vmExitDisposition.load() != VmExitDisposition::StopRequested)
     {
         WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
     }
@@ -589,6 +1014,14 @@ void WSLCSession::OnContainerdExited()
 
 void WSLCSession::OnVmExited()
 {
+    // A spontaneous exit we must permanently terminate, unless an expected stop already claimed it,
+    // in which case the exit was wanted and we decline.
+    if (!TryClaimSpontaneousExit())
+    {
+        WSL_LOG("WslcVmExitedDuringStop", TraceLoggingValue(m_id, "SessionId"));
+        return;
+    }
+
     WSL_LOG(
         "VmExited",
         TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
@@ -631,13 +1064,13 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
+    m_ioRelay->AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
         process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
+    m_ioRelay->AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
         process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
+    m_ioRelay->AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
     return process;
 }
@@ -845,7 +1278,7 @@ try
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     EnforceRegistryAllowlist(repo);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     if (!tagOrDigest.has_value())
@@ -903,7 +1336,7 @@ try
         comCall = RegisterUserCOMCallback();
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -1232,7 +1665,7 @@ try
 {
     WSLCExecutionContext context(this, WarningCallback);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1265,7 +1698,7 @@ try
         tag = tagOrDigest.value();
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1436,7 +1869,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLC_MAX_IMAGE_NAME_LENGTH);
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1469,7 +1902,7 @@ try
         names.emplace_back(ImageNames->Values[i]);
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1544,7 +1977,7 @@ try
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1653,7 +2086,7 @@ try
     *DeletedImages = nullptr;
     *Count = 0;
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1727,7 +2160,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
     RETURN_HR_IF(E_INVALIDARG, strlen(Options->Repo) + strlen(Options->Tag) + 1 > WSLC_MAX_IMAGE_NAME_LENGTH);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1764,7 +2197,7 @@ try
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
     EnforceRegistryAllowlist(repo);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
@@ -1785,7 +2218,7 @@ try
 
     *Output = nullptr;
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectImageLockHeld(ImageNameOrId).c_str()).release();
@@ -1833,7 +2266,7 @@ try
 
     *IdentityToken = nullptr;
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     wil::unique_cotaskmem_ansistring token;
@@ -1865,7 +2298,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     docker_schema::PruneImageResult pruneResult;
@@ -1926,7 +2359,7 @@ try
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
 
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
@@ -2004,7 +2437,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
-            m_ioRelay);
+            *m_ioRelay);
 
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
@@ -2037,7 +2470,7 @@ try
     ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
     // Look for an exact ID match first.
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
@@ -2076,6 +2509,73 @@ try
 }
 CATCH_RETURN();
 
+namespace {
+
+    // Activity token holds an activity reference to prevent idle VM teardown while client holds it.
+    // Implements IFastRundown so crashed clients reclaim stub promptly instead of slow default rundown.
+    class ContainerOperation
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IUnknown, IFastRundown>
+    {
+    public:
+        // Adopts an activity reference from CreateActivityToken; callback releases it.
+        void Initialize(std::function<void()>&& onRelease) noexcept
+        {
+            m_onRelease = std::move(onRelease);
+        }
+
+        ~ContainerOperation() override
+        {
+            if (m_onRelease)
+            {
+                m_onRelease();
+            }
+        }
+
+    private:
+        std::function<void()> m_onRelease;
+    };
+
+} // namespace
+
+Microsoft::WRL::ComPtr<IUnknown> WSLCSession::CreateActivityToken()
+{
+    // Record the in-flight activity up front so the VM cannot idle-terminate before the caller
+    // takes ownership of the returned token.
+    m_idleState->AddActivity();
+    auto countCleanup = wil::scope_exit([this]() { m_idleState->ReleaseActivity(); });
+
+    auto operation = Microsoft::WRL::Make<ContainerOperation>();
+    THROW_IF_NULL_ALLOC(operation.Get());
+
+    // Capture shared idle state so token can outlive session and release activity without keeping session alive.
+    std::shared_ptr<IdleState> idleState = m_idleState;
+    operation->Initialize([idleState = std::move(idleState)]() { idleState->ReleaseActivity(); });
+
+    // The token now owns the activity-count reference and will release it on destruction.
+    countCleanup.release();
+
+    Microsoft::WRL::ComPtr<IUnknown> token;
+    THROW_IF_FAILED(operation.As(&token));
+    return token;
+}
+
+HRESULT WSLCSession::BeginContainerOperation(IUnknown** Operation)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Operation);
+    *Operation = nullptr;
+
+    // Record the in-flight operation up front so the VM cannot idle-terminate before the client
+    // resolves the container and issues the operation (and streams any output).
+    auto token = CreateActivityToken();
+
+    RETURN_IF_FAILED(token.CopyTo(Operation));
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::ListContainers(
     const WSLCListContainersOptions* Options, WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
 try
@@ -2110,7 +2610,7 @@ try
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     std::vector<docker_schema::ContainerInfo> dockerContainers;
@@ -2189,7 +2689,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     std::lock_guard containersLock{m_containersLock};
@@ -2260,10 +2760,18 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
+
+    // The VmLease above is released when this call returns, but the process keeps running in the
+    // VM and the client holds the returned proxy. A root-namespace process is not tracked as a
+    // container, so attach an activity token bound to the process's lifetime; this keeps the VM
+    // alive for as long as the client holds the process, preventing the idle worker from tearing
+    // the VM down and killing the process out from under the client.
+    process->SetKeepAliveToken(CreateActivityToken());
+
     THROW_IF_FAILED(process.CopyTo(Process));
 
     return S_OK;
@@ -2286,7 +2794,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -2314,7 +2822,7 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     if (Options->Name != nullptr && Options->Name[0] != '\0')
@@ -2334,7 +2842,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     m_volumes->DeleteVolume(Name);
@@ -2355,7 +2863,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     auto volumeList = m_volumes->ListVolumes(std::move(filters));
@@ -2387,7 +2895,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     std::string json = m_volumes->InspectVolume(name);
@@ -2412,7 +2920,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     WSLCVolumes::PruneVolumesResult pruneResult;
@@ -2491,7 +2999,7 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -2600,7 +3108,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -2640,7 +3148,7 @@ try
     *Networks = nullptr;
     *Count = 0;
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     std::lock_guard networksLock(m_networksLock);
 
     if (m_networks.empty())
@@ -2679,7 +3187,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     std::lock_guard networksLock(m_networksLock);
 
     auto it = m_networks.find(name);
@@ -2734,7 +3242,7 @@ try
     // Scope the prune to WSLC-managed networks.
     filters["label"].push_back(WSLCNetworkManagedLabel);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -2867,97 +3375,56 @@ try
     // Acquire an exclusive lock to ensure that no operation is running.
     WI_VERIFY(sessionLock);
 
-    std::lock_guard containersLock(m_containersLock);
-    std::lock_guard networksLock(m_networksLock);
+    // Tear down the VM (if running) and all VM-scoped state, capturing the termination reason.
+    // This mirrors the soft teardown used for idle shutdown, but here it is permanent.
+    TearDownVmLockHeld(/* CaptureTerminationReason */ true);
 
-    m_containers.clear();
-    m_volumes.reset();
-    m_networks.clear();
+    m_vmState.store(VmState::None);
 
-    // Stop the IO relay.
-    // This stops:
-    // - container state monitoring.
-    // - container init process relays
-    // - execs relays
-    // - container logs relays
-    m_ioRelay.Stop();
-
-    {
-        std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
-        m_allocatedPorts.clear();
-    }
-
-    m_eventTracker.reset();
-    m_dockerClient.reset();
-
-    // Check if the VM has already exited (e.g., killed externally).
-    // If so, skip operations that require a live VM to avoid unnecessary waits.
-    // N.B. m_vmExitedEvent may be uninitialized if Terminate() is called from the
-    // Initialize() error path before GetTerminationEvent() succeeds.
-    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
-    {
-        WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
-
-        // The VM exited on its own, so it recorded the cause.
-        if (m_virtualMachine)
-        {
-            wil::unique_cotaskmem_string details;
-            LOG_IF_FAILED(m_virtualMachine->GetTerminationReason(&m_terminationReason, &details));
-            m_terminationDetails = details ? details.get() : L"";
-        }
-    }
-    else
-    {
-        // The VM is still alive, so this is a graceful shutdown initiated by us.
-        m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
-
-        if (m_virtualMachine)
-        {
-            m_virtualMachine->OnSessionTerminated();
-
-            // Stop dockerd first, then containerd (dockerd is a client of containerd).
-            // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-            if (m_dockerdProcess.has_value())
-            {
-                auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-                WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-            }
-
-            if (m_containerdProcess.has_value())
-            {
-                auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-                WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
-            }
-
-            // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-            if (m_storageMounted)
-            {
-                try
-                {
-                    m_virtualMachine->Unmount(c_containerdStorage);
-                    m_storageMounted = false;
-                }
-                CATCH_LOG();
-            }
-        }
-    }
-
-    m_dockerdProcess.reset();
-    m_containerdProcess.reset();
-    m_virtualMachine.reset();
-
-    // Delete the ephemeral swap VHD now that the VM is gone.
-    if (!m_swapVhdPath.empty())
-    {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_swapVhdPath.c_str()));
-        m_swapVhdPath.clear();
-    }
-
+    // Signal completion last so any observer of the terminated event sees a fully torn-down
+    // session and a populated termination reason.
     m_sessionTerminatedEvent.SetEvent();
+
+    // Release the exclusive lock before disarming the idle timer. If a timer callback is currently
+    // blocked acquiring the exclusive lock (about to evaluate idle teardown), it must be able to
+    // obtain it, observe m_terminating, and return — otherwise Disarm()'s wait for in-flight
+    // callbacks below would deadlock.
+    sessionLock.reset();
+
+    // Permanently disable idle teardown and drain any in-flight timer callback so it cannot
+    // reference this session after it is destroyed.
+    m_idleState->Disarm();
+
+    // Idle teardown is disabled and no operation can run past termination, so the parked VM
+    // factory can no longer be re-fetched; revoke it from the GIT.
+    if (m_vmFactoryGitCookie != 0)
+    {
+        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_vmFactoryGitCookie));
+        m_vmFactoryGitCookie = 0;
+    }
+
+    if (m_warningCallbackGitCookie != 0)
+    {
+        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_warningCallbackGitCookie));
+        m_warningCallbackGitCookie = 0;
+    }
 
     return S_OK;
 }
 CATCH_RETURN();
+
+wil::com_ptr<IWarningCallback> WSLCSession::AcquireWarningCallback() const
+{
+    wil::com_ptr<IWarningCallback> callback;
+    if (m_warningCallbackGitCookie != 0)
+    {
+        // Best-effort: the creating client's proxy may already be gone (e.g. the CLI exited before
+        // a later VM restart), in which case the warning falls through to the default sink.
+        LOG_IF_FAILED(m_git->GetInterfaceFromGlobal(m_warningCallbackGitCookie, __uuidof(IWarningCallback), callback.put_void()));
+    }
+
+    return callback;
+}
 
 HRESULT WSLCSession::RegisterCrashDumpCallback(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription)
 try
@@ -3022,7 +3489,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
@@ -3036,7 +3503,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->UnmountWindowsFolder(LinuxPath);
@@ -3048,7 +3515,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
@@ -3094,7 +3561,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = m_lock.lock_shared();
+    auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
@@ -3408,7 +3875,11 @@ void WSLCSession::CancelUserCOMCallbacks()
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 {
-    auto lock = m_lock.lock_shared();
+    // N.B. Invoked only from WSLCContainer::Delete, which already holds a VmLease (the shared
+    // session lock). The lease prevents a concurrent idle teardown from clearing m_containers,
+    // so this only needs m_containersLock. It must NOT re-acquire the shared session lock here:
+    // doing so while the idle worker is queued for the exclusive lock would deadlock (recursive
+    // shared acquire behind a pending writer).
     std::lock_guard containersLock(m_containersLock);
 
     WI_VERIFY(m_containers.erase(Container->ID()) == 1);
@@ -3476,7 +3947,7 @@ void WSLCSession::RecoverExistingContainers()
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
-                m_ioRelay);
+                *m_ioRelay);
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);

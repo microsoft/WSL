@@ -285,8 +285,7 @@ void WSLCSessionManagerImpl::CreateSession(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
-        // uses it to create the VM. Funneling VM creation through a factory lets the session
-        // own when VMs are created, rather than having one handed to it up front.
+        // uses it to create VMs on demand and recreate them after idle-termination.
         auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
