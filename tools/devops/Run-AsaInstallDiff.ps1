@@ -175,7 +175,9 @@ function Get-WslMsiProductCodes {
     )
     foreach ($r in $roots) {
         Get-ItemProperty $r -ErrorAction SilentlyContinue | Where-Object {
-            $_.DisplayName -match 'Windows Subsystem for Linux' -and $_.WindowsInstaller -eq 1
+            $names = $_.PSObject.Properties.Name
+            ($names -contains 'DisplayName') -and ($_.DisplayName -match 'Windows Subsystem for Linux') -and
+            ($names -contains 'WindowsInstaller') -and ($_.WindowsInstaller -eq 1)
         } | ForEach-Object { $codes += $_.PSChildName }
     }
     $codes | Select-Object -Unique
