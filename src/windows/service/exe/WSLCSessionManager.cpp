@@ -38,6 +38,7 @@ Abstract:
 #include "wslutil.h"
 #include "filesystem.hpp"
 #include "APICompat.h"
+#include "Localization.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -121,6 +122,10 @@ private:
             Settings.FeatureFlags,
             WslcFeatureFlagsVirtioFs,
             userSettings.Get<settings::Setting::SessionHostFileShareMode>() == settings::HostFileShareMode::VirtioFs);
+        WI_SetFlagIf(
+            Settings.FeatureFlags,
+            WslcFeatureFlagsPortRelayWslRelay,
+            userSettings.Get<settings::Setting::SessionPortRelay>() == settings::PortRelayType::WslRelay);
         Settings.StorageFlags = storageFlags;
     }
 };
@@ -283,7 +288,17 @@ void WSLCSessionManagerImpl::CreateSession(
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
+        const auto factoryHr =
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+        if (FAILED(factoryHr))
+        {
+            if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
+            {
+                THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
+            }
+
+            THROW_HR(factoryHr);
+        }
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
@@ -361,7 +376,7 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
+    THROW_IF_FAILED_MSG(result.value_or(WSLC_E_SESSION_NOT_FOUND), "Session '%lu' not found", Id);
 }
 
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
@@ -391,7 +406,10 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_SESSION_NOT_FOUND, wsl::shared::Localization::MessageWslcSessionNotFound(DisplayName), !result.has_value());
+
+    THROW_IF_FAILED_MSG(result.value(), "Failed to open session '%ls'", DisplayName);
 }
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
@@ -603,6 +621,11 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
+HRESULT WSLCSessionManager::InterfaceSupportsErrorInfo(_In_ REFIID riid)
+{
+    return riid == __uuidof(IWSLCSessionManager) ? S_OK : S_FALSE;
+}
+
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
 try
 {
@@ -663,7 +686,7 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
         return S_OK;
     });
 
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !result, "WSLC session %lu not found", Id);
+    THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, !result, "WSLC session %lu not found", Id);
     return result;
 }
 

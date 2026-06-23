@@ -84,7 +84,7 @@ std::wstring ContainerRunCommand::LongDescription() const
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << RunContainer;
 }

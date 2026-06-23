@@ -1130,9 +1130,9 @@ Webes letöltési... megkísérlése</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>A wsl2.virtio9p le van tiltva, vsock átvitellel visszaesik 9p értékre.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>A VirtioProxy hálózatkezelés nem támogatott, ha a wsl2.virtio le van tiltva; visszalépés a következőre: {} networkingMode.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>A Consomme hálózatkezelés nem támogatott, ha a wsl2.virtio le van tiltva; visszalépés a következőre: {} networkingMode.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>A futó kernelből hiányzik egy javítás, amely jelentősen javítja a virtio eszköz teljesítményét. Az optimalizálás engedélyezéséhez frissítsen egy újabb WSL-kernelre.</value>
@@ -1774,9 +1774,10 @@ A WSL-ben futó Linux bináris fájlok automatikusan használhatják a GPU-t a W
     <value>A telepítés módja</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>A VS Code telepítése után telepítheti a távoli WSL-bővítményt a Windows terminálból:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>WSL-projekt megnyitása Visual Studio Code-ban</value>
@@ -2062,12 +2063,20 @@ Usage:
     <value>Érvénytelen IP-cím: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Nem sikerült hozzárendelni a(z) {} portot, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') failed</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>A --session opció nem használható ezzel a paranccsal.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
-    <value>Failed to launch command {}. Errno = {}</value>
+    <value>Nem sikerült elindítani a(z) {} parancsot. Errno = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
@@ -2190,7 +2199,7 @@ Usage:
     <value>A következő argumentumok használhatók:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Színkimenet letiltása.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó argumentumát.</value>
@@ -2326,6 +2335,14 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Nem támogatott hálózati illesztőprogram: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Nem támogatott hálózati illesztőprogram-beállítás: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>A „Gateway” hálózati illesztőprogram-opcióhoz a „Subnet” megadása is szükséges.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>A(z) {} hálózat aktív végpontokkal rendelkezik.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2403,14 @@ További információ a termékről: https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Nem található WSLC-munkamenet a(z) „{}” helyen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Cannot use '{}' as session storage because the directory is not empty</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Cannot use '{}' as session storage because it is not a directory</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2689,14 +2714,14 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Futtasson egy parancsot egy munkamenetben.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
-    <value>Runs a command in an active session without a TTY. The command and its arguments are forwarded directly to the session. If no session is specified, the wslc default session will be used.</value>
+    <value>Parancsot futtat egy aktív munkamenetben TTY nélkül. A parancs és annak argumentumai közvetlenül a munkamenetbe lesznek továbbítva. Ha nincs megadva munkamenet, a rendszer a wslc alapértelmezett munkamenetét használja.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>A futtatott parancsnak átadandó argumentumok</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Munkamenet leállítása.</value>
@@ -2844,6 +2869,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Tároló csatlakoztatása hálózathoz</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Ne jelezzen hibát, ha a hálózat nem létezik</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Érvénytelen {} érték: a hálózatnév nem lehet üres vagy szóköz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2920,6 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A(z) /dev/shm mérete (pl. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Munkamenet-azonosító</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Munkamenet-tároló útvonala</value>
   </data>
@@ -2914,10 +2939,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Időbélyegek megjelenítése a napló kimenetében</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Naplók megjelenítése az időbélyegző óta (pl. Unix-korszak másodperceiben)</value>
+    <value>Naplók megjelenítése az időbélyeg óta (Unix epoch másodpercekben vagy RFC3339 formátumban, például 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Naplók megjelenítése az időbélyegző előtt (pl. Unix-korszak másodperceiben)</value>
+    <value>Naplók megjelenítése az időbélyeg előtt (Unix epoch másodpercekben vagy RFC3339 formátumban, például 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Új képhivatkozás képnév[:címke] formátumban</value>
@@ -2937,6 +2962,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Kötet csatlakoztatása a tárolóhoz</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Ne jelezzen hibát, ha a kötet nem létezik</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Munkakönyvtár a tárolón belül</value>
@@ -3026,6 +3054,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Érvénytelen {} argumentumérték: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Érvénytelen {} argumentumérték: {}. Unix epoch időbélyeget vagy RFC3339 dátum-időt vártunk (például 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Érvénytelen {} érték: a(z) {} kívül esik az érvényes tartományon ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3097,13 +3129,13 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Csak a hálózatneveket adja ki</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Távolítsa el az összes nem használt hálózatot.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
-    <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
+    <value>Eltávolítja az összes nem használt hálózatot. Egy hálózat akkor tekinthető nem használtnak, ha egyetlen tároló sem hivatkozik rá.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Törölve: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

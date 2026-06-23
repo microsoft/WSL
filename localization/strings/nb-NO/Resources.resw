@@ -1130,9 +1130,9 @@ Forsøker å laste ned...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p er deaktivert, og faller tilbake til 9p med vsock-transport.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy nettverket støttes ikke når wsl2.virtio er deaktivert. faller tilbake til networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme networking støttes ikke når wsl2.virtio er deaktivert; går tilbake til networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Den kjørende kjernen mangler en oppdatering som forbedrer ytelsen virtio enheten betydelig. Oppdater til en nyere WSL-kjerne for å aktivere denne optimaliseringen.</value>
@@ -1774,9 +1774,10 @@ Linux-binærfiler som kjører i WSL, kan automatisk bruke GPU i Windows for å �
     <value>Slik installerer du</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Etter at du har installert VS Code, kan du installere den eksterne WSL-utvidelsen fra Windows Terminal:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Åpne et WSL-prosjekt i Visual Studio Code</value>
@@ -2062,9 +2063,17 @@ Bruk:
     <value>Ugyldig IP-adresse «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Kan ikke tilordne port «{}», {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName({}) mislyktes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Alternativet --session kan ikke brukes sammen med denne kommandoen.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Kan ikke starte kommandoen {}. Errno = {}</value>
@@ -2190,7 +2199,7 @@ Bruk:
     <value>Følgende argumenter er tilgjengelige:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Deaktiver fargeutdata.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Hvis du vil ha mer informasjon om en bestemt kommando, må du angi hjelp-argumentet.</value>
@@ -2326,6 +2335,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Nettverksdriver støttes ikke: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Alternativet for nettverksdriver støttes ikke: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Alternativet Gateway for nettverksdriveren krever at Subnet også angis.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Nettverk {} har aktive endepunkter.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2403,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Finner ingen WSLC-økt i '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Kan ikke bruke {} som øktlagring fordi katalogen ikke er tom</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Kan ikke bruke {} som øktlagring fordi det ikke er en katalog</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2473,7 +2498,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Fjerner alle beholdere som er stoppet.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt gjenvunnet plass: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2566,7 +2591,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Totalt gjenvunnet plass: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2689,14 +2714,14 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Kjøre en kommando i en økt.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
     <value>Kjører en kommando i en aktiv økt uten TTY. Kommandoen og argumentene videresendes direkte til økten. Hvis ingen økt er angitt, brukes den wslc standardøkten.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>Argumenter som skal sendes til kommandoen som kjøres</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Avslutt en økt.</value>
@@ -2844,6 +2869,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Koble containeren til et nettverk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Ikke gi feil hvis nettverket ikke finnes</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ugyldig {}-verdi: nettverksnavnet kan ikke være tomt eller inneholde mellomrom</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2920,6 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Størrelse på /dev/shm (f.eks. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Økt-ID</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Bane for øktlagring</value>
   </data>
@@ -2914,10 +2939,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis timestamps i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Vis logger siden timestamp (f.eks. unix epoch-sekunder)</value>
+    <value>Vis logger siden timestamp (Unix epoch sekunder eller RFC3339, for eksempel 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Vis logger før timestamp (f.eks. unix epoch-sekunder)</value>
+    <value>Vis logger før timestamp (Unix epoch sekunder eller RFC3339, for eksempel 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildereferanse i bilde-navn[:merke]-format</value>
@@ -2937,6 +2962,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bindemonter et volum til beholderen</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Ikke rapporter feil hvis volumet ikke finnes</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeidsmappe i beholderen</value>
@@ -3025,6 +3053,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Ugyldig {} argumentverdi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ugyldig {} argumentverdi: {}. Forventet et Unix epoch-timestamp eller et RFC3339 dato/klokkeslett (f.eks. 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ugyldig {} verdi: {} er utenfor det gyldige intervallet ({}–{}).</value>

@@ -1130,9 +1130,9 @@ Probíhá pokus o stažení webu...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>Wsl2.virtio9p je zakázáno, probíhá návrat na 9p s přenosem vsock.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy sítě se nepodporují, pokud je wsl2.virtio zakázané. návrat k networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme sítě se nepodporují, pokud je wsl2.virtio zakázané. návrat k networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Aktuálně spuštěné jádro postrádá opravu, která výrazně zlepšuje výkon zařízení virtio. Pokud chcete tuto optimalizaci povolit, aktualizujte na novější jádro WSL.</value>
@@ -1774,9 +1774,10 @@ Binární soubory Linuxu spuštěné ve WSL můžou automaticky používat GPU v
     <value>Postup instalace</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Po instalaci nástroje VS Code můžete nainstalovat rozšíření Remote WSL z terminálu Windows:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Otevření projektu WSL ve Visual Studio Code</value>
@@ -2062,12 +2063,20 @@ Využití:
     <value>Neplatná IP adresa '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Failed to map port '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') selhalo</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Možnost --session nelze použít s tímto příkazem.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
-    <value>Failed to launch command {}. Errno = {}</value>
+    <value>Nepodařilo se spustit příkaz {}. Errno = {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
@@ -2190,7 +2199,7 @@ Využití:
     <value>K dispozici jsou následující argumenty:</value>
   </data>
   <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
-    <value>Disable color output.</value>
+    <value>Zakázat barevný výstup.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Pokud chcete získat podrobnosti o konkrétním příkazu, předejte ho do argumentu help.</value>
@@ -2326,6 +2335,14 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Nepodporovaný síťový ovladač: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Nepodporovaná možnost síťového ovladače: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Možnost síťového ovladače Gateway vyžaduje, aby se zadala i 'Subnet.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Síť {} má aktivní koncové body.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2403,14 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Nenašla se žádná relace WSLC v '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Nelze použít '{}' jako úložiště relací, protože adresář není prázdný</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>{} nelze použít jako úložiště relace, protože se nejedná o adresář</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2473,7 +2498,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Odebere všechny zastavené kontejnery.</value>
   </data>
   <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Celkové uvolněné místo: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
@@ -2566,7 +2591,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
-    <value>Total reclaimed space: {}</value>
+    <value>Celkové uvolněné místo: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2689,14 +2714,14 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
-    <value>Run a command in a session.</value>
+    <value>Spusťte příkaz v relaci.</value>
   </data>
   <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
-    <value>Runs a command in an active session without a TTY. The command and its arguments are forwarded directly to the session. If no session is specified, the wslc default session will be used.</value>
+    <value>Spustí příkaz v aktivní relaci bez TTY. Příkaz a jeho argumenty jsou přímo předány do relace. Pokud není zadána žádná relace, použije se výchozí relace wslc.</value>
     <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being run</value>
+    <value>Argumenty, které se mají předat příkazu, který se spouští</value>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>Ukončit relaci.</value>
@@ -2844,6 +2869,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Připojte kontejner k síti</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Nechybová zpráva, pokud síť neexistuje</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Neplatná hodnota {}: název sítě nemůže být prázdný ani obsahovat prázdné znaky.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2920,6 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Velikost /dev/shm (např. 64 mil., 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>ID relace</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Cesta k úložišti relace</value>
   </data>
@@ -2914,10 +2939,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Zobrazit časová razítka ve výstupu protokolu</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Zobrazit protokoly od časového razítka (např. unix epoch seconds)</value>
+    <value>Zobrazit protokoly od časového razítka (Unixové epochy sekund nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Zobrazit protokoly před časovým razítkem (např. unix epoch seconds)</value>
+    <value>Zobrazit protokoly před časovým razítkem (sekundy Unix epochy nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nový odkaz na obrázek ve formátu image-name[:tag]</value>
@@ -2937,6 +2962,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Připojit svazek ke kontejneru pomocí bind mount</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Nechybová zpráva, pokud svazek neexistuje</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Pracovní adresář v kontejneru</value>
@@ -3026,6 +3054,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Neplatná hodnota argumentu {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Neplatná hodnota argumentu {}: '{}'. Očekávalo se časové razítko epochy systému Unix nebo datum a čas RFC3339 (např. 2024-01-15T10:30:00Z).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
+  </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Neplatná hodnota {}: {} je mimo platný rozsah ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3097,13 +3129,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Vypíše pouze názvy sítí</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
-    <value>Remove all unused networks.</value>
+    <value>Odstraňte všechny nepoužívané sítě.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
-    <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
+    <value>Odstraní všechny nepoužívané sítě. Síť se považuje za nepoužívanou, pokud na ni neodkazuje žádný kontejner.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Odstraněno: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">

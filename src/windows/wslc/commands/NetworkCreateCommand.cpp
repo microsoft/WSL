@@ -46,7 +46,7 @@ std::wstring NetworkCreateCommand::LongDescription() const
 
 void NetworkCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << CreateNetwork;
 }
 } // namespace wsl::windows::wslc

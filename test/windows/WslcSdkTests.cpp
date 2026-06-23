@@ -323,7 +323,7 @@ class WslcSdkTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            uint64_t Pid;
+            uint32_t Pid;
             uint32_t Signal;
             uint64_t Timestamp;
         };
@@ -372,7 +372,7 @@ class WslcSdkTests
         VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<uint32_t>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
     }
 

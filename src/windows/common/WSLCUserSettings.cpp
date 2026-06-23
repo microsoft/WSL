@@ -89,9 +89,9 @@ namespace details {
         {
             return WSLCNetworkingModeNAT;
         }
-        if (value == "virtioproxy")
+        if (value == "consomme")
         {
-            return WSLCNetworkingModeVirtioProxy;
+            return WSLCNetworkingModeConsomme;
         }
 
         return std::nullopt;
@@ -114,6 +114,20 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)
     {
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionPortRelay)
+    {
+        if (value == "virtionet")
+        {
+            return PortRelayType::VirtioNet;
+        }
+        if (value == "wslrelay")
+        {
+            return PortRelayType::WslRelay;
+        }
+
+        return std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

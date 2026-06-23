@@ -143,7 +143,7 @@ typedef enum _WSLCNetworkingMode
 {
     WSLCNetworkingModeNone,
     WSLCNetworkingModeNAT,
-    WSLCNetworkingModeVirtioProxy
+    WSLCNetworkingModeConsomme
 } WSLCNetworkingMode;
 
 typedef enum _WSLCFeatureFlags
@@ -154,9 +154,10 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsGPU = 4,
     WslcFeatureFlagsVirtioFs = 8,
     WslcFeatureFlagsDebug = 16,
+    WslcFeatureFlagsPortRelayWslRelay = 32, // Use the wslrelay-based localhost port relay in Consomme networking mode.
 } WSLCFeatureFlags;
 
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug)")
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 

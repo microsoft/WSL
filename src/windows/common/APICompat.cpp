@@ -40,7 +40,7 @@ namespace {
         {
         }
 
-        IFACEMETHOD(OnCrashDump)(LPCWSTR DumpPath, LPCSTR ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp) override
+        IFACEMETHOD(OnCrashDump)(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
         {
             return m_inner->OnCrashDump(DumpPath, ProcessName, Pid, Signal, Timestamp);
         }
