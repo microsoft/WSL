@@ -684,7 +684,7 @@ class PluginTests
         ConfigurePlugin(PluginTestType::WslcImagePull);
 
         {
-            auto session = CreateWslcSession(L"plugin-wslc-pull-test", WSLCNetworkingModeVirtioProxy);
+            auto session = CreateWslcSession(L"plugin-wslc-pull-test", WSLCNetworkingModeConsomme);
 
             // Load the registry and debian images.
             LoadTestImage(*session, "debian:latest");

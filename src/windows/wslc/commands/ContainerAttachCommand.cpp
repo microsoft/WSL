@@ -43,8 +43,8 @@ std::wstring ContainerAttachCommand::LongDescription() const
 
 void ContainerAttachCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << AttachContainer(context.Args.Get<ArgType::ContainerId>());
 }
 } // namespace wsl::windows::wslc

@@ -141,10 +141,10 @@ void Process::EnsureCanStart() const
         throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
     }
 
-    auto cmdLine = GetImplementation(m_settings)->CmdLine();
+    auto cmdLine = GetImplementation(m_settings)->CommandLine();
     if (!cmdLine || cmdLine.Size() == 0)
     {
-        throw winrt::hresult_invalid_argument(L"Process requires a non-empty CmdLine to start");
+        throw winrt::hresult_invalid_argument(L"Process requires a non-empty CommandLine to start");
     }
 }
 
@@ -261,4 +261,23 @@ WslcProcess Process::ToHandle()
     EnsureStarted();
     return m_process.get();
 }
+
+void Process::Close()
+{
+    if (m_waitForExitAction)
+    {
+        m_waitForExitAction.Cancel();
+        m_waitForExitAction = nullptr;
+    }
+
+    // Methods called after Close() will fail due to EnsureStarted().
+    m_process.reset();
+}
+
+void Process::final_release(std::unique_ptr<Process> self)
+{
+    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    self->Close();
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

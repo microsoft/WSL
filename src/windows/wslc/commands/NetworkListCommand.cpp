@@ -57,8 +57,8 @@ void NetworkListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
-            << GetNetworks   //
+    context << ResolveSession //
+            << GetNetworks    //
             << ListNetworks;
 }
 } // namespace wsl::windows::wslc

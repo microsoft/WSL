@@ -44,8 +44,8 @@ std::wstring ImageTagCommand::LongDescription() const
 
 void ImageTagCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << TagImage;
 }
 } // namespace wsl::windows::wslc
