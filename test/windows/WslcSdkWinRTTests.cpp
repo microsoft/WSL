@@ -51,7 +51,7 @@ extern bool g_fastTestRun;
     } \
     CATCH_LOG()
 #define SCOPE_CLEANUP(operation) wil::scope_exit([&]() { IGNORE_ERRORS(operation) })
-#define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerFlags::Force))
+#define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerOption::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
 
 struct ProcessOutput
@@ -152,8 +152,8 @@ class WslcSdkWinRtTests
 
     struct RunContainerOptions
     {
-        std::vector<winrt::hstring> cmdLine = {};
-        WSLCSDK::ContainerFlags flags = WSLCSDK::ContainerFlags::None;
+        std::vector<winrt::hstring> commandLine = {};
+        bool enableGpu = false;
         std::optional<winrt::hstring> name = std::nullopt;
         std::chrono::milliseconds timeout = 2min;
         std::optional<WSLCSDK::ContainerNetworkingMode> networkingMode = std::nullopt;
@@ -164,16 +164,16 @@ class WslcSdkWinRtTests
     ProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        if (!options.cmdLine.empty())
+        if (!options.commandLine.empty())
         {
-            procSettings.CmdLine(winrt::single_threaded_vector(std::move(options.cmdLine)));
+            procSettings.CommandLine(winrt::single_threaded_vector(std::move(options.commandLine)));
         }
 
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
         auto containerSettings = WSLCSDK::ContainerSettings(imageName);
         containerSettings.InitProcess(procSettings);
-        containerSettings.Flags(options.flags);
+        containerSettings.EnableGpu(options.enableGpu);
 
         if (options.name)
         {
@@ -191,14 +191,14 @@ class WslcSdkWinRtTests
         StartContainerAndWaitForInitProcessExit(container, options.timeout);
         auto output = GetProcessOutput(container.InitProcess());
 
-        IGNORE_ERRORS(container.Delete(WSLCSDK::DeleteContainerFlags::Force));
+        IGNORE_ERRORS(container.Delete(WSLCSDK::DeleteContainerOption::Force));
 
         return output;
     }
 
     bool HasImage(winrt::hstring const& imageName)
     {
-        auto images = m_defaultSession.Images();
+        auto images = m_defaultSession.GetImages();
         return std::any_of(images.begin(), images.end(), [&](auto const& img) { return img.Name() == imageName; });
     }
 
@@ -244,7 +244,7 @@ class WslcSdkWinRtTests
         // Build session settings using the WinRT API
         auto settings = WSLCSDK::SessionSettings(c_testSessionName, m_storagePath.wstring());
         settings.CpuCount(4);
-        settings.MemoryMB(2048);
+        settings.MemorySizeInMB(2048);
         settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
@@ -293,7 +293,7 @@ class WslcSdkWinRtTests
 
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-extra-session", extraStorage.wstring());
         settings.CpuCount(2);
-        settings.MemoryMB(1024);
+        settings.MemorySizeInMB(1024);
         settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 1024ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
@@ -306,7 +306,7 @@ class WslcSdkWinRtTests
         // Negative: Must throw if used before Start()
         {
             auto session = WSLCSDK::Session(settings);
-            VERIFY_THROWS_HR(std::ignore = session.Images(), E_ILLEGAL_METHOD_CALL);
+            VERIFY_THROWS_HR(std::ignore = session.GetImages(), E_ILLEGAL_METHOD_CALL);
         }
 
         // Positive: Starting the session must succeed.
@@ -350,7 +350,7 @@ class WslcSdkWinRtTests
         // drops kill()-sent signals with default disposition when targeting PID 1 in a
         // PID namespace, so no core dump would be generated if we crash the init process.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -375,7 +375,7 @@ class WslcSdkWinRtTests
             });
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             const auto beforeCrash = winrt::clock::now();
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 30s);
@@ -407,7 +407,7 @@ class WslcSdkWinRtTests
             }
 
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
+            execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"kill -SEGV $$"}));
 
             StartProcessAndWaitForExit(container.CreateProcess(execSettings), 60s);
 
@@ -449,14 +449,14 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ImageList)
     {
         // Session has images pre-loaded - list must return at least one entry.
-        const auto images = m_defaultSession.Images();
+        const auto images = m_defaultSession.GetImages();
         VERIFY_IS_TRUE(images.Size() >= 1);
 
         // At least one image must be non-empty
         bool foundNonEmpty = false;
         for (auto const& img : images)
         {
-            if (!img.Name().empty() && img.SizeBytes() != 0)
+            if (!img.Name().empty() && img.Size() != 0)
             {
                 foundNonEmpty = true;
                 break;
@@ -510,7 +510,7 @@ class WslcSdkWinRtTests
 
             VERIFY_IS_TRUE(HasImage(c_importedImageName));
 
-            auto output = RunContainerAndWaitForExit(c_importedImageName, {.cmdLine = {L"/hello"}});
+            auto output = RunContainerAndWaitForExit(c_importedImageName, {.commandLine = {L"/hello"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_IS_TRUE(output.StandardOutput.find(L"Hello from Docker!") != std::string::npos);
         }
@@ -560,7 +560,7 @@ class WslcSdkWinRtTests
     {
         // Positive: stdout is captured correctly.
         {
-            auto output = RunContainerAndWaitForExit(L"debian:latest", {.cmdLine = {L"/bin/echo", L"OK"}});
+            auto output = RunContainerAndWaitForExit(L"debian:latest", {.commandLine = {L"/bin/echo", L"OK"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"OK\n");
             VERIFY_ARE_EQUAL(output.StandardError, L"");
@@ -568,8 +568,8 @@ class WslcSdkWinRtTests
 
         // Positive: stdout and stderr are routed independently.
         {
-            auto output =
-                RunContainerAndWaitForExit(L"debian:latest", {.cmdLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
+            auto output = RunContainerAndWaitForExit(
+                L"debian:latest", {.commandLine = {L"/bin/sh", L"-c", L"echo stdout && echo stderr >&2"}});
             VERIFY_ARE_EQUAL(output.ExitCode, 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"stdout\n");
             VERIFY_ARE_EQUAL(output.StandardError, L"stderr\n");
@@ -606,7 +606,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ContainerGetState)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -631,7 +631,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ContainerStopAndDelete)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"999"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"999"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -644,14 +644,14 @@ class WslcSdkWinRtTests
         VERIFY_NO_THROW(container.Stop(WSLCSDK::Signal::SIGKILL, TimeSpan::zero()));
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Exited);
 
-        VERIFY_NO_THROW(container.Delete(WSLCSDK::DeleteContainerFlags::None));
+        VERIFY_NO_THROW(container.Delete(WSLCSDK::DeleteContainerOption::None));
         VERIFY_ARE_EQUAL(container.State(), WSLCSDK::ContainerState::Deleted);
     }
 
     WSLC_TEST_METHOD(ProcessIOHandles)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(
+        procSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo STDOUT_TOKEN; echo STDERR_TOKEN >&2"}));
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
@@ -689,8 +689,7 @@ class WslcSdkWinRtTests
         {
             auto output = RunContainerAndWaitForExit(
                 L"debian:latest",
-                {.cmdLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
-                 .flags = WSLCSDK::ContainerFlags::None,
+                {.commandLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
                  .networkingMode = WSLCSDK::ContainerNetworkingMode::Bridged});
 
             VERIFY_ARE_EQUAL(output.StandardOutput, L"HAS_ETH0\n");
@@ -700,8 +699,7 @@ class WslcSdkWinRtTests
         {
             auto output = RunContainerAndWaitForExit(
                 L"debian:latest",
-                {.cmdLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
-                 .flags = WSLCSDK::ContainerFlags::None,
+                {.commandLine = {L"/bin/sh", L"-c", L"[ -d /sys/class/net/eth0 ] && echo 'HAS_ETH0' || echo 'NO_ETH0'"},
                  .networkingMode = WSLCSDK::ContainerNetworkingMode::None});
 
             VERIFY_ARE_EQUAL(output.StandardOutput, L"NO_ETH0\n");
@@ -729,7 +727,7 @@ class WslcSdkWinRtTests
         // Functional: BRIDGED networking with port mapping; HTTP server must be reachable.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
@@ -754,7 +752,7 @@ class WslcSdkWinRtTests
         // Functional: port mapping with explicit IPv4 WindowsAddress.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
@@ -781,7 +779,7 @@ class WslcSdkWinRtTests
         // Functional: port mapping with explicit IPv6 WindowsAddress.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
+            procSettings.CommandLine(
                 winrt::single_threaded_vector<winrt::hstring>({L"python3", L"-m", L"http.server", L"--bind", L"::", L"8000"}));
             procSettings.EnvironmentVariables(
                 winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"PYTHONUNBUFFERED", L"1"}}));
@@ -837,7 +835,7 @@ class WslcSdkWinRtTests
             containerSettings.Volumes(winrt::single_threaded_vector<WSLCSDK::ContainerVolume>(
                 {WSLCSDK::ContainerVolume(currentDirectory, L"/mnt/path", false)}));
             auto container = m_defaultSession.CreateContainer(containerSettings);
-            container.Delete(WSLCSDK::DeleteContainerFlags::None);
+            container.Delete(WSLCSDK::DeleteContainerOption::None);
         }
     }
 
@@ -869,7 +867,7 @@ class WslcSdkWinRtTests
             "! touch /mnt/ro/probe 2>/dev/null";
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", winrt::to_hstring(c_script)}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", winrt::to_hstring(c_script)}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -882,7 +880,7 @@ class WslcSdkWinRtTests
         StartContainerAndWaitForInitProcessExit(container);
 
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-        container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+        container.Delete(WSLCSDK::DeleteContainerOption::Force);
 
         // Verify the file written by the container is visible on the host.
         std::ifstream written(hostRwDir / "written.txt");
@@ -905,7 +903,7 @@ class WslcSdkWinRtTests
         // The inspect JSON must contain the container ID.
         VERIFY_IS_TRUE(winrt::to_string(inspectJson).find(winrt::to_string(id)) != std::string::npos);
 
-        container.Delete(WSLCSDK::DeleteContainerFlags::None);
+        container.Delete(WSLCSDK::DeleteContainerOption::None);
         cleanup.release();
     }
 
@@ -913,7 +911,7 @@ class WslcSdkWinRtTests
     {
         // Start a long-running container so we can exec into it.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -926,7 +924,7 @@ class WslcSdkWinRtTests
         // Positive: exec a command that exits 0.
         {
             auto execSettings = WSLCSDK::ProcessSettings();
-            execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/true"}));
+            execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/true"}));
 
             auto execProcess = container.CreateProcess(execSettings);
             StartProcessAndWaitForExit(execProcess);
@@ -948,7 +946,7 @@ class WslcSdkWinRtTests
         // Functional: container process should see the configured hostname.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
+            procSettings.CommandLine(
                 winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test \"$(hostname)\" = my-test-host"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -958,14 +956,14 @@ class WslcSdkWinRtTests
             auto container = m_defaultSession.CreateContainer(containerSettings);
             StartContainerAndWaitForInitProcessExit(container);
             VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+            container.Delete(WSLCSDK::DeleteContainerOption::Force);
         }
     }
 
     WSLC_TEST_METHOD(ContainerDomainName)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(
+        procSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test \"$(domainname)\" = test.local"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -975,7 +973,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-        container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+        container.Delete(WSLCSDK::DeleteContainerOption::Force);
     }
 
     // -----------------------------------------------------------------------
@@ -985,7 +983,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ProcessEnvVariables)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(
+        procSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test \"$MY_TEST_VAR\" = hello-from-test"}));
         procSettings.EnvironmentVariables(
             winrt::single_threaded_map(std::map<winrt::hstring, winrt::hstring>{{L"MY_TEST_VAR", L"hello-from-test"}}));
@@ -996,7 +994,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-        container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+        container.Delete(WSLCSDK::DeleteContainerOption::Force);
     }
 
     WSLC_TEST_METHOD(ProcessSignal)
@@ -1008,7 +1006,7 @@ class WslcSdkWinRtTests
         }
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1041,7 +1039,7 @@ class WslcSdkWinRtTests
         }
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1059,7 +1057,7 @@ class WslcSdkWinRtTests
     {
         auto runAndGetExitCode = [&](int code) -> int32_t {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(
+            procSettings.CommandLine(
                 winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", winrt::to_hstring(std::format("exit {}", code))}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1069,7 +1067,7 @@ class WslcSdkWinRtTests
             StartContainerAndWaitForInitProcessExit(container);
             auto exitCode = container.InitProcess().ExitCode();
 
-            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+            container.Delete(WSLCSDK::DeleteContainerOption::Force);
             return exitCode;
         };
 
@@ -1079,7 +1077,7 @@ class WslcSdkWinRtTests
         // Negative: querying ExitCode while process is still running must throw.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
@@ -1099,7 +1097,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ProcessGetState)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1136,7 +1134,7 @@ class WslcSdkWinRtTests
     {
         // Functional: container should see the configured working directory.
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test \"$(pwd)\" = /tmp"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"test \"$(pwd)\" = /tmp"}));
         procSettings.WorkingDirectory(L"/tmp");
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1145,7 +1143,7 @@ class WslcSdkWinRtTests
         auto container = m_defaultSession.CreateContainer(containerSettings);
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-        container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+        container.Delete(WSLCSDK::DeleteContainerOption::Force);
     }
 
     // -----------------------------------------------------------------------
@@ -1161,13 +1159,13 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(GetMissingComponents)
     {
         const auto missing = WSLCSDK::WslcService::GetMissingComponents();
-        VERIFY_ARE_EQUAL(missing, WSLCSDK::ComponentFlags::None);
+        VERIFY_ARE_EQUAL(missing.Size(), 0u);
     }
 
     WSLC_TEST_METHOD(InstallWithDependencies)
     {
         WSLCSDK::WslcService::InstallWithDependenciesAsync().get();
-        VERIFY_ARE_EQUAL(WSLCSDK::WslcService::GetMissingComponents(), WSLCSDK::ComponentFlags::None);
+        VERIFY_ARE_EQUAL(WSLCSDK::WslcService::GetMissingComponents().Size(), 0u);
     }
 
     // -----------------------------------------------------------------------
@@ -1179,7 +1177,7 @@ class WslcSdkWinRtTests
         // Negative: registering OutputReceived/ErrorReceived without OutputMode::Event must throw.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
@@ -1199,7 +1197,7 @@ class WslcSdkWinRtTests
         // Positive: with OutputMode::Event, registering and revoking event handlers must succeed.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1226,7 +1224,7 @@ class WslcSdkWinRtTests
         // Negative: OutputReceived/ErrorReceived with OutputMode::Stream must throw.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1246,7 +1244,7 @@ class WslcSdkWinRtTests
         std::string stdoutData, stderrData;
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(
+        procSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo STDOUT && echo STDERR >&2"}));
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
@@ -1274,7 +1272,7 @@ class WslcSdkWinRtTests
     {
         // Long-running init process to keep the container alive.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -1287,7 +1285,7 @@ class WslcSdkWinRtTests
         std::string stdoutData, stderrData;
 
         auto execProcSettings = WSLCSDK::ProcessSettings();
-        execProcSettings.CmdLine(
+        execProcSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo EXEC_OUT && echo EXEC_ERR >&2"}));
         execProcSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
@@ -1312,7 +1310,7 @@ class WslcSdkWinRtTests
         // (draining uncallbacked streams to prevent deadlock), so both stdout and stderr
         // handles are consumed and neither can be obtained via GetOutputStream.
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1341,7 +1339,7 @@ class WslcSdkWinRtTests
             std::promise<int32_t> exitPromise;
 
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(
                 {L"/bin/sh", L"-c", winrt::hstring(std::format(L"echo HELLO && exit {}", exitCodeArg))}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
@@ -1388,7 +1386,7 @@ class WslcSdkWinRtTests
 
         // Long-running init process to keep the container alive.
         auto initProcSettings = WSLCSDK::ProcessSettings();
-        initProcSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"999"}));
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"999"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(initProcSettings);
@@ -1402,7 +1400,7 @@ class WslcSdkWinRtTests
         std::atomic<bool> exitFired{false};
 
         auto execProcSettings = WSLCSDK::ProcessSettings();
-        execProcSettings.CmdLine(
+        execProcSettings.CommandLine(
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"while true; do echo LINE; sleep 0.05; done"}));
         execProcSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
@@ -1441,7 +1439,7 @@ class WslcSdkWinRtTests
         stdoutData.reserve(c_expectedBytes + 4096);
 
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(
             {L"/bin/sh", L"-c", L"dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64 -w 0"}));
         procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
@@ -1495,7 +1493,7 @@ class WslcSdkWinRtTests
         // Positive: write a marker via a container that mounts the named volume.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(
                 {L"/bin/sh", L"-c", L"echo wslc-winrt-vhd-test > /data/marker.txt"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1506,13 +1504,13 @@ class WslcSdkWinRtTests
             auto container = session.CreateContainer(containerSettings);
             StartContainerAndWaitForInitProcessExit(container);
             VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+            container.Delete(WSLCSDK::DeleteContainerOption::Force);
         }
 
         // Positive: read back the marker in a second container (read-only mount).
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(
                 {L"/bin/sh", L"-c", L"test \"$(cat /data/marker.txt)\" = wslc-winrt-vhd-test"}));
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1523,7 +1521,7 @@ class WslcSdkWinRtTests
             auto container = session.CreateContainer(containerSettings);
             StartContainerAndWaitForInitProcessExit(container);
             VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
-            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+            container.Delete(WSLCSDK::DeleteContainerOption::Force);
         }
 
         // Positive: delete the volume.
@@ -1533,7 +1531,7 @@ class WslcSdkWinRtTests
         // Negative: zero size must fail.
         VERIFY_THROWS_HR(session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, 0, WSLCSDK::VhdType::Dynamic)), E_INVALIDARG);
 
-        // Positive: fixed-allocation VHD; on-disk file size must be >= SizeBytes.
+        // Positive: fixed-allocation VHD; on-disk file size must be >= Size.
         {
             constexpr auto c_fixedVolumeName = L"wslc-sdk-vhd-fixed";
             constexpr auto c_fixedSizeBytes = 64ull * _1MB;
@@ -1546,18 +1544,18 @@ class WslcSdkWinRtTests
             VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
         }
 
-        // Positive: SetOwner() bakes uid/gid into the volume root inode at mkfs time.
+        // Positive: Owner() bakes uid/gid into the volume root inode at mkfs time.
         // Verify by stat-ing the mount inside a container.
         {
             constexpr auto c_ownedVolumeName = L"wslc-sdk-vhd-owned";
             auto vhdOptions = WSLCSDK::VhdOptions(c_ownedVolumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Dynamic);
-            vhdOptions.SetOwner(65534, 65534); // nobody:nogroup
+            vhdOptions.Owner(WSLCSDK::VhdOwner{65534, 65534}); // nobody:nogroup
             session.CreateVhdVolume(vhdOptions);
 
             auto deleteVolume = SCOPE_CLEANUP(session.DeleteVhdVolume(c_ownedVolumeName));
 
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/usr/bin/stat", L"-c", L"%u %g", L"/data"}));
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/usr/bin/stat", L"-c", L"%u %g", L"/data"}));
             procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
@@ -1570,7 +1568,7 @@ class WslcSdkWinRtTests
             auto output = GetProcessOutput(container.InitProcess());
             VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
             VERIFY_ARE_EQUAL(output.StandardOutput, L"65534 65534\n");
-            container.Delete(WSLCSDK::DeleteContainerFlags::Force);
+            container.Delete(WSLCSDK::DeleteContainerOption::Force);
         }
     }
 
@@ -1695,7 +1693,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(ExecOnStoppedContainer)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1707,7 +1705,7 @@ class WslcSdkWinRtTests
 
         // The init process has now exited. Attempting to exec on a stopped container must fail.
         auto execSettings = WSLCSDK::ProcessSettings();
-        execSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/echo", L"should-fail"}));
+        execSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/echo", L"should-fail"}));
 
         VERIFY_THROWS_HR(container.CreateProcess(execSettings).Start(), static_cast<HRESULT>(WSLC_E_CONTAINER_NOT_RUNNING));
     }
@@ -1715,7 +1713,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(DuplicateContainerName)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1733,7 +1731,7 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
     {
         auto procSettings = WSLCSDK::ProcessSettings();
-        procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"10"}));
 
         auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
         containerSettings.InitProcess(procSettings);
@@ -1744,7 +1742,7 @@ class WslcSdkWinRtTests
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         // Deleting a running container without Force must fail.
-        VERIFY_THROWS_HR(container.Delete(WSLCSDK::DeleteContainerFlags::None), static_cast<HRESULT>(WSLC_E_CONTAINER_IS_RUNNING));
+        VERIFY_THROWS_HR(container.Delete(WSLCSDK::DeleteContainerOption::None), static_cast<HRESULT>(WSLC_E_CONTAINER_IS_RUNNING));
     }
 
     WSLC_TEST_METHOD(DeleteNonExistentImage)
@@ -1762,7 +1760,7 @@ class WslcSdkWinRtTests
         // Negative: creating a GPU container on a session without GPU support must fail.
         {
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
+            containerSettings.EnableGpu(true);
 
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings).Start(), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
         }
@@ -1775,7 +1773,7 @@ class WslcSdkWinRtTests
         });
 
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-gpu-test", gpuStorage.wstring());
-        settings.FeatureFlags(WSLCSDK::SessionFeatureFlags::EnableGpu);
+        settings.EnableGpu(true);
         settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
 
         auto gpuSession = WSLCSDK::Session(settings);
@@ -1788,7 +1786,7 @@ class WslcSdkWinRtTests
         // the WSL GPU libraries inside a GPU container.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CmdLine(winrt::single_threaded_vector<winrt::hstring>(
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(
                 {L"/bin/sh",
                  L"-c",
                  L"test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg && cat /etc/ld.so.conf.d/ld.wsl.conf"}));
@@ -1796,7 +1794,7 @@ class WslcSdkWinRtTests
 
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
             containerSettings.InitProcess(procSettings);
-            containerSettings.Flags(WSLCSDK::ContainerFlags::EnableGpu);
+            containerSettings.EnableGpu(true);
 
             auto container = gpuSession.CreateContainer(containerSettings);
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
