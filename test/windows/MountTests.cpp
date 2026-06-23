@@ -474,12 +474,7 @@ class MountTests
         const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
 
         // Create a file symbolic link pointing at the real VHD.
-        if (!CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
-        {
-            // Creating symlinks requires Developer Mode or SeCreateSymbolicLinkPrivilege; skip if unavailable.
-            LogSkipped("Unable to create a symbolic link (error %d); skipping", GetLastError());
-            return;
-        }
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
 
         auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
 
@@ -503,11 +498,7 @@ class MountTests
 
         const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
 
-        if (!CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
-        {
-            LogSkipped("Unable to create a symbolic link (error %d); skipping", GetLastError());
-            return;
-        }
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
 
         auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
 
@@ -515,12 +506,14 @@ class MountTests
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + symlink.wstring() + L" --vhd --bare"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl();
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         WaitForVmTimeout(keepAlive);
 
-        // Recreating the VM restores the persisted disk mount; the symlinked VHD must re-attach.
+        // Recreating the VM restores the persisted disk mount; the symlinked VHD must re-attach. The
+        // block device name is not guaranteed to be stable across the VM teardown, so re-query it.
+        disk = GetBlockDeviceInWsl();
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
