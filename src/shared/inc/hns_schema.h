@@ -300,28 +300,19 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
         {DeviceType::VirtualCellular, "VirtualCellular"},
     })
 
-enum class CreateDeviceFlags
-{
-    None = 0,
-    DisableDAD = 1
-};
-
-DEFINE_ENUM_FLAG_OPERATORS(CreateDeviceFlags);
-
 struct CreateDeviceRequest
 {
     DeviceType type{};
     std::wstring deviceName;
     std::optional<GUID> lowerEdgeAdapterId;
     std::optional<std::wstring> lowerEdgeDeviceName;
-    CreateDeviceFlags flags{CreateDeviceFlags::None};
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName, flags);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName);
 
 inline void to_json(nlohmann::json& j, const CreateDeviceRequest& request)
 {
-    j = nlohmann::json{{"type", request.type}, {"deviceName", request.deviceName}, {"flags", request.flags}};
+    j = nlohmann::json{{"type", request.type}, {"deviceName", request.deviceName}};
 
     if (request.lowerEdgeAdapterId.has_value())
     {
@@ -424,8 +415,10 @@ struct HNSNetwork
     std::vector<Subnet> Subnets;
     NetworkFlags Flags{};
     InterfaceConstraint InterfaceConstraint{};
+    bool IsLoopback{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HNSNetwork, ID, Name, SourceMac, DNSSuffix, DNSServerList, DNSDomain, Subnets, Flags, InterfaceConstraint);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        HNSNetwork, ID, Name, SourceMac, DNSSuffix, DNSServerList, DNSDomain, Subnets, Flags, InterfaceConstraint, IsLoopback);
 };
 
 enum class NetworkMode
