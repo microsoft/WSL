@@ -1780,9 +1780,10 @@ WSL에서 실행되는 Linux 이진 파일은 Windows에서 GPU를 자동으로 
     <value>설치 방법</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>VS Code 설치한 후 Windows 터미널 원격 WSL 확장을 설치할 수 있습니다.
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Visual Studio Code WSL 프로젝트 열기</value>

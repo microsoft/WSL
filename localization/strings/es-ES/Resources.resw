@@ -316,7 +316,7 @@ y "wsl.exe --install &lt;Distro&gt;" para instalar.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 no se puede iniciar porque la virtualización no está habilitada en esta máquina.
-Asegúrese de que el componente opcional "Plataforma de máquina virtual" esté habilitado y de que la virtualización esté activada en la configuración de firmware del equipo.
+Asegúrate de que el componente opcional "Plataforma de máquina virtual" esté habilitado y de que la virtualización esté activada en la configuración de firmware del equipo.
 
 Habilitar "Plataforma de máquina virtual" ejecutando: wsl.exe --install --no-distribution
 
@@ -831,7 +831,7 @@ Para obtener más información sobre Admin Protection, visite https://aka.ms/apd
     <value>Abrir EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Esta distribución no contiene un nombre predeterminado. Use --name para elegir el nombre de la distribución.</value>
+    <value>Esta distribución no contiene un nombre predeterminado. Usa --name para elegir el nombre de la distribución.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -1205,13 +1205,13 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
-    <value>Hubo un problema. Prueba otra vez más tarde.</value>
+    <value>Hubo un problema. Inténtelo de nuevo más tarde.</value>
   </data>
   <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
     <value>Acerca de</value>
   </data>
   <data name="Settings_About.Header" xml:space="preserve">
-    <value>Sobre la configuración del subsistema de Windows para Linux</value>
+    <value>Acerca de la configuración del subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_About.Description" xml:space="preserve">
     <value>© Microsoft. Todos los derechos reservados.</value>
@@ -1220,7 +1220,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Configuración del Subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
-    <value>Subsistema de Windows para Linux Configuración permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación basada en GUI.</value>
+    <value>El ajuste Subsistema de Windows para Linux permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación basada en GUI.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
@@ -1264,7 +1264,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.dnsTunneling está establecido en true. Cuando se establece en true, Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, omitiendo los registros desconocidos.</value>
+    <value>Solo es aplicable cuando wsl2.dnsTunneling se establece en true. Cuando se establece en true, Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, omitiendo los registros desconocidos.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
@@ -1306,7 +1306,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Examinar distribuciones</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
+    <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
     <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1317,7 +1317,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
+    <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
@@ -1380,7 +1380,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated. "proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode está establecido en NAT. Booleano para informar a WSL para configurar el servidor DNS en Linux a la NAT en el host. Si se establece en false, se reflejarán los servidores DNS de Windows a Linux.</value>
+    <value>Solo es aplicable cuando wsl2.networkingMode se establece en NAT. Booleano para informar a WSL de que debe configurar el servidor DNS en Linux a nat en el host. Si se establece en false, se reflejarán los servidores DNS de Windows a Linux.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
@@ -1446,14 +1446,14 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Bucle invertido de dirección de host</value>
   </data>
   <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode se establece en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
+    <value>Solo es aplicable cuando wsl2.networkingMode se establece en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Ten en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Bucle invertido de dirección de host.</value>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode está establecido en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
+    <value>Solo es aplicable cuando wsl2.networkingMode se establece en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Ten en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
   </data>
   <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
     <value>Puertos omitidos</value>
@@ -1560,7 +1560,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Funciones de red</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
-    <value>Puede trabajar en todos los sistemas operativos con todos sus archivos.</value>
+    <value>Puedes trabajar en todos los sistemas operativos con todos sus archivos.</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
     <value>Acceso a archivos entre sistemas operativos</value>
@@ -1574,10 +1574,10 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
 'cd /mnt/c'</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
-    <value>Acceda a los archivos de Linux con el Explorador de archivos</value>
+    <value>Accede a los archivos de Linux con el Explorador de archivos</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
-    <value>Para ver los archivos de Linux desde Explorador de archivos, vaya a '\\wsl.localhost\'' o haga clic en el icono "Linux".</value>
+    <value>Para ver los archivos de Linux desde Explorador de archivos, ve a '\\wsl.localhost\'' o haga clic en el icono "Linux".</value>
     <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
@@ -1592,7 +1592,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Acceso a aplicaciones de red de Linux desde Windows</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
-    <value>Si va a compilar una aplicación de red (por ejemplo, una aplicación que se ejecuta en un servidor SQL Server o NodeJS) en la distribución de Linux, puede acceder a ella desde una aplicación de Windows (como el explorador de Internet Edge o Chrome) mediante localhost (como lo haría normalmente). Esto significa que si inició un servidor Linux que escucha el puerto 3000, puede ir a [http://localhost:3000] en Edge en Windows para acceder a él.</value>
+    <value>Si vas a compilar una aplicación de red (por ejemplo, una aplicación que se ejecuta en un servidor SQL Server o NodeJS) en la distribución de Linux, puedes acceder a ella desde una aplicación de Windows (como el explorador de Internet Edge o Chrome) mediante localhost (como lo haría normalmente). Esto significa que si iniciaste un servidor Linux que escucha el puerto 3000, puede ir a [http://localhost:3000] en Edge en Windows para acceder a él.</value>
     <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
@@ -1622,14 +1622,14 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Administración de distribuciones</value>
   </data>
   <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre los comandos básicos de WSL</value>
+    <value>Obtén más información sobre los comandos básicos de WSL</value>
   </data>
   <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslcommands</value>
     <comment>{Locked}Uri to the basic WSL commands documentation</comment>
   </data>
   <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre la importación de cualquier distribución de Linux</value>
+    <value>Obtén más información sobre la importación de cualquier distribución de Linux</value>
   </data>
   <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslcustomdistro</value>
@@ -1661,25 +1661,25 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
 
 Algunas de las ventajas de usar Docker Desktop con WSL son:
 
-• Puede ejecutar comandos de Docker en WSL o en Windows, con el mismo demonio de Docker e imágenes.
-• Puede compartir archivos y carpetas entre Windows y Linux sin problemas, mediante el montaje automático de unidades de Windows en WSL.
-• Puede usar sus herramientas y editores de Windows preferidos para trabajar en código y archivos de Linux, y viceversa, gracias a la interoperabilidad de WSL.</value>
+• Puedes ejecutar comandos de Docker en WSL o en Windows, con el mismo demonio de Docker e imágenes.
+• Puedes compartir archivos y carpetas entre Windows y Linux sin problemas, mediante el montaje automático de unidades de Windows en WSL.
+• Puedes usar tus herramientas y editores de Windows preferidos para trabajar en código y archivos de Linux, y viceversa, gracias a la interoperabilidad de WSL.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Integración de Docker Desktop</value>
   </data>
   <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre el uso de WSL con Docker</value>
+    <value>Obtén más información sobre el uso de WSL con Docker</value>
   </data>
   <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wsldocker</value>
     <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
   </data>
   <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
-    <value>El Subsistema de Windows para Linux (WSL) le permite ejecutar sus herramientas, utilidades, aplicaciones y flujos de trabajo favoritos de Linux directamente en Windows.
+    <value>El Subsistema de Windows para Linux (WSL) le permite ejecutar tus herramientas, utilidades, aplicaciones y flujos de trabajo favoritos de Linux directamente en Windows.
 
-Dedique un momento a obtener una vista previa de algunas de las características favoritas de la comunidad o vea nuestra documentación completa.</value>
+Dedica un momento a obtener una vista previa de algunas de las características favoritas de la comunidad o lee nuestra documentación completa.</value>
   </data>
   <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
     <value>Te damos la bienvenida a WSL</value>
@@ -1706,7 +1706,7 @@ Dedique un momento a obtener una vista previa de algunas de las características
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
-    <value>Puede usar aplicaciones Linux basadas en gráficos con interacciones nativas de Windows, como alt-tab, inicio del menú Inicio, anclaje de la barra de tareas y compatibilidad con cortar y pegar.</value>
+    <value>Puedes usar aplicaciones Linux basadas en gráficos con interacciones nativas de Windows, como alt-tab, inicio del menú Inicio, anclaje de la barra de tareas y compatibilidad con cortar y pegar.</value>
   </data>
   <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
     <value>Aplicaciones de GUI</value>
@@ -1714,27 +1714,27 @@ Dedique un momento a obtener una vista previa de algunas de las características
   <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
     <value>WSL puede aprovechar la GPU de Windows para flujos de trabajo de Machine Learning
 
-Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamente la GPU en Windows para acelerar su rendimiento. Solo tiene que instalar y ejecutar esos flujos de trabajo de la misma manera que lo haría en una máquina Linux normal. Hay muchas maneras diferentes de empezar a ejecutar CUDA en un contenedor de Docker si tiene una tarjeta gráfica NVIDIA, hasta ejecutar PyTorch o TensorFlow con DirectML en la tarjeta gráfica AMD, Intel o NVIDIA. Consulte la guía de introducción a continuación para obtener más información.</value>
+Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamente la GPU en Windows para acelerar tu rendimiento. Solo tienes que instalar y ejecutar esos flujos de trabajo de la misma manera que lo harías en una máquina Linux normal. Hay muchas maneras diferentes de empezar a ejecutar CUDA en un contenedor de Docker si tienes una tarjeta gráfica NVIDIA, hasta ejecutar PyTorch o TensorFlow con DirectML en la tarjeta gráfica AMD, Intel o NVIDIA. Consulta la guía de introducción a continuación para obtener más información.</value>
   </data>
   <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
     <value>Aceleración de la GPU</value>
   </data>
   <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre la aceleración de GPU</value>
+    <value>Obtén más información sobre la aceleración de GPU</value>
   </data>
   <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgpu</value>
     <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
   </data>
   <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las aplicaciones GUI de WSL</value>
+    <value>Obtén más información sobre las aplicaciones GUI de WSL</value>
   </data>
   <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslguiapps</value>
     <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
   </data>
   <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
-    <value>Esta es una lista de aplicaciones para probar (puede instalarlas todas en Ubuntu escribiendo 'sudo apt install &lt;Nombre de aplicación&gt;')
+    <value>Esta es una lista de aplicaciones para probar (puedes instalarlas todas en Ubuntu escribiendo 'sudo apt install &lt;Nombre de aplicación&gt;')
 
     • gedit: editor de texto básico
     • audacity: grabar y editar archivos de audio
@@ -1744,27 +1744,27 @@ Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamen
     • vlc: reproductor de vídeo</value>
   </data>
   <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
-    <value>Puede acceder fácilmente a las aplicaciones de red en los sistemas operativos Windows y Linux.</value>
+    <value>Puedes acceder fácilmente a las aplicaciones de red en los sistemas operativos Windows y Linux.</value>
   </data>
   <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
     <value>Integración de redes</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las aplicaciones de red</value>
+    <value>Obtén más información sobre las aplicaciones de red</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslnetworking</value>
     <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
   </data>
   <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las redes en modo reflejado</value>
+    <value>Obtén más información sobre las redes en modo reflejado</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslmirroredmode</value>
     <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
-   <value>Puede usar WSL como entorno de desarrollo a tiempo completo directamente desde VS Code.</value>
+   <value>Puedes usar WSL como entorno de desarrollo a tiempo completo directamente desde VS Code.</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
     <value>Integración de VS Code</value>
@@ -1780,15 +1780,16 @@ Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamen
     <value>Cómo instalarlo</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Después de instalar VS Code, puedes instalar la extensión WSL remota desde el Terminal Windows:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Abrir un proyecto WSL en Visual Studio Code</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
-    <value>Para abrir un proyecto en VS Code desde su distribución WSL, abra la línea de comando de la distribución y ejecute 'code .' para abrir un archivo de proyecto.
+    <value>Para abrir un proyecto en VS Code desde su distribución WSL, abre la línea de comando de la distribución y ejecute 'code .' para abrir un archivo de proyecto.
 
 También puedes acceder a más opciones remotas de VS Code mediante la paleta de comandos dentro de VS Code. Presiona "MAYÚS+CTRL+P" en el teclado para abrir la paleta de comandos y escribe "Remote-WSL" para ver una lista de las opciones remotas de VS Code disponibles, lo que te permite volver a abrir la carpeta en una sesión remota, especificar qué distribución deseas abrir y mucho más.</value>
   </data>
@@ -1799,7 +1800,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Funciones opcionales</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
-    <value>Declaración privacidad</value>
+    <value>Declaración de privacidad</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
     <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
@@ -1835,7 +1836,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
-    <value>Ejecute WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
+    <value>Ejecuta WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
@@ -1843,7 +1844,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Ejecute WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
+    <value>Ejecuta WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
@@ -1966,7 +1967,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Enable VirtIO</value>
   </data>
   <data name="Settings_Virtio.Description" xml:space="preserve">
-    <value>Use virtiofs en lugar del plan 9 para acceder a los archivos host, lo que aumenta la velocidad.</value>
+    <value>Usa virtiofs en lugar del plan 9 para acceder a los archivos host, lo que aumenta la velocidad.</value>
   </data>
   <data name="Settings_Virtio9p.Header" xml:space="preserve">
     <value>Habilitar Virtio 9p</value>

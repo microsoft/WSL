@@ -1774,9 +1774,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>如何安装</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>安装 VS Code 后，可以从 Windows 终端安装远程 WSL 扩展:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-"code –install-extension ms-vscode-remote.remote-wsl"</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>在 Visual Studio Code 中打开 WSL 项目</value>
@@ -2063,7 +2064,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToMapPort" xml:space="preserve">
-    <value>Failed to map port '{}', {}</value>
+    <value>未能映射端口 '{}'，{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
