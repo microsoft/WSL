@@ -53,16 +53,17 @@ endfunction()
 
 # Attack Surface Analyzer install-diff group. Runs on a single clean client image
 # and is generated only for nightly/release builds that publish the wsl.msi bundle.
-# Map ALLOW_UNSIGNED_PACKAGE (0/1) to a PowerShell switch literal for the runbook.
+# Map ALLOW_UNSIGNED_PACKAGE (0/1) straight through; the runbook switches accept 1/0.
+# (A literal "$true" cannot be bound to a [switch] when passed on a command line.)
 if (ALLOW_UNSIGNED_PACKAGE STREQUAL "1")
-    set(ASA_ALLOW_UNSIGNED "$true")
+    set(ASA_ALLOW_UNSIGNED "1")
 else()
-    set(ASA_ALLOW_UNSIGNED "$false")
+    set(ASA_ALLOW_UNSIGNED "0")
 endif()
 
 # Non-gating to start: report net-new findings without failing the run.
-# Flip to "$true" once the allowlist has been validated against a few nightly runs.
-set(ASA_FAIL_ON_NEW "$false")
+# Flip to "1" once the allowlist has been validated against a few nightly runs.
+set(ASA_FAIL_ON_NEW "0")
 
 function(add_asa_group image)
     set(DIR ${OUT}/asa-${image})

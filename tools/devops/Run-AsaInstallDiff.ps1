@@ -31,12 +31,14 @@ param(
     [string] $InstallDir = 'C:\Program Files\WSL',
 
     # Treat all unsigned WSL PE binaries under $InstallDir as expected. Use for
-    # unsigned dev/nightly builds where ESRP signing has not run.
-    [switch] $AllowUnsignedWslBinaries,
+    # unsigned dev/nightly builds where ESRP signing has not run. Accepts 1/0 or
+    # true/false (string, so it binds correctly when passed via powershell.exe -File).
+    [string] $AllowUnsignedWslBinaries = '0',
 
     # Exit non-zero when net-new (non-allowlisted) findings remain. Off by default
     # so the stage can be introduced as non-gating, then flipped on once clean.
-    [switch] $FailOnNewFindings,
+    # Accepts 1/0 or true/false (string, for the same -File binding reason).
+    [string] $FailOnNewFindings = '0',
 
     # When set, write a minimal TRX result file here so CloudTest's TRX parser can
     # surface the ASA job as a single pass/fail test. Empty = skip (local runs).
@@ -45,6 +47,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# The switches arrive as strings (powershell.exe -File coerces all args to string,
+# and [switch]/[bool] reject "1"/"0" there). Normalize to real booleans here.
+function ConvertTo-AsaBool([string] $value) {
+    return ($value -eq '1' -or $value -ieq 'true' -or $value -ieq '$true')
+}
+$allowUnsignedWslBinaries = ConvertTo-AsaBool $AllowUnsignedWslBinaries
+$failOnNewFindings = ConvertTo-AsaBool $FailOnNewFindings
 
 # Emit a minimal, well-formed TRX so CloudTest (Parser="TRX") reports the ASA job
 # as one pass/fail test. Job-level pass/fail is still driven by the process exit
@@ -245,7 +255,7 @@ function Test-Expected([string] $ruleId, [string] $path) {
             if ($norm -match $rx) { return $true }
         }
     }
-    if ($AllowUnsignedWslBinaries -and $ruleId -eq 'Unsigned binaries') {
+    if ($allowUnsignedWslBinaries -and $ruleId -eq 'Unsigned binaries') {
         $instNorm = $InstallDir.Replace('\', '/')
         if ($norm.StartsWith($instNorm, [StringComparison]::OrdinalIgnoreCase)) { return $true }
     }
@@ -287,7 +297,7 @@ if ($netNew.Count -gt 0) {
     }
     Write-Host ''
     Write-Host 'Review each finding. If benign, add it to tools/devops/asa-expected-findings.json with a rationale; otherwise fix the installer/code.'
-    if ($FailOnNewFindings) {
+    if ($failOnNewFindings) {
         throw "ASA install-diff found $($netNew.Count) net-new finding(s)."
     }
 }
