@@ -62,19 +62,42 @@ if (-not (Test-Admin)) {
 }
 
 # --- Ensure the ASA CLI is available ---
-$asa = Get-Command asa -ErrorAction SilentlyContinue
-if (-not $asa) {
+# ASA is distributed only as a .NET global tool (no prebuilt binaries), so this
+# bootstraps the .NET SDK on the fly when the agent/VM does not already have it.
+$AsaVersion = '2.3.331'
+
+function Resolve-Asa {
+    $cmd = Get-Command asa -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
     $toolPath = Join-Path $env:USERPROFILE '.dotnet\tools\asa.exe'
-    if (-not (Test-Path $toolPath)) {
-        Write-Host '=== Installing Attack Surface Analyzer CLI ===' -ForegroundColor Cyan
-        & dotnet tool install --global Microsoft.CST.AttackSurfaceAnalyzer.CLI
-        if ($LASTEXITCODE -ne 0) { throw "Failed to install ASA CLI ($LASTEXITCODE)" }
+    if (Test-Path $toolPath) { return $toolPath }
+
+    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($dotnet) {
+        $dotnetExe = $dotnet.Source
     }
-    $asa = $toolPath
+    else {
+        Write-Host '=== dotnet not found; bootstrapping .NET 8 SDK ===' -ForegroundColor Cyan
+        $installDir = Join-Path $env:USERPROFILE '.dotnet'
+        $installer = Join-Path $env:TEMP 'dotnet-install.ps1'
+        Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installer -UseBasicParsing
+        & $installer -Channel 8.0 -InstallDir $installDir
+        if ($LASTEXITCODE -ne 0) { throw "dotnet bootstrap failed ($LASTEXITCODE)" }
+        $dotnetExe = Join-Path $installDir 'dotnet.exe'
+    }
+    $env:PATH = (Join-Path $env:USERPROFILE '.dotnet\tools') + ';' + $env:PATH
+
+    Write-Host "=== Installing Attack Surface Analyzer CLI $AsaVersion ===" -ForegroundColor Cyan
+    & $dotnetExe tool install --global Microsoft.CST.AttackSurfaceAnalyzer.CLI --version $AsaVersion
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install ASA CLI ($LASTEXITCODE)" }
+
+    if (Test-Path $toolPath) { return $toolPath }
+    $cmd = Get-Command asa -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    throw 'ASA CLI not found after install.'
 }
-else {
-    $asa = $asa.Source
-}
+
+$asa = Resolve-Asa
 Write-Host "Using ASA: $asa"
 
 function Get-WslMsiProductCodes {
@@ -93,7 +116,9 @@ function Get-WslMsiProductCodes {
 
 # --- [0] Clean baseline: remove any pre-existing WSL MSI ---
 Write-Host '=== [0/5] Ensuring clean baseline ===' -ForegroundColor Cyan
-& wsl.exe --shutdown 2>$null
+if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+    try { & wsl.exe --shutdown } catch { }
+}
 foreach ($code in (Get-WslMsiProductCodes)) {
     Write-Host "Uninstalling existing WSL product $code"
     $u = Start-Process msiexec.exe -ArgumentList @('/x', $code, '/qn', '/norestart') -Wait -PassThru
