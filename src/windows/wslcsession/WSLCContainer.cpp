@@ -23,6 +23,7 @@ Abstract:
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
+#include "WSLCContainerLauncher.h"
 #include "APICompat.h"
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -1603,7 +1604,18 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         port.ContainerPort = containerOptions.Ports[i].ContainerPort;
         port.Family = containerOptions.Ports[i].Family;
         port.Protocol = containerOptions.Ports[i].Protocol;
-        strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress);
+
+        if (containerOptions.Ports[i].BindingAddress != nullptr)
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress) != 0);
+        }
+        else
+        {
+            const auto& defaultBindingAddress = wslcSession.DefaultBindingAddress(containerOptions.Ports[i].Family);
+            THROW_HR_IF_MSG(E_INVALIDARG, !defaultBindingAddress.has_value(), "No binding address was passed for port %d", i);
+
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, defaultBindingAddress->c_str()) != 0);
+        }
     }
 
     // Append exposed ports from the image, if requested.
@@ -1621,6 +1633,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 auto [port, protocol] = ParseExposedPortKey(portKey);
 
                 // Only TCP localhost mappings are currently supported by the relay path.
+                // TODO: Allow UDP + ipv6 binding in virtionet mode here.
                 if (protocol != IPPROTO_TCP)
                 {
                     continue;
@@ -1631,7 +1644,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 createdPort.Family = AF_INET;
                 createdPort.ContainerPort = port;
                 createdPort.Protocol = protocol;
-                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
+
+                // Honor the configured default host binding address (falling back to loopback).
+                const auto& defaultBindingAddress = wslcSession.DefaultBindingAddress(AF_INET);
+
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(createdPort.BindingAddress, defaultBindingAddress.value_or("127.0.0.1").c_str()) != 0);
             }
         }
     }

@@ -43,6 +43,8 @@ enum class Setting : size_t
     SessionDnsTunneling,
     CredentialStore,
     SessionPortRelay,
+    SessionDefaultBindingAddressIPv4,
+    SessionDefaultBindingAddressIPv6,
 
     Max
 };
@@ -97,6 +99,8 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,                true,                          "session.dnsTunneling")
     DEFINE_SETTING_MAPPING(CredentialStore,          std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
     DEFINE_SETTING_MAPPING(SessionPortRelay,         std::string, PortRelayType,       PortRelayType::VirtioNet,      "experimental.portRelay")
+    DEFINE_SETTING_MAPPING(SessionDefaultBindingAddressIPv4, std::string, std::string,  std::string{},                 "session.defaultBindingAddress.ipv4")
+    DEFINE_SETTING_MAPPING(SessionDefaultBindingAddressIPv6, std::string, std::string,  std::string{},                 "session.defaultBindingAddress.ipv6")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on

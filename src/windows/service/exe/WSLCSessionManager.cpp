@@ -61,6 +61,8 @@ struct SessionSettings
 {
     std::wstring DisplayName;
     std::wstring StoragePath;
+    std::optional<std::string> DefaultBindingAddressIPv4;
+    std::optional<std::string> DefaultBindingAddressIPv6;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -127,6 +129,9 @@ private:
             WslcFeatureFlagsPortRelayWslRelay,
             userSettings.Get<settings::Setting::SessionPortRelay>() == settings::PortRelayType::WslRelay);
         Settings.StorageFlags = storageFlags;
+
+        DefaultBindingAddressIPv4 = userSettings.Get<settings::Setting::SessionDefaultBindingAddressIPv4>();
+        DefaultBindingAddressIPv6 = userSettings.Get<settings::Setting::SessionDefaultBindingAddressIPv6>();
     }
 };
 
@@ -285,7 +290,19 @@ void WSLCSessionManagerImpl::CreateSession(
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
         wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
-        const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        if (defaultSettings != nullptr)
+        {
+            if (defaultSettings->DefaultBindingAddressIPv4.has_value())
+            {
+                sessionSettings.DefaultIpv4BindingAddress = defaultSettings->DefaultBindingAddressIPv4->c_str();
+            }
+            if (defaultSettings->DefaultBindingAddressIPv6.has_value())
+            {
+                sessionSettings.DefaultIpv6BindingAddress = defaultSettings->DefaultBindingAddressIPv6->c_str();
+            }
+        }
+
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         const auto factoryHr =
@@ -465,6 +482,10 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
+
+    // N.B. Default ipv4 & ipv6 address are purposefully left null when a session is created via the API.
+    // Callers must specific explicit binding addresses when mapping container ports.
+
     return sessionSettings;
 }
 

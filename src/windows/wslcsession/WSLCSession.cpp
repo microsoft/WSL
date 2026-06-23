@@ -350,6 +350,17 @@ try
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_creatorProcessName = Settings->CreatorProcessName ? Settings->CreatorProcessName : L"";
     m_featureFlags = Settings->FeatureFlags;
+
+    if (Settings->DefaultIpv4BindingAddress)
+    {
+        m_defaultIpv4BindingAddress = Settings->DefaultIpv4BindingAddress;
+    }
+
+    if (Settings->DefaultIpv6BindingAddress)
+    {
+        m_defaultIpv6BindingAddress = Settings->DefaultIpv6BindingAddress;
+    }
+
     m_pluginNotifier = PluginNotifier;
 
     // Get user token for the current process
@@ -3487,6 +3498,23 @@ void WSLCSession::RecoverExistingNetworks()
         "NetworksRecovered",
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_networks.size(), "NetworkCount"));
+}
+
+const std::optional<std::string>& WSLCSession::DefaultBindingAddress(int Family) const noexcept
+{
+    if (Family == AF_INET)
+    {
+        return m_defaultIpv4BindingAddress;
+    }
+    else if (Family == AF_INET6)
+    {
+        return m_defaultIpv6BindingAddress;
+    }
+    else
+    {
+        WI_ASSERT(false);
+        return {};
+    }
 }
 
 } // namespace wsl::windows::service::wslc
