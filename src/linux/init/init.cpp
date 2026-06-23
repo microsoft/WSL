@@ -2759,9 +2759,7 @@ try
         //
         try
         {
-            std::thread([]() {
-                UtilExecCommandLine("systemctl poweroff", nullptr);
-            }).detach();
+            std::thread([]() { UtilExecCommandLine("systemctl poweroff", nullptr); }).detach();
         }
         CATCH_LOG();
 
