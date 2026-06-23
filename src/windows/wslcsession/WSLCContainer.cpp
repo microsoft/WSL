@@ -1309,7 +1309,6 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
     {
-        // TODO: ipv6 support.
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
 
         wslc_schema::InspectPortBinding portBinding{};
