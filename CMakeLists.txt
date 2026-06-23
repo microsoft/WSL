@@ -163,6 +163,54 @@ find_nuget_package(Microsoft.Windows.CsWinRT CSWINRT /)
 
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
+# wslc-on-podman PoC: use a custom-built WSLg system distro instead of the system.vhd
+# shipped in the Microsoft.WSLg NuGet package. The VHD is produced by the
+# https://github.com/chemwolf6922/build-wslg GitHub Actions pipeline and published as the
+# "system-vhd" artifact. nightly.link exposes a public, unauthenticated download URL for it.
+#
+# - Override PODMAN_SYSTEM_VHD_URL to build a different pipeline run.
+# - Set PODMAN_SYSTEM_VHD to an already-downloaded system.vhd to skip the download entirely.
+# All other WSLg assets (WSLDVCPlugin.dll, *.rdp) still come from the NuGet package.
+set(PODMAN_SYSTEM_VHD_URL
+    "https://nightly.link/chemwolf6922/build-wslg/actions/runs/28005775394/system-vhd.zip"
+    CACHE STRING "URL of the zip archive containing the custom WSLg system.vhd")
+set(PODMAN_SYSTEM_VHD ""
+    CACHE FILEPATH "Path to a prebuilt WSLg system.vhd (skips the download when set)")
+
+if (PODMAN_SYSTEM_VHD)
+    if (NOT EXISTS "${PODMAN_SYSTEM_VHD}")
+        message(FATAL_ERROR "PODMAN_SYSTEM_VHD is set but does not exist: ${PODMAN_SYSTEM_VHD}")
+    endif()
+    set(WSLG_SYSTEM_VHD "${PODMAN_SYSTEM_VHD}")
+else()
+    set(PODMAN_SYSTEM_VHD_DIR "${CMAKE_BINARY_DIR}/_deps/${TARGET_PLATFORM}")
+    set(WSLG_SYSTEM_VHD "${PODMAN_SYSTEM_VHD_DIR}/system.vhd")
+
+    if (NOT EXISTS "${WSLG_SYSTEM_VHD}")
+        set(PODMAN_SYSTEM_VHD_ZIP "${PODMAN_SYSTEM_VHD_DIR}/system-vhd.zip")
+        file(MAKE_DIRECTORY "${PODMAN_SYSTEM_VHD_DIR}")
+        message(STATUS "Downloading custom WSLg system.vhd from ${PODMAN_SYSTEM_VHD_URL}")
+        file(DOWNLOAD "${PODMAN_SYSTEM_VHD_URL}" "${PODMAN_SYSTEM_VHD_ZIP}"
+            SHOW_PROGRESS
+            STATUS PODMAN_SYSTEM_VHD_DOWNLOAD_STATUS)
+        list(GET PODMAN_SYSTEM_VHD_DOWNLOAD_STATUS 0 PODMAN_SYSTEM_VHD_DOWNLOAD_CODE)
+        if (NOT PODMAN_SYSTEM_VHD_DOWNLOAD_CODE EQUAL 0)
+            list(GET PODMAN_SYSTEM_VHD_DOWNLOAD_STATUS 1 PODMAN_SYSTEM_VHD_DOWNLOAD_MESSAGE)
+            file(REMOVE "${PODMAN_SYSTEM_VHD_ZIP}")
+            message(FATAL_ERROR "Failed to download custom WSLg system.vhd from ${PODMAN_SYSTEM_VHD_URL}: ${PODMAN_SYSTEM_VHD_DOWNLOAD_MESSAGE}")
+        endif()
+
+        file(ARCHIVE_EXTRACT INPUT "${PODMAN_SYSTEM_VHD_ZIP}" DESTINATION "${PODMAN_SYSTEM_VHD_DIR}")
+        file(REMOVE "${PODMAN_SYSTEM_VHD_ZIP}")
+
+        if (NOT EXISTS "${WSLG_SYSTEM_VHD}")
+            message(FATAL_ERROR "system.vhd was not found in the archive downloaded from ${PODMAN_SYSTEM_VHD_URL}")
+        endif()
+    endif()
+endif()
+
+message(STATUS "Using WSLg system.vhd: ${WSLG_SYSTEM_VHD}")
+
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
