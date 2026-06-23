@@ -116,6 +116,20 @@ namespace details {
         return value;
     }
 
+    WSLC_VALIDATE_SETTING(SessionPortRelay)
+    {
+        if (value == "virtionet")
+        {
+            return PortRelayType::VirtioNet;
+        }
+        if (value == "wslrelay")
+        {
+            return PortRelayType::WslRelay;
+        }
+
+        return std::nullopt;
+    }
+
     WSLC_VALIDATE_SETTING(CredentialStore)
     {
         if (value == "wincred")

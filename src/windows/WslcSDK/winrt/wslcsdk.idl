@@ -14,13 +14,6 @@ Abstract:
 
 namespace Microsoft.WSL.Containers
 {
-    [flags]
-    enum SessionFeatureFlags
-    {
-        None = 0x00000000,
-        EnableGpu = 0x00000004
-    };
-
     enum SessionTerminationReason
     {
         Unknown = 0,
@@ -30,6 +23,17 @@ namespace Microsoft.WSL.Containers
 
     delegate void SessionTerminationHandler(SessionTerminationReason reason);
 
+    runtimeclass ProcessCrashInformation
+    {
+        String DumpPath { get; };
+        String ProcessName { get; };
+        UInt32 Pid { get; };
+        UInt32 Signal { get; };
+        Windows.Foundation.DateTime Timestamp { get; };
+    };
+
+    delegate void ProcessCrashHandler(ProcessCrashInformation information);
+
     runtimeclass SessionSettings
     {
         SessionSettings(String name, String storagePath);
@@ -38,13 +42,13 @@ namespace Microsoft.WSL.Containers
         String StoragePath;
 
         Windows.Foundation.IReference<UInt32> CpuCount;
-        Windows.Foundation.IReference<UInt32> MemoryMB;
+        Windows.Foundation.IReference<UInt32> MemorySizeInMB;
         Windows.Foundation.IReference<Windows.Foundation.TimeSpan> Timeout;
         VhdOptions VhdRequirements;
-        SessionFeatureFlags FeatureFlags;
+        Boolean EnableGpu;
     };
 
-    runtimeclass Session
+    runtimeclass Session : Windows.Foundation.IClosable
     {
         Session(SessionSettings settings);
 
@@ -53,10 +57,14 @@ namespace Microsoft.WSL.Containers
 
         Container CreateContainer(ContainerSettings containerSettings);
 
+        void PullImage(PullImageOptions options);
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
         // TODO: Explore additional overloads for other types of input streams
+        void ImportImage(String path, String imageName);
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> ImportImageAsync(String path, String imageName);
+        void LoadImage(String path);
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> LoadImageAsync(String path);
+        void PushImage(PushImageOptions options);
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PushImageAsync(PushImageOptions options);
 
         void DeleteImage(String nameOrId);
@@ -67,9 +75,10 @@ namespace Microsoft.WSL.Containers
 
         String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
 
-        IVectorView<ImageInfo> Images { get; };
+        IVectorView<ImageInfo> GetImages();
 
         event SessionTerminationHandler Terminated;
+        event ProcessCrashHandler ProcessCrashed;
     };
 
 
@@ -77,15 +86,6 @@ namespace Microsoft.WSL.Containers
     {
         None = 0,
         Bridged = 1,
-    };
-
-    [flags]
-    enum ContainerFlags
-    {
-        None = 0x00000000,
-        AutoRemove = 0x00000001,
-        EnableGpu = 0x00000002,
-        Privileged = 0x00000004,
     };
 
     enum PortProtocol
@@ -133,7 +133,7 @@ namespace Microsoft.WSL.Containers
     };
 
     [flags]
-    enum DeleteContainerFlags
+    enum DeleteContainerOption
     {
         None = 0,
         Force = 0x00000001
@@ -150,7 +150,9 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<ContainerNetworkingMode> NetworkingMode;
         String HostName;
         String DomainName;
-        ContainerFlags Flags;
+        Boolean EnableAutoRemove;
+        Boolean EnableGpu;
+        Boolean Privileged;
         IVector<ContainerPortMapping> PortMappings;
         IVector<ContainerVolume> Volumes;
         IVector<ContainerNamedVolume> NamedVolumes;
@@ -166,14 +168,15 @@ namespace Microsoft.WSL.Containers
         SIGTERM = 15, // SIGTERM: graceful shutdown
     };
 
-    runtimeclass Container
+    runtimeclass Container : Windows.Foundation.IClosable
     {
         void Start();
         void Stop(Signal signal, Windows.Foundation.TimeSpan timeout);
-        void Delete(DeleteContainerFlags flags);
+        void Delete(DeleteContainerOption flags);
 
         Process CreateProcess(ProcessSettings newProcessSettings);
 
+        // JSON response schema at: https://docs.docker.com/reference/api/engine/version/v1.53/#tag/Container/operation/ContainerInspect
         String Inspect();
 
         String Id { get; };
@@ -199,7 +202,7 @@ namespace Microsoft.WSL.Containers
         ProcessSettings();
 
         String WorkingDirectory;
-        IVector<String> CmdLine;
+        IVector<String> CommandLine;
         IMap<String, String> EnvironmentVariables;
         ProcessOutputMode OutputMode;
     };
@@ -215,7 +218,7 @@ namespace Microsoft.WSL.Containers
     delegate void ProcessOutputHandler(UInt8[] data);
     delegate void ProcessExitHandler(Int32 exitCode);
 
-    runtimeclass Process
+    runtimeclass Process : Windows.Foundation.IClosable
     {
         void Start();
 
@@ -232,12 +235,11 @@ namespace Microsoft.WSL.Containers
         event ProcessExitHandler Exited;
     };
 
-    [flags]
-    enum ComponentFlags
+    enum Component
     {
-        None = 0,
         VirtualMachinePlatform = 1,
         WslPackage = 2,
+        SdkNeedsUpdate = 4,
     };
 
     runtimeclass ServiceVersion
@@ -249,15 +251,16 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass InstallProgress
     {
-        ComponentFlags Component { get; };
+        Component Component { get; };
         UInt32 Progress { get; };
         UInt32 Total { get; };
     };
 
     runtimeclass WslcService
     {
-        static ComponentFlags GetMissingComponents();
+        static IVectorView<Component> GetMissingComponents();
         static ServiceVersion GetVersion();
+        static void InstallWithDependencies();
         static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
     };
 
@@ -267,18 +270,24 @@ namespace Microsoft.WSL.Containers
         Fixed = 1,
     };
 
+    struct VhdOwner
+    {
+        UInt32 Uid;
+        UInt32 Gid;
+    };
+
     runtimeclass VhdOptions
     {
-        VhdOptions(String name, UInt64 sizeInBytes, VhdType type);
+        VhdOptions(String name, UInt64 size, VhdType type);
 
         String Name;
-        UInt64 SizeInBytes;
+        UInt64 Size;
         VhdType Type;
 
-        // Sets owner uid/gid on the volume root inode at mkfs time. Only
+        // Owner uid/gid on the volume root inode at mkfs time. Only
         // supported on named volumes; setting this on a SessionSettings
         // VhdOptions fails at property-set time with E_INVALIDARG.
-        void SetOwner(UInt32 uid, UInt32 gid);
+        Windows.Foundation.IReference<VhdOwner> Owner;
     };
 
     enum ImageProgressStatus
@@ -329,7 +338,26 @@ namespace Microsoft.WSL.Containers
     {
         String Name { get; };
         Windows.Storage.Streams.IBuffer Sha256 { get; };
-        UInt64 SizeBytes { get; };
+        UInt64 Size { get; };
         Windows.Foundation.DateTime CreatedTimestamp { get; };
+    };
+
+    // Ensure wslcsdk.h and wslc.idl are also updated.
+    enum Error
+    {
+        ImageNotFound = 0x80040601,
+        ContainerPrefixAmbiguous = 0x80040602,
+        ContainerNotFound = 0x80040603,
+        VolumeNotFound = 0x80040604,
+        ContainerNotRunning = 0x80040605,
+        ContainerIsRunning = 0x80040606,
+        SessionReserved = 0x80040607,
+        InvalidSessionName = 0x80040608,
+        NetworkNotFound = 0x80040609,
+        WindowsUpdateSearchFailed = 0x8004060A,
+        SdkUpdateNeeded = 0x8004060B,
+        ContainerDisabled = 0x8004060C,
+        RegistryBlockedByPolicy = 0x8004060D,
+        VolumeNotAvailable = 0x8004060E,
     };
 }

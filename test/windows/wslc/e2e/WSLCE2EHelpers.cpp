@@ -358,13 +358,14 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list -q");
+    auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             EnsureImageContainersAreDeleted(image);
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
@@ -374,21 +375,44 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
+void EnsureNoUntaggedImages()
+{
+    auto result = RunWslc(L"image list --format json --filter dangling=true");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+
+    for (const auto& image : images)
+    {
+        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.Id, true));
+        auto deleteResult = RunWslc(std::format(L"image delete --force {}", id));
+
+        // Tolerate WSLC_E_IMAGE_NOT_FOUND - an untagged image may already be gone if it was a
+        // parent/child of another untagged image deleted earlier in this loop.
+        if (deleteResult.ExitCode != 0 &&
+            (!deleteResult.Stderr.has_value() || deleteResult.Stderr.value().find(L"WSLC_E_IMAGE_NOT_FOUND") == std::wstring::npos))
+        {
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list -q";
+    std::wstring listCommand = L"image list --format json";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"--session \"{}\" image list -q", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list --format json", sessionName);
     }
 
     auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             return;
         }
@@ -593,7 +617,49 @@ void WriteTestFileContent(const std::filesystem::path& filePath, const std::stri
 
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
-    return std::format(L"python3 -m http.server {}", port);
+    return std::format(L"python3 -u -m http.server {}", port);
+}
+
+std::wstring GetPythonUdpEchoServerScript(uint16_t port)
+{
+    // Inline Python UDP echo server: echoes each received datagram back uppercased, forever.
+    return std::format(
+        L"python3 -c \"import socket;"
+        L"s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);"
+        L"s.bind(('0.0.0.0',{}));"
+        L"[s.sendto(d.upper(),a) for d,a in iter(lambda:s.recvfrom(1024),0)]\"",
+        port);
+}
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family)
+{
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+    INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&addr));
+    SS_PORT(&addr) = htons(hostPort);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    do
+    {
+        wil::unique_socket sock{::socket(family, SOCK_DGRAM, IPPROTO_UDP)};
+        THROW_LAST_ERROR_IF(!sock);
+
+        DWORD timeout = 1000;
+        THROW_LAST_ERROR_IF(setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        if (sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR)
+        {
+            char buf[1024];
+            const int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
+            if (received != SOCKET_ERROR && received > 0 && std::string(buf, received) == expectedReply)
+            {
+                return std::string(buf, received);
+            }
+        }
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    VERIFY_FAIL(L"Timed out waiting for expected UDP echo reply from container");
+    return {};
 }
 
 namespace {

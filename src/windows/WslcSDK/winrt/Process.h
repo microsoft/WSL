@@ -37,18 +37,12 @@ struct Process : ProcessT<Process>
     winrt::event_token Exited(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& handler);
     void Exited(winrt::event_token const& token) noexcept;
 
+    void Close();
+    static void final_release(std::unique_ptr<Process> self);
+
     WslcProcess ToHandle();
     ProcessOutputMode OutputMode();
     void AttachHandle(WslcProcess handle);
-
-    static void final_release(std::unique_ptr<Process> self)
-    {
-        self->m_process.reset();
-        if (self->m_waitForExitAction)
-        {
-            self->m_waitForExitAction.Cancel();
-        }
-    }
 
 private:
     void EnsureStarted() const;
