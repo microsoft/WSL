@@ -1781,9 +1781,10 @@ Les binaires Linux exécutés dans WSL peuvent utiliser automatiquement votre GP
     <value>Comment installer</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Après avoir installé VS Code, vous pouvez installer l’extension Remote WSL à partir du terminal Windows :
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Ouvrir un Projet WSL dans Visual Studio Code</value>

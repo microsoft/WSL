@@ -1774,9 +1774,10 @@ Linux-binärfiler som körs i WSL kan automatiskt använda din GPU i Windows fö
     <value>Så här installerar du</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>När du har installerat VS Code kan du installera WSL-fjärrtillägget från Windows-terminal:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Öppna ett WSL-projekt i Visual Studio Code</value>
