@@ -1307,7 +1307,7 @@ typedef enum _LX_MINI_INIT_NETWORKING_MODE
     LxMiniInitNetworkingModeNat = 1,
     LxMiniInitNetworkingModeBridged = 2,
     LxMiniInitNetworkingModeMirrored = 3,
-    LxMiniInitNetworkingModeVirtioProxy = 4
+    LxMiniInitNetworkingModeConsomme = 4
 } LX_MINI_INIT_NETWORKING_MODE,
     *PLX_MINI_INIT_NETWORKING_MODE;
 
