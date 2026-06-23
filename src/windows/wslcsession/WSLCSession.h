@@ -256,8 +256,6 @@ public:
 
     bool WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const;
 
-    const std::optional<std::string>& DefaultBindingAddress(int Family) const noexcept;
-
 private:
     ULONG m_id = 0;
 
@@ -328,8 +326,6 @@ private:
     std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLCFeatureFlags m_featureFlags{};
-    std::optional<std::string> m_defaultIpv4BindingAddress;
-    std::optional<std::string> m_defaultIpv6BindingAddress;
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
 

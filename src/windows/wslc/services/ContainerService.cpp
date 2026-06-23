@@ -23,6 +23,7 @@ Abstract:
 #include <WSLCProcessLauncher.h>
 #include <ConsoleState.h>
 #include <CommandLine.h>
+#include <WSLCUserSettings.h>
 #include <filesystem>
 #include <unordered_map>
 #include <wslc.h>
@@ -81,6 +82,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         }
     }
 
+    const auto defaultBindingAddressIpv4 = settings::User().Get<settings::Setting::SessionDefaultBindingAddressIPv4>();
+    const auto defaultBindingAddressIpv6 = settings::User().Get<settings::Setting::SessionDefaultBindingAddressIPv6>();
+
     // Set port options if provided
     for (const auto& port : options.Ports)
     {
@@ -92,6 +96,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         if (portMapping.HostIP().has_value())
         {
             bindAddress = portMapping.HostIP()->IP();
+        }
+        else
+        {
+            // No explicit host IP: apply the configured default binding address for the
+            // family, if any. When unset, AddPort falls back to loopback.
+            const auto& configuredDefault = (family == AF_INET6) ? defaultBindingAddressIpv6 : defaultBindingAddressIpv4;
+            if (!configuredDefault.empty())
+            {
+                bindAddress = configuredDefault;
+            }
         }
 
         auto containerPort = portMapping.ContainerPort();

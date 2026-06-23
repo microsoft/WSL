@@ -568,6 +568,74 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
+    // Verifies that 'session.defaultBindingAddress.ipv4: default' resolves to the built-in
+    // loopback default (127.0.0.1) for a published port specified without an explicit host IP.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Default)
+    {
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, "session:\n  defaultBindingAddress:\n    ipv4: default\n");
+
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
+    }
+
+    // Verifies that a configured 'session.defaultBindingAddress.ipv4' overrides the loopback
+    // default for a published port specified without an explicit host IP.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Override)
+    {
+        const auto hostIp = GetHostAdapterIpv4();
+        if (!hostIp.has_value())
+        {
+            WEX::Logging::Log::Comment(L"Skipping: no suitable non-loopback host IPv4 address was found.");
+            return;
+        }
+
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, std::format("session:\n  defaultBindingAddress:\n    ipv4: {}\n", *hostIp));
+
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        const auto hostIpWide = std::wstring(hostIp->begin(), hostIp->end());
+        ExpectHttpResponse(std::format(L"http://{}:{}", hostIpWide, HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL(*hostIp, portBindings[0].HostIp);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
     {
         // Start a container with a simple server listening on a port

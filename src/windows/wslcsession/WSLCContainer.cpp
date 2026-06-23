@@ -23,7 +23,6 @@ Abstract:
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
-#include "WSLCContainerLauncher.h"
 #include "APICompat.h"
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -1307,14 +1306,14 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Config.User = dockerInspect.Config.User;
     wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
 
-    // Map WSLC port mappings (Windows host ports only). HostIp is not set here and will use
-    // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
+    // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
     {
         // TODO: ipv6 support.
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
 
         wslc_schema::InspectPortBinding portBinding{};
+        portBinding.HostIp = e.VmMapping.BindingAddressString();
         portBinding.HostPort = std::to_string(e.VmMapping.HostPort());
 
         wslcInspect.Ports[portKey].push_back(std::move(portBinding));
@@ -1604,18 +1603,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         port.ContainerPort = containerOptions.Ports[i].ContainerPort;
         port.Family = containerOptions.Ports[i].Family;
         port.Protocol = containerOptions.Ports[i].Protocol;
-
-        if (containerOptions.Ports[i].BindingAddress != nullptr)
-        {
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress) != 0);
-        }
-        else
-        {
-            const auto& defaultBindingAddress = wslcSession.DefaultBindingAddress(containerOptions.Ports[i].Family);
-            THROW_HR_IF_MSG(E_INVALIDARG, !defaultBindingAddress.has_value(), "No binding address was passed for port %d", i);
-
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, defaultBindingAddress->c_str()) != 0);
-        }
+        strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress);
     }
 
     // Append exposed ports from the image, if requested.
@@ -1633,7 +1621,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 auto [port, protocol] = ParseExposedPortKey(portKey);
 
                 // Only TCP localhost mappings are currently supported by the relay path.
-                // TODO: Allow UDP + ipv6 binding in virtionet mode here.
                 if (protocol != IPPROTO_TCP)
                 {
                     continue;
@@ -1644,11 +1631,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 createdPort.Family = AF_INET;
                 createdPort.ContainerPort = port;
                 createdPort.Protocol = protocol;
-
-                // Honor the configured default host binding address (falling back to loopback).
-                const auto& defaultBindingAddress = wslcSession.DefaultBindingAddress(AF_INET);
-
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(createdPort.BindingAddress, defaultBindingAddress.value_or("127.0.0.1").c_str()) != 0);
+                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
             }
         }
     }
