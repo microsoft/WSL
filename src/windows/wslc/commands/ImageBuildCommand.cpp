@@ -33,7 +33,9 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::BuildTarget),
         Argument::Create(ArgType::File),
         Argument::Create(ArgType::NoCache),
+        Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::Tag, false, NO_LIMIT),
+        Argument::Create(ArgType::Ulimit, false, NO_LIMIT),
         Argument::Create(ArgType::Verbose),
     };
 }

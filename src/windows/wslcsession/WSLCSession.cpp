@@ -936,6 +936,27 @@ try
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
 
+    if (Options->ShmSize > 0)
+    {
+        buildArgs.push_back("--shm-size");
+        buildArgs.push_back(std::to_string(Options->ShmSize));
+    }
+
+    for (ULONG i = 0; i < Options->UlimitsCount; i++)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Ulimits);
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Ulimits[i].Name);
+        buildArgs.push_back("--ulimit");
+        if (Options->Ulimits[i].Soft == Options->Ulimits[i].Hard)
+        {
+            buildArgs.push_back(std::format("{}={}", Options->Ulimits[i].Name, Options->Ulimits[i].Soft));
+        }
+        else
+        {
+            buildArgs.push_back(std::format("{}={}:{}", Options->Ulimits[i].Name, Options->Ulimits[i].Soft, Options->Ulimits[i].Hard));
+        }
+    }
+
     buildArgs.push_back("-f");
     buildArgs.push_back("-");
     buildArgs.push_back(mountPath);

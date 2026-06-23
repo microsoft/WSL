@@ -30,6 +30,8 @@ public:
         const std::wstring& target,
         WSLCBuildImageFlags flags,
         IProgressCallback* callback,
+        int64_t shmSize = 0,
+        const std::vector<std::tuple<std::string, int64_t, int64_t>>& ulimits = {},
         HANDLE cancelEvent = nullptr);
 
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(
