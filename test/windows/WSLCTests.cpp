@@ -8016,10 +8016,10 @@ class WSLCTests
             };
 
             auto validateInspectPortBinding = [&](auto& container,
-                                                uint16_t containerPort,
-                                                int protocol,
-                                                const std::string& expectedHostIp,
-                                                std::optional<uint16_t> expectedHostPort) -> std::string {
+                                                  uint16_t containerPort,
+                                                  int protocol,
+                                                  const std::string& expectedHostIp,
+                                                  std::optional<uint16_t> expectedHostPort) -> std::string {
                 auto inspectData = container.Inspect();
 
                 auto portKey = std::format("{}/{}", containerPort, protocol == IPPROTO_UDP ? "udp" : "tcp");
