@@ -1781,9 +1781,10 @@ Binários do Linux em execução no WSL podem usar automaticamente a GPU no Wind
     <value>Como instalar</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Depois de instalar o VS Code, você pode instalar a extensão Remote WSL a partir do Terminal do Windows:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Abrir um projeto do WSL no Visual Studio Code</value>

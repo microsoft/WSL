@@ -1774,9 +1774,10 @@ Pliki binarne systemu Linux działające w podsystemie WSL mogą automatycznie k
     <value>Jak zainstalować</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Po zainstalowaniu programu VS Code możesz zainstalować rozszerzenie Remote WSL z poziomu narzędzia Terminal Windows:
+    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
 
-„code –install-extension ms-vscode-remote.remote-wsl”</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Otwórz projektu podsystemu WSL w programie Visual Studio Code</value>
