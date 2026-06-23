@@ -562,6 +562,12 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
 {
+    // Acquire the activity hold up front for containers recovered or created in an active state, so
+    // a recovered running container keeps the VM alive even before any client opens its wrapper.
+    if (m_state == WslcContainerStateCreated || m_state == WslcContainerStateRunning)
+    {
+        m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
+    }
 }
 
 WSLCContainerImpl::~WSLCContainerImpl()
@@ -1266,6 +1272,12 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
         } while (!control->GetExitEvent().wait(100));
 
         auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options->Flags);
+
+        // The exec'd process wrapper is handed to the client and is not retained internally, so its
+        // lifetime tracks the client's proxy. Bind a keep-alive token to it so the idle worker does
+        // not tear the VM down (killing the process) while the client still holds the proxy.
+        process->SetKeepAliveToken(m_wslcSession.CreateActivityToken());
+
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLCProcess), (void**)Process));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());
@@ -2159,6 +2171,24 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
 
     m_state = State;
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
+
+    // Keep the VM alive while this container is Created/Running and release the hold once it reaches
+    // a terminal state, even when no client holds the wrapper (e.g. a detached `run -d` container).
+    // Dropping the hold on the transition to Exited is what lets an otherwise-idle VM be torn down.
+    UpdateActivityHoldLockHeld();
+}
+
+__requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
+{
+    const bool active = (m_state == WslcContainerStateCreated || m_state == WslcContainerStateRunning);
+    if (active && !m_activityHold)
+    {
+        m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
+    }
+    else if (!active && m_activityHold)
+    {
+        m_activityHold.reset();
+    }
 }
 
 WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
@@ -2167,6 +2197,7 @@ WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std:
 }
 
 HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
+try
 {
     WSLCExecutionContext context(&m_session);
 
@@ -2178,8 +2209,10 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* 
     *Stdout = {};
     *Stderr = {};
 
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
@@ -2237,6 +2270,7 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 }
 
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
+try
 {
     WSLCExecutionContext context(&m_session);
 
@@ -2245,22 +2279,35 @@ HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, const WSLCProcess
     RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     *Process = nullptr;
+
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Exec, Options, StartOptions, Process);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
+try
 {
     WSLCExecutionContext context(&m_session);
 
+    // Hold a VM lease for the whole operation: --rm containers self-delete during Stop, which
+    // disconnects the wrapper and drops activity. Without the lease, the idle worker can fire
+    // during the post-stop destroy wait (up to 60s) and tear the VM down mid-call.
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
+try
 {
     WSLCExecutionContext context(&m_session);
 
+    // Hold a VM lease for the same reason as Stop(): --rm can self-delete and drop activity.
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
 try
@@ -2269,11 +2316,13 @@ try
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
 }
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
+try
 {
     WSLCExecutionContext context(&m_session);
 
@@ -2281,8 +2330,10 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 
     *Output = nullptr;
 
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Inspect, Output);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Stats(LPSTR* Output)
 try
@@ -2292,6 +2343,8 @@ try
     RETURN_HR_IF(E_POINTER, Output == nullptr);
 
     *Output = nullptr;
+
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stats, Output);
 }
 CATCH_RETURN();
@@ -2304,6 +2357,11 @@ try
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLCSession that the container has been deleted.
+    // Hold a VM lease across the whole operation: deleting a container makes it inactive and
+    // can trigger an idle teardown. Without the lease the idle worker could take the session
+    // lock exclusively and clear m_containers (destroying this container) concurrently, racing
+    // the delete and inverting the container->session lock order.
+    auto vmLease = m_session.AcquireVmLease();
     auto [lock, impl] = LockImpl();
 
     impl->Delete(Flags);
@@ -2329,11 +2387,14 @@ try
 CATCH_LOG();
 
 HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
+try
 {
     WSLCExecutionContext context(&m_session);
 
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
@@ -2346,6 +2407,7 @@ try
     *Stdout = {};
     *Stderr = {};
 
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
 CATCH_RETURN();
@@ -2523,6 +2585,8 @@ HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opti
 try
 {
     COMServiceExecutionContext context;
+
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Options);
 }
 CATCH_RETURN();
@@ -2531,6 +2595,8 @@ HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkName)
 try
 {
     COMServiceExecutionContext context;
+
+    auto vmLease = m_session.AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
 }
 CATCH_RETURN();
