@@ -3171,7 +3171,7 @@ class WSLCTests
 
             if (mode == WSLCNetworkingModeConsomme)
             {
-                // Virtio proxy points resolv.conf at the eth0 gateway.
+                // Consomme points resolv.conf at the eth0 gateway.
                 ExpectCommandResult(
                     session.get(),
                     {"/bin/sh",

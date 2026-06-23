@@ -367,7 +367,7 @@ void WSLCVirtualMachine::ConfigureNetworking()
     std::vector<WSLCProcessFd> fds;
     fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
 
-    // Virtio proxy forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
+    // Consomme forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
     const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeConsomme;
     if (enableDnsTunneling)
     {

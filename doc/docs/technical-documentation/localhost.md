@@ -19,7 +19,7 @@ Bound guest ports are tracked and forwarded to the host, optionally via [wslrela
 
 See `src/windows/common/ConsommeNetworking.cpp`.
 
-See `src/linux/localhost.cpp`.
+See `src/linux/init/localhost.cpp`.
 
 [consomme]: https://github.com/microsoft/openvmm/tree/main/vm/devices/net/net_consomme/consomme
 [openvmm]: https://github.com/microsoft/openvmm

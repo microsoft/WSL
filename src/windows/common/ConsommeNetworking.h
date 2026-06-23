@@ -31,7 +31,7 @@ public:
         wil::shared_handle userToken,
         std::wstring swiotlbConfig);
 
-    ~ConsommeNetworking();
+    ~ConsommeNetworking() override;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
     ConsommeNetworking(const ConsommeNetworking&) = delete;

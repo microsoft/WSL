@@ -5284,7 +5284,7 @@ class ConsommeTests
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
-    // Verifies that virtio proxy + dnsTunneling points resolv.conf at the gateway, not the hvsocket listener IP.
+    // Verifies that Consomme + dnsTunneling points resolv.conf at the gateway, not the hvsocket listener IP.
     WSL2_TEST_METHOD(DnsTunnelingResolvConfUsesGateway)
     {
         CONSOMME_TEST_ONLY();

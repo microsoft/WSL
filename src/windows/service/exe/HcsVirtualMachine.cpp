@@ -437,7 +437,7 @@ try
     // The DNS hvsocket is only allocated for NAT mode.
     THROW_HR_IF(E_INVALIDARG, (FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode == WSLCNetworkingModeNAT) != (DnsSocket != nullptr));
 
-    // The check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
+    // The check still applies to Consomme because the host Consomme NAT uses the same Windows DNS APIs.
     if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
         const auto result = wsl::core::networking::DnsResolver::LoadDnsResolverMethods();
@@ -714,10 +714,10 @@ try
 
     std::lock_guard lock(m_lock);
 
-    auto* virtioNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+    auto* consommeNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), consommeNet == nullptr);
 
-    return virtioNet->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
+    return consommeNet->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
 }
 CATCH_RETURN()
 
@@ -728,10 +728,10 @@ try
 
     std::lock_guard lock(m_lock);
 
-    auto* virtioNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+    auto* consommeNet = dynamic_cast<wsl::core::ConsommeNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), consommeNet == nullptr);
 
-    return virtioNet->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
+    return consommeNet->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
 }
 CATCH_RETURN()
 
