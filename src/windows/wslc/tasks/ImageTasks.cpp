@@ -64,6 +64,10 @@ void BuildImage(CLIExecutionContext& context)
     auto tags = context.Args.GetAll<ArgType::Tag>();
     auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
     auto labels = context.Args.GetAll<ArgType::Label>();
+    for (const auto& label : labels)
+    {
+        validation::ParseLabel(label);
+    }
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
