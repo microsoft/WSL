@@ -2563,6 +2563,17 @@ try
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
+    // Validate IPAM options client-side: podman returns HTTP 500 (-> E_FAIL) for a malformed
+    // subnet/gateway, but these are bad arguments and should fail fast with E_INVALIDARG.
+    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    {
+        ValidateSubnetOption(it->second);
+    }
+    if (auto it = driverOpts.find("Gateway"); it != driverOpts.end())
+    {
+        ValidateGatewayOption(it->second);
+    }
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
