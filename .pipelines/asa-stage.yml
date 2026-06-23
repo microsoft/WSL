@@ -1,0 +1,75 @@
+# Attack Surface Analyzer (ASA) install-diff stage.
+#
+# Runs on a clean Windows agent: installs the freshly built wsl.msi and uses ASA
+# to verify the installer does not weaken the OS security configuration. Findings
+# are triaged against tools/devops/asa-expected-findings.json; the SARIF and the
+# net-new report are published as artifacts.
+#
+# Introduced as NON-GATING (failOnNewFindings: false). Once the allowlist is
+# confirmed stable, flip failOnNewFindings to true to make it a hard gate.
+
+parameters:
+  - name: pool
+    type: string
+    default: ''
+
+  # When false, the stage reports findings but does not fail the build.
+  - name: failOnNewFindings
+    type: boolean
+    default: false
+
+  # WSL-built PE binaries are unsigned on dev/nightly builds (ESRP signing runs on
+  # release). Allow them so the gate only flags genuinely new surface.
+  - name: allowUnsignedWslBinaries
+    type: boolean
+    default: true
+
+stages:
+  - stage: asa
+    displayName: "Attack Surface Analyzer"
+    dependsOn: [build_x64]
+    jobs:
+      - job: asa_install_diff
+        displayName: "ASA install-diff (x64)"
+        timeoutInMinutes: 60
+
+        variables:
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+          ob_artifactBaseName: 'drop_wsl'
+          ob_artifactSuffix: '_asa'
+
+        ${{ if eq(parameters.pool, '') }}:
+          pool: {'type': 'windows'}
+        ${{ else }}:
+          pool: ${{ parameters.pool }}
+
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download x64 build artifact
+            inputs:
+              artifact: "drop_wsl_build"
+              path: $(Pipeline.Workspace)\drop_x64
+
+          - task: UseDotNet@2
+            displayName: Install .NET SDK (for ASA CLI)
+            inputs:
+              packageType: sdk
+              version: '8.x'
+
+          - task: PowerShell@2
+            displayName: Run ASA install-diff
+            inputs:
+              targetType: filePath
+              filePath: tools/devops/Run-AsaInstallDiff.ps1
+              arguments: >-
+                -MsiPath (Get-ChildItem '$(Pipeline.Workspace)\drop_x64\bundle\wsl.*.x64.msi' | Select-Object -First 1 -ExpandProperty FullName)
+                -WorkDir '$(ob_outputDirectory)\asa'
+                -AllowUnsignedWslBinaries:$${{ parameters.allowUnsignedWslBinaries }}
+                -FailOnNewFindings:$${{ parameters.failOnNewFindings }}
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish ASA report
+            condition: always()
+            inputs:
+              targetPath: $(ob_outputDirectory)\asa
+              artifactName: $(ob_artifactBaseName)$(ob_artifactSuffix)

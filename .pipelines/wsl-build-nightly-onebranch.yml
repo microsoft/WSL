@@ -54,3 +54,9 @@ extends:
     - template: nuget-stage.yml@self
       parameters:
         isNightly: true
+
+    - template: asa-stage.yml@self
+      parameters:
+        # Non-gating for now: publishes ASA findings without failing the build.
+        # Flip to true once the allowlist in tools/devops/asa-expected-findings.json is stable.
+        failOnNewFindings: false
