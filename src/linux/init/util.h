@@ -128,6 +128,8 @@ void UtilCanonicalisePathSeparator(std::string& Path, char Separator);
 
 wil::unique_fd UtilConnectToInteropServer(std::optional<pid_t> Pid = {});
 
+uid_t UtilGetPeerUid(int Socket);
+
 wil::unique_fd UtilConnectUnix(const char* Path);
 
 wil::unique_fd UtilConnectVsock(

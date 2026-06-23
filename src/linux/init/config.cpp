@@ -339,7 +339,8 @@ void ConfigHandleInteropMessage(
     bool Elevated,
     gsl::span<gsl::byte> Message,
     const MESSAGE_HEADER* Header,
-    const wsl::linux::WslDistributionConfig& Config)
+    const wsl::linux::WslDistributionConfig& Config,
+    uid_t PeerUid)
 
 /*++
 
@@ -361,6 +362,12 @@ Arguments:
 
     Header- Supplies the message Header.
 
+    Config - Supplies the distribution configuration.
+
+    PeerUid - Supplies the user ID of the connecting peer, as reported by
+        SO_PEERCRED, or (uid_t)-1 if the peer could not be identified. Used to
+        authorize privileged message types.
+
 Return Value:
 
     None.
@@ -372,6 +379,19 @@ try
     switch (Header->MessageType)
     {
     case LxInitMessageCreateProcessUtilityVm:
+
+        //
+        // This message is relayed to wslservice on the host, which creates a
+        // process in the Windows session owner's token. Only root inside the
+        // distribution may drive it from init's interop socket.
+        //
+
+        if (PeerUid != 0)
+        {
+            LOG_ERROR("LxInitMessageCreateProcessUtilityVm denied: peer uid {}", PeerUid);
+            break;
+        }
+
         if (InteropChannel.Socket() > 0)
         {
             InteropChannel.SendMessage<LX_INIT_CREATE_NT_PROCESS_UTILITY_VM>(Message);
@@ -394,7 +414,21 @@ try
             return;
         }
 
-        auto Value = UtilGetEnvironmentVariable(wsl::shared::string::FromMessageBuffer<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message));
+        //
+        // init's environment may contain sensitive values, so only disclose
+        // it to a root peer.
+        //
+
+        std::string Value;
+        if (PeerUid == 0)
+        {
+            Value = UtilGetEnvironmentVariable(wsl::shared::string::FromMessageBuffer<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message));
+        }
+        else
+        {
+            LOG_ERROR("LxInitMessageQueryEnvironmentVariable denied: peer uid {}", PeerUid);
+        }
+
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Response(LxInitMessageQueryEnvironmentVariable);
         Response.WriteString(Value);
         Transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
@@ -421,7 +455,19 @@ try
         bool success = false;
         auto sendResponse = wil::scope_exit([&]() { Transaction.SendResultMessage<bool>(success); });
 
-        if (!Config.BootInit || Config.InitPid.value_or(0) != getpid())
+        //
+        // A login session may only be created by root or by the target user
+        // itself. The persistent init check below is self-routing (which init
+        // process acts on the message), not peer authorization, so the peer
+        // credential check is required to enforce the trust boundary.
+        //
+
+        const bool isPersistentInit = Config.BootInit && Config.InitPid.value_or(0) == getpid();
+        if (PeerUid != 0 && PeerUid != CreateSession->Uid)
+        {
+            LOG_ERROR("LxInitMessageCreateLoginSession denied: peer uid {} target uid {}", PeerUid, CreateSession->Uid);
+        }
+        else if (!isPersistentInit)
         {
             LOG_ERROR("Unexpected LxInitMessageCreateLoginSession message");
         }
@@ -974,6 +1020,8 @@ try
                     continue;
                 }
 
+                const uid_t PeerUid = UtilGetPeerUid(ClientChannel.Socket());
+
                 auto transaction = ClientChannel.ReceiveTransaction();
                 auto [Message, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
                 if (Message == nullptr)
@@ -981,7 +1029,7 @@ try
                     continue;
                 }
 
-                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config);
+                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config, PeerUid);
             }
         });
 

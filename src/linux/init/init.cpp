@@ -1966,6 +1966,8 @@ Return Value:
                 continue;
             }
 
+            const uid_t PeerUid = UtilGetPeerUid(channel.Socket());
+
             auto transaction = channel.ReceiveTransaction();
             auto [Header, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (Header != nullptr)
@@ -1973,7 +1975,7 @@ Return Value:
                 try
                 {
                     ConfigHandleInteropMessage(
-                        transaction, ControlChannel, WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsElevated), Span, Header, Config);
+                        transaction, ControlChannel, WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsElevated), Span, Header, Config, PeerUid);
                 }
                 CATCH_LOG();
             }
