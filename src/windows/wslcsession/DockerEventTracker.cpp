@@ -173,7 +173,6 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {"start", ContainerEvent::Start},
         {"die", ContainerEvent::Stop},
         {"remove", ContainerEvent::Destroy},
-        {"exec_die", ContainerEvent::ExecDied},
         {"exec_died", ContainerEvent::ExecDied}};
 
     auto actor = parsed.find("Actor");

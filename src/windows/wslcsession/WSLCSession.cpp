@@ -456,9 +456,16 @@ try
     // non-running container after an unclean session restart - an upstream containers-storage overlay
     // graph-driver issue (see containers/podman#19090), not a fault on our side. Log and continue so
     // the session still comes up rather than taking down the process.
+    // Recover each resource kind under its own guard so a failure recovering one
+    // (e.g. the podman#19090 overlay graph-driver 500 above) does not skip the other.
     try
     {
         RecoverExistingNetworks();
+    }
+    CATCH_LOG();
+
+    try
+    {
         RecoverExistingContainers();
     }
     CATCH_LOG();

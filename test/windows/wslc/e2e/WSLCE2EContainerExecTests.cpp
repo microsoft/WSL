@@ -113,7 +113,7 @@ class WSLCE2EContainerExecTests
         auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash --norc", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Ignore resize-repaint messages. Those are emitted when the the tty initial size is set, which can happen before or after we start running commands.
+        // Ignore resize-repaint messages. Those are emitted when the tty initial size is set, which can happen before or after we start running commands.
         session.IgnoreSequence(VT::BuildContainerAttachPrompt(prompt));
 
         session.ExpectStdout(expectedPrompt);

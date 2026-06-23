@@ -63,17 +63,6 @@ static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
         // so root `inspect` retains its docker-era lenient behavior — any
         // invalid name should yield "Object not found", not a raw E_FAIL.
         //
-        // The detailed message from podman is on the COM IErrorInfo channel
-        // (set by THROW_DOCKER_USER_ERROR in wslcsession), not on the
-        // wil::ResultException itself, so we peek IErrorInfo here. Peeking
-        // is destructive (GetErrorInfo transfers ownership), so we restore
-        // it via SetErrorInfo when we don't tolerate, to preserve the
-        // outer-most user-facing message.
-        // podman-compat quirk: name-validation failures come back as 5xx
-        // (mapped to E_FAIL) instead of 400 Bad Request. Treat as not-found
-        // so root `inspect` retains its docker-era lenient behavior — any
-        // invalid name should yield "Object not found", not a raw E_FAIL.
-        //
         // The detailed error text from podman doesn't survive on
         // wil::ResultException::what() (which carries source-location
         // info) or on the TLS IErrorInfo (already consumed by wil when
