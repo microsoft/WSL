@@ -18,17 +18,22 @@ stages:
         pool:
           type: windows
 
+        # OneFuzz job notification (a team alias) and the bug assignee (a person) must be defined as secret pipeline variables.
         variables:
-          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
-          fuzzingBinDir: '$(Build.SourcesDirectory)\bin\x64\Release'
-          fuzzingStagingDir: '$(ob_outputDirectory)\fuzzing'
+          - template: variables.yml
+          - name: ob_outputDirectory
+            value: '$(Build.SourcesDirectory)\out'
+          - name: fuzzingBinDir
+            value: '$(Build.SourcesDirectory)\bin\x64\Release'
+          - name: fuzzingStagingDir
+            value: '$(ob_outputDirectory)\fuzzing'
 
         steps:
           - task: CMake@1
             displayName: "CMake configure (fuzzing)"
             inputs:
               workingDirectory: "."
-              cmakeArgs: . --fresh -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DWSL_BUILD_FUZZING=true
+              cmakeArgs: . --fresh -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=$(cmakeSystemVersion) -DWSL_BUILD_FUZZING=true -DONEFUZZ_NOTIFICATION_EMAIL=$(oneFuzzNotificationEmail) -DONEFUZZ_ASSIGNED_TO=$(oneFuzzAssignedTo)
 
           # Build the fuzzing targets, and the MSI for setting up the VMs
           - task: CMake@1
@@ -60,10 +65,9 @@ stages:
                 # (e.g. wslcsdk.dll/pdb) under the fuzzing output dir.
                 Copy-Item "$binDir\fuzzing\*" $dropDir -Force
 
-                # Shared runtime deps. The ASAN runtime path was exported by the CMake configure
-                # step as the asanRuntimeDll job variable.
+                # Shared runtime deps. CMake copies the ASAN runtime next to the build output.
                 Copy-Item "$binDir\wsl.msi" $dropDir
-                Copy-Item "$(asanRuntimeDll)" $dropDir -ErrorAction Stop
+                Copy-Item "$binDir\clang_rt.asan_dynamic*.dll" $dropDir
 
                 Get-ChildItem $dropDir -Recurse | Format-Table Name, Length
 

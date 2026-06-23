@@ -326,7 +326,7 @@ if (WSL_BUILD_FUZZING)
 
     # All instrumented binaries import the dynamic ASAN runtime.
     # We resolve its path so that we can include it in the MSI; we can find it next to the compiler.
-    # We also export its path as a pipeline variable so we can find it there.
+    # We also copy it next to the build output so that the pipeline can find it easily.
     if (${TARGET_PLATFORM} STREQUAL "arm64")
         set(ASAN_ARCH "aarch64")
     else()
@@ -334,7 +334,7 @@ if (WSL_BUILD_FUZZING)
     endif()
     get_filename_component(MSVC_BIN_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
     set(ASAN_RUNTIME_DLL ${MSVC_BIN_DIR}/clang_rt.asan_dynamic-${ASAN_ARCH}.dll)
-    execute_process(COMMAND ${CMAKE_COMMAND} -E echo "##vso[task.setvariable variable=asanRuntimeDll]${ASAN_RUNTIME_DLL}")
+    file(COPY ${ASAN_RUNTIME_DLL} DESTINATION ${BIN})
 endif ()
 
 if (WSL_ENABLE_FUZZING_REPLAY)

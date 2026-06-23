@@ -1,5 +1,15 @@
 set(FUZZING_OUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/fuzzing)
 
+# OneFuzz job notification (a team alias) and bug assignee (a person), substituted into
+# OneFuzzConfigEntry.json.in. The pipeline passes these via -D from secret variables; local
+# builds leave them empty since they never submit to OneFuzz.
+if (NOT DEFINED ONEFUZZ_NOTIFICATION_EMAIL)
+    set(ONEFUZZ_NOTIFICATION_EMAIL "")
+endif()
+if (NOT DEFINED ONEFUZZ_ASSIGNED_TO)
+    set(ONEFUZZ_ASSIGNED_TO "")
+endif()
+
 function(add_fuzzing_harness TARGET)
     cmake_parse_arguments(ARG "" "TARGET_NAME" "LINK_LIBRARIES;EXTRA_DEPENDENCIES;INCLUDE_DIRECTORIES" ${ARGN})
 

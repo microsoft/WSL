@@ -1,5 +1,5 @@
     {
-      "JobNotificationEmail": "florch@microsoft.com",
+      "JobNotificationEmail": "${ONEFUZZ_NOTIFICATION_EMAIL}",
       "Skip": false,
       "RebootAfterSetup": true,
       "Fuzzer": {
@@ -23,7 +23,7 @@
       "AdoTemplate": {
         "Org": "microsoft",
         "Project": "OS",
-        "AssignedTo": "florch@microsoft.com",
+        "AssignedTo": "${ONEFUZZ_ASSIGNED_TO}",
         "AreaPath": "OS\\Windows Client and Services\\WinPD\\DFX-Developer Fundamentals and Experiences\\DEFT\\InstaDev",
         "IterationPath": "OS"
       }
