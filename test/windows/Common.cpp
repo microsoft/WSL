@@ -3082,7 +3082,7 @@ std::optional<std::string> GetHostAdapterIpv4()
             }
 
             char buf[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &ipv4, buf, sizeof(buf));
+            VERIFY_IS_NOT_NULL(inet_ntop(AF_INET, &ipv4, buf, sizeof(buf)));
             return std::string(buf);
         }
     }
