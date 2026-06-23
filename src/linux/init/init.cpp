@@ -2753,21 +2753,14 @@ try
     {
         THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
+        //
+        // systemctl poweroff is normally async but can block in rare cases.
+        // Run it in a thread so a stuck invocation can't prevent the fallback timeout below.
+        //
         try
         {
             std::thread([]() {
-                //
-                // systemctl poweroff is async after the operation is successfully enqueued.
-                // However, in some rare cases, systemctl poweroff can block.
-                // Run it in a separate thread to avoid blocking the timeout.
-                //
-                int rc = UtilExecCommandLine("systemctl poweroff", nullptr);
-                if (rc < 0)
-                {
-                    LOG_ERROR("systemctl poweroff failed {}, calling reboot(RB_POWER_OFF)", rc);
-                    reboot(RB_POWER_OFF);
-                    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
-                }
+                UtilExecCommandLine("systemctl poweroff", nullptr);
             }).detach();
         }
         CATCH_LOG();
