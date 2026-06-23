@@ -1642,7 +1642,7 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
     return *this;
 }
 
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags, OnError&& OnError)
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags, OnError&& onError)
 {
     auto entry = std::make_unique<Entry>();
     entry->HandleFlags = flags;
@@ -1655,7 +1655,7 @@ void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Fl
     }
     else
     {
-        entry->ErrorCallback = std::move(OnError);
+        entry->ErrorCallback = std::move(onError);
     }
     m_handles.emplace_back(std::move(entry));
 }

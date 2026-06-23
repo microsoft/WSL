@@ -492,7 +492,7 @@ public:
     MultiHandleWait(MultiHandleWait&&) noexcept;
     MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
-    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None, OnError&& OnError = []() { throw; });
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None, OnError&& onError = []() { throw; });
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
