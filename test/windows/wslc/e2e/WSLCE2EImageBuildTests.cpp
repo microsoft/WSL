@@ -193,7 +193,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
 
         // Use both the short alias (-l) and long form (--label) to confirm both parse paths.
         auto buildResult = RunWslc(std::format(
@@ -228,7 +228,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath, "FROM debian:latest\nLABEL conflict=from-dockerfile\nCMD [\"echo\", \"label-override-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(
