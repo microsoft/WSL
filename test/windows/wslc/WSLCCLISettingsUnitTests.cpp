@@ -548,10 +548,10 @@ class WSLCCLISettingsUnitTests
     }
 
     // -----------------------------------------------------------------------
-    // session.defaultBindingAddress.ipv4 / ipv6
+    // session.defaultBindingAddress
     // -----------------------------------------------------------------------
 
-    // When unset, both default binding addresses fall back to the empty built-in default.
+    // When unset, the default binding address falls back to the empty built-in default.
     TEST_METHOD(Validation_DefaultBindingAddress_Absent_UsesEmptyDefault)
     {
         auto dir = UniqueTempDir();
@@ -560,26 +560,22 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv4>());
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv6>());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
     }
 
-    // Valid IPv4 and IPv6 binding addresses load without warnings.
-    TEST_METHOD(Validation_DefaultBindingAddress_ValidValues)
+    // A valid IPv4 binding address loads without warnings.
+    TEST_METHOD(Validation_DefaultBindingAddress_ValidValue)
     {
         auto dir = UniqueTempDir();
         WriteFile(
             dir / L"settings.yaml",
             "session:\n"
-            "  defaultBindingAddress:\n"
-            "    ipv4: 0.0.0.0\n"
-            "    ipv6: \"::\"\n");
+            "  defaultBindingAddress: 0.0.0.0\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(std::string("0.0.0.0"), s.Get<Setting::SessionDefaultBindingAddressIPv4>());
-        VERIFY_ARE_EQUAL(std::string("::"), s.Get<Setting::SessionDefaultBindingAddressIPv6>());
+        VERIFY_ARE_EQUAL(std::string("0.0.0.0"), s.Get<Setting::SessionDefaultBindingAddress>());
     }
 
     // "default" magic string uses the built-in (empty) default with no warning.
@@ -589,72 +585,48 @@ class WSLCCLISettingsUnitTests
         WriteFile(
             dir / L"settings.yaml",
             "session:\n"
-            "  defaultBindingAddress:\n"
-            "    ipv4: default\n"
-            "    ipv6: default\n");
+            "  defaultBindingAddress: default\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv4>());
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv6>());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
     }
 
-    // An invalid IPv4 address is rejected: the default is used and an invalid-value warning emitted.
-    TEST_METHOD(Validation_DefaultBindingAddress_InvalidIPv4_UsesDefaultAndWarns)
+    // An invalid address is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_DefaultBindingAddress_InvalidValue_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
         WriteFile(
             dir / L"settings.yaml",
             "session:\n"
-            "  defaultBindingAddress:\n"
-            "    ipv4: not-an-ip\n");
+            "  defaultBindingAddress: not-an-ip\n");
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv4>());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress.ipv4", s.SettingsFilePath().wstring(), 3),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
             s.GetWarnings().front().Message);
-        VERIFY_ARE_EQUAL(std::wstring(L"session.defaultBindingAddress.ipv4"), s.GetWarnings().front().SettingPath);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.defaultBindingAddress"), s.GetWarnings().front().SettingPath);
     }
 
-    // An IPv6 literal in the IPv4 slot is rejected (wrong family) and warns.
-    TEST_METHOD(Validation_DefaultBindingAddress_IPv6InIPv4Slot_UsesDefaultAndWarns)
+    // An IPv6 literal is rejected (the default binding address is IPv4 only) and warns.
+    TEST_METHOD(Validation_DefaultBindingAddress_IPv6Rejected_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
         WriteFile(
             dir / L"settings.yaml",
             "session:\n"
-            "  defaultBindingAddress:\n"
-            "    ipv4: \"::1\"\n");
+            "  defaultBindingAddress: \"::1\"\n");
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv4>());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress.ipv4", s.SettingsFilePath().wstring(), 3),
-            s.GetWarnings().front().Message);
-    }
-
-    // An invalid IPv6 address (and an IPv4 literal in the IPv6 slot) are rejected and warn.
-    TEST_METHOD(Validation_DefaultBindingAddress_InvalidIPv6_UsesDefaultAndWarns)
-    {
-        auto dir = UniqueTempDir();
-        WriteFile(
-            dir / L"settings.yaml",
-            "session:\n"
-            "  defaultBindingAddress:\n"
-            "    ipv6: 127.0.0.1\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddressIPv6>());
-        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(
-            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress.ipv6", s.SettingsFilePath().wstring(), 3),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
             s.GetWarnings().front().Message);
     }
 };

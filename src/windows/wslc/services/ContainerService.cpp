@@ -82,8 +82,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         }
     }
 
-    const auto defaultBindingAddressIpv4 = settings::User().Get<settings::Setting::SessionDefaultBindingAddressIPv4>();
-    const auto defaultBindingAddressIpv6 = settings::User().Get<settings::Setting::SessionDefaultBindingAddressIPv6>();
+    const auto defaultBindingAddress = settings::User().Get<settings::Setting::SessionDefaultBindingAddress>();
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -97,15 +96,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         {
             bindAddress = portMapping.HostIP()->IP();
         }
-        else
+        else if (!defaultBindingAddress.empty())
         {
-            // No explicit host IP: apply the configured default binding address for the
-            // family, if any. When unset, AddPort falls back to loopback.
-            const auto& configuredDefault = (family == AF_INET6) ? defaultBindingAddressIpv6 : defaultBindingAddressIpv4;
-            if (!configuredDefault.empty())
-            {
-                bindAddress = configuredDefault;
-            }
+            // No explicit host IP: apply the configured default binding address (IPv4 only,
+            // since IPv6 bindings are always explicit). When unset, AddPort falls back to loopback.
+            bindAddress = defaultBindingAddress;
         }
 
         auto containerPort = portMapping.ContainerPort();

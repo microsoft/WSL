@@ -568,12 +568,12 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
-    // Verifies that 'session.defaultBindingAddress.ipv4: default' resolves to the built-in
+    // Verifies that 'session.defaultBindingAddress: default' resolves to the built-in
     // loopback default (127.0.0.1) for a published port specified without an explicit host IP.
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Default)
     {
         const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
-        HostFileChange settings(settingsPath, "session:\n  defaultBindingAddress:\n    ipv4: default\n");
+        HostFileChange settings(settingsPath, "session:\n  defaultBindingAddress: default\n");
 
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {}:{} {} {}",
@@ -598,7 +598,7 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
-    // Verifies that a configured 'session.defaultBindingAddress.ipv4' overrides the loopback
+    // Verifies that a configured 'session.defaultBindingAddress' overrides the loopback
     // default for a published port specified without an explicit host IP.
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Override)
     {
@@ -610,7 +610,7 @@ class WSLCE2EContainerRunTests
         }
 
         const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
-        HostFileChange settings(settingsPath, std::format("session:\n  defaultBindingAddress:\n    ipv4: {}\n", *hostIp));
+        HostFileChange settings(settingsPath, std::format("session:\n  defaultBindingAddress: {}\n", *hostIp));
 
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {}:{} {} {}",

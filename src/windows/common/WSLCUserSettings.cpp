@@ -48,10 +48,8 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # maxStorageSize: default\n"
     "\n"
     "  # Default host address that published ports bind to when 'container run -p' is\n"
-    "  # used without an explicit address (default: 127.0.0.1 for IPv4, ::1 for IPv6)\n"
-    "  # defaultBindingAddress:\n"
-    "  #   ipv4: default\n"
-    "  #   ipv6: default\n"
+    "  # used without an explicit address (default: 127.0.0.1)\n"
+    "  # defaultBindingAddress: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -136,27 +134,17 @@ namespace details {
         return std::nullopt;
     }
 
-    // Validates an IPv4 or IPv6 binding address string. Returns the address unchanged when it
-    // parses to a valid literal of the requested family, otherwise nullopt to reject it.
-    std::optional<std::string> ValidateBindingAddress(const std::string& value, int family)
+    WSLC_VALIDATE_SETTING(SessionDefaultBindingAddress)
     {
-        in6_addr address{}; // 16 bytes - large enough for both an IPv4 and an IPv6 result.
-        if (inet_pton(family, value.c_str(), &address) != 1)
+        // The default binding address only applies to IPv4 ports (IPv6 bindings are always
+        // explicit), so it must parse as a valid IPv4 literal.
+        in_addr address{};
+        if (inet_pton(AF_INET, value.c_str(), &address) != 1)
         {
             return std::nullopt;
         }
 
         return value;
-    }
-
-    WSLC_VALIDATE_SETTING(SessionDefaultBindingAddressIPv4)
-    {
-        return ValidateBindingAddress(value, AF_INET);
-    }
-
-    WSLC_VALIDATE_SETTING(SessionDefaultBindingAddressIPv6)
-    {
-        return ValidateBindingAddress(value, AF_INET6);
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)
