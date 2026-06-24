@@ -2948,6 +2948,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+  <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
+    <value>Invalid argument "{}" for '--mount' flag: bad format of mount (expected type=bind|volume|tmpfs,source=...,target=...)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Follow log output</value>
   </data>
@@ -3011,6 +3015,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_MemoryArgDescription" xml:space="preserve">
     <value>Memory limit (e.g. 512M, 1G)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
+    <value>Attach a filesystem mount to the container</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Container host name</value>

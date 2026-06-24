@@ -87,6 +87,7 @@ _(Latest,         "latest",              L"l",              Kind::Flag,        L
 _(Link,           "link",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkArgDescription()) \
 _(LinkLocalIp,    "link-local-ip",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,         "memory",              L"m",              Kind::Value,       Localization::WSLCCLI_MemoryArgDescription()) \
+_(Mount,          "mount",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_MountArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,   "network-alias",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkAliasArgDescription()) \

@@ -457,6 +457,95 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
+ParsedMount ParseMount(const std::wstring& value)
+{
+    std::wstring type;
+    std::wstring source;
+    std::wstring target;
+    bool readOnly = false;
+
+    const auto fail = [&]() { throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value)); };
+
+    size_t position = 0;
+    while (position < value.size())
+    {
+        const auto comma = value.find(L',', position);
+        const auto token = value.substr(position, comma == std::wstring::npos ? std::wstring::npos : comma - position);
+        position = comma == std::wstring::npos ? value.size() : comma + 1;
+
+        if (token.empty())
+        {
+            continue;
+        }
+
+        const auto keyValue = SplitKeyValue(token);
+        if (IsEqual(keyValue.Key, L"type", true))
+        {
+            type = keyValue.Value;
+        }
+        else if (IsEqual(keyValue.Key, L"source", true) || IsEqual(keyValue.Key, L"src", true))
+        {
+            source = keyValue.Value;
+        }
+        else if (
+            IsEqual(keyValue.Key, L"target", true) || IsEqual(keyValue.Key, L"destination", true) || IsEqual(keyValue.Key, L"dst", true))
+        {
+            target = keyValue.Value;
+        }
+        else if (IsEqual(keyValue.Key, L"readonly", true) || IsEqual(keyValue.Key, L"ro", true))
+        {
+            readOnly = keyValue.Value.empty() || IsEqual(keyValue.Value, L"true", true) || IsEqual(keyValue.Value, L"1", true);
+        }
+        else
+        {
+            fail();
+        }
+    }
+
+    if (type.empty())
+    {
+        type = L"volume";
+    }
+
+    if (target.empty())
+    {
+        fail();
+    }
+
+    ParsedMount result;
+    if (IsEqual(type, L"tmpfs", true))
+    {
+        if (!source.empty())
+        {
+            fail();
+        }
+
+        result.IsTmpfs = true;
+        result.TmpfsSpec = WideToMultiByte(target);
+    }
+    else if (IsEqual(type, L"bind", true) || IsEqual(type, L"volume", true))
+    {
+        if (source.empty())
+        {
+            fail();
+        }
+
+        result.VolumeSpec = source + L":" + target;
+        if (readOnly)
+        {
+            result.VolumeSpec += L":ro";
+        }
+
+        std::ignore = models::VolumeMount::Parse(result.VolumeSpec);
+    }
+    else
+    {
+        fail();
+    }
+
+    return result;
+}
+
 // Map of signal names to WSLCSignal enum values
 static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
     {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},

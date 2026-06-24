@@ -708,6 +708,22 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::Mount))
+    {
+        for (const auto& value : context.Args.GetAll<ArgType::Mount>())
+        {
+            auto parsed = validation::ParseMount(value);
+            if (parsed.IsTmpfs)
+            {
+                options.Tmpfs.emplace_back(std::move(parsed.TmpfsSpec));
+            }
+            else
+            {
+                options.Volumes.emplace_back(std::move(parsed.VolumeSpec));
+            }
+        }
+    }
+
     if (context.Args.GetFlag<ArgType::Remove>())
     {
         options.Remove = true;

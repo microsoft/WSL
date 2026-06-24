@@ -132,6 +132,13 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
+    case ArgType::Mount:
+        for (const auto& value : execArgs.GetAll<ArgType::Mount>())
+        {
+            std::ignore = validation::ParseMount(value);
+        }
+        break;
+
     case ArgType::WorkDir:
     {
         const auto& value = execArgs.Get<ArgType::WorkDir>();
