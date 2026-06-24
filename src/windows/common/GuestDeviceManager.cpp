@@ -69,6 +69,76 @@ GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil:
     return m_deviceHostSupport->AddNewDevice(deviceId, server, tag);
 }
 
+_Requires_lock_not_held_(m_lock)
+std::wstring GuestDeviceManager::AddVirtioFsAggregateShare(
+    _In_ const GUID& DeviceId,
+    _In_ const GUID& ImplementationClsid,
+    _In_ PCWSTR ShareName,
+    _In_opt_ PCWSTR RootOptions,
+    _In_opt_ PCWSTR DeviceOptions,
+    _In_ PCWSTR Path,
+    _In_ UINT32 Flags,
+    _In_ HANDLE UserToken)
+{
+    auto guestDeviceLock = m_lock.lock_exclusive();
+
+    // Build the root name with per-root mount options (uid/gid/symlinkroot).
+    // N.B. Unlike AddHdvShareWithOptions, no vm_id is appended here; the
+    // device-level vm_id/vcpus/swiotlb ride on the device tag instead.
+    std::wstring nameWithOptions{ShareName};
+    if (ARGUMENT_PRESENT(RootOptions) && RootOptions[0] != L'\0')
+    {
+        nameWithOptions += L";";
+        nameWithOptions += RootOptions;
+    }
+
+    wil::com_ptr<IPlan9FileSystem> server;
+    {
+        auto revert = wil::impersonate_token(UserToken);
+
+        server = GetRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag);
+        if (!server)
+        {
+            server = wil::CoCreateInstance<IPlan9FileSystem>(ImplementationClsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
+            m_deviceHostSupport->AddRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag.c_str(), server);
+        }
+
+        // Queue (or, once the device exists, immediately add) the folder as a
+        // named root of the aggregate device.
+        THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), Path, Flags));
+    }
+
+    // Create the aggregate device once per implementation class. This performs
+    // the HCS hot-add and drains any roots queued above; subsequent shares only
+    // call AddSharePath, which the device host handles live.
+    auto existing = m_aggregateDeviceTags.find(ImplementationClsid);
+    if (existing != m_aggregateDeviceTags.end())
+    {
+        return existing->second;
+    }
+
+    // Generate the device tag the guest will mount (GUID, 36 chars, no braces).
+    GUID tagGuid{};
+    THROW_IF_FAILED(CoCreateGuid(&tagGuid));
+    std::wstring deviceTag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::GuidToStringFlags::None);
+
+    // Device-level control options (vcpus/swiotlb) and the owning VM id ride on
+    // the device tag; the device host strips them before the guest sees the tag.
+    std::wstring deviceTagWithOptions{deviceTag};
+    if (ARGUMENT_PRESENT(DeviceOptions) && DeviceOptions[0] != L'\0')
+    {
+        deviceTagWithOptions += L";";
+        deviceTagWithOptions += DeviceOptions;
+    }
+    deviceTagWithOptions += std::format(L";vm_id={}", m_machineId);
+
+    // Not impersonated: HCS hot-add requires more privilege than the user has.
+    (void)m_deviceHostSupport->AddNewDevice(DeviceId, server, deviceTagWithOptions);
+
+    m_aggregateDeviceTags.emplace(ImplementationClsid, deviceTag);
+    return deviceTag;
+}
+
 void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server)
 {
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);

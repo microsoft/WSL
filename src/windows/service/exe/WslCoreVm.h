@@ -174,6 +174,16 @@ private:
         bool operator==(const VirtioFsShare& other) const;
     };
 
+    // Result of adding a virtio-fs share in the aggregate model: the device tag
+    // the guest mounts (shared by all shares of the same elevation), the
+    // synthetic root name to bind-mount under it, and the canonical source path.
+    struct VirtioFsMountInfo
+    {
+        std::wstring DeviceTag;
+        std::wstring ShareName;
+        std::wstring Source;
+    };
+
     WslCoreVm(_In_ wsl::core::Config&& VmConfig);
 
     _Requires_lock_held_(m_guestDeviceLock)
@@ -183,7 +193,7 @@ private:
     void AddPlan9Share(_In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ wsl::windows::common::hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_ PCWSTR VirtIoTag);
 
     _Requires_lock_held_(m_guestDeviceLock)
-    std::pair<std::wstring, std::wstring> AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
+    VirtioFsMountInfo AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
     ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
@@ -265,6 +275,10 @@ private:
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
+    // Aggregate virtio-fs device tag per elevation (false = user, true = admin).
+    // All shares of the same elevation are roots of one device; the guest mounts
+    // this tag once and bind-mounts each share's synthetic root under it.
+    _Guarded_by_(m_guestDeviceLock) std::map<bool, std::wstring> m_aggregateVirtioFsDeviceTags;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };

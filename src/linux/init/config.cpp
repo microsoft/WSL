@@ -1734,7 +1734,7 @@ Return Value:
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Root);
         }
         else
         {

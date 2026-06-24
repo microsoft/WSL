@@ -420,7 +420,7 @@ public:
         WINDOWS_11_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        constexpr auto c_iterations = 15;
+        constexpr auto c_iterations = 25;
         auto testDir = std::filesystem::current_path() / "virtiofs-loop-test";
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

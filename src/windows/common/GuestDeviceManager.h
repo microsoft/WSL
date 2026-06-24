@@ -48,6 +48,22 @@ public:
     _Requires_lock_not_held_(m_lock)
     GUID AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag);
 
+    // Aggregate virtio-fs: a single device per implementation class (admin vs.
+    // non-admin) exposes many host folders as named children of a synthetic
+    // root, so one PCI/MMIO footprint backs many drvfs shares (instead of one
+    // device per share). Adds the folder as a named root, creating the device on
+    // first use. Returns the device tag the guest mounts.
+    _Requires_lock_not_held_(m_lock)
+    std::wstring AddVirtioFsAggregateShare(
+        _In_ const GUID& DeviceId,
+        _In_ const GUID& ImplementationClsid,
+        _In_ PCWSTR ShareName,
+        _In_opt_ PCWSTR RootOptions,
+        _In_opt_ PCWSTR DeviceOptions,
+        _In_ PCWSTR Path,
+        _In_ UINT32 Flags,
+        _In_ HANDLE UserToken);
+
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
 
     void AddSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
@@ -82,4 +98,7 @@ private:
     std::wstring m_machineId;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
+    // Per implementation-class aggregate virtio-fs device tag (the tag the guest
+    // mounts). Created on the first share for each class.
+    _Guarded_by_(m_lock) std::map<GUID, std::wstring, wsl::windows::common::helpers::GuidLess> m_aggregateDeviceTags;
 };

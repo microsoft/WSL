@@ -1155,10 +1155,13 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     MESSAGE_HEADER Header;
     int Result;
     unsigned int TagOffset;
+    // Synthetic root name to bind-mount under the (aggregate) device's mount.
+    // Empty for non-aggregate replies.
+    unsigned int NameOffset;
     unsigned int SourceOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(NameOffset), STRING_FIELD(SourceOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
