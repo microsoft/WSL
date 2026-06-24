@@ -81,18 +81,18 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"tar") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_SourceNotStdin)
     {
-        // Source must be '-' — anything else should fail.
+        // A local file that doesn't exist should fail with a "source not found" error.
         // Use RunWslc which pipes NUL to stdin (not a terminal).
         const auto result = RunWslc(L"container cp somefile.tar fakecontainer:/path");
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"somefile.tar") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidTargetFormat_NoColon)
@@ -506,79 +506,38 @@ private:
 
     std::filesystem::path TarPath{};
 
-    // Creates a minimal tar file containing a single text file.
-    // tar format: 512-byte header + file data padded to 512 bytes + 1024 bytes end-of-archive marker.
+    // Creates a tar file containing a single text file using tar.exe.
     void CreateTestTarFile()
     {
-        const std::string fileName = "testfile.txt";
-        const std::string fileContent = "wslc-cp-test-content\n";
+        // Create a temp directory with a test file to archive.
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto tarSrcDir = std::filesystem::path(tempDir) / L"wslc-cp-tar-src";
+        std::filesystem::create_directories(tarSrcDir);
+        auto cleanupSrcDir = wil::scope_exit([&] { std::filesystem::remove_all(tarSrcDir); });
 
-        // Build a POSIX tar header (512 bytes).
-        std::array<char, 512> header{};
-
-        // name (0-99)
-        std::copy(fileName.begin(), fileName.end(), header.begin());
-
-        // mode (100-107): 0644
-        std::string mode = "0000644";
-        std::copy(mode.begin(), mode.end(), header.begin() + 100);
-
-        // uid (108-115): 0
-        std::string uid = "0000000";
-        std::copy(uid.begin(), uid.end(), header.begin() + 108);
-
-        // gid (116-123): 0
-        std::string gid = "0000000";
-        std::copy(gid.begin(), gid.end(), header.begin() + 116);
-
-        // size (124-135): octal size
-        auto sizeStr = std::format("{:011o}", fileContent.size());
-        std::copy(sizeStr.begin(), sizeStr.end(), header.begin() + 124);
-
-        // mtime (136-147): 0
-        std::string mtime = "00000000000";
-        std::copy(mtime.begin(), mtime.end(), header.begin() + 136);
-
-        // Initialize checksum field with spaces for checksum calculation.
-        std::fill(header.begin() + 148, header.begin() + 156, ' ');
-
-        // typeflag (156): '0' (regular file)
-        header[156] = '0';
-
-        // Compute checksum: sum of all unsigned bytes in the header.
-        unsigned int checksum = 0;
-        for (unsigned char c : header)
+        auto testFile = tarSrcDir / L"testfile.txt";
         {
-            checksum += c;
-        }
-        auto checksumStr = std::format("{:06o}", checksum);
-        std::copy(checksumStr.begin(), checksumStr.end(), header.begin() + 148);
-        header[154] = '\0';
-        header[155] = ' ';
-
-        // Write the tar file.
-        wil::unique_hfile file(CreateFileW(TarPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF(!file);
-
-        DWORD written = 0;
-
-        // Write header.
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), header.data(), static_cast<DWORD>(header.size()), &written, nullptr));
-
-        // Write file content.
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), fileContent.data(), static_cast<DWORD>(fileContent.size()), &written, nullptr));
-
-        // Pad to 512-byte boundary.
-        auto padding = 512 - (fileContent.size() % 512);
-        if (padding < 512)
-        {
-            std::vector<char> pad(padding, '\0');
-            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), pad.data(), static_cast<DWORD>(pad.size()), &written, nullptr));
+            wil::unique_hfile file(
+                CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!file);
+            const std::string content = "wslc-cp-test-content\n";
+            DWORD written = 0;
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
         }
 
-        // End-of-archive: two 512-byte blocks of zeros.
-        std::array<char, 1024> endOfArchive{};
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), endOfArchive.data(), static_cast<DWORD>(endOfArchive.size()), &written, nullptr));
+        // Use tar.exe to create the archive.
+        auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" testfile.txt", TarPath.wstring(), tarSrcDir.wstring());
+        STARTUPINFOW si{sizeof(si)};
+        PROCESS_INFORMATION pi{};
+        THROW_LAST_ERROR_IF(!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+        wil::unique_handle tarProcess(pi.hProcess);
+        wil::unique_handle tarThread(pi.hThread);
+        WaitForSingleObject(tarProcess.get(), INFINITE);
+
+        DWORD exitCode = 0;
+        GetExitCodeProcess(tarProcess.get(), &exitCode);
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
     }
 };
 } // namespace WSLCE2ETests

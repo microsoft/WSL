@@ -2468,6 +2468,10 @@ Usage: wslc container cp [OPTIONS] SOURCE DEST
     <value>Invalid destination format. Expected CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Invalid source format. Expected CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
   <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
     <value>Source path not found: {0}</value>
     <comment>{0} is the source path</comment>
@@ -2786,7 +2790,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Show all regardless of state.</value>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
-    <value>Archive mode (preserve uid/gid information)</value>
+    <value>Archive mode (accepted for Docker CLI compatibility)</value>
+    <comment>{Locked="Docker"}</comment>
   </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Set build-time variables (KEY=VALUE)</value>

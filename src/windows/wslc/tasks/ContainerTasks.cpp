@@ -352,8 +352,10 @@ void CopyToContainer(CLIExecutionContext& context)
         {
             // Local path → container: create tar from local path using tar.exe
             auto widePath = MultiByteToWide(source);
+            std::error_code fsError;
+            bool pathExists = std::filesystem::exists(widePath, fsError);
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), !std::filesystem::exists(widePath));
+                E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), fsError || !pathExists);
 
             auto absPath = std::filesystem::absolute(widePath);
             auto parentDir = absPath.parent_path().wstring();
@@ -377,10 +379,15 @@ void CopyToContainer(CLIExecutionContext& context)
             auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDirStr, fileName);
             STARTUPINFOW si{sizeof(si)};
             PROCESS_INFORMATION pi{};
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-                Localization::WSLCCLI_CpTarNotFoundError(),
-                !CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+            {
+                auto lastError = GetLastError();
+                THROW_HR_WITH_USER_ERROR_IF(
+                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                    Localization::WSLCCLI_CpTarNotFoundError(),
+                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
+                THROW_WIN32(lastError);
+            }
             wil::unique_handle tarProcess(pi.hProcess);
             wil::unique_handle tarThread(pi.hThread);
 
@@ -406,13 +413,15 @@ void CopyToContainer(CLIExecutionContext& context)
         // container → local
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || srcPath.empty());
+            E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
         auto wideTarget = MultiByteToWide(target);
         auto absTarget = std::filesystem::absolute(wideTarget);
 
         // Ensure target directory exists
-        std::filesystem::create_directories(absTarget);
+        std::error_code dirError;
+        std::filesystem::create_directories(absTarget, dirError);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
 
         // Download archive from container to a temp file
         wchar_t tempDir[MAX_PATH]{};
@@ -441,10 +450,15 @@ void CopyToContainer(CLIExecutionContext& context)
         auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, targetDir);
         STARTUPINFOW si{sizeof(si)};
         PROCESS_INFORMATION pi{};
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-            Localization::WSLCCLI_CpTarNotFoundError(),
-            !CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+        if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+        {
+            auto lastError = GetLastError();
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                Localization::WSLCCLI_CpTarNotFoundError(),
+                lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
+            THROW_WIN32(lastError);
+        }
         wil::unique_handle tarProcess(pi.hProcess);
         wil::unique_handle tarThread(pi.hThread);
 
