@@ -367,8 +367,14 @@ void CopyToContainer(CLIExecutionContext& context)
             auto tempPath = std::wstring(tempFile);
             auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
 
-            // Create tar archive
-            auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDir, fileName);
+            // Create tar archive — strip trailing separator to avoid the CRT parsing '\"' as an escaped quote
+            auto parentDirStr = parentDir;
+            while (parentDirStr.size() > 1 && (parentDirStr.back() == L'\\' || parentDirStr.back() == L'/'))
+            {
+                parentDirStr.pop_back();
+            }
+
+            auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDirStr, fileName);
             STARTUPINFOW si{sizeof(si)};
             PROCESS_INFORMATION pi{};
             THROW_HR_WITH_USER_ERROR_IF(
@@ -424,8 +430,15 @@ void CopyToContainer(CLIExecutionContext& context)
             ContainerService::CopyFromContainer(session, containerId, srcPath, tarFileHandle.get());
         }
 
+        // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote
+        auto targetDir = absTarget.wstring();
+        while (!targetDir.empty() && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
+        {
+            targetDir.pop_back();
+        }
+
         // Extract the tar archive to the target directory
-        auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, absTarget.wstring());
+        auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, targetDir);
         STARTUPINFOW si{sizeof(si)};
         PROCESS_INFORMATION pi{};
         THROW_HR_WITH_USER_ERROR_IF(

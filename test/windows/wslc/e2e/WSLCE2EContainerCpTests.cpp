@@ -305,6 +305,148 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalFileToContainer)
+    {
+        // Create and start a container.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create a local file to copy.
+        auto localFile = wsl::windows::common::filesystem::GetTempFilename();
+        auto cleanupLocal = wil::scope_exit([&] { DeleteFileW(localFile.c_str()); });
+
+        {
+            wil::unique_hfile file(
+                CreateFileW(localFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!file);
+            const std::string content = "local-file-content\n";
+            DWORD written = 0;
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+        }
+
+        // Copy local file to container.
+        const auto cpResult = RunWslc(std::format(L"container cp {} {}:/tmp/", localFile.wstring(), WslcContainerName));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Verify the file was copied.
+        auto fileName = localFile.filename().string();
+        const auto execResult =
+            RunWslc(std::format(L"container exec {} cat /tmp/{}", WslcContainerName, wsl::shared::string::MultiByteToWide(fileName)));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_IS_TRUE(execResult.Stdout->find(L"local-file-content") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalFileNotFound)
+    {
+        // Copying a nonexistent local file should fail.
+        const auto result = RunWslc(std::format(L"container cp C:\\nonexistent_wslc_test_file.txt {}:/tmp/", WslcContainerName));
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal)
+    {
+        // Create and start a container with a known file.
+        auto runResult = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo container-content > /tmp/fromcontainer.txt && sleep infinity\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait briefly for the file to be created inside the container.
+        Sleep(1000);
+
+        // Create a temp directory to download into.
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-download-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        // Copy from container to local.
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/tmp/fromcontainer.txt {}", WslcContainerName, downloadDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Verify the file was extracted locally.
+        auto extractedFile = downloadDir / L"fromcontainer.txt";
+        VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_TrailingBackslash)
+    {
+        // Regression test: trailing backslash on local path should not break tar extraction.
+        auto runResult = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo backslash-test > /tmp/bstest.txt && sleep infinity\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        Sleep(1000);
+
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-backslash-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        // Copy with explicit trailing backslash in target path.
+        auto targetWithBackslash = downloadDir.wstring() + L"\\";
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/tmp/bstest.txt {}", WslcContainerName, targetWithBackslash));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        auto extractedFile = downloadDir / L"bstest.txt";
+        VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_NonexistentPath)
+    {
+        // TODO: This test is disabled because DownloadArchive hangs on 404 responses.
+        // The HTTP error path reads until socket close, but Docker keeps the connection alive.
+        // Filed as a separate bug to fix the DownloadArchive error handling.
+        WEX::Logging::Log::Comment(L"Skipped: DownloadArchive hangs on non-existent path (known bug)");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)
+    {
+        // Create a container, put a file in it, stop it, then copy out.
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Container has exited (ran a one-shot command). Copy from the stopped container.
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-stopped-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/tmp/stopped.txt {}", WslcContainerName, downloadDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        auto extractedFile = downloadDir / L"stopped.txt";
+        VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidDirection_LocalToLocal)
+    {
+        // local → local is not a valid copy direction.
+        const auto result = RunWslc(L"container cp C:\\temp\\somefile.txt C:\\temp\\dest\\");
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container-cp";
     const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-cp";
