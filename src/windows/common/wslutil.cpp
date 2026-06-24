@@ -87,6 +87,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
+    X(WSL_E_SWAP_FILE_CONFLICTS_WITH_DISTRO),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
@@ -1127,6 +1128,22 @@ bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& 
 {
     return wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdFileExtension) ||
            wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
+}
+
+std::optional<std::filesystem::path> wsl::windows::common::wslutil::GetResultantSwapPath(_In_ const std::filesystem::path& swapFilePath)
+{
+    if (swapFilePath.empty())
+    {
+        return std::nullopt;
+    }
+
+    auto resultPath = swapFilePath;
+    if (!wsl::windows::common::string::IsPathComponentEqual(resultPath.extension().native(), c_vhdxFileExtension))
+    {
+        resultPath += c_vhdxFileExtension;
+    }
+
+    return resultPath;
 }
 
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
