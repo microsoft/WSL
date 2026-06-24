@@ -181,26 +181,26 @@
                 <!-- WslPluginHost - out-of-process plugin isolation (process spawned by service) -->
                 <!-- WslPluginHost AppID — SYSTEM-only activation -->
                 <!-- O:SYG:SYD:(A;;CCDCSW;;;SY) -->
-                <RegistryKey Root="HKCR" Key="AppID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}">
+                <RegistryKey Root="HKCR" Key="AppID\{74c1b5a4-055a-44b5-a945-0da20205e94f}">
                     <RegistryValue Name="AccessPermission" Value="010004801400000020000000000000002C00000001010000000000051200000001010000000000051200000002001C0001000000000014000B000000010100000000000512000000" Type="binary" />
                     <RegistryValue Name="LaunchPermission" Value="010004801400000020000000000000002C00000001010000000000051200000001010000000000051200000002001C0001000000000014000B000000010100000000000512000000" Type="binary" />
                 </RegistryKey>
-                <RegistryKey Root="HKCR" Key="CLSID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}">
-                    <RegistryValue Name="AppId" Value="{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}" Type="string" />
+                <RegistryKey Root="HKCR" Key="CLSID\{74c1b5a4-055a-44b5-a945-0da20205e94f}">
+                    <RegistryValue Name="AppId" Value="{74c1b5a4-055a-44b5-a945-0da20205e94f}" Type="string" />
                     <RegistryValue Value="WslPluginHost" Type="string" />
                 </RegistryKey>
-                <RegistryKey Root="HKCR" Key="CLSID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}\LocalServer32">
+                <RegistryKey Root="HKCR" Key="CLSID\{74c1b5a4-055a-44b5-a945-0da20205e94f}\LocalServer32">
                     <RegistryValue Value='"[INSTALLDIR]wslpluginhost.exe"' Type="string" />
                 </RegistryKey>
 
                 <!-- WslPluginHost interfaces — use the shared wslserviceproxystub.dll -->
-                <RegistryKey Root="HKCR" Key="Interface\{A2B3C4D5-E6F7-4890-AB12-CD34EF56A789}">
+                <RegistryKey Root="HKCR" Key="Interface\{B09EEE6A-7EC9-4FEF-A4BD-1EA17BF4AD3D}">
                     <RegistryValue Value="IWslPluginHostCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
-                <RegistryKey Root="HKCR" Key="Interface\{B3C4D5E6-F7A8-4901-BC23-DE45FA67B890}">
+                <RegistryKey Root="HKCR" Key="Interface\{25BB890F-C873-409A-B799-08A9D98997FF}">
                     <RegistryValue Value="IWslPluginHost" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
