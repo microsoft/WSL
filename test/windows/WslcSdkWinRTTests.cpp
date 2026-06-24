@@ -1596,6 +1596,8 @@ class WslcSdkWinRtTests
 
         const auto image = winrt::to_hstring(std::format("{}/hello-world:latest", registryAddress));
 
+        auto cleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
+
         // Positive: pulling with correct credentials must succeed.
         {
             auto opts = WSLCSDK::PullImageOptions(image);
@@ -1627,6 +1629,8 @@ class WslcSdkWinRtTests
             PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
             const auto image = winrt::to_hstring(std::format("{}/hello-world:latest", registryAddress));
+
+            auto imageCleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
 
             // Delete the image locally so the pull is a real network pull.
             IGNORE_ERRORS(m_defaultSession.DeleteImage(image));
