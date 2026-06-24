@@ -1774,7 +1774,7 @@ A WSL-ben futó Linux bináris fájlok automatikusan használhatják a GPU-t a W
     <value>A telepítés módja</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>A VS Code telepítése után telepítheti a távoli WSL-bővítményt a Windows terminálból:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2406,11 +2406,11 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
-    <value>Cannot use '{}' as session storage because the directory is not empty</value>
+    <value>A(z) {} nem használható munkamenet-tárolóként, mert a könyvtár nem üres</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
-    <value>Cannot use '{}' as session storage because it is not a directory</value>
+    <value>A(z) {} nem használható munkamenet-tárolóként, mert nem könyvtár</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">

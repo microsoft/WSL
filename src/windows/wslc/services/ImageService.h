@@ -26,6 +26,7 @@ public:
         const std::wstring& contextPath,
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
+        const std::vector<std::wstring>& labels,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
         WSLCBuildImageFlags flags,

@@ -22,8 +22,7 @@ using wsl::shared::EmptyObject;
 
 struct InspectPortBinding
 {
-    // WSLC always binds to localhost. Included for Docker API compatibility.
-    std::string HostIp = "127.0.0.1";
+    std::string HostIp;
     std::string HostPort;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectPortBinding, HostIp, HostPort);

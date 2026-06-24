@@ -1781,7 +1781,7 @@ Binários do Linux em execução no WSL podem usar automaticamente a GPU no Wind
     <value>Como instalar</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>Depois de instalar o VS Code, você pode instalar a extensão Remote WSL a partir do Terminal do Windows:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2071,7 +2071,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToMapPort" xml:space="preserve">
-    <value>Failed to map port '{}', {}</value>
+    <value>Falha ao mapear a porta '{}', {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">

@@ -63,6 +63,11 @@ void BuildImage(CLIExecutionContext& context)
 
     auto tags = context.Args.GetAll<ArgType::Tag>();
     auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
+    auto labels = context.Args.GetAll<ArgType::Label>();
+    for (const auto& label : labels)
+    {
+        validation::ParseLabel(label);
+    }
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
@@ -85,7 +90,7 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

@@ -1632,7 +1632,7 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
 
         for (auto& entry : m_handles)
         {
-            entry->self = this;
+            entry->Self = this;
         }
 
         // N.B. moving a MultiHandleWait() while running is not supported
@@ -1642,12 +1642,21 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
     return *this;
 }
 
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags, OnError&& onError)
 {
     auto entry = std::make_unique<Entry>();
     entry->HandleFlags = flags;
     entry->Handle = std::move(handle);
-    entry->self = this;
+    entry->Self = this;
+
+    if (WI_IsFlagSet(flags, Flags::IgnoreErrors))
+    {
+        entry->ErrorCallback = []() {};
+    }
+    else
+    {
+        entry->ErrorCallback = std::move(onError);
+    }
     m_handles.emplace_back(std::move(entry));
 }
 
@@ -1660,8 +1669,8 @@ void NTAPI MultiHandleWait::WaitCallback(PVOID Context, BOOLEAN /*TimerOrWaitFir
 {
     auto* entry = static_cast<Entry*>(Context);
 
-    entry->self->m_signaledHandles.push(entry);
-    entry->self->m_handleSignaledEvent.SetEvent();
+    entry->Self->m_signaledHandles.push(entry);
+    entry->Self->m_handleSignaledEvent.SetEvent();
 }
 
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
@@ -1690,13 +1699,9 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
             catch (...)
             {
-                if (WI_IsFlagSet(signaledEntry->HandleFlags, Flags::IgnoreErrors))
-                {
-                    signaledEntry->Handle.reset();
-                    continue;
-                }
-
-                throw;
+                signaledEntry->ErrorCallback(); // Might throw and cancel the IO.
+                signaledEntry->Handle.reset();
+                continue;
             }
         }
 
@@ -1715,13 +1720,9 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 }
                 catch (...)
                 {
-                    if (WI_IsFlagSet(entry.HandleFlags, Flags::IgnoreErrors))
-                    {
-                        entry.Handle.reset();
-                        break;
-                    }
-
-                    throw;
+                    entry.ErrorCallback(); // Might throw and cancel the IO.
+                    entry.Handle.reset();
+                    break;
                 }
             }
 

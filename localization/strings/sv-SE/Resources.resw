@@ -1131,7 +1131,7 @@ Försöker ladda ned...</value>
     <value>wsl2.virtio9p är inaktiverat och återgår till 9p med vsock-transport.</value>
   </data>
   <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
-    <value>Consomme nätverk stöds inte när wsl2.virtio är inaktiverat. återgår till networkingMode {}.</value>
+    <value>Consomme-nätverk stöds inte när wsl2.virtio är inaktiverat. Återgår till networkingMode {}.</value>
     <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
@@ -1774,9 +1774,9 @@ Linux-binärfiler som körs i WSL kan automatiskt använda din GPU i Windows fö
     <value>Så här installerar du</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>När du har installerat VS Code kan du installera WSL-fjärrtillägget från Windows-terminal:
 
-'code --install-extension ms-vscode-remote.remote-wsl'</value>
+code --install-extension ms-vscode-remote.remote-wsl</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
