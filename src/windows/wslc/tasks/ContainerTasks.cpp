@@ -435,7 +435,7 @@ void CopyToContainer(CLIExecutionContext& context)
 
         // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote
         auto targetDir = absTarget.wstring();
-        while (!targetDir.empty() && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
+        while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
         {
             targetDir.pop_back();
         }
