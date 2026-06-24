@@ -873,6 +873,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->Labels.Count > 0 && Options->Labels.Values == nullptr);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
@@ -934,6 +935,13 @@ try
         RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Values[i][0] == '-');
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
+    }
+    for (ULONG i = 0; i < Options->Labels.Count; i++)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Labels.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, Options->Labels.Values[i][0] == '-');
+        buildArgs.push_back("--label");
+        buildArgs.push_back(Options->Labels.Values[i]);
     }
 
     buildArgs.push_back("-f");
