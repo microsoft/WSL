@@ -1136,10 +1136,21 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     if (SocketCodePair.first != 200)
     {
         // Export failed, parse the error message.
-        auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+        try
+        {
+            auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
+        }
     }
 }
 
