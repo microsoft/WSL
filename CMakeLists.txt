@@ -133,6 +133,9 @@ find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
+# NOTICE.txt is published at the root of the Microsoft.WSLg NuGet (not under build/native/bin),
+# so compute its path explicitly rather than walking up from WSLG_SOURCE_DIR.
+set(WSLG_NOTICE_PATH "${CMAKE_BINARY_DIR}/packages/Microsoft.WSLg.${WSLG_VERSION}/NOTICE.txt")
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
 
