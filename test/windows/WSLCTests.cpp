@@ -1332,10 +1332,10 @@ class WSLCTests
             auto largeFile =
                 wil::create_new_file(L"largefile", GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, FILE_FLAG_DELETE_ON_CLOSE);
 
-            // Create an invalid header (docker ignores the entire file if it's header is only null bytes).
+            // Create an invalid header (docker ignores the entire file if its header is only null bytes).
             DWORD bytesWritten{};
             THROW_IF_WIN32_BOOL_FALSE(WriteFile(largeFile.get(), "foo", 3, &bytesWritten, nullptr));
-            THROW_LAST_ERROR_IF(SetFilePointer(largeFile.get(), 300 * _1MB, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+            THROW_LAST_ERROR_IF(SetFilePointer(largeFile.get(), static_cast<LONG>(300 * _1MB), nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
 
             THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(largeFile.get()));
             THROW_LAST_ERROR_IF(SetFilePointer(largeFile.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
