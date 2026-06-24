@@ -3706,14 +3706,12 @@ class WSLCTests
             }
 
             if (expectedBinaries.empty())
-            {
-                LogWarning("No executables found found in C:\\Windows\\system32\\lxss\\lib. Skipping bind mount test");
-            }
+                LogWarning("No executables found in C:\\Windows\\system32\\lxss\\lib. Skipping GPU executable bind mount test");
             else
             {
                 for (const auto& e : expectedBinaries)
                 {
-                    expect({"test", "-x", std::format("/usr/lib/wsl/lib/{}", e)}, 0);
+                    expect({"test", "-x", std::format("/usr/bin/{}", e)}, 0);
                 }
             }
         }
