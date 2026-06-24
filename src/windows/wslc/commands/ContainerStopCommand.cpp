@@ -47,7 +47,7 @@ std::wstring ContainerStopCommand::LongDescription() const
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << StopContainers;
 }
 // clang-format on

@@ -19,9 +19,13 @@ namespace wsl::windows::wslc::models {
 
 struct Session
 {
+    NON_COPYABLE(Session);
+    DEFAULT_MOVABLE(Session);
+
     explicit Session(wil::com_ptr<IWSLCSession> session) : m_session(std::move(session))
     {
     }
+
     IWSLCSession* Get() const noexcept
     {
         return m_session.get();

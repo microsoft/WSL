@@ -2147,7 +2147,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
             L"[wsl2]\n");
         validateWarnings(
             L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
@@ -2166,7 +2166,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
@@ -3563,7 +3563,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 {NetworkingConfiguration::Nat, NetworkingConfiguration::Nat},
                 {NetworkingConfiguration::Bridged, NetworkingConfiguration::Bridged},
                 {NetworkingConfiguration::Mirrored, NetworkingConfiguration::Mirrored},
-                {NetworkingConfiguration::VirtioProxy, NetworkingConfiguration::VirtioProxy},
+                {NetworkingConfiguration::Consomme, NetworkingConfiguration::Consomme},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue

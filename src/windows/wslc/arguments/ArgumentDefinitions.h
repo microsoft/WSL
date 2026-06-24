@@ -99,7 +99,6 @@ _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
-_(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
 _(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription()) \

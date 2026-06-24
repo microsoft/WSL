@@ -20,14 +20,14 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 struct InstallProgress : InstallProgressT<InstallProgress>
 {
     InstallProgress() = default;
-    InstallProgress(winrt::Microsoft::WSL::Containers::ComponentFlags component, uint32_t progress, uint32_t total);
+    InstallProgress(winrt::Microsoft::WSL::Containers::Component component, uint32_t progress, uint32_t total);
 
-    winrt::Microsoft::WSL::Containers::ComponentFlags Component();
+    winrt::Microsoft::WSL::Containers::Component Component();
     uint32_t Progress();
     uint32_t Total();
 
 private:
-    winrt::Microsoft::WSL::Containers::ComponentFlags m_component{};
+    winrt::Microsoft::WSL::Containers::Component m_component{};
     uint32_t m_progress{};
     uint32_t m_total{};
 };

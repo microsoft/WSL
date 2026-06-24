@@ -2517,14 +2517,42 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
+static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));
+    std::wstring value;
+    HRESULT hr = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+    THROW_IF_FAILED(hr);
+    return value;
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name) : m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), nullptr));
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) :
+    m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), Value.c_str()));
 }
 
 ScopedEnvVariable::~ScopedEnvVariable()
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), nullptr));
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), m_originalValue.has_value() ? m_originalValue->c_str() : nullptr));
+}
+
+void ScopedEnvVariable::Set(const std::wstring& Value)
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), Value.c_str()));
+}
+
+void ScopedEnvVariable::Clear()
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
@@ -3011,6 +3039,55 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     {
         sendRequest();
     }
+}
+
+std::optional<std::string> GetHostAdapterIpv4()
+{
+    ULONG bufferSize = 0;
+    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    auto result = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &bufferSize);
+    if (result != ERROR_BUFFER_OVERFLOW)
+    {
+        return std::nullopt;
+    }
+
+    std::vector<BYTE> buffer(bufferSize);
+    auto* adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+    result = GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &bufferSize);
+    if (result != ERROR_SUCCESS)
+    {
+        return std::nullopt;
+    }
+
+    for (auto* adapter = adapters; adapter != nullptr; adapter = adapter->Next)
+    {
+        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK || adapter->IfType == IF_TYPE_TUNNEL)
+        {
+            continue;
+        }
+
+        for (auto* addr = adapter->FirstUnicastAddress; addr != nullptr; addr = addr->Next)
+        {
+            if (addr->Address.lpSockaddr->sa_family != AF_INET)
+            {
+                continue;
+            }
+
+            auto& ipv4 = reinterpret_cast<sockaddr_in*>(addr->Address.lpSockaddr)->sin_addr;
+
+            // Skip APIPA (169.254.x.x) addresses.
+            if ((ntohl(ipv4.s_addr) & 0xFFFF0000) == 0xA9FE0000)
+            {
+                continue;
+            }
+
+            char buf[INET_ADDRSTRLEN];
+            VERIFY_IS_NOT_NULL(inet_ntop(AF_INET, &ipv4, buf, sizeof(buf)));
+            return std::string(buf);
+        }
+    }
+
+    return std::nullopt;
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)

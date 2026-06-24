@@ -63,6 +63,11 @@ void BuildImage(CLIExecutionContext& context)
 
     auto tags = context.Args.GetAll<ArgType::Tag>();
     auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
+    auto labels = context.Args.GetAll<ArgType::Label>();
+    for (const auto& label : labels)
+    {
+        validation::ParseLabel(label);
+    }
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
@@ -85,7 +90,7 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -118,10 +123,10 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
-        // Print only the image names.
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
+            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
         }
 
         return;
@@ -239,7 +244,12 @@ void ImportImage(CLIExecutionContext& context)
     }
 
     auto& input = context.Args.Get<ArgType::ImportFile>();
-    services::ImageService::Import(session, input, imageName);
+    auto imageId = services::ImageService::Import(session, input, imageName);
+    if (!imageId.empty())
+    {
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
+    }
 }
 
 void InspectImages(CLIExecutionContext& context)

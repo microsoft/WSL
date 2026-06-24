@@ -48,6 +48,10 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(MapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) override;
+    IFACEMETHOD(UnmapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:

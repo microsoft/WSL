@@ -18,10 +18,11 @@ Abstract:
 
 namespace wsl::windows::common::wslc_schema {
 
+using wsl::shared::EmptyObject;
+
 struct InspectPortBinding
 {
-    // WSLC always binds to localhost. Included for Docker API compatibility.
-    std::string HostIp = "127.0.0.1";
+    std::string HostIp;
     std::string HostPort;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectPortBinding, HostIp, HostPort);
@@ -119,11 +120,22 @@ struct ImageConfig
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
     std::optional<std::vector<std::string>> Env;
+    std::optional<std::map<std::string, EmptyObject>> ExposedPorts;
     std::optional<std::map<std::string, std::string>> Labels;
+    std::string StopSignal;
     std::string User;
+    std::optional<std::map<std::string, EmptyObject>> Volumes;
     std::string WorkingDir;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, Labels, User, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, ExposedPorts, Labels, StopSignal, User, Volumes, WorkingDir);
+};
+
+struct ImageRootFS
+{
+    std::string Type;
+    std::optional<std::vector<std::string>> Layers;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageRootFS, Type, Layers);
 };
 
 struct InspectImage
@@ -140,9 +152,10 @@ struct InspectImage
     int64_t Size{};
     std::optional<std::map<std::string, std::string>> Metadata;
     std::optional<ImageConfig> Config;
+    std::optional<ImageRootFS> RootFS;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config, RootFS);
 };
 
 struct InspectVolume

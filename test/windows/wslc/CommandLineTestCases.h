@@ -41,7 +41,7 @@ COMMAND_LINE_TEST_CASE(L"system session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"system session list extraarg", L"list", false)
-COMMAND_LINE_TEST_CASE(L"system session shell session1", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session run ls", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run echo foo", L"run", true) // Command with trailing arguments
@@ -52,7 +52,7 @@ COMMAND_LINE_TEST_CASE(L"system session run \"ls -la /tmp\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run", L"run", false)                    // Missing required command positional
 COMMAND_LINE_TEST_CASE(L"--session session1 system session run", L"run", false) // Missing required command positional
 COMMAND_LINE_TEST_CASE(L"system session run --notanarg ls", L"run", false)      // Invalid flag before command
-COMMAND_LINE_TEST_CASE(L"system session terminate session1", L"terminate", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage", L"enter", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage --name my-session", L"enter", true)
@@ -229,6 +229,18 @@ COMMAND_LINE_TEST_CASE(L"container logs --until 1700000000 cont1", L"logs", true
 COMMAND_LINE_TEST_CASE(L"container logs --since 1700000000 --until 1700001000 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --since abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --until abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --until 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+05:30 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.123456789Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-13-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T25:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Zextra cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1960-01-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-02-31T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+0530 cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --follow --timestamps --since 100 --tail 5 cont1", L"logs", true)
 
 // Image command

@@ -23,6 +23,7 @@ Abstract:
 #include <WSLCProcessLauncher.h>
 #include <ConsoleState.h>
 #include <CommandLine.h>
+#include <WSLCUserSettings.h>
 #include <filesystem>
 #include <unordered_map>
 #include <wslc.h>
@@ -81,30 +82,34 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         }
     }
 
+    const auto defaultBindingAddress = settings::User().Get<settings::Setting::SessionDefaultBindingAddress>();
+
     // Set port options if provided
     for (const auto& port : options.Ports)
     {
         auto portMapping = PublishPort::Parse(port);
 
+        const int protocol = portMapping.PortProtocol() == PublishPort::Protocol::UDP ? IPPROTO_UDP : IPPROTO_TCP;
+        const int family = (portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6()) ? AF_INET6 : AF_INET;
+        std::optional<std::string> bindAddress;
+        if (portMapping.HostIP().has_value())
         {
-            // https://github.com/microsoft/WSL/issues/14433
-            // The following scenarios are currently not implemented:
-            // - Host port mappings with a specific host IP
-            // - Host port mappings with UDP protocol
-            if (portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
-            {
-                THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappings with specific host IPs or UDP protocol are not currently supported");
-            }
+            bindAddress = portMapping.HostIP()->IP();
+        }
+        else if (!defaultBindingAddress.empty())
+        {
+            // No explicit host IP: apply the configured default binding address (IPv4 only,
+            // since IPv6 bindings are always explicit). When unset, AddPort falls back to loopback.
+            bindAddress = defaultBindingAddress;
         }
 
         auto containerPort = portMapping.ContainerPort();
         for (uint16_t i = 0; i < containerPort.Count(); ++i)
         {
             auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
-            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
-            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
+            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? static_cast<uint16_t>(WSLC_EPHEMERAL_PORT)
+                                                                        : static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, family, protocol, bindAddress);
         }
     }
 

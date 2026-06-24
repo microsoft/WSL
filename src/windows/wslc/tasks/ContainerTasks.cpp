@@ -966,16 +966,19 @@ void ViewContainerLogs(CLIExecutionContext& context)
         tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
     }
 
+    // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
+    // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
+    // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
-        since = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Since>());
+        since = validation::GetTimestampFromString(context.Args.Get<ArgType::Since>());
     }
 
     ULONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
-        until = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Until>());
+        until = validation::GetTimestampFromString(context.Args.Get<ArgType::Until>());
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);

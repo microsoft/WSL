@@ -128,12 +128,36 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureNoUntaggedImages();
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
 void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content);
+
+// Sets up a clean test directory and returns a scope_exit to remove it.
+inline auto SetupTestDirectory(const std::filesystem::path& directory)
+{
+    std::error_code ec;
+    std::filesystem::remove_all(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    std::filesystem::create_directories(directory, ec);
+    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(directory), "%hs", ec.message().c_str());
+
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directory]() {
+        std::error_code removeError;
+        std::filesystem::remove_all(directory, removeError);
+    });
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port);
+std::wstring GetPythonUdpEchoServerScript(uint16_t port);
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family = AF_INET);
+
+void WaitForContainerOutput(const std::wstring& containerName, std::string_view expected, std::chrono::milliseconds timeout = std::chrono::seconds(60));
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -196,5 +220,30 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
+// Verifies that a string is a valid hex ID output.
+// truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.
+inline void VerifyIdOutput(const std::wstring& id, bool truncated)
+{
+    constexpr size_t c_truncatedLength = 12;
+    constexpr size_t c_fullLength = 64;
+
+    const size_t expectedLength = truncated ? c_truncatedLength : c_fullLength;
+
+    VERIFY_ARE_EQUAL(id.size(), expectedLength);
+
+    bool allHex = true;
+    for (size_t i = 0; i < expectedLength; i++)
+    {
+        const auto ch = id[i];
+        if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f')))
+        {
+            allHex = false;
+            break;
+        }
+    }
+
+    VERIFY_IS_TRUE(allHex, WEX::Common::String().Format(L"ID is not a valid hex string: '%ls'", id.c_str()));
+}
 
 } // namespace WSLCE2ETests

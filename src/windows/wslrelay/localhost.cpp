@@ -593,7 +593,7 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
         {
             if (it != ports.end())
             {
-                result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
                 continue;
             }
             else
@@ -615,6 +615,12 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                 catch (...)
                 {
                     result = wil::ResultFromCaughtException();
+                    if (result == HRESULT_FROM_WIN32(WSAEACCES))
+                    {
+                        // Translate WSAEACCES to WSAEADDRINUSE to match the virtionet behavior.
+                        result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
+                    }
+
                     continue;
                 }
             }

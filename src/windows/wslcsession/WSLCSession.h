@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCVolumes.h"
@@ -73,7 +74,7 @@ private:
 // The SYSTEM service creates the VM and passes IWSLCVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLCSession() = default;
@@ -97,6 +98,7 @@ public:
         _In_opt_ IWarningCallback* WarningCallback) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
+    IFACEMETHOD(GetDisplayName)(_Out_ LPWSTR* DisplayName) override;
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
@@ -111,10 +113,11 @@ public:
     IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
-        _In_ LPCSTR ImageName,
+        _In_opt_ LPCSTR ImageName,
         _In_ IProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+        _In_opt_ IWarningCallback* WarningCallback,
+        _Out_ LPSTR* ImageId) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(SaveImages)(_In_ WSLCHandle OutputHandle, _In_ const WSLCStringArray* ImageNames, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImagesOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
@@ -198,6 +201,41 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
 
+    // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
+    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    IFACEMETHOD(PullImage)(
+        _In_ LPCSTR Image,
+        _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(LoadImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(ImportImage)(
+        _In_ WSLCCompatHandle ImageHandle,
+        _In_opt_ LPCSTR ImageName,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ LPSTR* ImageId) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLCCompatListImagesOptions* Options, _Out_ WSLCCompatImageInformation** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLCCompatDeleteImageOptions* Options, _Out_ WSLCCompatDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
+    IFACEMETHOD(TagImage)(_In_ const WSLCCompatTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(
+        _In_ LPCSTR Image,
+        _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_opt_ IWSLCCompatProgressCallback* ProgressCallback,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback) override;
+    IFACEMETHOD(CreateContainer)(
+        _In_ const WSLCCompatContainerOptions* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
+    IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
+
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
     UserHandle OpenUserHandle(WSLCHandle Handle);
@@ -233,7 +271,7 @@ private:
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
-    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp);
+    void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     _Requires_shared_lock_held_(m_lock)
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
@@ -251,7 +289,7 @@ private:
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
+    std::optional<std::string> ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 
@@ -266,6 +304,7 @@ private:
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
+    bool m_storageMounted = false;
 
     // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
     // These locks protect m_containers without requiring an exclusive m_lock.
