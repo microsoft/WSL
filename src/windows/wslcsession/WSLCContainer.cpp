@@ -1306,14 +1306,13 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Config.User = dockerInspect.Config.User;
     wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
 
-    // Map WSLC port mappings (Windows host ports only). HostIp is not set here and will use
-    // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
+    // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
     {
-        // TODO: ipv6 support.
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
 
         wslc_schema::InspectPortBinding portBinding{};
+        portBinding.HostIp = e.VmMapping.BindingAddressString();
         portBinding.HostPort = std::to_string(e.VmMapping.HostPort());
 
         wslcInspect.Ports[portKey].push_back(std::move(portBinding));

@@ -1137,7 +1137,7 @@ Es wird versucht,...</value>
     <value>wsl2.virtio9p ist deaktiviert und fällt mit vsock-Transport auf 9p zurück.</value>
   </data>
   <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
-    <value>Consomme networking is not supported when wsl2.virtio is disabled; falling back to networkingMode {}.</value>
+    <value>Consomme-Netzwerk wird nicht unterstützt, wenn wsl2.virtio deaktiviert ist; es wird auf networkingMode {} zurückgegriffen.</value>
     <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
@@ -1782,7 +1782,8 @@ Linux-Binärdateien, die in WSL ausgeführt werden, können Ihre GPU in Windows 
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Nachdem Sie VS Code installiert haben, können Sie die Remote-WSL-Erweiterung über das Windows-Terminal installieren:
 
-„code –install-extension ms-vscode-remote.remote-wsl“</value>
+„code --install-extension ms-vscode-remote.remote-wsl“</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>WSL-Projekt in Visual Studio Code öffnen</value>

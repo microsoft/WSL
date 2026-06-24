@@ -493,6 +493,7 @@ typedef struct _WSLCBuildImageOptions
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
+    WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions

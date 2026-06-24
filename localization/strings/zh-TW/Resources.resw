@@ -1782,7 +1782,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>安裝 VS Code 之後，即可從 Windows 終端機安裝遠端 WSL 延伸模組:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>使用 Visual Studio Code 開啟 WSL 專案</value>

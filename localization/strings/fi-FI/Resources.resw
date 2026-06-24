@@ -1776,7 +1776,8 @@ WSL:ssä toimivat Linux-binaarit voivat nopeuttaa suorituskykyään automaattise
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Kun olet asentanut VS Coden, voit asentaa WSL-etälaajennuksen Windows-päätteestä:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Avaa WSL-projekti Visual Studio koodissa</value>

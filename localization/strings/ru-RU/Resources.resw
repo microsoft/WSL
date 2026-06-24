@@ -1781,9 +1781,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Установка</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>После установки VS Code можно установить удаленное расширение WSL из терминала Windows:
+    <value>После установки VS Code можно установить удаленное расширение WSL из Терминала Windows:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Открыть проект WSL в Visual Studio Code</value>
