@@ -278,7 +278,7 @@ void ExportContainer(CLIExecutionContext& context)
     }
 }
 
-void CopyToContainer(CLIExecutionContext& context)
+void ContainerCp(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::Source));

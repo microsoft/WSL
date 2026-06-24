@@ -35,6 +35,6 @@ void ContainerCpCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << CopyToContainer;
+        << ContainerCp;
 }
 } // namespace wsl::windows::wslc
