@@ -34,7 +34,7 @@
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
-                <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${WSLG_NOTICE_PATH}" />
+                <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${CMAKE_SOURCE_DIR}/NOTICE.txt" />
 
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                     <File Id="libwsl.dll" Name="libwsl.dll" Source="${PACKAGE_INPUT_DIR}/libwsl.dll" />

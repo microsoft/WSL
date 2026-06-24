@@ -133,7 +133,6 @@ find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /)
-set(WSLG_NOTICE_PATH "${WSLG_SOURCE_DIR}/NOTICE.txt")
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
 
