@@ -317,8 +317,7 @@ class WSLCE2EContainerCpTests
         auto cleanupLocal = wil::scope_exit([&] { DeleteFileW(localFile.c_str()); });
 
         {
-            wil::unique_hfile file(
-                CreateFileW(localFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            wil::unique_hfile file(CreateFileW(localFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             THROW_LAST_ERROR_IF(!file);
             const std::string content = "local-file-content\n";
             DWORD written = 0;
@@ -397,8 +396,7 @@ class WSLCE2EContainerCpTests
 
         // Copy with explicit trailing backslash in target path.
         auto targetWithBackslash = downloadDir.wstring() + L"\\";
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/tmp/bstest.txt {}", WslcContainerName, targetWithBackslash));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/bstest.txt {}", WslcContainerName, targetWithBackslash));
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         auto extractedFile = downloadDir / L"bstest.txt";
@@ -419,8 +417,7 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/nonexistent/file.txt {}", WslcContainerName, downloadDir.wstring()));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/nonexistent/file.txt {}", WslcContainerName, downloadDir.wstring()));
         VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
         VERIFY_IS_TRUE(cpResult.Stderr.has_value());
@@ -440,8 +437,7 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/no/such/directory/ {}", WslcContainerName, downloadDir.wstring()));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/no/such/directory/ {}", WslcContainerName, downloadDir.wstring()));
         VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
         VERIFY_IS_TRUE(cpResult.Stderr.has_value());
@@ -457,8 +453,7 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/tmp/file.txt {}", InvalidContainerName, downloadDir.wstring()));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/file.txt {}", InvalidContainerName, downloadDir.wstring()));
         VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
         VERIFY_IS_TRUE(cpResult.Stderr.has_value());
@@ -469,9 +464,7 @@ class WSLCE2EContainerCpTests
     {
         // Create a container, put a file in it, stop it, then copy out.
         auto runResult = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Container has exited (ran a one-shot command). Copy from the stopped container.
@@ -481,8 +474,7 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/tmp/stopped.txt {}", WslcContainerName, downloadDir.wstring()));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/stopped.txt {}", WslcContainerName, downloadDir.wstring()));
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         auto extractedFile = downloadDir / L"stopped.txt";
@@ -518,8 +510,7 @@ private:
 
         auto testFile = tarSrcDir / L"testfile.txt";
         {
-            wil::unique_hfile file(
-                CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            wil::unique_hfile file(CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             THROW_LAST_ERROR_IF(!file);
             const std::string content = "wslc-cp-test-content\n";
             DWORD written = 0;

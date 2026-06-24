@@ -325,16 +325,13 @@ void CopyToContainer(CLIExecutionContext& context)
     {
         // stdin/local → container
         auto [containerId, destPath] = parseContainerPath(target);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
 
         if (sourceIsStdin)
         {
             auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::WSLCCLI_CpStdinIsTerminalError(),
-                wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
+                E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
 
             LARGE_INTEGER fileSize{};
             ULONGLONG contentSize = 0;
@@ -354,8 +351,7 @@ void CopyToContainer(CLIExecutionContext& context)
             auto widePath = MultiByteToWide(source);
             std::error_code fsError;
             bool pathExists = std::filesystem::exists(widePath, fsError);
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), fsError || !pathExists);
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), fsError || !pathExists);
 
             auto absPath = std::filesystem::absolute(widePath);
             auto parentDir = absPath.parent_path().wstring();
@@ -397,23 +393,21 @@ void CopyToContainer(CLIExecutionContext& context)
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
 
             // Open the tar file and upload
-            wil::unique_hfile tarFileHandle(CreateFileW(
-                tempPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            wil::unique_hfile tarFileHandle(
+                CreateFileW(tempPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
             THROW_LAST_ERROR_IF(!tarFileHandle);
 
             LARGE_INTEGER fileSize{};
             THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFileHandle.get(), &fileSize));
 
-            ContainerService::CopyToContainer(
-                session, containerId, destPath, tarFileHandle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+            ContainerService::CopyToContainer(session, containerId, destPath, tarFileHandle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
         }
     }
     else if (sourceIsContainer && !targetIsContainer)
     {
         // container → local
         auto [containerId, srcPath] = parseContainerPath(source);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
         auto wideTarget = MultiByteToWide(target);
         auto absTarget = std::filesystem::absolute(wideTarget);
@@ -432,8 +426,8 @@ void CopyToContainer(CLIExecutionContext& context)
         auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
 
         {
-            wil::unique_hfile tarFileHandle(CreateFileW(
-                tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            wil::unique_hfile tarFileHandle(
+                CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             THROW_LAST_ERROR_IF(!tarFileHandle);
 
             ContainerService::CopyFromContainer(session, containerId, srcPath, tarFileHandle.get());

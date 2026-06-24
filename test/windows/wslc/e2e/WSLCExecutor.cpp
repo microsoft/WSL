@@ -241,8 +241,7 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
     return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
 }
 
-WSLCExecutionResult RunWslcWithStdinFile(
-    const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType)
+WSLCExecutionResult RunWslcWithStdinFile(const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType)
 {
     SECURITY_ATTRIBUTES securityAttributes{};
     securityAttributes.nLength = sizeof(securityAttributes);
