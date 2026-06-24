@@ -403,6 +403,33 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_FileDestination)
+    {
+        // When the local target doesn't end with a separator and isn't an existing directory,
+        // it should be treated as a file destination (matching docker cp semantics).
+        auto runResult = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo file-dest-test > /tmp/srcfile.txt && sleep infinity\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        Sleep(1000);
+
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto targetFile = std::filesystem::path(tempDir) / L"wslc-cp-file-dest-test" / L"renamed.txt";
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(targetFile.parent_path()); });
+
+        // Copy from container to a specific file path (not a directory).
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/tmp/srcfile.txt {}", WslcContainerName, targetFile.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // The file should exist at the exact target path, not inside a directory named "renamed.txt".
+        VERIFY_IS_TRUE(std::filesystem::exists(targetFile));
+        VERIFY_IS_TRUE(std::filesystem::is_regular_file(targetFile));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_NonexistentPath)
     {
         // Regression test: DownloadArchive used to hang on 404 because the HTTP/1.1 keep-alive
