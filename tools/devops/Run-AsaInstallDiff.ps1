@@ -156,7 +156,12 @@ function Install-AsaDotnetRuntime {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installer -UseBasicParsing
     & $installer -Channel $AsaDotnetChannel -Runtime aspnetcore -InstallDir $DotnetRoot
-    if ($LASTEXITCODE -ne 0) { throw "dotnet runtime bootstrap failed ($LASTEXITCODE)" }
+    $sharedRoot = Join-Path $DotnetRoot 'shared'
+    $netCore = Join-Path $sharedRoot 'Microsoft.NETCore.App'
+    $aspNet = Join-Path $sharedRoot 'Microsoft.AspNetCore.App'
+    if (-not (Test-Path $netCore) -or -not (Test-Path $aspNet)) {
+        throw "dotnet runtime bootstrap failed: expected shared frameworks under $sharedRoot"
+    }
     $env:DOTNET_ROOT = $DotnetRoot
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
     $env:DOTNET_NOLOGO = '1'
