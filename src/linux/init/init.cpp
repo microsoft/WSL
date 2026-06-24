@@ -2757,11 +2757,7 @@ try
         // systemctl poweroff is normally async but can block in rare cases.
         // Run it in a thread so a stuck invocation can't prevent the fallback timeout below.
         //
-        try
-        {
-            std::thread([]() { UtilExecCommandLine("systemctl poweroff", nullptr); }).detach();
-        }
-        CATCH_LOG();
+        std::thread([]() { UtilExecCommandLine("systemctl poweroff", nullptr); }).detach();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
         LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
