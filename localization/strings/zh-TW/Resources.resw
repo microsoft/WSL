@@ -1780,7 +1780,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>安裝方式</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>安裝 VS Code 之後，即可從 Windows 終端機安裝遠端 WSL 延伸模組:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
