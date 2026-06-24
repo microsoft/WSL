@@ -1780,7 +1780,7 @@ Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamen
     <value>Cómo instalarlo</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>Después de instalar VS Code, puedes instalar la extensión WSL remota desde Terminal Windows:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
