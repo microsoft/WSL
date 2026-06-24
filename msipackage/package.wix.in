@@ -34,6 +34,11 @@
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
+                <!-- Third-party OSS attributions. NOTICE.txt lives at the root of the Microsoft.WSLg NuGet, while
+                     WSLG_SOURCE_DIR points at <package>/build/native/bin, hence the relative path up to the package root.
+                     Staged to the install directory so the notice is discoverable per OSS attribution requirements. -->
+                <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${WSLG_SOURCE_DIR}/../../../NOTICE.txt" />
+
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                     <File Id="libwsl.dll" Name="libwsl.dll" Source="${PACKAGE_INPUT_DIR}/libwsl.dll" />
                 <?endif?>
