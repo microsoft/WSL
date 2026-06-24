@@ -19,9 +19,9 @@ import "unknwn.idl";
 import "wtypes.idl";
 import "wslc.idl";
 
-cpp_quote("const GUID CLSID_WslPluginHost = {0x7a1d2c3e, 0x4b5f, 0x6a7d, {0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f}};")
+cpp_quote("const GUID CLSID_WslPluginHost = {0x74c1b5a4, 0x055a, 0x44b5, {0xa9, 0x45, 0x0d, 0xa2, 0x02, 0x05, 0xe9, 0x4f}};")
 cpp_quote("#ifdef __cplusplus")
-cpp_quote("class DECLSPEC_UUID(\"7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f\") WslPluginHost;")
+cpp_quote("class DECLSPEC_UUID(\"74c1b5a4-055a-44b5-a945-0da20205e94f\") WslPluginHost;")
 cpp_quote("#endif")
 
 //
@@ -30,7 +30,7 @@ cpp_quote("#endif")
 //
 
 [
-    uuid(A2B3C4D5-E6F7-4890-AB12-CD34EF56A789),
+    uuid(B09EEE6A-7EC9-4FEF-A4BD-1EA17BF4AD3D),
     pointer_default(unique),
     object
 ]
@@ -94,7 +94,7 @@ interface IWslPluginHostCallback : IUnknown
 //
 
 [
-    uuid(B3C4D5E6-F7A8-4901-BC23-DE45FA67B890),
+    uuid(25BB890F-C873-409A-B799-08A9D98997FF),
     pointer_default(unique),
     object
 ]
