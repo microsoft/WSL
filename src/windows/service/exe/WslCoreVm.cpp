@@ -2766,15 +2766,15 @@ try
                     THROW_HR_IF_MSG(
                         E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
 
-                try
-                {
-                    auto response = ProcessVirtioFsRequest(message);
+                    try
+                    {
+                        auto response = ProcessVirtioFsRequest(message);
 
-                    // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
-                    io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
-                }
-                CATCH_LOG();
-            }),
+                        // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
+                        io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
+                    }
+                    CATCH_LOG();
+                }),
             io::MultiHandleWait::IgnoreErrors);
     }));
 
