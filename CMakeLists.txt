@@ -332,10 +332,12 @@ endif()
 # but dynamic-link the Universal CRT (ucrt.dll) which is an OS component on Windows 10+.
 # This eliminates the VCRUNTIME/MSVCP redistributable dependency while avoiding the size
 # cost of statically linking the UCRT. See https://aka.ms/hybridcrt for details.
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
-set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}   /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
-set(CMAKE_EXE_LINKER_FLAGS_DEBUG      "${CMAKE_EXE_LINKER_FLAGS_DEBUG}      /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
+foreach(config RELEASE RELWITHDEBINFO MINSIZEREL)
+    set(CMAKE_SHARED_LINKER_FLAGS_${config} "${CMAKE_SHARED_LINKER_FLAGS_${config}} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+    set(CMAKE_EXE_LINKER_FLAGS_${config}    "${CMAKE_EXE_LINKER_FLAGS_${config}}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+endforeach()
+set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG    "${CMAKE_EXE_LINKER_FLAGS_DEBUG}    /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
