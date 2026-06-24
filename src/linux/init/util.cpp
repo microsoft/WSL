@@ -3535,7 +3535,7 @@ Return Value:
 --*/
 
 {
-    wil::unique_fd Fd{open(Path, O_RDONLY | O_CLOEXEC)};
+    wil::unique_fd Fd{TEMP_FAILURE_RETRY(open(Path, O_RDONLY | O_CLOEXEC))};
     if (!Fd)
     {
         if (LogErrors)
@@ -3802,7 +3802,7 @@ Return Value:
 {
     const std::string Request = std::to_string(Bytes);
 
-    wil::unique_fd Fd{open(RECLAIM_PATH, O_WRONLY | O_CLOEXEC)};
+    wil::unique_fd Fd{TEMP_FAILURE_RETRY(open(RECLAIM_PATH, O_WRONLY | O_CLOEXEC))};
     if (!Fd)
     {
         LOG_ERROR("open({}) failed {}", RECLAIM_PATH, errno);
