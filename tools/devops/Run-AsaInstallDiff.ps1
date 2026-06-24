@@ -138,30 +138,45 @@ if (-not (Test-Admin)) {
 }
 
 # --- Ensure the ASA CLI is available ---
-# ASA ships a self-contained Windows build (no .NET SDK or NuGet feed required),
-# so download and unzip it here. This works on a clean VM image where only a
-# runtime-only 'dotnet' host (or none) is present. The self-contained zip is only
-# published up to 2.3.321; newer tags ship the dotnet global tool only.
+# ASA ships a prebuilt Windows CLI zip (ASA_win), the last such build being 2.3.321
+# (newer tags ship the dotnet global tool only). That zip is framework-dependent on
+# the .NET 9 runtimes (Microsoft.NETCore.App + Microsoft.AspNetCore.App), so on a
+# clean VM image we also install the matching ASP.NET Core runtime before running it.
 $AsaVersion = '2.3.321'
 $AsaUrl = "https://github.com/microsoft/AttackSurfaceAnalyzer/releases/download/v$AsaVersion/ASA_win_$AsaVersion.zip"
+$AsaDotnetChannel = '9.0'
+$DotnetRoot = 'C:\Program Files\dotnet'
+
+function Install-AsaDotnetRuntime {
+    # ASA_win is a framework-dependent .NET 9 app. Install the ASP.NET Core 9 shared
+    # runtime (which carries the base .NET runtime too) into the default location so
+    # the apphost resolves it; also pin DOTNET_ROOT for deterministic resolution.
+    Write-Host "=== Installing .NET $AsaDotnetChannel runtime for ASA ===" -ForegroundColor Cyan
+    $installer = Join-Path $WorkDir 'dotnet-install.ps1'
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installer -UseBasicParsing
+    & $installer -Channel $AsaDotnetChannel -Runtime aspnetcore -InstallDir $DotnetRoot
+    if ($LASTEXITCODE -ne 0) { throw "dotnet runtime bootstrap failed ($LASTEXITCODE)" }
+    $env:DOTNET_ROOT = $DotnetRoot
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+    $env:DOTNET_NOLOGO = '1'
+}
 
 function Resolve-Asa {
-    $cmd = Get-Command asa -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-
     $toolsDir = Join-Path $WorkDir 'asa-cli'
     $exe = Join-Path $toolsDir "ASA_win_$AsaVersion\Asa.exe"
-    if (Test-Path $exe) { return $exe }
+    if (-not (Test-Path $exe)) {
+        Write-Host "=== Downloading Attack Surface Analyzer CLI $AsaVersion ===" -ForegroundColor Cyan
+        New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+        $zip = Join-Path $toolsDir "ASA_win_$AsaVersion.zip"
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $AsaUrl -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath $toolsDir -Force
+    }
+    if (-not (Test-Path $exe)) { throw "ASA CLI not found after download (expected $exe)." }
 
-    Write-Host "=== Downloading Attack Surface Analyzer CLI $AsaVersion ===" -ForegroundColor Cyan
-    New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
-    $zip = Join-Path $toolsDir "ASA_win_$AsaVersion.zip"
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $AsaUrl -OutFile $zip -UseBasicParsing
-    Expand-Archive -Path $zip -DestinationPath $toolsDir -Force
-
-    if (Test-Path $exe) { return $exe }
-    throw "ASA CLI not found after download (expected $exe)."
+    Install-AsaDotnetRuntime
+    return $exe
 }
 
 $asa = Resolve-Asa
