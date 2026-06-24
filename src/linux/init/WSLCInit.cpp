@@ -340,6 +340,13 @@ void HandleMessageImpl(
             }
             else if (UtilWriteBuffer(socket.get(), relayBuffer.data(), bytesRead) < 0)
             {
+                if (errno == ECONNRESET || errno == EPIPE)
+                {
+                    // The other side of the socket has been closed. This isn't necessarily an error, so stop relaying this direction.
+                    pollDescriptors[1].fd = -1;
+                    continue;
+                }
+
                 LOG_ERROR("write failed {}", errno);
                 break;
             }

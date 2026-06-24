@@ -1327,6 +1327,30 @@ class WSLCTests
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
 
+        // Validate that a large (300MB) invalid tar fails with proper error message and code.
+        {
+            auto largeFile =
+                wil::create_new_file(L"largefile", GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, FILE_FLAG_DELETE_ON_CLOSE);
+
+            // Create an invalid header (docker ignores the entire file if its header is only null bytes).
+            DWORD bytesWritten{};
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(largeFile.get(), "foo", 3, &bytesWritten, nullptr));
+            THROW_LAST_ERROR_IF(SetFilePointer(largeFile.get(), static_cast<LONG>(300 * _1MB), nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+
+            THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(largeFile.get()));
+            THROW_LAST_ERROR_IF(SetFilePointer(largeFile.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+
+            VERIFY_IS_TRUE(GetFileSizeEx(largeFile.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart, 300 * _1MB);
+
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->ImportImage(
+                    ToCOMInputHandle(largeFile.get()), "invalid-large-image:test", nullptr, fileSize.QuadPart, nullptr, &imageId),
+                E_FAIL);
+
+            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
+
         // Validate that ImportImage fails when the input pipe is closed during reading.
         {
             wil::unique_handle pipeRead;
