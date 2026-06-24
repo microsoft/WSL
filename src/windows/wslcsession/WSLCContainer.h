@@ -99,6 +99,7 @@ public:
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
+    void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -238,6 +239,7 @@ public:
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
     IFACEMETHOD(UploadArchive)(_In_ WSLCHandle TarHandle, _In_ LPCSTR DestPath, _In_ ULONGLONG ContentSize) override;
+    IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ WSLCHandle OutHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;

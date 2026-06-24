@@ -414,6 +414,16 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchi
     return SendRequestImpl(verb::put, url, {}, headers);
 }
 
+std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket), response.chunked()};
+}
+
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
     return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);

@@ -24,6 +24,7 @@ Abstract:
 #include "TableOutput.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
+#include <filesystem>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -287,33 +288,162 @@ void CopyToContainer(CLIExecutionContext& context)
     auto source = WideToMultiByte(context.Args.Get<ArgType::Source>());
     auto target = WideToMultiByte(context.Args.Get<ArgType::Target>());
 
-    // Parse CONTAINER:PATH from the target
-    auto colonPos = target.find(':');
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), colonPos == std::string::npos || colonPos == 0);
+    // Determine copy direction by looking for CONTAINER:PATH patterns.
+    // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
+    auto isContainerPath = [](const std::string& path) -> bool {
+        auto colonPos = path.find(':');
+        if (colonPos == std::string::npos || colonPos == 0)
+        {
+            return false;
+        }
 
-    auto containerId = target.substr(0, colonPos);
-    auto destPath = target.substr(colonPos + 1);
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), destPath.empty());
+        // Single letter before colon is a Windows drive path
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            return false;
+        }
 
-    // Source must be "-" for stdin
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpStdinOnlyError(), source != "-");
+        return true;
+    };
 
-    auto stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(stdinHandle));
+    auto parseContainerPath = [](const std::string& path) -> std::pair<std::string, std::string> {
+        auto colonPos = path.find(':');
+        // Skip Windows drive letter if present
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            colonPos = path.find(':', 2);
+        }
 
-    // Try to get file size if stdin is redirected from a file
-    LARGE_INTEGER fileSize{};
-    ULONGLONG contentSize = 0;
-    if (GetFileSizeEx(stdinHandle, &fileSize))
+        return {path.substr(0, colonPos), path.substr(colonPos + 1)};
+    };
+
+    bool sourceIsStdin = (source == "-");
+    bool sourceIsContainer = !sourceIsStdin && isContainerPath(source);
+    bool targetIsContainer = isContainerPath(target);
+
+    if ((sourceIsStdin || !sourceIsContainer) && targetIsContainer)
     {
-        contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
-    }
+        // stdin/local → container
+        auto [containerId, destPath] = parseContainerPath(target);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
 
-    // Note: The --archive/-a flag is accepted for CLI compatibility with docker cp, but is a
-    // no-op here. Since stdin provides a pre-built tar archive, uid/gid ownership is already
-    // encoded in the tar headers and Docker's PUT /archive extracts preserving that metadata.
-    ContainerService::CopyToContainer(session, containerId, destPath, stdinHandle, contentSize);
+        if (sourceIsStdin)
+        {
+            auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::WSLCCLI_CpStdinIsTerminalError(),
+                wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
+
+            LARGE_INTEGER fileSize{};
+            ULONGLONG contentSize = 0;
+            if (GetFileSizeEx(inputHandle, &fileSize))
+            {
+                contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
+            }
+
+            // Note: The --archive/-a flag is accepted for CLI compatibility with docker cp, but is a
+            // no-op here. Since the tar archive contains uid/gid ownership in its headers, and Docker's
+            // PUT /archive extracts preserving that metadata.
+            ContainerService::CopyToContainer(session, containerId, destPath, inputHandle, contentSize);
+        }
+        else
+        {
+            // Local path → container: create tar from local path using tar.exe
+            auto widePath = MultiByteToWide(source);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), !std::filesystem::exists(widePath));
+
+            auto absPath = std::filesystem::absolute(widePath);
+            auto parentDir = absPath.parent_path().wstring();
+            auto fileName = absPath.filename().wstring();
+
+            // Create a temp tar file
+            wchar_t tempDir[MAX_PATH]{};
+            THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+            wchar_t tempFile[MAX_PATH]{};
+            THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
+            auto tempPath = std::wstring(tempFile);
+            auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
+
+            // Create tar archive
+            auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDir, fileName);
+            STARTUPINFOW si{sizeof(si)};
+            PROCESS_INFORMATION pi{};
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                Localization::WSLCCLI_CpTarNotFoundError(),
+                !CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+            wil::unique_handle tarProcess(pi.hProcess);
+            wil::unique_handle tarThread(pi.hThread);
+
+            WaitForSingleObject(tarProcess.get(), INFINITE);
+            DWORD exitCode = 0;
+            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+            // Open the tar file and upload
+            wil::unique_hfile tarFileHandle(CreateFileW(
+                tempPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!tarFileHandle);
+
+            LARGE_INTEGER fileSize{};
+            THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFileHandle.get(), &fileSize));
+
+            ContainerService::CopyToContainer(
+                session, containerId, destPath, tarFileHandle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+        }
+    }
+    else if (sourceIsContainer && !targetIsContainer)
+    {
+        // container → local
+        auto [containerId, srcPath] = parseContainerPath(source);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || srcPath.empty());
+
+        auto wideTarget = MultiByteToWide(target);
+        auto absTarget = std::filesystem::absolute(wideTarget);
+
+        // Ensure target directory exists
+        std::filesystem::create_directories(absTarget);
+
+        // Download archive from container to a temp file
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        wchar_t tempFile[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
+        auto tempPath = std::wstring(tempFile);
+        auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
+
+        {
+            wil::unique_hfile tarFileHandle(CreateFileW(
+                tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!tarFileHandle);
+
+            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFileHandle.get());
+        }
+
+        // Extract the tar archive to the target directory
+        auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, absTarget.wstring());
+        STARTUPINFOW si{sizeof(si)};
+        PROCESS_INFORMATION pi{};
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+            Localization::WSLCCLI_CpTarNotFoundError(),
+            !CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+        wil::unique_handle tarProcess(pi.hProcess);
+        wil::unique_handle tarThread(pi.hThread);
+
+        WaitForSingleObject(tarProcess.get(), INFINITE);
+        DWORD exitCode = 0;
+        GetExitCodeProcess(tarProcess.get(), &exitCode);
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    }
+    else
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
+    }
 }
 
 void ListContainers(CLIExecutionContext& context)

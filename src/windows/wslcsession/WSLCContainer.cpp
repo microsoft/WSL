@@ -1200,6 +1200,62 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+{
+    auto lock = m_lock.lock_shared();
+
+    auto [statusCode, socket, isChunked] = m_dockerClient.GetArchive(m_id, SrcPath);
+
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
+
+    wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
+
+    std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        errorJson.append(buffer.data(), buffer.size());
+    };
+
+    if (statusCode != 200)
+    {
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(socket)}, std::move(accumulateError)));
+    }
+    else if (isChunked)
+    {
+        io.AddHandle(
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+    }
+    else
+    {
+        io.AddHandle(
+            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+    }
+
+    lock.reset();
+
+    io.Run({});
+
+    if (statusCode != 200)
+    {
+        try
+        {
+            auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, statusCode == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
+        }
+    }
+}
+
 void WSLCContainerImpl::GetState(WSLCContainerState* Result)
 {
     auto lock = m_lock.lock_shared();
@@ -2413,6 +2469,15 @@ HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULON
     RETURN_HR_IF(E_POINTER, DestPath == nullptr);
     RETURN_HR_IF(E_INVALIDARG, DestPath[0] == '\0');
     return CallImpl(&WSLCContainerImpl::UploadArchive, TarHandle, DestPath, ContentSize);
+}
+
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
 }
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
