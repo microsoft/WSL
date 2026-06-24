@@ -1104,7 +1104,10 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
         lock.reset();
 
         DWORD timeout = 2000;
-        setsockopt(SocketCodePair.second.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+        LOG_LAST_ERROR_IF(
+            setsockopt(
+                SocketCodePair.second.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) ==
+            SOCKET_ERROR);
 
         std::array<char, 4096> buf{};
         for (;;)
@@ -1233,7 +1236,9 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
         lock.reset();
 
         DWORD timeout = 2000; // 2 seconds — more than enough for a buffered error body
-        setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+        LOG_LAST_ERROR_IF(
+            setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) ==
+            SOCKET_ERROR);
 
         std::array<char, 4096> buf{};
         for (;;)
