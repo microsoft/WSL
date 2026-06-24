@@ -407,10 +407,62 @@ class WSLCE2EContainerCpTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_NonexistentPath)
     {
-        // TODO: This test is disabled because DownloadArchive hangs on 404 responses.
-        // The HTTP error path reads until socket close, but Docker keeps the connection alive.
-        // Filed as a separate bug to fix the DownloadArchive error handling.
-        WEX::Logging::Log::Comment(L"Skipped: DownloadArchive hangs on non-existent path (known bug)");
+        // Regression test: DownloadArchive used to hang on 404 because the HTTP/1.1 keep-alive
+        // socket never closed. The fix shuts down the socket so the read sees EOF immediately.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-notfound-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/nonexistent/file.txt {}", WslcContainerName, downloadDir.wstring()));
+        VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
+        VERIFY_IS_TRUE(cpResult.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, cpResult.Stderr.value().size());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_NonexistentDir)
+    {
+        // Regression test: DownloadArchive 404 for a nonexistent directory path.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-notfound-dir-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/no/such/directory/ {}", WslcContainerName, downloadDir.wstring()));
+        VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
+        VERIFY_IS_TRUE(cpResult.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, cpResult.Stderr.value().size());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_Download_NonexistentContainer)
+    {
+        // Regression test: DownloadArchive error path when the container itself doesn't exist.
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-no-container-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult =
+            RunWslc(std::format(L"container cp {}:/tmp/file.txt {}", InvalidContainerName, downloadDir.wstring()));
+        VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
+        VERIFY_IS_TRUE(cpResult.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, cpResult.Stderr.value().size());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)

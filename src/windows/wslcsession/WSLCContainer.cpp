@@ -1096,27 +1096,39 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        // If the export failed, accumulate the error message.
-        errorJson.append(buffer.data(), buffer.size());
-    };
 
     if (SocketCodePair.first != 200)
     {
-        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+        // Read the error body synchronously with a timeout. HTTP/1.1 keep-alive would hang
+        // the async io.Run() path because the socket never closes.
+        lock.reset();
+
+        DWORD timeout = 2000;
+        setsockopt(SocketCodePair.second.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+
+        std::array<char, 4096> buf{};
+        for (;;)
+        {
+            auto bytesRead = recv(SocketCodePair.second.get(), buf.data(), static_cast<int>(buf.size()), 0);
+            if (bytesRead <= 0)
+            {
+                break;
+            }
+            errorJson.append(buf.data(), bytesRead);
+        }
     }
     else
     {
         io.AddHandle(
             std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+
+        // Release the lock so the container can still be interacted with while the export is in progress.
+        // Past this point, no member variables can be accessed.
+        lock.reset();
+
+        io.Run({});
     }
-
-    // Release the lock so the container can still be interacted with while the export is in progress.
-    // Past this point, no member variables can be accessed.
-    lock.reset();
-
-    io.Run({});
 
     if (SocketCodePair.first != 200)
     {
@@ -1211,30 +1223,48 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
     wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        errorJson.append(buffer.data(), buffer.size());
-    };
 
     if (statusCode != 200)
     {
-        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(socket)}, std::move(accumulateError)));
-    }
-    else if (isChunked)
-    {
-        io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
-            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        // Read the error body synchronously. Docker error responses are small JSON and already
+        // buffered in the socket. We cannot use the async io.Run() path with a raw ReadHandle
+        // because HTTP/1.1 keep-alive holds the connection open indefinitely, causing a hang.
+        // Use a short receive timeout so we don't block if Docker keeps the connection alive.
+        lock.reset();
+
+        DWORD timeout = 2000; // 2 seconds — more than enough for a buffered error body
+        setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+
+        std::array<char, 4096> buf{};
+        for (;;)
+        {
+            auto bytesRead = recv(socket.get(), buf.data(), static_cast<int>(buf.size()), 0);
+            if (bytesRead <= 0)
+            {
+                break;
+            }
+            errorJson.append(buf.data(), bytesRead);
+        }
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
-            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        if (isChunked)
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+        else
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+
+        lock.reset();
+
+        io.Run({});
     }
-
-    lock.reset();
-
-    io.Run({});
 
     if (statusCode != 200)
     {
