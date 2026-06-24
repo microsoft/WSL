@@ -263,6 +263,9 @@ typedef struct _WSLCContainerOptions
     LONGLONG NanoCpus;
     [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
     ULONG UlimitsCount;
+
+    WSLCStringArray CapAdd;
+    WSLCStringArray CapDrop;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

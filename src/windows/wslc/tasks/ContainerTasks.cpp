@@ -433,6 +433,36 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::ReadOnly))
+    {
+        options.ReadOnly = true;
+    }
+
+    if (context.Args.Contains(ArgType::Privileged))
+    {
+        options.Privileged = true;
+    }
+
+    if (context.Args.Contains(ArgType::CapAdd))
+    {
+        auto caps = context.Args.GetAll<ArgType::CapAdd>();
+        options.CapAdd.reserve(options.CapAdd.size() + caps.size());
+        for (const auto& value : caps)
+        {
+            options.CapAdd.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::CapDrop))
+    {
+        auto caps = context.Args.GetAll<ArgType::CapDrop>();
+        options.CapDrop.reserve(options.CapDrop.size() + caps.size());
+        for (const auto& value : caps)
+        {
+            options.CapDrop.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;

@@ -85,6 +85,8 @@ public:
     void SetMemoryLimit(std::int64_t Bytes);
     void SetNanoCpus(std::int64_t NanoCpus);
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
+    void SetCapAdd(std::vector<std::string>&& CapAdd);
+    void SetCapDrop(std::vector<std::string>&& CapDrop);
 
     using WSLCProcessLauncher::FormatResult;
     using WSLCProcessLauncher::SetTtySize;
@@ -122,5 +124,7 @@ private:
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;
     std::deque<std::string> m_ulimitNames;
+    std::vector<std::string> m_capAdd;
+    std::vector<std::string> m_capDrop;
 };
 } // namespace wsl::windows::common

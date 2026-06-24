@@ -98,9 +98,11 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsGpu = 2, // Enable GPU access.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
     WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
+    WSLCContainerFlagsReadOnly = 16, // Mount the container's root filesystem as read-only.
+    WSLCContainerFlagsPrivileged = 32, // Give the container extended (privileged) access to the host.
 } WSLCContainerFlags;
 
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll | WSLCContainerFlagsReadOnly | WSLCContainerFlagsPrivileged)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 

@@ -1203,6 +1203,8 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --cap-add         Add Linux capabilities to the container\r\n"
+                << L"  --cap-drop        Drop Linux capabilities from the container\r\n"
                 << L"  --cidfile         Write the container ID to the provided path\r\n"
                 << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
                 << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
@@ -1220,8 +1222,10 @@ private:
                 << L"  --name            Name of the container\r\n"
                 << L"  --network         Connect a container to a network\r\n"
                 << L"  --network-alias   Add a network-scoped alias for the container\r\n"
+                << L"  --privileged      Give extended privileges to the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
+                << L"  --read-only       Mount the container's root filesystem as read only\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container\r\n"

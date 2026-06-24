@@ -1473,6 +1473,24 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsInit);
+    request.HostConfig.ReadonlyRootfs = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsReadOnly);
+    request.HostConfig.Privileged = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged);
+
+    if (containerOptions.CapAdd.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG, containerOptions.CapAdd.Values, "CapAdd.Values is null with Count=%lu", containerOptions.CapAdd.Count);
+
+        request.HostConfig.CapAdd = StringArrayToVector(containerOptions.CapAdd);
+    }
+
+    if (containerOptions.CapDrop.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG, containerOptions.CapDrop.Values, "CapDrop.Values is null with Count=%lu", containerOptions.CapDrop.Count);
+
+        request.HostConfig.CapDrop = StringArrayToVector(containerOptions.CapDrop);
+    }
 
     request.HostConfig.Memory = containerOptions.MemoryBytes;
     request.HostConfig.NanoCpus = containerOptions.NanoCpus;

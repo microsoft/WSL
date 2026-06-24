@@ -169,6 +169,16 @@ void WSLCContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
     m_dnsOptions = std::move(DnsOptions);
 }
 
+void WSLCContainerLauncher::SetCapAdd(std::vector<std::string>&& CapAdd)
+{
+    m_capAdd = std::move(CapAdd);
+}
+
+void WSLCContainerLauncher::SetCapDrop(std::vector<std::string>&& CapDrop)
+{
+    m_capDrop = std::move(CapDrop);
+}
+
 void WSLCContainerLauncher::SetMemoryLimit(std::int64_t Bytes)
 {
     m_memoryBytes = Bytes;
@@ -391,6 +401,28 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.NanoCpus = m_nanoCpus;
     options.UlimitsCount = static_cast<ULONG>(m_ulimits.size());
     options.Ulimits = m_ulimits.size() > 0 ? m_ulimits.data() : nullptr;
+
+    std::vector<const char*> capAddStorage;
+    for (const auto& e : m_capAdd)
+    {
+        capAddStorage.push_back(e.c_str());
+    }
+
+    if (!capAddStorage.empty())
+    {
+        options.CapAdd = {capAddStorage.data(), static_cast<ULONG>(capAddStorage.size())};
+    }
+
+    std::vector<const char*> capDropStorage;
+    for (const auto& e : m_capDrop)
+    {
+        capDropStorage.push_back(e.c_str());
+    }
+
+    if (!capDropStorage.empty())
+    {
+        options.CapDrop = {capDropStorage.data(), static_cast<ULONG>(capDropStorage.size())};
+    }
 
     // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;

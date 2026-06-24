@@ -53,6 +53,8 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsReadOnly, options.ReadOnly);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsPrivileged, options.Privileged);
 
     std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front();
 
@@ -154,6 +156,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     for (const auto& [name, soft, hard] : options.Ulimits)
     {
         containerLauncher.AddUlimit(name, soft, hard);
+    }
+
+    if (!options.CapAdd.empty())
+    {
+        containerLauncher.SetCapAdd(std::vector<std::string>(options.CapAdd));
+    }
+
+    if (!options.CapDrop.empty())
+    {
+        containerLauncher.SetCapDrop(std::vector<std::string>(options.CapDrop));
     }
 
     if (!options.Entrypoint.empty())

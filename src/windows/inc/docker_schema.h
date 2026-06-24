@@ -239,8 +239,16 @@ struct HostConfig
     std::int64_t NanoCpus{};
     std::optional<std::vector<Ulimit>> Ulimits;
 
+    // Mount the container's root filesystem as read-only.
+    bool ReadonlyRootfs{};
+    // Give the container extended (privileged) access to the host.
+    bool Privileged{};
+    // Linux capabilities to add to / drop from the container.
+    std::optional<std::vector<std::string>> CapAdd;
+    std::optional<std::vector<std::string>> CapDrop;
+
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits, ReadonlyRootfs, Privileged, CapAdd, CapDrop);
 };
 
 struct EndpointSettings

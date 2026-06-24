@@ -39,6 +39,8 @@ _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       L
 _(BuildPull,      "pull",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,    "target",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildTargetArgDescription()) \
 _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CIDFileArgDescription()) \
+_(CapAdd,         "cap-add",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CapAddArgDescription()) \
+_(CapDrop,        "cap-drop",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CapDropArgDescription()) \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,           "cpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CpusArgDescription()) \
@@ -89,11 +91,13 @@ _(Output,         "output",              L"o",              Kind::Value,       L
 _(Password,       "password",            L"p",              Kind::Value,       Localization::WSLCCLI_LoginPasswordArgDescription()) \
 _(PasswordStdin,  "password-stdin",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_PathArgDescription()) \
+_(Privileged,     "privileged",          NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_PrivilegedArgDescription()) \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ProgressArgDescription())*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        Localization::WSLCCLI_PublishAllArgDescription()) \
 /*_(Pull,           "pull",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_PullArgDescription())*/ \
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
+_(ReadOnly,       "read-only",           NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_ReadOnlyArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \

@@ -942,6 +942,34 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_ReadOnly_RootFsIsReadOnly)
+    {
+        // With a read-only root filesystem, writing to '/' must fail. 'touch' (a regular command)
+        // lets '2>/dev/null' cleanly suppress the EROFS message, unlike a shell '>' redirection.
+        auto result = RunWslc(std::format(
+            L"container run --rm --read-only {} sh -c \"touch /should-fail 2>/dev/null && echo wrote || echo readonly\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"readonly\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_CapDrop_RemovesCapability)
+    {
+        // Dropping CAP_CHOWN must make chown fail with EPERM even as root.
+        auto result = RunWslc(std::format(
+            L"container run --rm --cap-drop CAP_CHOWN {} sh -c \"chown 1 /tmp 2>/dev/null && echo ok || echo denied\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"denied\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Privileged_AllowsMount)
+    {
+        // A privileged container has CAP_SYS_ADMIN and can mount filesystems.
+        auto result = RunWslc(std::format(
+            L"container run --rm --privileged {} sh -c \"mount -t tmpfs none /mnt 2>/dev/null && echo ok || echo fail\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"ok\n", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WithLabel_Success)
     {
         auto result = RunWslc(std::format(
@@ -1154,6 +1182,8 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
+                << L"  --cap-add         Add Linux capabilities to the container\r\n"
+                << L"  --cap-drop        Drop Linux capabilities from the container\r\n"
                 << L"  --cidfile         Write the container ID to the provided path\r\n"
                 << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
@@ -1172,8 +1202,10 @@ private:
                 << L"  --name            Name of the container\r\n"
                 << L"  --network         Connect a container to a network\r\n"
                 << L"  --network-alias   Add a network-scoped alias for the container\r\n"
+                << L"  --privileged      Give extended privileges to the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
+                << L"  --read-only       Mount the container's root filesystem as read only\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container\r\n"

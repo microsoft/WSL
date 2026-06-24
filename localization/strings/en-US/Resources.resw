@@ -2907,6 +2907,12 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publish all exposed ports to random host ports</value>
   </data>
+  <data name="WSLCCLI_PrivilegedArgDescription" xml:space="preserve">
+    <value>Give extended privileges to the container</value>
+  </data>
+  <data name="WSLCCLI_ReadOnlyArgDescription" xml:space="preserve">
+    <value>Mount the container's root filesystem as read only</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Outputs the container IDs only</value>
   </data>
@@ -2975,6 +2981,12 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities to the container</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities from the container</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP address of the DNS nameserver in resolv.conf</value>
