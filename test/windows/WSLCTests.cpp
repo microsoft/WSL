@@ -11260,8 +11260,8 @@ class WSLCTests
         });
 
         // Create a session and, via the docker CLI, inject a "local" volume with driver options we don't support (type=nfs).
-        // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the
-        // next session recovers it.
+        // This bypasses our CreateVolume validation, leaving a volume that WSLCGuestVolumeImpl::Open will reject when the next
+        // session recovers it.
         {
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
