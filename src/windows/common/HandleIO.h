@@ -478,6 +478,8 @@ class MultiHandleWait
 public:
     NON_COPYABLE(MultiHandleWait);
 
+    using OnError = std::function<void()>;
+
     enum Flags
     {
         None = 0,
@@ -490,7 +492,7 @@ public:
     MultiHandleWait(MultiHandleWait&&) noexcept;
     MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
 
-    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None, OnError&& onError = []() { throw; });
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
@@ -499,7 +501,8 @@ private:
     {
         Flags HandleFlags{};
         std::unique_ptr<OverlappedIOHandle> Handle;
-        MultiHandleWait* self;
+        MultiHandleWait* Self;
+        OnError ErrorCallback;
     };
 
     static void NTAPI WaitCallback(PVOID Context, BOOLEAN TimerOrWaitFired);
