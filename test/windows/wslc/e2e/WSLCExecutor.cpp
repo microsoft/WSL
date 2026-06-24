@@ -165,6 +165,7 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType eleva
     if (stdinHandle.has_value())
     {
         effectiveStdin = stdinHandle.value();
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(effectiveStdin, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
     }
     else
     {
