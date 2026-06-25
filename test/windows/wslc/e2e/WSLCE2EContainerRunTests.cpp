@@ -1015,8 +1015,8 @@ class WSLCE2EContainerRunTests
 
         // When --stop-timeout is not specified, no timeout is forwarded to the container configuration.
         {
-            auto result = RunWslc(std::format(
-                L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            auto result =
+                RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             const auto inspect = InspectContainer(WslcContainerName);
@@ -1027,15 +1027,15 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopTimeout_Invalid)
     {
         {
-            auto result = RunWslc(
-                std::format(L"container run --rm --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid stop-timeout argument value: abc\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
-            auto result = RunWslc(
-                std::format(L"container run --rm --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }

@@ -732,10 +732,7 @@ class WSLCE2EContainerCreateTests
         {
             constexpr int ExpectedStopTimeout = 30;
             auto result = RunWslc(std::format(
-                L"container create --stop-timeout {} --name {} {}",
-                ExpectedStopTimeout,
-                WslcContainerName,
-                DebianImage.NameAndTag()));
+                L"container create --stop-timeout {} --name {} {}", ExpectedStopTimeout, WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             const auto inspect = InspectContainer(WslcContainerName);
