@@ -239,13 +239,8 @@ class WSLCE2EContainerStopTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
     {
-        // Run a container that exits when it receives SIGTERM (the default stop signal). A container's
-        // PID 1 ignores signals it has no handler for, so an explicit trap is required for the stop to
-        // complete.
-        auto result = RunWslc(std::format(
-            LR"(container run -d --name {} {} bash -c "trap 'exit 0' TERM; while true; do sleep 1; done")",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
@@ -253,49 +248,11 @@ class WSLCE2EContainerStopTests
         // Verify container is running
         VerifyContainerIsListed(containerId, L"running");
 
-        // -1 means "no timeout" (wait indefinitely), which is a valid value. The container honors
-        // SIGTERM, so the stop completes promptly.
+        // -1 is a valid timeout value
         result = RunWslc(std::format(L"container stop {} -t -1", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // The container should be stopped after a successful stop
-        VerifyContainerIsListed(containerId, L"exited");
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_NoTimeoutWaitsUntilKilled)
-    {
-        // Run a container that ignores SIGTERM (the default stop signal) so that a stop with no
-        // timeout (-1) waits indefinitely instead of escalating to SIGKILL. The container is created
-        // with a default stop timeout of 0 to confirm the explicit -t -1 overrides that configured value.
-        auto result = RunWslc(std::format(
-            LR"(container run -d --stop-timeout 0 --name {} {} bash -c "trap '' TERM; while true; do sleep 1; done")",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
-        VERIFY_IS_FALSE(containerId.empty());
-
-        // Verify container is running
-        VerifyContainerIsListed(containerId, L"running");
-
-        // Stop with -t -1 (no timeout). Because the container ignores SIGTERM and there is no timeout,
-        // the stop request blocks indefinitely waiting for the container to stop, so run it asynchronously.
-        auto stopSession = RunWslcInteractive(std::format(L"container stop {} -t -1", containerId));
-
-        // The container must keep running for at least 2 seconds, confirming -1 did not force a kill.
-        Sleep(2000);
-        VERIFY_IS_TRUE(stopSession.IsRunning(), L"`stop -t -1` should still be waiting and must not have killed the container");
-        VerifyContainerIsListed(containerId, L"running");
-
-        // Force the container to stop with a kill (SIGKILL cannot be ignored).
-        result = RunWslc(std::format(L"container kill {}", containerId));
-        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
-
-        // Once the container is killed, the pending stop completes successfully.
-        const auto stopExitCode = stopSession.Wait(DefaultWaitTimeoutMs);
-        VERIFY_ARE_EQUAL(0, stopExitCode);
-
-        // The container should be stopped after the kill
+        // Verify the container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
     }
 

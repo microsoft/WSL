@@ -104,8 +104,6 @@ private:
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
-    // WSLC_STOP_TIMEOUT_DEFAULT means the stop timeout was not specified, so the
-    // container runtime default is used.
     LONG m_stopTimeout = WSLC_STOP_TIMEOUT_DEFAULT;
     int64_t m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;

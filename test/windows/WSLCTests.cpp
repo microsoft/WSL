@@ -6232,6 +6232,35 @@ class WSLCTests
             expectContainerList({});
         }
 
+        // test StopContainer with custom timeouts.
+        // N.B. We can't validate the actual timeouts since the tests environement will affect container stop times.
+        {
+            {
+                // Create a container with a no stop timeout.
+                WSLCContainerLauncher launcher("debian:latest", "test-container-stop-timeout", {"sleep", "99999"});
+                launcher.SetStopTimeout(WSLC_STOP_TIMEOUT_NONE);
+
+                auto container = launcher.Launch(*m_defaultSession);
+
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Config.StopTimeout.value_or(0), WSLC_STOP_TIMEOUT_NONE);
+
+                // Validate that passing '0' as the stop timeout overrides the default
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalNone, 0));
+            }
+
+            {
+                // Create a container with an instant stop timeout.
+                WSLCContainerLauncher launcher("debian:latest", "test-container-stop-timeout", {"sleep", "99999"});
+                launcher.SetStopTimeout(0);
+
+                auto container = launcher.Create(*m_defaultSession);
+
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Config.StopTimeout.value_or(-1), 0);
+            }
+        }
+
         // Validate that Kill() works as expected
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-kill", {"sleep", "99999"}, {});

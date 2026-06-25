@@ -67,9 +67,6 @@ using WslcInspectContainer = wsl::windows::common::wslc_schema::InspectContainer
 
 namespace {
 
-// Validates a stop timeout value. WSLC_STOP_TIMEOUT_DEFAULT means the timeout was not
-// specified (the container runtime default is used) and WSLC_STOP_TIMEOUT_NONE (-1) means
-// no timeout (wait indefinitely). Any other negative value is invalid.
 void ValidateStopTimeout(LONG TimeoutSeconds)
 {
     THROW_HR_WITH_USER_ERROR_IF(
