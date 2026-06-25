@@ -3718,6 +3718,28 @@ class WSLCTests
             // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
             expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
             expect({"/bin/sh", "-c", "ldconfig -p | grep -q ' => /usr/lib/wsl/lib/'"}, 0);
+
+            std::vector<std::string> expectedBinaries;
+            for (const auto& entry : std::filesystem::directory_iterator("C:\\Windows\\system32\\lxss\\lib"))
+            {
+                const auto fileName = entry.path().filename().wstring();
+                if (entry.is_regular_file() && fileName.find(L".so") == std::wstring::npos)
+                {
+                    expectedBinaries.push_back(wsl::shared::string::WideToMultiByte(fileName));
+                }
+            }
+
+            if (expectedBinaries.empty())
+            {
+                LogWarning("No executables found in C:\\Windows\\system32\\lxss\\lib. Skipping GPU executable bind mount test");
+            }
+            else
+            {
+                for (const auto& e : expectedBinaries)
+                {
+                    expect({"test", "-x", std::format("/usr/bin/{}", e)}, 0);
+                }
+            }
         }
 
         // Validate that containers without the GPU flag do not have GPU resources.

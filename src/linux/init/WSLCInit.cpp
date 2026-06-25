@@ -152,6 +152,25 @@ try
     const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
+    constexpr auto c_binPath = "/usr/bin";
+    if (std::filesystem::is_directory(LXSS_LIB_PATH))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(LXSS_LIB_PATH))
+        {
+            const auto fileName = entry.path().filename().string();
+            if (fileName.find(".so") != std::string::npos || !entry.is_regular_file())
+            {
+                continue;
+            }
+
+            const auto target = std::format("{}/{}", c_binPath, fileName);
+            if (UtilMountFile(entry.path().c_str(), target.c_str()) < 0)
+            {
+                LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
+            }
+        }
+    }
+
     return 0;
 }
 CATCH_RETURN_ERRNO()
