@@ -101,7 +101,7 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
     }
 
     const bool msiInstall = wsl::shared::string::EndsWith<wchar_t>(release.name, L".msi");
-    const auto downloadPath = DownloadFile(release.url, release.name);
+    const auto downloadPath = DownloadFile(release.url, release.name, callerOwnsProcess);
     if (msiInstall)
     {
         auto logFile = std::filesystem::temp_directory_path() / L"wsl-install-logs.txt";
