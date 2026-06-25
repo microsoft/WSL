@@ -355,7 +355,8 @@ if (-not [string]::IsNullOrWhiteSpace($wslgFolderWsl))
     # Run as the super user (uid=0) so root-only logs such as pulseaudio.log are readable.
     $wslgSuperUser = & wsl.exe -- id -nu 0
     # pulseaudio.log, weston.log and stderr.log plus the legacy /mnt/wslg/dumps crash dumps.
-    & wsl.exe -u $wslgSuperUser -e sh -c "cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt '$wslgFolderWsl/' 2>/dev/null; [ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps '$wslgFolderWsl/dumps'; exit 0" 2>&1 | Out-Null
+    # The destination is passed as $1 so paths containing a single quote are handled safely.
+    & wsl.exe -u $wslgSuperUser -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; [ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$wslgFolderWsl" 2>&1 | Out-Null
 }
 
 # Newer builds write WSLg crash dumps (e.g. core.weston) to %TEMP%\wsl-crashes on the host.
