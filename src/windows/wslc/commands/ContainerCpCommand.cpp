@@ -33,8 +33,8 @@ std::wstring ContainerCpCommand::LongDescription() const
 
 void ContainerCpCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ContainerCp;
 }
 } // namespace wsl::windows::wslc

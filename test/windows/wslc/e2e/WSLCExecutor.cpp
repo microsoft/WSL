@@ -161,11 +161,14 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType eleva
     }
 
     wil::unique_hfile nul;
+    wil::unique_hfile stdinDup;
     HANDLE effectiveStdin = nullptr;
     if (stdinHandle.has_value())
     {
-        effectiveStdin = stdinHandle.value();
-        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(effectiveStdin, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        // Duplicate as inheritable to avoid mutating the caller's handle state.
+        THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+            GetCurrentProcess(), stdinHandle.value(), GetCurrentProcess(), stdinDup.put(), 0, TRUE, DUPLICATE_SAME_ACCESS));
+        effectiveStdin = stdinDup.get();
     }
     else
     {
