@@ -40,6 +40,55 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
+// Detects the end-of-header marker ("\r\n\r\n") in an HTTP message. State is maintained
+// across successive reads so a terminator split between two reads is handled correctly.
+// N.B. Detection is strict: a bare-LF separator ("\n\n") is not treated as a terminator.
+class HttpHeaderEndDetector
+{
+public:
+    // Advances the state machine over a single byte. Returns true once the full "\r\n\r\n"
+    // terminator has been consumed.
+    bool Consume(char Byte) noexcept
+    {
+        switch (m_state)
+        {
+        case State::Start:
+            m_state = (Byte == '\r') ? State::Cr : State::Start;
+            break;
+        case State::Cr:
+            m_state = (Byte == '\n') ? State::CrLf : ((Byte == '\r') ? State::Cr : State::Start);
+            break;
+        case State::CrLf:
+            m_state = (Byte == '\r') ? State::CrLfCr : State::Start;
+            break;
+        case State::CrLfCr:
+            m_state = (Byte == '\n') ? State::Done : ((Byte == '\r') ? State::Cr : State::Start);
+            break;
+        case State::Done:
+            break;
+        }
+
+        return m_state == State::Done;
+    }
+
+    bool IsDone() const noexcept
+    {
+        return m_state == State::Done;
+    }
+
+private:
+    enum class State
+    {
+        Start,
+        Cr,
+        CrLf,
+        CrLfCr,
+        Done
+    };
+
+    State m_state = State::Start;
+};
+
 class DockerHTTPException : public std::runtime_error
 {
 public:
@@ -199,7 +248,7 @@ public:
         std::function<void(const gsl::span<char>&)> OnResponse;
         std::function<void()> OnCompleted;
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
-        size_t LineFeeds = 0;
+        HttpHeaderEndDetector HeaderEnd;
         std::optional<size_t> RemainingContentLength;
         std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };

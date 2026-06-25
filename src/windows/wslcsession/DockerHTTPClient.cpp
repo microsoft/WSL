@@ -661,17 +661,15 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
     }
     else
     {
-        // Otherwise keep parsing the HTTP response header.
+        // Otherwise keep parsing the HTTP response header. Scan for the end-of-header marker
+        // ("\r\n\r\n"); HeaderEnd carries state across reads in case it straddles a boundary.
         size_t i{};
-        for (i = 0; i < Content.size() && LineFeeds < 2; i++)
+        for (i = 0; i < Content.size(); i++)
         {
-            if (Content[i] == '\n')
+            if (HeaderEnd.Consume(Content[i]))
             {
-                LineFeeds++;
-            }
-            else if (Content[i] != '\r')
-            {
-                LineFeeds = 0;
+                i++; // Include the terminating byte in the header.
+                break;
             }
         }
 
@@ -805,7 +803,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
     parser.eager(false);
     parser.skip(false);
 
-    size_t lineFeeds = 0;
+    HttpHeaderEndDetector headerEnd;
     // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
@@ -820,17 +818,17 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
-        // Scan only the newly peeked bytes [Offset, Offset + bytesRead)
+        // Scan only the newly peeked bytes [Offset, Offset + bytesRead) for the end-of-header
+        // marker. headerEnd carries state across iterations in case it straddles a read boundary.
+        bool headerComplete = false;
         size_t i = 0;
-        for (i = Offset; i < bytesRead + Offset && lineFeeds < 2; i++)
+        for (i = Offset; i < bytesRead + Offset; i++)
         {
-            if (buffer[i] == '\n')
+            if (headerEnd.Consume(buffer[i]))
             {
-                lineFeeds++;
-            }
-            else if (buffer[i] != '\r')
-            {
-                lineFeeds = 0;
+                i++; // Include the terminating byte in the header.
+                headerComplete = true;
+                break;
             }
         }
 
@@ -847,7 +845,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
         Offset += bytesRead;
         buffer.resize(Offset);
 
-        if (lineFeeds == 2) // Header is complete, feed it to the parser.
+        if (headerComplete) // Header is complete, feed it to the parser.
         {
 
 #ifdef WSLC_HTTP_DEBUG
