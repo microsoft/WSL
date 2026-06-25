@@ -1774,7 +1774,7 @@ WSL'de çalışan Linux ikili dosyaları, performanslarını hızlandırmak içi
     <value>Yükleme</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>VS Code'u yükledikten sonra Remote WSL uzantısını Windows Terminal'den yükleyebilirsiniz:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
