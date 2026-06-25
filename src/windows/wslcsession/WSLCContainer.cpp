@@ -67,6 +67,17 @@ using WslcInspectContainer = wsl::windows::common::wslc_schema::InspectContainer
 
 namespace {
 
+// Validates a stop timeout value. WSLC_STOP_TIMEOUT_DEFAULT means the timeout was not
+// specified (the container runtime default is used) and WSLC_STOP_TIMEOUT_NONE (-1) means
+// no timeout (wait indefinitely). Any other negative value is invalid.
+void ValidateStopTimeout(LONG TimeoutSeconds)
+{
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcInvalidStopTimeout(TimeoutSeconds),
+        TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT);
+}
+
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
 {
     if (array.Count == 0)
@@ -944,6 +955,8 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         SignalArg = Signal;
     }
 
+    ValidateStopTimeout(TimeoutSeconds);
+
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
     bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
@@ -961,10 +974,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         }
         else
         {
-            std::optional<ULONG> TimeoutArg;
-            if (TimeoutSeconds >= 0)
+            std::optional<LONG> TimeoutArg;
+            if (TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT)
             {
-                TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+                TimeoutArg = TimeoutSeconds;
             }
 
             m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
@@ -1305,6 +1318,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Config.Entrypoint = dockerInspect.Config.Entrypoint;
     wslcInspect.Config.User = dockerInspect.Config.User;
     wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
+    wslcInspect.Config.StopTimeout = dockerInspect.Config.StopTimeout;
 
     // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
@@ -1417,6 +1431,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     if (containerOptions.StopSignal != WSLCSignalNone)
     {
         request.StopSignal = std::to_string(containerOptions.StopSignal);
+    }
+
+    ValidateStopTimeout(containerOptions.StopTimeout);
+    if (containerOptions.StopTimeout != WSLC_STOP_TIMEOUT_DEFAULT)
+    {
+        request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 
     if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)

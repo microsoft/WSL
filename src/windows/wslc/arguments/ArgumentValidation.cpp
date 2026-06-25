@@ -48,6 +48,13 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
         break;
 
+    case ArgType::StopTimeout:
+        // Only validate that the value is an integer here; range validation (rejecting
+        // negative values) happens in the service so that --stop-timeout and `container
+        // stop --time` share a single source of truth and error message.
+        validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        break;
+
     case ArgType::ShmSize:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
         break;

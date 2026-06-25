@@ -129,6 +129,11 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
+void WSLCContainerLauncher::SetStopTimeout(LONG Timeout)
+{
+    m_stopTimeout = Timeout;
+}
+
 void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
 {
     m_shmSize = ShmSize;
@@ -295,6 +300,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
+    options.StopTimeout = m_stopTimeout;
     options.Flags = m_containerFlags;
     options.ShmSize = m_shmSize;
 
