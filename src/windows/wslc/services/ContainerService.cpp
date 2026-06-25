@@ -74,7 +74,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-            primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
+            primary.empty() || primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
 
         for (const auto& alias : options.NetworkAliases)
         {

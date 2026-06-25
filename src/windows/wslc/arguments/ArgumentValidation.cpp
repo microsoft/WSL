@@ -108,6 +108,17 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
     }
 
+    case ArgType::Driver:
+    {
+        const auto& value = execArgs.Get<ArgType::Driver>();
+        if (value.empty() ||
+            std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        {
+            throw ArgumentException(Localization::WSLCCLI_DriverEmptyError(m_name));
+        }
+        break;
+    }
+
     case ArgType::Network:
     {
         for (const auto& value : execArgs.GetAll<ArgType::Network>())
