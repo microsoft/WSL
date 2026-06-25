@@ -4,7 +4,7 @@ When reviewing code, enforce the conventions in `.github/copilot-instructions.md
 
 ### ABI Safety (Critical)
 Only the SDK-facing and public surfaces require a backward-compatible ABI. Every other COM interface (`wslc.idl`, `wslservice.idl`, etc.) is in-box and shipped in lockstep with its only clients, with the proxy/stub regenerated each build, so methods may be appended to those freely. Do **not** flag in-box interfaces.
-- **Flag** ABI-breaking changes (new or reordered methods, changed struct layouts) only in the stable surfaces: `WSLCCompat.idl` (the WSLC SDK-facing layer, which must stay backward compatible) and the public plugin API (`WSLPluginHooksV1` / `WSLPluginAPIV1` structs in `WslPluginApi.h`).
+- **Flag** ABI-breaking changes (new, removed, or reordered methods, changed struct layouts) only in the stable surfaces: `WSLCCompat.idl` (the WSLC SDK-facing layer, which must stay backward compatible) and the public plugin API (`WSLPluginHooksV1` / `WSLPluginAPIV1` structs in `WslPluginApi.h`).
 - **Do not flag** new methods appended to in-box interfaces such as `IWSLCSession` in `wslc.idl`, or interfaces in `wslservice.idl`.
 
 ### Resource Safety
