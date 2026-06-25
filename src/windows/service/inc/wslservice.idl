@@ -10,6 +10,8 @@ Abstract:
 
     This file contains the COM object definitions used to talk with the WSL
     service "WslService"
+    // N.B. These interfaces are internal and non-stable. ABI breaking changes in this
+    // file are OK, since the client and service always ship together in the same package.
 
 --*/
 
