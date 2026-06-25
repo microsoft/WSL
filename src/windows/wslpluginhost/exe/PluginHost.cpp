@@ -128,7 +128,12 @@ try
         signatureHandle = wsl::windows::common::install::ValidateFileSignature(PluginPath);
     }
 
-    m_module.reset(LoadLibrary(PluginPath));
+    // Load with restricted search so the plugin's dependent DLLs are resolved only
+    // from the plugin's own directory and the system default directories, never the
+    // current/working directory. This host runs as SYSTEM, so an unqualified search
+    // would be a dependency search-path hijack vector. PluginPath is a full path,
+    // which LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR requires.
+    m_module.reset(LoadLibraryExW(PluginPath, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS));
     THROW_LAST_ERROR_IF_NULL(m_module);
     signatureHandle.reset(); // Safe to release after LoadLibrary has mapped the DLL
 
