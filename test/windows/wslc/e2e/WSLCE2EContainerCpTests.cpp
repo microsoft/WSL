@@ -421,8 +421,7 @@ class WSLCE2EContainerCpTests
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(targetFile.parent_path()); });
 
         // Copy from container to a specific file path (not a directory).
-        const auto cpResult =
-            RunWslc(std::format(L"container cp {}:/tmp/srcfile.txt {}", WslcContainerName, targetFile.wstring()));
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/srcfile.txt {}", WslcContainerName, targetFile.wstring()));
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // The file should exist at the exact target path, not inside a directory named "renamed.txt".

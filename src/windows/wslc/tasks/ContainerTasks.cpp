@@ -438,8 +438,7 @@ void ContainerCp(CLIExecutionContext& context)
             // Extract directly into the target directory.
             std::error_code dirError;
             std::filesystem::create_directories(absTarget, dirError);
-            THROW_HR_IF_MSG(
-                HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
 
             // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote
             auto targetDir = absTarget.wstring();
