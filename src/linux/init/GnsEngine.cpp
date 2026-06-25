@@ -671,7 +671,7 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
                 }
             }
 
-            manager.UpdateMirroredLoopbackRulesForInterface(interface.Name(), Operation::Create);
+            manager.UpdateMirroredLoopbackRulesForInterface(interface.Name(), AF_INET, Operation::Create);
             break;
         }
         case wsl::shared::hns::OperationType::Remove:
@@ -702,7 +702,7 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
                 }
             }
 
-            manager.UpdateMirroredLoopbackRulesForInterface(interface.Name(), Operation::Remove);
+            manager.UpdateMirroredLoopbackRulesForInterface(interface.Name(), AF_INET, Operation::Remove);
             break;
         }
         default:
