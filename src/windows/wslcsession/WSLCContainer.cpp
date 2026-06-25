@@ -293,8 +293,11 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
     return resolved;
 }
 
+std::string FormatPortEndpoint(const ContainerPortMapping& portMapping);
+
 // Builds the port-mapping list from caller-supplied requests.
-std::vector<ContainerPortMapping> BuildPortMappings(std::vector<_WSLCPortMapping>& requestedPorts, std::string_view primary, WSLCVirtualMachine& vm)
+std::vector<ContainerPortMapping> BuildPortMappings(
+    std::vector<_WSLCPortMapping>& requestedPorts, std::string_view primary, WSLCVirtualMachine& vm, const std::string& containerName)
 {
     std::vector<ContainerPortMapping> ports;
     ports.reserve(requestedPorts.size());
@@ -310,7 +313,22 @@ std::vector<ContainerPortMapping> BuildPortMappings(std::vector<_WSLCPortMapping
         auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
         if (allocateVmPorts)
         {
-            entry.VmMapping.AssignVmPort(vm.AllocatePort(e.Family, e.Protocol));
+            std::shared_ptr<wsl::windows::service::wslc::VmPortAllocation> allocation;
+            if (entry.VmMapping.IsLocalhost() && e.HostPort != WSLC_EPHEMERAL_PORT)
+            {
+                allocation = vm.TryAllocatePort(e.HostPort, e.Family, e.Protocol);
+
+                THROW_HR_WITH_USER_ERROR_IF(
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE),
+                    wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(entry), containerName),
+                    !allocation);
+            }
+            else
+            {
+                allocation = vm.AllocatePort(e.Family, e.Protocol);
+            }
+
+            entry.VmMapping.AssignVmPort(allocation);
         }
     }
     return ports;
@@ -1649,7 +1667,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
         primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
 
-    auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
+    auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine, containerName);
 
     request.HostConfig.NetworkMode = networkMode;
     request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
