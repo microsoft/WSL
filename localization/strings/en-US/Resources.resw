@@ -2386,6 +2386,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Failed to create volume '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcTooManyVirtioFsShares" xml:space = "preserve" >
+    <value>Too many volumes have been mounted (limit: {}). Restart the session to mount more volumes. This will be fixed in a future release.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcPortInUse" xml:space = "preserve" >
     <value>Port {} is already in use, cannot start container {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
