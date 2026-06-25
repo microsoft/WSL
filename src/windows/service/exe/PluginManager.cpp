@@ -470,6 +470,15 @@ void PluginManager::EnsureJobObjectCreated()
 
 std::vector<BYTE> PluginManager::SerializeSid(PSID Sid)
 {
+    // WSLCPluginNotifier sets Session->UserSid to nullptr when its stored SID is
+    // empty (e.g. stopping notifications during teardown). Return an empty buffer
+    // so the marshaled SidSize is 0; the host treats a null/empty SID as optional
+    // (see PluginHost::BuildWslcSessionContext).
+    if (Sid == nullptr)
+    {
+        return {};
+    }
+
     const DWORD sidLength = GetLengthSid(Sid);
     std::vector<BYTE> buffer(sidLength);
     THROW_IF_WIN32_BOOL_FALSE(CopySid(sidLength, buffer.data(), Sid));
