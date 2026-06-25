@@ -140,7 +140,7 @@ static __always_inline int l4_csum_off(__u8 nexthdr)
 }
 
 // Replace the 16-byte IPv6 address at addr_off with new_addr, fixing the L4 (pseudo-header) checksum.
-static __always_inline void swap_addr(struct __sk_buff *skb, __u32 addr_off, const __u8 *new_addr)
+static __always_inline void swap_addr(struct __sk_buff* skb, __u32 addr_off, const __u8* new_addr)
 {
     __u8 nexthdr = 0;
     if (bpf_skb_load_bytes(skb, NEXTHDR_OFF, &nexthdr, 1) < 0)
@@ -175,7 +175,7 @@ static __always_inline void swap_addr(struct __sk_buff *skb, __u32 addr_off, con
     }
 }
 
-static __always_inline int is_ipv6(struct __sk_buff *skb)
+static __always_inline int is_ipv6(struct __sk_buff* skb)
 {
     return skb->protocol == bpf_htons(ETH_P_IPV6);
 }
@@ -183,7 +183,7 @@ static __always_inline int is_ipv6(struct __sk_buff *skb)
 // Ingress on loopback0: learn X, mark the source with the sentinel, set the destination to ::1, and
 // redirect onto lo so the ::1 destination is accepted and delivered locally.
 SEC("tc/ingress")
-int loopback6_ingress(struct __sk_buff *skb)
+int loopback6_ingress(struct __sk_buff* skb)
 {
     if (!is_ipv6(skb))
     {
@@ -206,7 +206,7 @@ int loopback6_ingress(struct __sk_buff *skb)
     if (bpf_skb_load_bytes(skb, DADDR_OFF, daddr, sizeof(daddr)) == 0)
     {
         __u32 key = 0;
-        __u8 *slot = bpf_map_lookup_elem(&loopback6_xaddr, &key);
+        __u8* slot = bpf_map_lookup_elem(&loopback6_xaddr, &key);
         if (slot)
         {
             __builtin_memcpy(slot, daddr, 16);
@@ -235,7 +235,7 @@ int loopback6_ingress(struct __sk_buff *skb)
 // Egress on loopback0: a destination of SENTINEL uniquely identifies a relay reply. Restore the source to
 // the learned X and the destination to ::1 so the relay matches the flow.
 SEC("tc/egress")
-int loopback6_egress(struct __sk_buff *skb)
+int loopback6_egress(struct __sk_buff* skb)
 {
     if (!is_ipv6(skb))
     {
@@ -254,7 +254,7 @@ int loopback6_egress(struct __sk_buff *skb)
     }
 
     __u32 key = 0;
-    __u8 *x = bpf_map_lookup_elem(&loopback6_xaddr, &key);
+    __u8* x = bpf_map_lookup_elem(&loopback6_xaddr, &key);
     if (x)
     {
         swap_addr(skb, SADDR_OFF, x);

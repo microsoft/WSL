@@ -98,8 +98,8 @@ std::optional<Loopback6BpfPrograms> LoadLoopback6RelayPrograms()
         return std::nullopt;
     }
 
-    int ingressFd =
-        LoadProgram(kLoopback6IngressInsns, LOOPBACK6_INGRESS_INSN_BYTES, kLoopback6IngressMapRelocs, LOOPBACK6_INGRESS_MAP_RELOC_COUNT, mapFd);
+    int ingressFd = LoadProgram(
+        kLoopback6IngressInsns, LOOPBACK6_INGRESS_INSN_BYTES, kLoopback6IngressMapRelocs, LOOPBACK6_INGRESS_MAP_RELOC_COUNT, mapFd);
     int egressFd =
         LoadProgram(kLoopback6EgressInsns, LOOPBACK6_EGRESS_INSN_BYTES, kLoopback6EgressMapRelocs, LOOPBACK6_EGRESS_MAP_RELOC_COUNT, mapFd);
 
