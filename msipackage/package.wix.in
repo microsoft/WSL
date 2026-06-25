@@ -41,7 +41,7 @@
                 <?endif?>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
-                <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/build/native/bin/${TARGET_PLATFORM}/system.vhd"/>
+                <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>
 
                 <!-- Add INSTALLDIR to system PATH to make wslc.exe and other CLI tools accessible. -->
@@ -441,8 +441,8 @@
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
                     <File Id="msrdc.exe" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/msrdc.exe" />
-                    <File Id="wslg.rdp" Source="${WSLG_SOURCE_DIR}/build/native/bin/wslg.rdp" />
-                    <File Id="wslg_desktop.rdp" Source="${WSLG_SOURCE_DIR}/build/native/bin/wslg_desktop.rdp" />
+                    <File Id="wslg.rdp" Source="${WSLG_SOURCE_DIR}/wslg.rdp" />
+                    <File Id="wslg_desktop.rdp" Source="${WSLG_SOURCE_DIR}/wslg_desktop.rdp" />
                     <File Id="rdclientax.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdclientax.dll" />
                     <File Id="rdpnanoTransport.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" />
                     <File Id="RdpWinStlHelper.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" />
