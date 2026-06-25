@@ -560,6 +560,33 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 }
 
+void WSLCVirtualMachine::RemoveDirectory(const std::string& Path)
+{
+    // rmdir only removes an empty directory, so callers can rely on it to leave
+    // a non-empty directory untouched.
+    constexpr auto rmdirPath = "/bin/rmdir";
+
+    std::vector<std::string> args = {rmdirPath, Path};
+
+    ServiceProcessLauncher launcher(rmdirPath, args);
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Path)
+{
+    wsl::shared::MessageWriter<WSLC_LISTDIR> message;
+    message.WriteString(Path);
+
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
+
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
+
+    return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
+}
+
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
 {
     auto [pid, _, subChannel] = Fork(WSLC_FORK::Thread);

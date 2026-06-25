@@ -190,6 +190,43 @@ void HandleMessageImpl(
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_LISTDIR& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    wsl::shared::MessageWriter<WSLC_LISTDIR_RESULT> writer;
+
+    try
+    {
+        const auto* path = wsl::shared::string::FromMessageBuffer<WSLC_LISTDIR>(Buffer);
+        THROW_ERRNO_IF(EINVAL, path == nullptr);
+
+        wil::unique_dir dir{opendir(path)};
+        THROW_LAST_ERROR_IF(!dir);
+
+        std::vector<std::string> entries;
+        for (dirent64* entry = readdir64(dir.get()); entry != nullptr; entry = readdir64(dir.get()))
+        {
+            const std::string_view name{entry->d_name};
+            if (name == "." || name == "..")
+            {
+                continue;
+            }
+
+            entries.emplace_back(name);
+        }
+
+        auto pointers = wsl::shared::string::StringPointersFromArray(entries, false);
+        writer.WriteStringArray(writer->EntriesIndex, pointers.data(), pointers.size());
+        writer->Result = 0;
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_LISTDIR::TResponse>(writer.Span());
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel,
     wsl::shared::Transaction& Transaction,
     const WSLC_GET_GUEST_CAPABILITIES& Message,
@@ -965,7 +1002,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)
