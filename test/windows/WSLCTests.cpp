@@ -3706,7 +3706,9 @@ class WSLCTests
             }
 
             if (expectedBinaries.empty())
+            {
                 LogWarning("No executables found in C:\\Windows\\system32\\lxss\\lib. Skipping GPU executable bind mount test");
+            }
             else
             {
                 for (const auto& e : expectedBinaries)
