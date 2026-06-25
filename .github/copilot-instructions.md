@@ -140,7 +140,7 @@ When modifying service interfaces (`src/windows/service/inc/`):
 - String params: `[in, unique] LPCWSTR` with `[string]` for marshaled strings
 - Handle params: `[in, system_handle(sh_file)] HANDLE`
 - User-facing errors: pass `[in, out] LXSS_ERROR_INFO* Error`
-- **ABI stability applies only to SDK-facing and public surfaces.** `WSLCCompat.idl` (the WSLC SDK-facing layer) and the public plugin API (`WslPluginApi.h`) must stay backward compatible: do not add, remove, or reorder methods on their existing interfaces, and do not change struct layouts. Introduce a new versioned interface with a new IID instead. Every other in-box interface (`IWSLCSession` in `wslc.idl`, the interfaces in `wslservice.idl`, etc.) is rebuilt and shipped in lockstep with its only clients, so appending new methods to those is fine.
+- **ABI stability applies only to SDK-facing and public surfaces.** `WSLCCompat.idl` (the WSLC SDK-facing layer) and the public plugin API (`WslPluginApi.h`) must stay backward compatible: do not add, remove, or reorder methods on their existing interfaces, and do not change struct layouts. Introduce a new versioned interface with a new IID instead. Every other interface (`IWSLCSession` in `wslc.idl`, the interfaces in `wslservice.idl`, etc.) is internal and non-stable: rebuilt and shipped in lockstep with its only clients, so appending new methods to those is fine.
 - Custom error codes: `WSL_E_xxx` via `MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + N)`
 
 ### Config File (.wslconfig) Conventions
