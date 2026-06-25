@@ -49,15 +49,27 @@ void LifetimeManager::ClearCallbacks()
     //  (1) deadlocks
     //  (2) concurrent modification of the callback list
     //  (3) closing the process handle while the wait is still pending
+    //  (4) leaking threadpool waits/timers that were never canceled
     //
     // The strategy is to:
     //  1. Take the lock
-    //  2. Move all clients to a local list
+    //  2. For each callback, cancel its wait/timer (so no further callbacks are
+    //     queued) and re-home the handle into a regular (cancel + drain + close)
+    //     wil container; move the rest of the callback into a local list
     //  3. Release the lock
-    //  4. Wait for any pending callbacks (when the local vectors go out of
-    //     scope).
+    //  4. Let the local containers go out of scope, which drains any in-flight
+    //     callbacks (each callback acquires m_lock - which we no longer hold,
+    //     finds nothing in m_callbackList, and returns) and closes the
+    //     threadpool objects
+    //
+    // The per-client members are the _nowait variants so the chain-of-waits in
+    // m_lastCallbackWait/m_lastTimerWait can swap them from inside their own
+    // callback without self-deadlocking. When they're being torn down outside
+    // a callback context (here and in RemoveCallback) we deliberately re-home
+    // them into the cancel-and-wait variants so teardown is fully synchronous.
     std::vector<ClientCallback> callbacks;
     std::vector<wil::unique_threadpool_wait> waits;
+    std::vector<wil::unique_threadpool_timer> timers;
     {
         std::lock_guard<std::mutex> lock(m_lock);
 
@@ -66,9 +78,18 @@ void LifetimeManager::ClearCallbacks()
 
         for (auto& callback : m_callbackList)
         {
+            if (callback.timer)
+            {
+                callback.CancelTimer();
+                wil::unique_threadpool_timer scopedTimer{callback.timer.release()};
+                timers.push_back(std::move(scopedTimer));
+            }
+
             for (auto& child : callback.clientProcesses)
             {
-                waits.emplace_back(child.terminationWait.release());
+                child.CancelWait();
+                wil::unique_threadpool_wait scopedWait{child.terminationWait.release()};
+                waits.push_back(std::move(scopedWait));
             }
 
             callbacks.emplace_back(std::move(callback));
@@ -144,13 +165,40 @@ bool LifetimeManager::RemoveCallback(_In_ ULONG64 ClientKey)
 {
     bool callbackFound = false;
     ClientCallback oldClient{};
-    std::lock_guard<std::mutex> lock(m_lock);
-    const auto client = _FindClient(ClientKey);
-    if (client != m_callbackList.end())
+    std::vector<wil::unique_threadpool_wait> waits;
+    std::vector<wil::unique_threadpool_timer> timers;
     {
-        oldClient = std::move(*client);
-        m_callbackList.erase(client);
-        callbackFound = true;
+        std::lock_guard<std::mutex> lock(m_lock);
+        const auto client = _FindClient(ClientKey);
+        if (client != m_callbackList.end())
+        {
+            oldClient = std::move(*client);
+            m_callbackList.erase(client);
+            callbackFound = true;
+        }
+    }
+
+    // The entry has been removed from m_callbackList so any callback that fires
+    // from here on will no-op. Cancel the per-client wait/timer (so no further
+    // callbacks are queued) and re-home the _nowait handles into cancel-and-wait
+    // wil containers; their destructors below drain any in-flight callbacks and
+    // close the threadpool objects, all outside m_lock. See ClearCallbacks() for
+    // the longer rationale.
+    if (callbackFound)
+    {
+        if (oldClient.timer)
+        {
+            oldClient.CancelTimer();
+            wil::unique_threadpool_timer scopedTimer{oldClient.timer.release()};
+            timers.push_back(std::move(scopedTimer));
+        }
+
+        for (auto& process : oldClient.clientProcesses)
+        {
+            process.CancelWait();
+            wil::unique_threadpool_wait scopedWait{process.terminationWait.release()};
+            waits.push_back(std::move(scopedWait));
+        }
     }
 
     return callbackFound;
@@ -296,6 +344,11 @@ void LifetimeManager::OwnedProcess::operator=(OwnedProcess&& source) noexcept
 {
     process = std::move(source.process);
     terminationWait = std::move(source.terminationWait);
+}
+
+void LifetimeManager::OwnedProcess::CancelWait() const
+{
+    SetThreadpoolWait(terminationWait.get(), nullptr, nullptr);
 }
 
 void LifetimeManager::OwnedProcess::InitializeListenForTermination(_In_ PTP_WAIT_CALLBACK Callback, _In_ PVOID Context)
