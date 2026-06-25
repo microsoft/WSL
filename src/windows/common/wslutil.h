@@ -209,7 +209,7 @@ std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
 GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> name);
 
-std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
+std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress = true);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 

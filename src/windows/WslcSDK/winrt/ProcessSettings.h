@@ -36,8 +36,8 @@ struct ProcessSettings : ProcessSettingsT<ProcessSettings>
 
     hstring WorkingDirectory();
     void WorkingDirectory(hstring const& value);
-    winrt::Windows::Foundation::Collections::IVector<hstring> CmdLine();
-    void CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
+    winrt::Windows::Foundation::Collections::IVector<hstring> CommandLine();
+    void CommandLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> EnvironmentVariables();
     void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
     winrt::Microsoft::WSL::Containers::ProcessOutputMode OutputMode();
@@ -47,12 +47,12 @@ struct ProcessSettings : ProcessSettingsT<ProcessSettings>
 
 private:
     std::string m_workingDirectory;
-    winrt::Windows::Foundation::Collections::IVector<hstring> m_cmdLine{winrt::single_threaded_vector<hstring>()};
+    winrt::Windows::Foundation::Collections::IVector<hstring> m_commandLine{winrt::single_threaded_vector<hstring>()};
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> m_environmentVariables{winrt::single_threaded_map<hstring, hstring>()};
     winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
 
     std::unique_ptr<WslcProcessSettings> m_processSettings;
-    StringArray m_cmdLineStrings;
+    StringArray m_commandLineStrings;
     StringArray m_envStrings;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -47,6 +47,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size (e.g. 500GB default: 1TB)\n"
     "  # maxStorageSize: default\n"
     "\n"
+    "  # Default host address that published ports bind to when 'container run -p' is\n"
+    "  # used without an explicit address (default: 127.0.0.1)\n"
+    "  # defaultBindingAddress: default\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -89,9 +93,9 @@ namespace details {
         {
             return WSLCNetworkingModeNAT;
         }
-        if (value == "virtioproxy")
+        if (value == "consomme")
         {
-            return WSLCNetworkingModeVirtioProxy;
+            return WSLCNetworkingModeConsomme;
         }
 
         return std::nullopt;
@@ -113,6 +117,33 @@ namespace details {
 
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)
     {
+        return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionPortRelay)
+    {
+        if (value == "virtionet")
+        {
+            return PortRelayType::VirtioNet;
+        }
+        if (value == "wslrelay")
+        {
+            return PortRelayType::WslRelay;
+        }
+
+        return std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionDefaultBindingAddress)
+    {
+        // The default binding address only applies to IPv4 ports (IPv6 bindings are always
+        // explicit), so it must parse as a valid IPv4 literal.
+        in_addr address{};
+        if (inet_pton(AF_INET, value.c_str(), &address) != 1)
+        {
+            return std::nullopt;
+        }
+
         return value;
     }
 

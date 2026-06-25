@@ -35,8 +35,12 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void HostName(hstring const& value);
     hstring DomainName();
     void DomainName(hstring const& value);
-    winrt::Microsoft::WSL::Containers::ContainerFlags Flags();
-    void Flags(winrt::Microsoft::WSL::Containers::ContainerFlags const& value);
+    bool EnableAutoRemove();
+    void EnableAutoRemove(bool value);
+    bool EnableGpu();
+    void EnableGpu(bool value);
+    bool Privileged();
+    void Privileged(bool value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> PortMappings();
     void PortMappings(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> Volumes();
@@ -53,7 +57,7 @@ private:
     winrt::Windows::Foundation::IReference<winrt::Microsoft::WSL::Containers::ContainerNetworkingMode> m_networkingMode{nullptr};
     std::string m_hostName;
     std::string m_domainName;
-    winrt::Microsoft::WSL::Containers::ContainerFlags m_flags{winrt::Microsoft::WSL::Containers::ContainerFlags::None};
+    WslcContainerFlags m_containerFlags{WSLC_CONTAINER_FLAG_NONE};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerPortMapping> m_portMappings{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerPortMapping>()};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> m_volumes{

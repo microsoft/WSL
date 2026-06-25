@@ -119,6 +119,7 @@ void ImageService::Build(
     const std::wstring& contextPath,
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
+    const std::vector<std::wstring>& labels,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
     WSLCBuildImageFlags flags,
@@ -167,6 +168,10 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    std::vector<std::string> labelStrings;
+    std::vector<LPCSTR> labelPointers;
+    toMultiByte(labels, labelStrings, labelPointers);
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
     auto contextPathStr = absolutePath.wstring();
@@ -177,6 +182,7 @@ void ImageService::Build(
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
+        .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -232,16 +238,19 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, warningCallback.Get()));
 }
 
-void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+std::string ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
     auto source = OpenImageInput(input);
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
         ToCOMInputHandle(source.Handle.Get()),
         imageName.empty() ? nullptr : imageName.c_str(),
         nullptr,
         source.ContentLength,
-        warningCallback.Get()));
+        warningCallback.Get(),
+        &imageId));
+    return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)

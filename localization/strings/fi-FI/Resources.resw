@@ -1130,9 +1130,9 @@ Yritetään ladata verkkoa...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p on poistettu käytöstä, palataan takaisin 9p:hen vsock-siirron avulla.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy-verkkoa ei tueta, kun wsl2.virtio on poistettu käytöstä; palataan networkingMode-tilaan {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme-verkkoa ei tueta, kun wsl2.virtio on poistettu käytöstä; palataan networkingMode-tilaan {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Käynnissä olevasta ytimestä puuttuu korjaustiedosto, joka parantaa virtio-laitteen suorituskykyä merkittävästi. Ota tämä optimointi käyttöön päivittämällä uudempi WSL-ydin.</value>
@@ -1776,7 +1776,8 @@ WSL:ssä toimivat Linux-binaarit voivat nopeuttaa suorituskykyään automaattise
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Kun olet asentanut VS Coden, voit asentaa WSL-etälaajennuksen Windows-päätteestä:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Avaa WSL-projekti Visual Studio koodissa</value>
@@ -2062,9 +2063,17 @@ Käyttö:
     <value>Virheellinen IP-osoite {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Portin "{}", {} yhdistäminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') epäonnistui</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>--session -valintaa ei voi käyttää tämän komennon kanssa.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Komennon {} käynnistäminen epäonnistui. Virhekoodi = {}</value>
@@ -2326,6 +2335,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Ei-tuettu verkkokortin ohjain: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Verkko-ohjainasetusta {} ei tueta</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Verkko-ohjaimen vaihtoehto Gateway vaatii myös Subnet-määrityksen.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Verkolla {} on aktiivisia päätepisteitä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2403,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>WSLC-istuntoa ei löytynyt kohteesta {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Kohdetta '{}' ei voi käyttää istunnon tallennustilana, koska hakemisto ei ole tyhjä</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Kohdetta {} ei voi käyttää istunnon tallennustilana, koska se ei ole hakemisto</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2844,6 +2869,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Yhdistä säilö verkkoon</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Älä ilmoita virhettä, jos verkkoa ei ole olemassa</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Virheellinen {}-arvo: verkon nimi ei voi olla tyhjä tai sisältää välilyöntejä</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2920,6 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Koko /dev/shm (esim. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Istunnon tunnus</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Istunnon tallennuspolku</value>
   </data>
@@ -2914,10 +2939,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Näytä aikaleimat lokitulosteessa</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Näytä lokit aikaleiman jälkeen (esim. Unix-epookin sekuntit)</value>
+    <value>Näytä lokit aikaleimasta lähtien (Unix-kausisekunnit tai RFC3339, esim. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Näytä lokit ennen aikaleimaa (esim. Unix-epookin sekuntit)</value>
+    <value>Näytä lokit ennen aikaleimaa (Unix-kausisekunnit tai RFC3339, esim. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Uusi kuvaviittaus muodossa kuva-nimi[:tag]</value>
@@ -2937,6 +2962,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Sido asema säilöön</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Älä ilmoita virhettä, jos taltiota ei ole olemassa</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Työhakemisto säilön sisällä</value>
@@ -3025,6 +3053,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Virheellinen argumentin {} arvo: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Virheellinen {}-argumentin arvo: {}. Odotettiin Unix-kauden aikaleimaa tai RFC3339 päivämäärä-aikaa (esimerkiksi 2024-01-15T10:30:00Z)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Virheellinen {}-arvo: {} on kelvollisen alueen ulkopuolella ({}-{}).</value>

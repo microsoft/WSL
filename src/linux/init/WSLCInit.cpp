@@ -152,6 +152,25 @@ try
     const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
+    constexpr auto c_binPath = "/usr/bin";
+    if (std::filesystem::is_directory(LXSS_LIB_PATH))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(LXSS_LIB_PATH))
+        {
+            const auto fileName = entry.path().filename().string();
+            if (fileName.find(".so") != std::string::npos || !entry.is_regular_file())
+            {
+                continue;
+            }
+
+            const auto target = std::format("{}/{}", c_binPath, fileName);
+            if (UtilMountFile(entry.path().c_str(), target.c_str()) < 0)
+            {
+                LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
+            }
+        }
+    }
+
     return 0;
 }
 CATCH_RETURN_ERRNO()
@@ -340,6 +359,13 @@ void HandleMessageImpl(
             }
             else if (UtilWriteBuffer(socket.get(), relayBuffer.data(), bytesRead) < 0)
             {
+                if (errno == ECONNRESET || errno == EPIPE)
+                {
+                    // The other side of the socket has been closed. This isn't necessarily an error, so stop relaying this direction.
+                    pollDescriptors[1].fd = -1;
+                    continue;
+                }
+
                 LOG_ERROR("write failed {}", errno);
                 break;
             }
@@ -781,6 +807,12 @@ void HandleMessageImpl(
     Transaction.SendResultMessage<uint32_t>(SocketAddress.svm_port);
     Channel.Close();
     UtilSetThreadName("PortRelay");
+
+    // If the host end of a relay socket is reset, a write will raise SIGPIPE. Ignore it so
+    // the failure surfaces as an EPIPE return value (handled by the relay loop) instead of
+    // terminating this forked PortRelay process and tearing down the vsock accept listener.
+    THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
+
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 

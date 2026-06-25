@@ -78,7 +78,7 @@ Abstract:
 //
 // The hard-coded link-local addresses used for communicating over the loopback to the host
 //
-#define LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS "169.254.73.152"
+#define LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS "169.254.73.249"
 #define LX_INIT_IPV6_LOOPBACK_GATEWAY_ADDRESS "fe80::500:4aef:feef:2aa2"
 
 //
@@ -649,7 +649,7 @@ typedef struct _LX_PROCESS_CRASH
     MESSAGE_HEADER Header;
     std::uint64_t Timestamp;
     std::uint32_t Signal;
-    std::uint64_t Pid;
+    std::uint32_t Pid;
 
     char Buffer[];
 
@@ -1307,7 +1307,7 @@ typedef enum _LX_MINI_INIT_NETWORKING_MODE
     LxMiniInitNetworkingModeNat = 1,
     LxMiniInitNetworkingModeBridged = 2,
     LxMiniInitNetworkingModeMirrored = 3,
-    LxMiniInitNetworkingModeVirtioProxy = 4
+    LxMiniInitNetworkingModeConsomme = 4
 } LX_MINI_INIT_NETWORKING_MODE,
     *PLX_MINI_INIT_NETWORKING_MODE;
 

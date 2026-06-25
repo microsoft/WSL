@@ -23,7 +23,7 @@ Abstract:
 #include "MirroredNetworking.h"
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
-#include "VirtioNetworking.h"
+#include "ConsommeNetworking.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -545,8 +545,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
-    // Virtio proxy forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
-    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::VirtioProxy;
+    // Consomme forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
+    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::Consomme;
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
@@ -573,7 +573,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         const auto startTime = std::chrono::steady_clock::now();
 
         // For NAT networking, ensure the network can be created. If creating the network fails, fall back to
-        // virtio proxy networking mode.
+        // Consomme networking mode.
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
         if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
@@ -584,9 +584,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             if (!natNetwork)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
-                    ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::VirtioProxy)));
+                    ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::Consomme)));
 
-                m_vmConfig.NetworkingMode = NetworkingMode::VirtioProxy;
+                m_vmConfig.NetworkingMode = NetworkingMode::Consomme;
             }
         }
 
@@ -604,15 +604,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 m_networkingEngine = std::make_unique<wsl::core::NatNetworking>(
                     m_system.get(), std::move(natNetwork), std::move(gnsChannel), m_vmConfig, std::move(dnsTunnelingSocket));
             }
-            else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
+            else if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
             {
-                wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
-                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
-                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
-                // NAT may have fallen back to virtio proxy after the early-config message; drop the unused DNS hvsocket.
+                wsl::core::ConsommeNetworkingFlags flags =
+                    wsl::core::ConsommeNetworkingFlags::Ipv6 | wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
+                WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
+                // NAT may have fallen back to Consomme after the early-config message; drop the unused DNS hvsocket.
                 dnsTunnelingSocket.reset();
 
-                m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
+                m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
                     std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, m_swiotlbOption);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
@@ -1977,7 +1978,7 @@ bool WslCoreVm::IsDnsTunnelingSupported() const
 {
     WI_ASSERT(
         m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
-        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
+        m_vmConfig.NetworkingMode == NetworkingMode::Consomme);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
@@ -2974,7 +2975,7 @@ void WslCoreVm::ValidateNetworkingMode()
         EMIT_USER_WARNING(Localization::MessageLocalhostForwardingNotSupportedMirroredMode());
     }
 
-    // The DnsResolver support check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
+    // The DnsResolver support check still applies to Consomme because the host Consomme NAT uses the same Windows DNS APIs.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
         // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.
