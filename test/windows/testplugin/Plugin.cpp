@@ -681,9 +681,15 @@ HRESULT OnDistributionUnregistered(const WSLSessionInformation* Session, const W
 HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
 try
 {
-    g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName) << ", id=" << Session->SessionId
-              << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
-              << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
+    // ParallelWslcWithCallbacks fires this on multiple notification threads, so route
+    // through LogLine (g_logMutex) to keep log lines from interleaving.
+    LogLine(std::format(
+        "WSLC Session created, name={}, id={}, pid={}, token={}, sid={}",
+        wsl::shared::string::WideToMultiByte(Session->DisplayName),
+        Session->SessionId,
+        Session->ApplicationPid,
+        Session->UserToken != nullptr ? "set" : "null",
+        Session->UserSid != nullptr ? "set" : "null"));
 
     if (g_testType == PluginTestType::WslcSessionRejected)
     {
@@ -933,8 +939,9 @@ HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
         g_wslcAsyncWorker.reset();
     }
 
-    g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
-              << ", id=" << Session->SessionId << std::endl;
+    // Can be invoked on parallel notification threads; serialize via LogLine.
+    LogLine(std::format(
+        "WSLC Session stopping, name={}, id={}", wsl::shared::string::WideToMultiByte(Session->DisplayName), Session->SessionId));
 
     return S_OK;
 }
