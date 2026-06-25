@@ -341,6 +341,30 @@ if ($LogProfile -eq "networking")
     Remove-Item $networkingBashScript
 }
 
+# Collect WSLg logs (https://github.com/microsoft/wslg)
+$wslgFolder = "$folder/wslg"
+mkdir -p $wslgFolder | Out-Null
+
+# Resolve the destination as a WSL path so files (including binary crash dumps) can be copied inside WSL.
+$wslgFolderFull = (Resolve-Path $wslgFolder).Path
+$wslgFolderWsl = $null
+try { $wslgFolderWsl = (& wsl.exe -e wslpath -u "$wslgFolderFull" 2>$null).Trim() } catch {}
+
+if (-not [string]::IsNullOrWhiteSpace($wslgFolderWsl))
+{
+    # Run as the super user (uid=0) so root-only logs such as pulseaudio.log are readable.
+    $wslgSuperUser = & wsl.exe -- id -nu 0
+    # pulseaudio.log, weston.log and stderr.log plus the legacy /mnt/wslg/dumps crash dumps.
+    & wsl.exe -u $wslgSuperUser -e sh -c "cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt '$wslgFolderWsl/' 2>/dev/null; [ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps '$wslgFolderWsl/dumps'; exit 0" 2>&1 | Out-Null
+}
+
+# Newer builds write WSLg crash dumps (e.g. core.weston) to %TEMP%\wsl-crashes on the host.
+$wslCrashes = "$env:TEMP\wsl-crashes"
+if (Test-Path $wslCrashes)
+{
+    Copy-Item $wslCrashes "$wslgFolder/wsl-crashes" -Recurse -ErrorAction Ignore
+}
+
 if ($Dump)
 {
     $Assembly = [PSObject].Assembly.GetType('System.Management.Automation.WindowsErrorReporting')

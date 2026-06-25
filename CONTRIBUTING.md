@@ -90,6 +90,8 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 ```
 The script will output the path of the log file once done.
 
+The collected logs include WSLg (graphical and audio application) logs from `/mnt/wslg` and any WSLg crash dumps, so the same script covers graphical-app issues.
+
 For specific scenarios, you can use different log profiles:
 - `.\collect-wsl-logs.ps1 -LogProfile storage` - Enhanced storage tracing
 - `.\collect-wsl-logs.ps1 -LogProfile networking` - Comprehensive networking tracing (includes packet capture, tcpdump, etc.)
