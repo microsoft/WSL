@@ -52,7 +52,7 @@ add_custom_command(
     COMMAND ${WIX_SOURCE_DIR}/wix.exe build ${PACKAGE_WIX} -o ${OUTPUT_PACKAGE} -arch ${TARGET_PLATFORM} -dcl ${COMPRESSION} -cc ${CAB_CACHE} -pdbtype none
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/msipackage"
     VERBATIM
-    DEPENDS ${PACKAGE_WIX} ${BINARIES_DEPENDENCIES} # Make sure the package is rebuilt if any of the binaries or resources change
+    DEPENDS ${PACKAGE_WIX} ${BINARIES_DEPENDENCIES} ${CMAKE_SOURCE_DIR}/NOTICE.txt # Make sure the package is rebuilt if any of the binaries or resources change
 )
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})

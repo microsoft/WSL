@@ -132,7 +132,7 @@ find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
-find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
+find_nuget_package(Microsoft.WSLg WSLG /)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
 
@@ -235,8 +235,8 @@ set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
 # and the pipeline's symbol publishing step find them. Without the PDBs here,
 # Watson can't resolve function names in their crash frames.
 string(REPLACE ".dll" ".pdb" WSLG_TS_PLUGIN_PDB ${WSLG_TS_PLUGIN_DLL})
-file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
-file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_PDB} ${BIN}/${WSLG_TS_PLUGIN_PDB})
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/build/native/bin/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/build/native/bin/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_PDB} ${BIN}/${WSLG_TS_PLUGIN_PDB})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
 # wsldevicehost.dll is packaged directly from its NuGet package, so only its PDB
