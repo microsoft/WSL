@@ -3612,6 +3612,56 @@ class WSLCTests
         }
     }
 
+    // Validate that the correct error is returned when too many virtiofs shares are mounted.
+    WSLC_TEST_METHOD(VirtiofsVolumesLimit)
+    {
+        constexpr size_t c_maxVirtioFsShares = wsl::shared::c_maxVirtioFsShares;
+
+        auto settings = GetDefaultSessionSettings(L"virtiofs-share-limit-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        // Use a dedicated session so the share count starts at zero (no GPU libraries are mounted).
+        auto session = CreateSession(settings);
+
+        auto testRoot = std::filesystem::current_path() / "test-folder-share-limit";
+        std::filesystem::create_directories(testRoot);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testRoot); });
+
+        auto folderForIndex = [&](size_t index) {
+            auto folder = testRoot / std::to_string(index);
+            std::filesystem::create_directories(folder);
+            return folder;
+        };
+
+        // Mount distinct Windows folders (each creates a new share) until the limit is reached.
+        size_t mounted = 0;
+        HRESULT lastResult = S_OK;
+        for (size_t i = 0; i <= c_maxVirtioFsShares; ++i)
+        {
+            auto folder = folderForIndex(i);
+            auto mountPoint = std::format("/vfs-limit-{}", i);
+
+            lastResult = session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false);
+            if (FAILED(lastResult))
+            {
+                break;
+            }
+
+            mounted++;
+        }
+
+        VERIFY_ARE_EQUAL(mounted, c_maxVirtioFsShares);
+        VERIFY_ARE_EQUAL(lastResult, E_OUTOFMEMORY);
+        ValidateCOMErrorMessage(
+            L"Too many volumes have been mounted (limit: 15). Restart the session to mount more volumes. This will be fixed in a "
+            L"future release.");
+
+        // Reusing an already-created share must still succeed.
+        auto reusedFolder = folderForIndex(0);
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(reusedFolder.c_str(), "/vfs-limit-reuse", false));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/vfs-limit-reuse"));
+    }
+
     // This test case validates that no file descriptors are leaked to user processes.
     WSLC_TEST_METHOD(Fd)
     {

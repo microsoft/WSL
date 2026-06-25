@@ -1072,6 +1072,13 @@ try
                 shareGuid = shareIt->second;
                 reusingShare = true;
             }
+            else
+            {
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_OUTOFMEMORY,
+                    shared::Localization::MessageWslcTooManyVirtioFsShares(shared::c_maxVirtioFsShares),
+                    m_virtioFsShares.size() >= shared::c_maxVirtioFsShares);
+            }
         }
 
         if (!reusingShare)
