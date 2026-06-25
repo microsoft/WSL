@@ -2765,6 +2765,11 @@ class WslcSdkTests
         // without errors.
         std::filesystem::path sessionStorage = m_storagePath / "wslc-resource-reuse-storage";
 
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(sessionStorage, ec);
+        });
+
         WslcSessionSettings sessionSettings;
         VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-resource-reuse", sessionStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSetSessionSettingsCpuCount(&sessionSettings, 2));
@@ -2799,7 +2804,7 @@ class WslcSdkTests
             // resources are freed so that the next iteration can reopen the same storage without error.
             VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
             VERIFY_SUCCEEDED(WslcReleaseSession(session.get()));
-            session.release(); // ownership transferred to the explicit calls above
+            session.release(); // explicit calls above
         }
     }
 
