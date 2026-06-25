@@ -348,15 +348,23 @@ GUID wsl::windows::common::wslutil::CreateV5Uuid(const GUID& namespaceGuid, cons
     return EndianSwap(newGuid);
 }
 
-std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename)
+std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress)
 {
     wsl::windows::common::ConsoleProgressBar progressBar;
     auto progress = [&](auto current, auto total) {
-        progressBar.Print(current, total);
+        if (reportProgress)
+        {
+            progressBar.Print(current, total);
+        }
         return true;
     };
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { progressBar.Clear(); });
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (reportProgress)
+        {
+            progressBar.Clear();
+        }
+    });
 
     return DownloadFileImpl(Url, Filename, progress);
 }
