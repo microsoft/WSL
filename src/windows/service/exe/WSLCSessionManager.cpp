@@ -339,7 +339,19 @@ void WSLCSessionManagerImpl::CreateSession(
                 auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
                 wil::com_ptr<IWSLCSession> session;
                 wil::com_ptr<IWSLCSessionReference> serviceRef;
-                THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef));
+                const auto factoryHr =
+                    factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+                if (FAILED(factoryHr))
+                {
+                    // Surface the localized user-facing message the per-user session
+                    // factory set via IErrorInfo, instead of only the bare HRESULT.
+                    if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
+                    {
+                        THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
+                    }
+
+                    THROW_HR(factoryHr);
+                }
 
                 // Register the session reference so plugin API callbacks (WslcMountFolder etc.)
                 // can resolve it WITHOUT taking m_wslcSessionsLock during the OnWslcSessionCreated
