@@ -266,10 +266,6 @@ typedef struct _WSLCContainerOptions
     [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
     ULONG UlimitsCount;
 
-    // Timeout in seconds to wait for the container to stop before killing it.
-    // WSLC_STOP_TIMEOUT_DEFAULT indicates the timeout was not specified, so the
-    // container runtime default is used. WSLC_STOP_TIMEOUT_NONE (-1) means no timeout
-    // (wait indefinitely). Any other negative value is rejected.
     LONG StopTimeout;
 } WSLCContainerOptions;
 
