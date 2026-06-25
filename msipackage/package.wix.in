@@ -41,7 +41,7 @@
                 <?endif?>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
-                <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
+                    <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd" />
                 <?endif?>
 
                 <!-- Add INSTALLDIR to system PATH to make wslc.exe and other CLI tools accessible. -->
