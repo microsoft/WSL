@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestMap>
+  <TestJobGroup Name="AsaTestGroup" TestSystem="Default" ConfigPath="[BuildRoot]\testbin\${TARGET_PLATFORM}\cloudtest\asa-${image}\TestGroup.xml" IsActive="true"/>
+  <Providers>
+    <Provider Type="PipelineArtifacts">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[drop]" />
+        <Add Name="PipelineArtifactBuildUrl" Value="https://${VSO_ORG}.visualstudio.com/${VSO_PROJECT}/_build/results?buildId=${PIPELINE_BUILD_ID}"/>
+        <Add Name="PipelineArtifactName" Value="drop_wsl_build"/>
+      </Properties>
+    </Provider>
+  </Providers>
+</TestMap>
