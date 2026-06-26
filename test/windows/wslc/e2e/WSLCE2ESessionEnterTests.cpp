@@ -109,9 +109,14 @@ class WSLCE2ESessionEnterTests
     WSLC_TEST_METHOD(WSLCE2E_SessionEnter_StoragePathNotFound)
     {
         auto result = RunWslc(L"system session enter does-not-exist");
-        const auto expectedPath = std::filesystem::absolute(L"does-not-exist").wstring();
+
+        // The CLI resolves the storage argument to an absolute path (see EnterSession task) and the
+        // service validates it eagerly at session creation, reporting the friendly "No WSLC session
+        // found in '<path>'" message rather than a bare system error.
+        const auto storagePath = std::filesystem::absolute(L"does-not-exist").wstring();
         result.Verify({
-            .Stderr = std::format(L"No WSLC session found in '{}'\r\nError code: ERROR_PATH_NOT_FOUND\r\n", expectedPath),
+            .Stderr = wsl::shared::Localization::MessageWslcSessionStorageNotFound(storagePath) +
+                      L"\r\nError code: ERROR_PATH_NOT_FOUND\r\n",
             .ExitCode = 1,
         });
     }

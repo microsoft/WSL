@@ -16,6 +16,7 @@ Abstract:
 
 #include "ServiceProcessLauncher.h"
 #include "WSLCSession.h"
+#include "WSLCIdleState.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLCProcessControl.h"
@@ -176,6 +177,10 @@ private:
     void MapPorts();
     void UnmapPorts();
 
+    // Acquires or releases the activity hold so it is held exactly while the container is Running,
+    // keeping the session's VM alive across idle teardown.
+    __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
+
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
     mutable wil::srwlock m_lock;
@@ -220,6 +225,11 @@ private:
     DockerEventTracker::EventTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
     std::string m_networkMode;
+
+    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
+    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
+    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    ActivityRef m_activityHold;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
