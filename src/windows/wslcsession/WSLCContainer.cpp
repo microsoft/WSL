@@ -562,9 +562,10 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
 {
-    // Acquire the activity hold up front for containers recovered or created in an active state, so
-    // a recovered running container keeps the VM alive even before any client opens its wrapper.
-    if (m_state == WslcContainerStateCreated || m_state == WslcContainerStateRunning)
+    // Acquire the activity hold up front for a container recovered in the running state, so it keeps
+    // the VM alive even before any client opens its wrapper. A merely-created (never-started)
+    // container does not pin the VM: its metadata survives teardown and the VM restarts on next use.
+    if (m_state == WslcContainerStateRunning)
     {
         m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
     }
@@ -1890,11 +1891,21 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     {
         auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
         auto state = DockerStateToWSLCState(dockerContainer.State);
-        const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
 
-        if (!timestamp.empty())
+        if (state == WslcContainerStateCreated)
         {
-            container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
+            // A created-but-never-started container has no StartedAt/FinishedAt; its state last
+            // changed when it was created.
+            container->m_stateChangedAt = static_cast<std::uint64_t>(dockerContainer.Created);
+        }
+        else
+        {
+            const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+
+            if (!timestamp.empty())
+            {
+                container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
+            }
         }
     }
     catch (...)
@@ -2172,15 +2183,16 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
     m_state = State;
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 
-    // Keep the VM alive while this container is Created/Running and release the hold once it reaches
-    // a terminal state, even when no client holds the wrapper (e.g. a detached `run -d` container).
-    // Dropping the hold on the transition to Exited is what lets an otherwise-idle VM be torn down.
+    // Keep the VM alive while this container is Running and release the hold once it leaves that
+    // state, even when no client holds the wrapper (e.g. a detached `run -d` container). Dropping
+    // the hold on the transition out of Running is what lets an otherwise-idle VM be torn down; a
+    // Created or Exited container does not pin the VM, since its metadata survives teardown.
     UpdateActivityHoldLockHeld();
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
 {
-    const bool active = (m_state == WslcContainerStateCreated || m_state == WslcContainerStateRunning);
+    const bool active = (m_state == WslcContainerStateRunning);
     if (active && !m_activityHold)
     {
         m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
