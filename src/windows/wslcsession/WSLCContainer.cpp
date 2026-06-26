@@ -1433,6 +1433,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsStopTimeout))
     {
         ValidateStopTimeout(containerOptions.StopTimeout);
+
+        THROW_HR_IF(E_INVALIDARG, containerOptions.StopTimeout == WSLC_STOP_TIMEOUT_DEFAULT);
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 

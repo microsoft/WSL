@@ -5647,7 +5647,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(process.Wait(), WSLCSignalSIGHUP + 128);
         }
 
-        // Validate that the default stop signal can be overriden.
+        // Validate that the default stop signal can be overridden.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-stop-signal-2", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
             launcher.SetDefaultStopSignal(WSLCSignalSIGHUP);
