@@ -133,9 +133,8 @@ public:
 
     std::vector<HANDLE> SetExitEvents(std::vector<HANDLE>&& exitEvents)
     {
-        std::vector<HANDLE> oldEvents;
-        std::swap(oldEvents, m_exitEvents);
-        return oldEvents;
+        std::swap(exitEvents, m_exitEvents);
+        return std::move(exitEvents);
     }
 
     const std::vector<HANDLE>& GetExitEvents() const
