@@ -57,7 +57,11 @@ markdown_extensions:
     - pymdownx.inlinehilite
     - pymdownx.snippets
     - pymdownx.details
-    - pymdownx.superfences
+    - pymdownx.superfences:
+        custom_fences:
+          - name: mermaid
+            class: mermaid
+            format: !!python/name:mermaid2.fence_mermaid_custom
 
 # Renders the version selector in the Material header. The version list is read
 # from versions.json, produced by doc/build_versioned_docs.py (mike). This
