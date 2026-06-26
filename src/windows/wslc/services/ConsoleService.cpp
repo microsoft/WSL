@@ -28,13 +28,10 @@ namespace {
 
     // Interrupts and joins the stdin-relay worker thread at teardown.
     //
-    // A worker thread is only created when stdin is not a character device (any non-FILE_TYPE_CHAR handle,
-    // e.g. a redirected pipe); the console (FILE_TYPE_CHAR) and detach paths create none, so this no-ops
-    // (not joinable) for them. When that handle is a non-overlapped (synchronous) pipe the worker blocks
-    // in a ReadFile() that neither the exit event nor CancelIoEx() can interrupt, so once the relay's
-    // scope-exit runs (normally after io.Run() returns) the join() below would hang until stdin is closed
-    // -- the bug this guards against. The exit event is signaled first (enough for handles that support
-    // overlapped IO), then CancelSynchronousIo() aborts the synchronous read the event cannot reach.
+    // The worker only exists when stdin is not a character device (any non-FILE_TYPE_CHAR handle, e.g. a
+    // redirected pipe), so this no-ops (not joinable) for a console. When stdin is a non-overlapped
+    // (synchronous) pipe the worker blocks in a ReadFile() that neither the exit event nor CancelIoEx() can
+    // interrupt, so the join() below would hang until stdin is closed -- the bug this guards against.
     void InterruptAndJoinInputThread(std::thread& inputThread, wil::unique_event& exitEvent)
     {
         if (!inputThread.joinable())
@@ -42,25 +39,28 @@ namespace {
             return;
         }
 
-        if (exitEvent)
-        {
-            exitEvent.SetEvent();
-        }
+        FAIL_FAST_IF(!exitEvent);
+        exitEvent.SetEvent();
 
-        // CancelSynchronousIo() only aborts I/O in flight on the target thread at the instant it is called,
-        // so a single call can miss the worker while it is between read iterations. Cancel immediately to
-        // unblock a worker already parked in ReadFile, then retry every 50ms until the thread exits;
-        // WaitForSingleObject is both the termination test and the backoff. ERROR_NOT_FOUND means nothing
-        // was in flight to cancel, which is expected, so only unexpected failures are logged.
+        // Overlapped IO will get terminated by SetEvent(). Synchronous IO will not, so we need to cancel it.
         const auto threadHandle = static_cast<HANDLE>(inputThread.native_handle());
-        do
+        DWORD waitResult = WAIT_TIMEOUT;
+        while (waitResult == WAIT_TIMEOUT)
         {
             if (!CancelSynchronousIo(threadHandle))
             {
-                const auto lastError = GetLastError();
-                LOG_HR_IF(HRESULT_FROM_WIN32(lastError), lastError != ERROR_NOT_FOUND);
+                // ERROR_NOT_FOUND just means nothing was in flight to cancel (expected); any other error
+                // means the cancel cannot make progress and would otherwise spin this loop, so throw.
+                const auto cancelError = GetLastError();
+                THROW_WIN32_IF(cancelError, cancelError != ERROR_NOT_FOUND);
             }
-        } while (WaitForSingleObject(threadHandle, 50) == WAIT_TIMEOUT);
+
+            waitResult = WaitForSingleObject(threadHandle, 50);
+        }
+
+        // The loop only breaks on a non-timeout result; anything but WAIT_OBJECT_0 (e.g. WAIT_FAILED) is an
+        // error -- surface it instead of join()ing on a thread we can't confirm has exited.
+        THROW_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
 
         inputThread.join();
     }

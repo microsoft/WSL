@@ -162,7 +162,7 @@ class WSLCE2EContainerExecTests
         // so wslc hangs. The test exercises this by running `exec -i echo hello` and requiring it to exit while the
         // client keeps stdin open.
         //
-        // If this regresses, look at the client-side stdin relay teardown: ConsoleService::InterruptAndJoinInputThread
+        // If this regresses, look at the client-side stdin relay teardown: InterruptAndJoinInputThread
         // (the CancelSynchronousIo retry loop that unblocks the worker) and relay.cpp's InterruptableRead (which maps
         // the resulting ERROR_OPERATION_ABORTED to EOF).
         VerifyContainerIsNotListed(WslcContainerName);
