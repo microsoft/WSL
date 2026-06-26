@@ -1371,4 +1371,208 @@ WSL2_DRVFS_TEST_CLASS(VirtioFs);
 // TODO: Enable again once the issue is resolved
 // WSL2_DRVFS_TEST_CLASS(Virtio9p);
 
+//
+// Tests for the per-mount transport= option and the
+// experimental.drvFsTransports setting, which together let a single VM
+// expose all three DrvFs transports concurrently.
+//
+
+class DrvFsTransportOverride
+{
+    WSL_TEST_CLASS(DrvFsTransportOverride)
+
+    std::unique_ptr<WslConfigChange> m_config;
+
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        if (!LxsstuVmMode())
+        {
+            LogSkipped("This test class is only applicable to WSL2");
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE);
+        }
+
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        m_config.reset();
+        if (LxsstuVmMode())
+        {
+            LxsstuUninitialize(FALSE);
+        }
+        return true;
+    }
+
+    static void UnmountAndRemove(const wchar_t* MountPoint)
+    {
+        LxsstuLaunchWsl(std::format(L"-u root umount '{}'", MountPoint).c_str());
+        LxsstuLaunchWsl(std::format(L"-u root rmdir '{}'", MountPoint).c_str());
+    }
+
+    struct MountPointGuard
+    {
+        const wchar_t* path;
+        ~MountPointGuard()
+        {
+            UnmountAndRemove(path);
+        }
+    };
+
+    static MountPointGuard CreateMountPoint(const wchar_t* MountPoint)
+    {
+        UnmountAndRemove(MountPoint);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root mkdir -p '{}'", MountPoint).c_str()), 0);
+        return {MountPoint};
+    }
+
+    static std::wstring GrepMountLine(const wchar_t* MountPoint)
+    {
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"mount | grep -F ' {} type ' | head -n1", MountPoint).c_str());
+        return out;
+    }
+
+    //
+    // With experimental.drvFsTransports=true the host stands up all three
+    // transport backends, so each of the three transport values produces a
+    // working mount with the expected filesystem type.
+    //
+    WSL2_TEST_METHOD(MountAllThreeTransports)
+    {
+        m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsTransports = true})));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0);
+
+        struct Case
+        {
+            const wchar_t* mountPoint;
+            const wchar_t* transport;
+            const wchar_t* expectedType;
+        };
+
+        const Case cases[] = {
+            {L"/tmp/drvfs_plan9", L"transport=plan9", L"9p"},
+            {L"/tmp/drvfs_virtio9p", L"transport=virtio9p", L"9p"},
+            {L"/tmp/drvfs_virtiofs", L"transport=virtiofs", L"virtiofs"},
+        };
+
+        for (const auto& c : cases)
+        {
+            auto guard = CreateMountPoint(c.mountPoint);
+
+            const auto mountCmd = std::format(L"-u root mount -t drvfs C: '{}' -o {}", c.mountPoint, c.transport);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCmd.c_str()), 0, c.transport);
+
+            const auto grepOut = GrepMountLine(c.mountPoint);
+            LogInfo("transport=%ls -> %ls", c.transport, grepOut.c_str());
+
+            const std::wstring expectedToken = std::wstring(L" type ") + c.expectedType + L" ";
+            VERIFY_IS_TRUE(
+                grepOut.find(expectedToken) != std::wstring::npos,
+                std::format(L"Expected '{}' in mount line for transport {}", expectedToken, c.transport).c_str());
+
+            // transport= must be consumed by mount.drvfs and not leak into mount(2).
+            VERIFY_IS_TRUE(
+                grepOut.find(L"transport=") == std::wstring::npos,
+                L"transport= option must be stripped before passing to mount(2)");
+
+            // Basic IO sanity check.
+            auto [lsOut, lsErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"ls '{}/Windows'", c.mountPoint));
+            VERIFY_IS_TRUE(!lsOut.empty(), c.transport);
+        }
+    }
+
+    //
+    // transport= at the start, middle, and end of the options string is
+    // correctly extracted, and other options (like uid=) are preserved.
+    //
+    WSL2_TEST_METHOD(TransportOptionPositions)
+    {
+        m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsTransports = true})));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0);
+
+        struct Case
+        {
+            const wchar_t* mountPoint;
+            const wchar_t* options;
+        };
+
+        const Case cases[] = {
+            {L"/tmp/drvfs_pos_first", L"transport=plan9,uid=1000,gid=1000"},
+            {L"/tmp/drvfs_pos_mid", L"uid=1000,transport=plan9,gid=1000"},
+            {L"/tmp/drvfs_pos_last", L"uid=1000,gid=1000,transport=plan9"},
+        };
+
+        for (const auto& c : cases)
+        {
+            auto guard = CreateMountPoint(c.mountPoint);
+
+            const auto mountCmd = std::format(L"-u root mount -t drvfs C: '{}' -o {}", c.mountPoint, c.options);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCmd.c_str()), 0, c.options);
+
+            const auto grepOut = GrepMountLine(c.mountPoint);
+            VERIFY_IS_TRUE(grepOut.find(L" type 9p ") != std::wstring::npos, c.options);
+            VERIFY_IS_TRUE(grepOut.find(L"transport=") == std::wstring::npos, L"transport= must be consumed");
+            VERIFY_IS_TRUE(grepOut.find(L"uid=1000") != std::wstring::npos, L"uid= must be preserved");
+        }
+    }
+
+    //
+    // Unknown and empty transport values fail the mount with an error message
+    // to stderr rather than silently falling back to the default.
+    //
+    WSL2_TEST_METHOD(TransportInvalidReturnsError)
+    {
+        m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsTransports = true})));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0);
+
+        for (const wchar_t* opt : {L"transport=bogus", L"transport="})
+        {
+            const wchar_t* mountPoint = L"/tmp/drvfs_invalid";
+            auto guard = CreateMountPoint(mountPoint);
+
+            // Mount must fail with a non-zero exit code.
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"-u root mount -t drvfs C: '{}' -o {}", mountPoint, opt).c_str()), 0, opt);
+
+            const auto grepOut = GrepMountLine(mountPoint);
+            VERIFY_IS_TRUE(grepOut.empty(), std::format(L"mount with '{}' must fail (not silently succeed)", opt).c_str());
+        }
+    }
+
+    //
+    // When the experimental flag is OFF (default), requesting a transport
+    // whose backend is not running in the VM must fail at mount time. In
+    // Plan9 mode neither virtio9p nor virtiofs is up, so both fail.
+    //
+    WSL2_TEST_METHOD(TransportFailsWhenBackendUnavailable)
+    {
+        m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsMode = DrvFsMode::Plan9})));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0);
+
+        const wchar_t* mountPoint = L"/tmp/drvfs_unavail";
+
+        for (const wchar_t* transport : {L"transport=virtio9p", L"transport=virtiofs"})
+        {
+            auto guard = CreateMountPoint(mountPoint);
+
+            // Mount should fail because the backend isn't running.
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"-u root mount -t drvfs C: '{}' -o {}", mountPoint, transport).c_str()), 0, transport);
+
+            const auto grepOut = GrepMountLine(mountPoint);
+            VERIFY_IS_TRUE(
+                grepOut.empty(),
+                std::format(L"Mount with {} should fail when its backend is not running (got: {})", transport, grepOut).c_str());
+        }
+
+        // Sanity: the default backend still works.
+        auto guard = CreateMountPoint(mountPoint);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-u root mount -t drvfs C: '{}' -o transport=plan9", mountPoint).c_str()),
+            0,
+            L"transport=plan9 should succeed in plan9 default mode");
+    }
+};
+
 } // namespace DrvFsTests
