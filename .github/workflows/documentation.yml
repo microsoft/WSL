@@ -34,7 +34,7 @@ jobs:
 
   DeployDocs:
     needs: Build
-    if: github.event_name != 'push'
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
