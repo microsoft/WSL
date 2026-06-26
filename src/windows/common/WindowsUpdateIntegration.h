@@ -70,8 +70,8 @@ struct WindowsUpdateContext
         ResetProductRegistration,
     };
 
-    // Performs a complete update flow. This is a convenience method to remove the need to call and coordinate the individual actions.
-    // Calls the progress callback, if provided, with the overall update progress estimate.
+    // Performs a complete update flow. This is a convenience method to remove the need to call and coordinate the individual
+    // actions. Calls the progress callback, if provided, with the overall update progress estimate.
     //  Download and install phases are split according to the values defined above.
     void RunUpdateFlow(UpdateOptions options = UpdateOptions::EnsureProductRegistration, const std::function<void(uint32_t)>& progress = {});
 

@@ -126,8 +126,7 @@ namespace anon {
     };
 } // namespace anon
 
-WindowsUpdateContext::WindowsUpdateContext() :
-    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>())
+WindowsUpdateContext::WindowsUpdateContext() : WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>())
 {
 }
 

@@ -1730,7 +1730,9 @@ try
 
         using WindowsUpdateContext = wsl::windows::common::WindowsUpdateContext;
         WindowsUpdateContext wuContext;
-        wuContext.RunUpdateFlow(isRepair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration, callback);
+        wuContext.RunUpdateFlow(
+            isRepair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration,
+            callback);
 
         if (wuContext.GetUpdateCount() == 0)
         {
