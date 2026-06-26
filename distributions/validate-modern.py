@@ -520,7 +520,11 @@ def read_url(url: dict, elf_magic):
                         tar_format = MAGIC.from_buffer(e)
 
                 file.seek(0, 0)
-                read_tar(url, file, elf_magic)
+
+                try:
+                    read_tar(url, file, elf_magic)
+                except Exception as e:
+                    error(url, f"Failed to read tar from URL: {address}: {e}")
 
 
      expected_sha = url['Sha256']() if 'Sha256' in url else None

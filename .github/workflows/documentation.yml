@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    paths: ['doc/**']
 
 concurrency:
   group: ${{ github.workflow }}
@@ -23,11 +24,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install packages
-        run: pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
+        run: pip install -r doc/requirements.txt --break-system-packages
         shell: bash
 
       - name: Build documentation
-        run:  mkdocs build -f doc/mkdocs.yml
+        run: mkdocs build -f doc/mkdocs.yml
         shell: bash
 
       - uses: actions/upload-pages-artifact@v4

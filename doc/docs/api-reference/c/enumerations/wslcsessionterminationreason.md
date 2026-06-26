@@ -1,0 +1,16 @@
+# WslcSessionTerminationReason
+
+```c
+typedef enum WslcSessionTerminationReason
+{
+    WSLC_SESSION_TERMINATION_REASON_UNKNOWN = 0,
+    WSLC_SESSION_TERMINATION_REASON_SHUTDOWN = 1,
+    WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
+} WslcSessionTerminationReason;
+```
+
+| Enumerator | Value |
+|---|---|
+| `WSLC_SESSION_TERMINATION_REASON_UNKNOWN` | `0` |
+| `WSLC_SESSION_TERMINATION_REASON_SHUTDOWN` | `1` |
+| `WSLC_SESSION_TERMINATION_REASON_CRASHED` | `2` |
