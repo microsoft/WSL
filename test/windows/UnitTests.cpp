@@ -6319,6 +6319,39 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_IS_TRUE(getCaseSensitivity(testDir));
     }
 
+    TEST_METHOD(CaseSensitivityDeepNesting)
+    {
+        // Regression test for stack overflow in EnsureCaseSensitiveDirectoryRecursive on deeply
+        // nested directory trees. The original recursive DFS implementation could blow the
+        // 1 MB Windows thread stack at a few hundred levels of nesting (each frame held a
+        // FILE_ID_BOTH_DIR_INFORMATION buffer plus locals); the iterative implementation must
+        // succeed at depths well beyond that without consuming caller stack space.
+
+        constexpr auto testDir = L"deep-case-test";
+        constexpr int depth = 1024;
+        constexpr auto flags = wsl::windows::common::filesystem::c_case_sensitive_folders_only | LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            // The deep tree exceeds MAX_PATH; remove it via the long-path prefix so the
+            // remove walk can see every component.
+            std::error_code ec;
+            std::filesystem::remove_all(std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir), ec);
+        });
+
+        // Build the deep chain via the \\?\ long-path prefix because the cumulative path
+        // length goes well past MAX_PATH.
+        auto deepPath = std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir);
+        for (int i = 0; i < depth; ++i)
+        {
+            deepPath += std::format(L"\\d{}", i);
+        }
+
+        std::filesystem::create_directories(deepPath);
+
+        // Should not crash with a stack overflow regardless of tree depth.
+        wsl::windows::common::filesystem::EnsureCaseSensitiveDirectory(testDir, flags);
+    }
+
     TEST_METHOD(AutomountRespectedWithElevation)
     {
         DistroFileChange distributionconf(L"/etc/wsl.conf", false);
