@@ -4,21 +4,18 @@ on:
   push:
     branches: [main, master]
     paths: ['doc/**']
+  pull_request:
+    paths: ['doc/**']
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  DeployDocs:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  Build:
     runs-on: ubuntu-latest
     permissions:
         contents: read
-        pages: write
-        id-token: write
     steps:
       - name: Checkout actions
         uses: actions/checkout@v4
@@ -35,6 +32,18 @@ jobs:
         with:
           path: doc/site
 
+  DeployDocs:
+    needs: Build
+    if: github.event_name != 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+        pages: write
+        id-token: write
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

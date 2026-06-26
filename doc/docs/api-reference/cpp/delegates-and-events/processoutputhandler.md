@@ -1,6 +1,7 @@
 # ProcessOutputHandler
 
 Observed use:
+
 - `Process::OutputReceived` and `Process::ErrorReceived` raise one argument containing raw output bytes.
 - The wrapper forwards a `winrt::array_view<const uint8_t>` produced from the C callback buffer.
 
