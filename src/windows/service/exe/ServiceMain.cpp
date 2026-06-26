@@ -258,6 +258,12 @@ void WslService::ServiceStopped()
         LxssClientUninitialize();
     }
 
+    // Release plugin host COM proxies BEFORE CoUninitialize. The IWslPluginHost
+    // proxies must be torn down while COM is still initialized; otherwise the
+    // proxy/stub DLL is unloaded and releasing the proxies later (during global
+    // destruction) crashes inside the marshaler.
+    g_pluginManager.Shutdown();
+
     // There is a potential deadlock if CoUninitialize() is called before the LanguageChangeNotifyThread
     // isn't done initializing. Clearing the COM objects before calling CoUninitialize() works around the issue.
     winrt::clear_factory_cache();
