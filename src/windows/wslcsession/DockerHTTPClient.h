@@ -20,6 +20,7 @@ Abstract:
 #include <boost/beast/http.hpp>
 #include "relay.hpp"
 #include "docker_schema.h"
+#include "HttpHeaderEndDetector.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
@@ -39,52 +40,6 @@ Abstract:
     }
 
 namespace wsl::windows::service::wslc {
-
-// Detects the end-of-header marker ("\r\n\r\n") in an HTTP message
-class HttpHeaderEndDetector
-{
-public:
-    // Returns true once the full "\r\n\r\n" terminator has been consumed.
-    bool Consume(char Byte) noexcept
-    {
-        switch (m_state)
-        {
-        case State::Start:
-            m_state = (Byte == '\r') ? State::Cr : State::Start;
-            break;
-        case State::Cr:
-            m_state = (Byte == '\n') ? State::CrLf : ((Byte == '\r') ? State::Cr : State::Start);
-            break;
-        case State::CrLf:
-            m_state = (Byte == '\r') ? State::CrLfCr : State::Start;
-            break;
-        case State::CrLfCr:
-            m_state = (Byte == '\n') ? State::Done : ((Byte == '\r') ? State::Cr : State::Start);
-            break;
-        case State::Done:
-            break;
-        }
-
-        return m_state == State::Done;
-    }
-
-    bool IsDone() const noexcept
-    {
-        return m_state == State::Done;
-    }
-
-private:
-    enum class State
-    {
-        Start,
-        Cr,
-        CrLf,
-        CrLfCr,
-        Done
-    };
-
-    State m_state = State::Start;
-};
 
 class DockerHTTPException : public std::runtime_error
 {
@@ -245,7 +200,7 @@ public:
         std::function<void(const gsl::span<char>&)> OnResponse;
         std::function<void()> OnCompleted;
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
-        HttpHeaderEndDetector HeaderEnd;
+        common::HttpHeaderEndDetector HeaderEnd;
         std::optional<size_t> RemainingContentLength;
         std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };
