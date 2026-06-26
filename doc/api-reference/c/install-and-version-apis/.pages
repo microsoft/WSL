@@ -1,0 +1,9 @@
+title: Install and Version APIs
+nav:
+  - index.md
+  - wslcgetmissingcomponents.md
+  - wslcgetversion.md
+  - wslcinstallwithdependencies.md
+  - dllmain.md
+  - dllgetactivationfactory.md
+  - dllcanunloadnow.md
