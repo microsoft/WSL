@@ -2389,6 +2389,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Falha ao criar o volume ''{}'': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Muitos volumes foram montados (limite: {}). Reinicie a sessão para montar mais volumes. Isso será corrigido em uma versão futura.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>A porta {} já está em uso, não é possível iniciar o contêiner {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

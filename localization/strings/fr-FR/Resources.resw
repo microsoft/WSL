@@ -1781,7 +1781,7 @@ Les binaires Linux exécutés dans WSL peuvent utiliser automatiquement votre GP
     <value>Comment installer</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>Après avoir installé VS Code, vous pouvez installer l’extension Remote WSL à partir du terminal Windows :
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2387,6 +2387,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Désolé... Nous n’avons pas pu créer le volume « {} » : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Trop de volumes ont été montés (limite : {}). Redémarrez la session pour monter d’autres volumes. Ce problème sera résolu dans une version ultérieure.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
