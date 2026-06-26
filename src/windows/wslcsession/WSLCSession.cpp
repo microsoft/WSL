@@ -2447,12 +2447,14 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
-    static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
+    // Reject case-mismatches of reserved driver-option keys.
+    static constexpr std::array<std::string_view, 3> c_reservedDriverOpts{"Internal", "Subnet", "Gateway"};
     for (const auto& [key, _] : driverOpts)
     {
-        const bool supported = std::any_of(
-            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
+        const bool caseMismatch = std::any_of(c_reservedDriverOpts.begin(), c_reservedDriverOpts.end(), [&](std::string_view opt) {
+            return key != opt && wsl::shared::string::IsEqual(key, opt, true);
+        });
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), caseMismatch);
     }
 
     THROW_HR_WITH_USER_ERROR_IF(
@@ -2492,6 +2494,20 @@ try
         ipam.Config.emplace().push_back(std::move(ipamConfig));
     }
 
+    // Forward any non-reserved driver options to Docker. Reserved keys (Internal, Subnet, Gateway)
+    // are translated into Docker's typed network fields above and not echoed back here.
+    for (const auto& [key, value] : driverOpts)
+    {
+        if (std::none_of(c_reservedDriverOpts.begin(), c_reservedDriverOpts.end(), [&](std::string_view opt) { return key == opt; }))
+        {
+            if (!request.Options.has_value())
+            {
+                request.Options.emplace();
+            }
+            (*request.Options)[key] = value;
+        }
+    }
+
     docker_schema::CreateNetworkResponse createResult;
     try
     {
@@ -2529,6 +2545,10 @@ try
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
     entry.Labels = full.Labels;
+    if (full.Options)
+    {
+        entry.Options = *full.Options;
+    }
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
@@ -2653,6 +2673,10 @@ try
     result.Scope = entry.Scope;
     result.Internal = entry.Internal;
     result.Labels = entry.Labels;
+    if (!entry.Options.empty())
+    {
+        result.Options = entry.Options;
+    }
 
     result.IPAM.Driver = entry.IPAM.Driver;
     if (entry.IPAM.Config)
@@ -3483,6 +3507,10 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
             entry.Labels = network.Labels;
+            if (network.Options)
+            {
+                entry.Options = *network.Options;
+            }
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {
