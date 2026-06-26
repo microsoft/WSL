@@ -5572,7 +5572,7 @@ class WSLCTests
 
             // Invalid container flags are rejected with E_INVALIDARG.
             options.Image = "debian:latest";
-            options.Flags = static_cast<WSLCContainerFlags>(0x10);
+            options.Flags = static_cast<WSLCContainerFlags>(0x20);
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
 
             // Invalid init process flags are rejected with E_INVALIDARG.
