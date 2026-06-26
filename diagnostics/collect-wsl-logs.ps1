@@ -345,21 +345,21 @@ if ($LogProfile -eq "networking")
 $wslgFolder = "$folder/wslg"
 mkdir -p $wslgFolder | Out-Null
 
-# Run in a job with a timeout so a wedged WSL service can't hang collection. --system reaches
-# /mnt/wslg as the wslg user even when the default distro is WSL1 or isn't running.
+# Run in a job with a timeout so a wedged WSL service can't hang collection. --system --user root
+# reaches /mnt/wslg even when the default distro is WSL1 or isn't running, and can read root-only logs.
 $wslgJob = Start-Job -ScriptBlock {
     param($DestFull, $CollectDumps)
 
-    $destWsl = & wsl.exe --system -e wslpath -u "$DestFull" 2>$null
+    $destWsl = & wsl.exe --system --user root -e wslpath -u "$DestFull" 2>$null
     if ([string]::IsNullOrWhiteSpace($destWsl)) { return }
     $destWsl = $destWsl.Trim()
 
     # Destination is passed as $1 so paths containing a single quote are handled safely.
-    & wsl.exe --system -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
+    & wsl.exe --system --user root -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
 
     if ($CollectDumps)
     {
-        & wsl.exe --system -e sh -c '[ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$destWsl"
+        & wsl.exe --system --user root -e sh -c '[ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$destWsl"
     }
 } -ArgumentList (Resolve-Path $wslgFolder).Path, ([bool]$Dump)
 

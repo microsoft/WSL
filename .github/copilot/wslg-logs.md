@@ -6,9 +6,9 @@ of diagnostics to request for a WSLg bug is the WSLg repo bug report template
 (`.github/ISSUE_TEMPLATE/bug_report.yml` in microsoft/wslg).
 
 `diagnostics/collect-wsl-logs.ps1` collects the logs into a `wslg/` subfolder of the log archive
-(via `wsl.exe --system`, with a timeout so a wedged service can't hang collection), so a standard
-WSL log collection already contains the log files below. Crash dumps (`dumps/`, `wsl-crashes/`) are
-only collected when the script is run with `-Dump`.
+(via `wsl.exe --system --user root`, with a timeout so a wedged service can't hang collection), so a
+standard WSL log collection already contains the log files below. Crash dumps (`dumps/`,
+`wsl-crashes/`) are only collected when the script is run with `-Dump`.
 
 ## Architecture (just enough to read the logs)
 
