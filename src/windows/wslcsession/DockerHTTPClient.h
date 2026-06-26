@@ -40,14 +40,11 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-// Detects the end-of-header marker ("\r\n\r\n") in an HTTP message. State is maintained
-// across successive reads so a terminator split between two reads is handled correctly.
-// N.B. Detection is strict: a bare-LF separator ("\n\n") is not treated as a terminator.
+// Detects the end-of-header marker ("\r\n\r\n") in an HTTP message
 class HttpHeaderEndDetector
 {
 public:
-    // Advances the state machine over a single byte. Returns true once the full "\r\n\r\n"
-    // terminator has been consumed.
+    // Returns true once the full "\r\n\r\n" terminator has been consumed.
     bool Consume(char Byte) noexcept
     {
         switch (m_state)

@@ -661,16 +661,11 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
     }
     else
     {
-        // Otherwise keep parsing the HTTP response header. Scan for the end-of-header marker
-        // ("\r\n\r\n"); HeaderEnd carries state across reads in case it straddles a boundary.
+        // Otherwise keep parsing the HTTP response header.
         size_t i{};
-        for (i = 0; i < Content.size(); i++)
+        for (i = 0; i < Content.size() && !HeaderEnd.IsDone(); i++)
         {
-            if (HeaderEnd.Consume(Content[i]))
-            {
-                i++; // Include the terminating byte in the header.
-                break;
-            }
+            HeaderEnd.Consume(Content[i]);
         }
 
         // Feed the parser up to the end of the header.
@@ -818,18 +813,11 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
-        // Scan only the newly peeked bytes [Offset, Offset + bytesRead) for the end-of-header
-        // marker. headerEnd carries state across iterations in case it straddles a read boundary.
-        bool headerComplete = false;
+        // Scan only the newly peeked bytes [Offset, Offset + bytesRead)
         size_t i = 0;
-        for (i = Offset; i < bytesRead + Offset; i++)
+        for (i = Offset; i < bytesRead + Offset && !headerEnd.IsDone(); i++)
         {
-            if (headerEnd.Consume(buffer[i]))
-            {
-                i++; // Include the terminating byte in the header.
-                headerComplete = true;
-                break;
-            }
+            headerEnd.Consume(buffer[i]);
         }
 
         WI_ASSERT(i >= Offset);
@@ -845,7 +833,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
         Offset += bytesRead;
         buffer.resize(Offset);
 
-        if (headerComplete) // Header is complete, feed it to the parser.
+        if (headerEnd.IsDone()) // Header is complete, feed it to the parser.
         {
 
 #ifdef WSLC_HTTP_DEBUG
