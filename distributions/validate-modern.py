@@ -161,7 +161,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
 
             sys.exit(1 if errors else 0)
 
-    except:
+    except Exception:
         if debug:
             import traceback
             traceback.print_exc()
