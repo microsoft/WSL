@@ -1731,7 +1731,8 @@ try
             {
                 callback(0);
             }
-            wsl::windows::common::install::UpdatePackage(true, false, false);
+            // Use pre-release builds and repair semantics (required since this function uses the SDK binary version as a filter).
+            wsl::windows::common::install::UpdatePackage(true, true, false);
             if (callback)
             {
                 callback(100);
