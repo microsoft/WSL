@@ -17,6 +17,7 @@ Abstract:
 
 #include "Common.h"
 #include "registry.hpp"
+#include "install.h"
 #include "PluginTests.h"
 #include "wslcsdk.h"
 
@@ -1124,5 +1125,112 @@ class InstallerTests
         InstallMsi();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
+    }
+
+    TEST_METHOD(UpgradeWithLockedFileReportsRebootRequired)
+    {
+        // Ensure the MSI is installed cleanly first. If a prior test run was
+        // interrupted, the MSI may be missing — reinstall it.
+        if (!IsMsiPackageInstalled())
+        {
+            InstallMsi();
+        }
+
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        // Stop the WSL service so nothing holds files open.
+        StopWslService();
+
+        // Uninstall the MSI. MsiInstallProduct on an already-registered ProductCode
+        // enters maintenance mode and won't replace files. We need a fresh install
+        // so the MSI actually writes files and hits the lock.
+        UninstallMsi();
+
+        // Create a dummy system.vhd in the install directory so we have something to lock.
+        // When the MSI does a fresh install it will try to write its real system.vhd here,
+        // but can't because the dummy is memory-mapped — resulting in 3010.
+        std::filesystem::create_directories(m_installedPath);
+        auto systemVhdPath = m_installedPath / L"system.vhd";
+        {
+            wil::unique_hfile dummyHandle{
+                CreateFileW(systemVhdPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_TRUE(dummyHandle.is_valid());
+            BYTE pad = 0;
+            DWORD written = 0;
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(dummyHandle.get(), &pad, 1, &written, nullptr));
+        }
+
+        // Memory-map the dummy to simulate a running VM. A memory-mapped file cannot
+        // be renamed or deleted regardless of directory permissions — this forces the MSI
+        // to schedule a delayed rename (MoveFileEx MOVEFILE_DELAY_UNTIL_REBOOT) and return 3010.
+        wil::unique_hfile lockedHandle{CreateFileW(
+            systemVhdPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(lockedHandle.is_valid());
+
+        wil::unique_handle mapping{CreateFileMappingW(lockedHandle.get(), nullptr, PAGE_READONLY, 0, 0, nullptr)};
+        VERIFY_IS_TRUE(mapping.is_valid());
+
+        auto* mapView = MapViewOfFile(mapping.get(), FILE_MAP_READ, 0, 0, 1);
+        VERIFY_IS_NOT_NULL(mapView);
+        auto unmapOnExit = wil::scope_exit([mapView]() { UnmapViewOfFile(mapView); });
+
+        // Fake a stale version so the WslInstaller service thinks an upgrade is needed.
+        RegistryKeyChange<std::wstring> version(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"Version", L"1.0.0");
+
+        // Remove the MSIX so we can reinstall it to trigger the WslInstaller service.
+        UninstallMsix();
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        // Install the MSIX — this starts the WslInstaller service which detects the
+        // stale version and runs the MSI. With system.vhd locked, the MSI returns 3010
+        // and WslInstaller calls SetRebootRequiredMarker().
+        InstallMsix();
+
+        // Wait for the reboot-required marker — this is the signal that the installer
+        // completed the MSI install and hit the locked file (3010).
+        auto waitForMarker = []() { THROW_HR_IF(E_FAIL, !wsl::windows::common::install::IsRebootRequired()); };
+
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(waitForMarker, std::chrono::seconds(1), std::chrono::minutes(5));
+        }
+        catch (...)
+        {
+            VERIFY_FAIL("Timed out waiting for reboot-required marker to be set by WslInstaller");
+        }
+
+        // Release the memory map and handle — the file has been renamed to .rbf by MSI.
+        unmapOnExit.reset();
+        mapping.reset();
+        lockedHandle.reset();
+
+        // Verify that launching wsl.exe (a command that goes through CallMsiPackage) fails
+        // with the reboot-required error.
+        auto wslCommandLine = LxssGenerateWslCommandLine(L"echo OK");
+        auto [output, warnings, wslExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(wslCommandLine.data());
+
+        LogInfo("wsl echo OK output: %ls", output.c_str());
+        LogInfo("wsl echo OK warnings: %ls", warnings.c_str());
+        VERIFY_ARE_NOT_EQUAL(wslExitCode, 0);
+
+        // The error message should mention a restart is required.
+        auto combined = output + warnings;
+        VERIFY_IS_TRUE(combined.find(L"restart") != std::wstring::npos);
+
+        // Non-distro commands (--version, --list, --shutdown, --update) must keep working
+        // even with the marker set — they go through CallMsiPackage but don't reach the
+        // service's _CreateInstance gate, so they should not be blocked.
+        std::wstring versionCmd = wsl::windows::common::wslutil::GetMsiPackagePath().value_or(L"") + L"\\wsl.exe --version";
+        auto [versionOutput, versionWarnings, versionExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(versionCmd.data());
+        LogInfo("wsl --version output: %ls", versionOutput.c_str());
+        VERIFY_ARE_EQUAL(versionExitCode, 0L);
+
+        // Clean up: delete the volatile marker and reinstall cleanly.
+        wsl::windows::common::registry::DeleteKey(OpenLxssMachineKey(KEY_ALL_ACCESS).get(), L"MSI\\RebootPending");
+        VERIFY_IS_FALSE(wsl::windows::common::install::IsRebootRequired());
+
+        InstallMsi();
+        ValidatePackageInstalledProperly();
     }
 };

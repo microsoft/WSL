@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "Localization.h"
 #include "LxssUserSession.h"
 #include "LxssInstance.h"
@@ -2493,6 +2494,14 @@ _Requires_lock_not_held_(m_instanceLock)
 std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_opt_ LPCGUID DistroGuid, _In_ ULONG Flags)
 {
     ExecutionContext context(Context::CreateInstance);
+
+    // If a previous MSI install is pending reboot (files like system.vhd have been
+    // renamed away and are waiting for delayed replacement), block instance creation
+    // with a clear error rather than launching against a broken install.
+    if (wsl::windows::common::install::IsRebootRequired())
+    {
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED), wsl::shared::Localization::MessageUpdateRebootRequired());
+    }
 
     // Validate flags.
     THROW_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_CREATE_INSTANCE_FLAGS_ALL)));
