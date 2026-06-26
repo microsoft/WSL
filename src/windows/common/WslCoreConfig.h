@@ -324,7 +324,7 @@ struct Config
     ConfigKeyPresence LoadKernelModulesPresence = ConfigKeyPresence::Absent;
     bool LoadDefaultKernelModules = true;
     bool EnableNestedVirtualization = !shared::Arm64 && windows::common::helpers::IsWindows11OrAbove();
-    bool EnableVirtio9p = false;
+    bool EnableVirtio9p = true;
     bool EnableVirtio = !shared::Arm64 || windows::common::helpers::IsWindows11OrAbove();
     bool EnableVirtioFs = false;
     int KernelDebugPort = 0;
