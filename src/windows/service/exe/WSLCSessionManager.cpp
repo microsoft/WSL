@@ -182,7 +182,7 @@ try
     info.DisplayName = entry.DisplayName.c_str();
     info.ApplicationPid = entry.CreatorPid;
     info.UserToken = entry.UserToken.get();
-    info.UserSid = entry.UserSid.data();
+    info.UserSid = entry.UserSid.empty() ? nullptr : entry.UserSid.data();
     g_pluginManager.OnWslcSessionStopping(&info);
 }
 CATCH_LOG()
@@ -400,7 +400,7 @@ void WSLCSessionManagerImpl::CreateSession(
         info.DisplayName = resolvedDisplayName.c_str();
         info.ApplicationPid = createdPid;
         info.UserToken = createdToken.get();
-        info.UserSid = createdSid.data();
+        info.UserSid = createdSid.empty() ? nullptr : createdSid.data();
 
         HRESULT pluginHr = S_OK;
         try
