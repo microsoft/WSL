@@ -22,21 +22,21 @@ class HttpHeaderEndDetector
 {
 public:
     // Returns true once the full "\r\n\r\n" terminator has been consumed.
-    bool Consume(char Byte) noexcept
+    bool Consume(char byte) noexcept
     {
         switch (m_state)
         {
         case State::Start:
-            m_state = (Byte == '\r') ? State::Cr : State::Start;
+            m_state = (byte == '\r') ? State::Cr : State::Start;
             break;
         case State::Cr:
-            m_state = (Byte == '\n') ? State::CrLf : ((Byte == '\r') ? State::Cr : State::Start);
+            m_state = (byte == '\n') ? State::CrLf : ((byte == '\r') ? State::Cr : State::Start);
             break;
         case State::CrLf:
-            m_state = (Byte == '\r') ? State::CrLfCr : State::Start;
+            m_state = (byte == '\r') ? State::CrLfCr : State::Start;
             break;
         case State::CrLfCr:
-            m_state = (Byte == '\n') ? State::Done : ((Byte == '\r') ? State::Cr : State::Start);
+            m_state = (byte == '\n') ? State::Done : ((byte == '\r') ? State::Cr : State::Start);
             break;
         case State::Done:
             break;
