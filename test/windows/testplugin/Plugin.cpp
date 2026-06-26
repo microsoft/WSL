@@ -480,29 +480,39 @@ HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistribut
         const GUID distroId = Distribution->Id;
 
         g_asyncWorker.emplace([sessionId, distroId]() {
-            // Sleep briefly so the call is guaranteed to happen after the
-            // hook has returned — exercises the cross-apartment callback
-            // path from a non-hook thread that hasn't called CoInitializeEx.
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-            wil::unique_socket socket;
-            std::vector<const char*> args = {"/bin/echo", "hello-from-worker", nullptr};
-            const HRESULT hr = g_api->ExecuteBinaryInDistribution(sessionId, &distroId, args[0], args.data(), &socket);
-
-            if (SUCCEEDED(hr))
+            HRESULT hr = E_FAIL;
+            try
             {
-                const auto output = ReadFromSocket(socket.get());
-                std::string captured(output.begin(), output.end());
-                // Strip trailing newline added by /bin/echo so the log line
-                // doesn't get split when ValidateLogFile splits on '\n'.
-                while (!captured.empty() && (captured.back() == '\n' || captured.back() == '\r'))
+                // Sleep briefly so the call is guaranteed to happen after the
+                // hook has returned — exercises the cross-apartment callback
+                // path from a non-hook thread that hasn't called CoInitializeEx.
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+                wil::unique_socket socket;
+                std::vector<const char*> args = {"/bin/echo", "hello-from-worker", nullptr};
+                hr = g_api->ExecuteBinaryInDistribution(sessionId, &distroId, args[0], args.data(), &socket);
+
+                if (SUCCEEDED(hr))
                 {
-                    captured.pop_back();
+                    const auto output = ReadFromSocket(socket.get());
+                    std::string captured(output.begin(), output.end());
+                    // Strip trailing newline added by /bin/echo so the log line
+                    // doesn't get split when ValidateLogFile splits on '\n'.
+                    while (!captured.empty() && (captured.back() == '\n' || captured.back() == '\r'))
+                    {
+                        captured.pop_back();
+                    }
+                    std::lock_guard guard{g_logMutex};
+                    g_asyncWorkerOutput = std::move(captured);
                 }
-                std::lock_guard guard{g_logMutex};
-                g_asyncWorkerOutput = std::move(captured);
+            }
+            catch (...)
+            {
+                hr = wil::ResultFromCaughtException();
             }
 
+            // Always fulfill the promise so OnDistroStopping's future.get() can
+            // never block indefinitely, even if the body above threw.
             g_asyncWorkerResult->set_value(hr);
         });
     }
