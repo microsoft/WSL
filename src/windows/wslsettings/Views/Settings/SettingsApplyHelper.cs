@@ -161,6 +161,7 @@ internal static class SettingsApplyHelper
             { WslConfigEntry.KernelPath, "Settings_CustomKernelPath/Header" },
             { WslConfigEntry.SystemDistroPath, "Settings_CustomSystemDistroPath/Header" },
             { WslConfigEntry.KernelModulesPath, "Settings_CustomKernelModulesPath/Header" },
+            { WslConfigEntry.KernelHeadersPath, "Settings_CustomKernelHeadersPath/Header" },
         };
 
     private static string FormatValue(WslConfigEntry entry, object value)
