@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include <Sfc.h>
+#include <msiquery.h>
 
 #include "Common.h"
 #include "registry.hpp"
@@ -21,6 +22,7 @@ Abstract:
 #include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
+using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
@@ -343,6 +345,28 @@ class InstallerTests
     {
         const auto msiKey = wsl::windows::common::registry::OpenKey(m_lxssKey.get(), L"MSI", KEY_ALL_ACCESS);
         wsl::windows::common::registry::DeleteKeyValue(msiKey.get(), L"ProductCode");
+    }
+
+    // Queries the MSI database for the sequence number of the given action in InstallExecuteSequence.
+    // Returns -1 if the action is not found.
+    int GetMsiSequenceNumber(MSIHANDLE database, LPCWSTR action)
+    {
+        unique_msi_handle view;
+        THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(database, L"SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ?", &view));
+        unique_msi_handle rec{MsiCreateRecord(1)};
+        THROW_IF_WIN32_ERROR(MsiRecordSetStringW(rec.get(), 1, action));
+        THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), rec.get()));
+
+        MSIHANDLE hResult = 0;
+        auto fetchResult = MsiViewFetch(view.get(), &hResult);
+        if (fetchResult == ERROR_NO_MORE_ITEMS)
+        {
+            return -1;
+        }
+
+        THROW_IF_WIN32_ERROR(fetchResult);
+        unique_msi_handle result{hResult};
+        return MsiRecordGetInteger(result.get(), 1);
     }
 
     void InstallGitHubRelease(const std::wstring& version)
@@ -692,6 +716,43 @@ class InstallerTests
             L"Update failed (exit code: 1603).\r\n"
             L"Error code: Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE\r\n",
             output);
+    }
+
+    TEST_METHOD(MsiRemoveExistingProductsScheduledInsideTransaction)
+    {
+        // Verify that RemoveExistingProducts is scheduled inside the MSI transaction
+        // (between InstallInitialize and InstallFinalize). This is the effect of
+        // Schedule="afterInstallInitialize" on <MajorUpgrade> in package.wix.in.
+        //
+        // When RemoveExistingProducts runs inside the transaction, a failed upgrade
+        // triggers rollback that restores the previous installation's files.
+        // Without this scheduling, the old product is removed outside the transaction
+        // and cannot be restored on failure — leaving no WSL files on disk.
+
+        unique_msi_handle database;
+        THROW_IF_WIN32_ERROR(MsiOpenDatabaseW(m_msiPath.c_str(), MSIDBOPEN_READONLY, &database));
+
+        auto installInitialize = GetMsiSequenceNumber(database.get(), L"InstallInitialize");
+        auto removeExistingProducts = GetMsiSequenceNumber(database.get(), L"RemoveExistingProducts");
+        auto installFinalize = GetMsiSequenceNumber(database.get(), L"InstallFinalize");
+
+        LogInfo("MSI sequence: InstallInitialize=%d, RemoveExistingProducts=%d, InstallFinalize=%d", installInitialize, removeExistingProducts, installFinalize);
+
+        VERIFY_ARE_NOT_EQUAL(-1, installInitialize);
+        VERIFY_ARE_NOT_EQUAL(-1, removeExistingProducts);
+        VERIFY_ARE_NOT_EQUAL(-1, installFinalize);
+
+        // RemoveExistingProducts must be after InstallInitialize (inside the transaction)
+        VERIFY_IS_GREATER_THAN(
+            removeExistingProducts,
+            installInitialize,
+            L"RemoveExistingProducts must be scheduled after InstallInitialize for rollback protection");
+
+        // RemoveExistingProducts must be before InstallFinalize (still inside the transaction)
+        VERIFY_IS_LESS_THAN(
+            removeExistingProducts,
+            installFinalize,
+            L"RemoveExistingProducts must be scheduled before InstallFinalize for rollback protection");
     }
 
     TEST_METHOD(WslUpdateNoNewVersion)
