@@ -104,7 +104,7 @@ private:
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
-    LONG m_stopTimeout = WSLC_STOP_TIMEOUT_DEFAULT;
+    std::optional<LONG> m_stopTimeout;
     int64_t m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;

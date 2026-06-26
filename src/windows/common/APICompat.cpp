@@ -294,7 +294,6 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 
     m_value.Flags = Options.Flags;
     m_value.StopSignal = Options.StopSignal;
-    m_value.StopTimeout = WSLC_STOP_TIMEOUT_DEFAULT;
     m_value.HostName = Options.HostName;
     m_value.DomainName = Options.DomainName;
 

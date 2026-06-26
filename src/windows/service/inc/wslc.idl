@@ -44,7 +44,7 @@ cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
-cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MAX") // use the default container stop timeout (10 seconds).
+cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MIN") // Pass to Stop() to use the default container stop timeout
 cpp_quote("#define WSLC_STOP_TIMEOUT_NONE -1") // Wait forever for the container to stop.
 
 typedef
@@ -266,6 +266,7 @@ typedef struct _WSLCContainerOptions
     [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
     ULONG UlimitsCount;
 
+    // Ignored unless WSLCContainerFlagsStopTimeout is set in Flags.
     LONG StopTimeout;
 } WSLCContainerOptions;
 

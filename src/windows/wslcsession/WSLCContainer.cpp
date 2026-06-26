@@ -1430,9 +1430,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.StopSignal = std::to_string(containerOptions.StopSignal);
     }
 
-    ValidateStopTimeout(containerOptions.StopTimeout);
-    if (containerOptions.StopTimeout != WSLC_STOP_TIMEOUT_DEFAULT)
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsStopTimeout))
     {
+        ValidateStopTimeout(containerOptions.StopTimeout);
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 
