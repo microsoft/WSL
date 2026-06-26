@@ -3419,7 +3419,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3454,30 +3454,34 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 
-    const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
-        try
-        {
-            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
-            THROW_LAST_ERROR_IF(!ProcessSocket);
-
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
-            execv(Path, (char* const*)(ArgumentArray.data()));
-
-            // If this point is reached, an error needs to be reported back since execv() failed.
-            THROW_LAST_ERROR();
-        }
-        catch (...)
-        {
-            auto error = wil::ResultFromCaughtException();
-            LOG_ERROR("Command execution failed: {}", errno);
-
-            if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+    const int ChildPid = UtilCreateChildProcess(
+        "CreateChildProcess",
+        [&]() {
+            try
             {
-                LOG_ERROR("Failed to write command execution status: {}", errno);
+                wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+                THROW_LAST_ERROR_IF(!ProcessSocket);
+
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
+                execv(Path, (char* const*)(ArgumentArray.data()));
+
+                // If this point is reached, an error needs to be reported back since execv() failed.
+                THROW_LAST_ERROR();
             }
-        }
-    });
+            catch (...)
+            {
+                auto error = wil::ResultFromCaughtException();
+                LOG_ERROR("Command execution failed: {}", errno);
+
+                if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+                {
+                    LOG_ERROR("Failed to write command execution status: {}", errno);
+                }
+            }
+        },
+        {},
+        DistroCgroupPath);
 
     THROW_LAST_ERROR_IF(ChildPid < 0);
     ControlPipe.write().reset();
@@ -3739,3 +3743,56 @@ try
     }).detach();
 }
 CATCH_LOG()
+
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
+{
+    return std::format("{}/distro-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
+}
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
+{
+    // Only cpu and memory are required for wsl's resource limit.
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory") < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
+        return -1;
+    }
+    const char* const OptionalControllers[] = {"+pids", "+io", "+cpuset", "+hugetlb", "+rdma", "+misc"};
+    for (const auto Controller : OptionalControllers)
+    {
+        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Controller) < 0)
+        {
+            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Controller, CgroupPath, errno);
+        }
+    }
+    return 0;
+}
+
+void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject)
+try
+{
+    std::string ProcsFile{};
+    if (IsSystemd)
+    {
+        ProcsFile = CgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR + "/cgroup.procs";
+    }
+    else
+    {
+        auto NonSystemdCgroupPath = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
+        auto NonSystemdCgroupExists = access(NonSystemdCgroupPath.c_str(), F_OK) == 0;
+        if (NonSystemdCgroupExists)
+        {
+            ProcsFile = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR "/cgroup.procs";
+        }
+        else
+        {
+            ProcsFile = CgroupPath + "/cgroup.procs";
+        }
+    }
+
+    if (WriteToFile(ProcsFile.c_str(), "0") < 0)
+    {
+        LOG_WARNING("Failed to move process to cgroup {} for {}: {}", CgroupPath, LogSubject, errno);
+    }
+}
+CATCH_LOG();

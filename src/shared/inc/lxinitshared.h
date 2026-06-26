@@ -273,6 +273,7 @@ Abstract:
 #define LX_WSL2_DISTRO_READ_ONLY_ENV "WSL_DISTRO_READ_ONLY"
 #define LX_WSL2_NETWORKING_MODE_ENV "WSL2_NETWORKING_MODE"
 #define LX_WSL2_DISTRO_INIT_PID "WSL2_DISTRO_INIT_PID"
+#define LX_WSL2_DISTRO_CGROUP_PATH "WSL2_DISTRO_CGROUP_PATH"
 
 //
 // Command line arguments shared between init & mini_init
@@ -1270,6 +1271,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
     bool EnableDnsTunneling;
     bool EnableSafeMode;
     bool DefaultKernel;
+    bool IsolateDistroCgroup;
     unsigned int KernelModulesDeviceId;
     unsigned int HostnameOffset;
     unsigned int KernelModulesListOffset;
@@ -1286,6 +1288,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
         FIELD(EnableDnsTunneling),
         FIELD(EnableSafeMode),
         FIELD(DefaultKernel),
+        FIELD(IsolateDistroCgroup),
         FIELD(KernelModulesDeviceId),
         STRING_FIELD(HostnameOffset),
         STRING_FIELD(KernelModulesListOffset));
