@@ -22,21 +22,18 @@ jobs:
     steps:
       - name: Checkout actions
         uses: actions/checkout@v4
-        with:
-          # Full history + tags so every released version can be rebuilt.
-          fetch-depth: 0
 
       - name: Install packages
         run: pip install -r doc/requirements.txt --break-system-packages
         shell: bash
 
-      - name: Build versioned documentation
-        run: python doc/build_versioned_docs.py --output public
+      - name: Build documentation
+        run: mkdocs build -f doc/mkdocs.yml
         shell: bash
 
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: public
+          path: doc/site
 
       - name: Deploy to GitHub Pages
         id: deployment

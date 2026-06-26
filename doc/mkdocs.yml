@@ -26,12 +26,13 @@ nav:
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md
        - 'Systemd': technical-documentation/systemd.md
-    # The API reference is a separate, independently versioned mini-site built
-    # from mkdocs-api.yml. This entry redirects into it (see docs/api.md).
-    - 'API reference': api.md
+    # The API reference tree (docs/api-reference) is appended here; its
+    # navigation is driven by the per-folder .pages files (awesome-pages plugin).
+    - '...'
 
 plugins:
     - search
+    - awesome-pages
     - mermaid2:
         version: 11.4.1
         arguments:
