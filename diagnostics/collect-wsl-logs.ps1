@@ -345,25 +345,43 @@ if ($LogProfile -eq "networking")
 $wslgFolder = "$folder/wslg"
 mkdir -p $wslgFolder | Out-Null
 
-# Resolve the destination as a WSL path so files (including binary crash dumps) can be copied inside WSL.
-$wslgFolderFull = (Resolve-Path $wslgFolder).Path
-$wslgFolderWsl = $null
-try { $wslgFolderWsl = (& wsl.exe -e wslpath -u "$wslgFolderFull" 2>$null).Trim() } catch {}
+# Run in a job with a timeout so a wedged WSL service can't hang collection. --system reaches
+# /mnt/wslg as the wslg user even when the default distro is WSL1 or isn't running.
+$wslgJob = Start-Job -ScriptBlock {
+    param($DestFull, $CollectDumps)
 
-if (-not [string]::IsNullOrWhiteSpace($wslgFolderWsl))
+    $destWsl = & wsl.exe --system -e wslpath -u "$DestFull" 2>$null
+    if ([string]::IsNullOrWhiteSpace($destWsl)) { return }
+    $destWsl = $destWsl.Trim()
+
+    # Destination is passed as $1 so paths containing a single quote are handled safely.
+    & wsl.exe --system -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
+
+    if ($CollectDumps)
+    {
+        & wsl.exe --system -e sh -c '[ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$destWsl"
+    }
+} -ArgumentList (Resolve-Path $wslgFolder).Path, ([bool]$Dump)
+
+if (Wait-Job $wslgJob -Timeout 60)
 {
-    # Run as the super user (uid=0) so root-only logs such as pulseaudio.log are readable.
-    $wslgSuperUser = & wsl.exe -- id -nu 0
-    # pulseaudio.log, weston.log and stderr.log plus the legacy /mnt/wslg/dumps crash dumps.
-    # The destination is passed as $1 so paths containing a single quote are handled safely.
-    & wsl.exe -u $wslgSuperUser -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; [ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$wslgFolderWsl" 2>&1 | Out-Null
+    Receive-Job $wslgJob | Out-Null
 }
-
-# Newer builds write WSLg crash dumps (e.g. core.weston) to %TEMP%\wsl-crashes on the host.
-$wslCrashes = "$env:TEMP\wsl-crashes"
-if (Test-Path $wslCrashes)
+else
 {
-    Copy-Item $wslCrashes "$wslgFolder/wsl-crashes" -Recurse -ErrorAction Ignore
+    Write-Host -ForegroundColor Yellow "WSLg log collection timed out and was skipped."
+    Stop-Job $wslgJob
+}
+Remove-Job $wslgJob -Force
+
+# Crash dumps are only collected with -Dump, since users may not expect dumps to be published by default.
+if ($Dump)
+{
+    $wslCrashes = "$env:TEMP\wsl-crashes"
+    if (Test-Path $wslCrashes)
+    {
+        Copy-Item $wslCrashes "$wslgFolder/wsl-crashes" -Recurse -ErrorAction Ignore
+    }
 }
 
 if ($Dump)

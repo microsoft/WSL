@@ -347,7 +347,7 @@ wpr -stop logs.ETL
 ### Log Analysis Tools
 - Use WPA (Windows Performance Analyzer) for ETL traces
 - Key providers: `Microsoft.Windows.Lxss.Manager`, `Microsoft.Windows.Subsystem.Lxss`
-- For graphical/audio (WSLg) issues, see `.github/copilot/wslg-logs.md`. `collect-wsl-logs.ps1` gathers WSLg logs (`/mnt/wslg`: weston.log, pulseaudio.log, wlog.log, stderr.log, versions.txt) plus crash dumps (`%TEMP%\wsl-crashes`, legacy `/mnt/wslg/dumps`) into a `wslg/` folder. WSLg code lives in https://github.com/microsoft/wslg, not this repo.
+- For graphical/audio (WSLg) issues, see `.github/copilot/wslg-logs.md`. `collect-wsl-logs.ps1` gathers WSLg logs (`/mnt/wslg`: weston.log, pulseaudio.log, wlog.log, stderr.log, versions.txt) into a `wslg/` folder using `wsl.exe --system`; crash dumps (`%TEMP%\wsl-crashes`, legacy `/mnt/wslg/dumps`) are only collected with `-Dump`. WSLg code lives in https://github.com/microsoft/wslg, not this repo.
 
 ### Debug Console (Linux)
 Add to `%USERPROFILE%\.wslconfig`:

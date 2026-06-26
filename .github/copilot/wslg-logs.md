@@ -5,8 +5,10 @@ source lives in a separate repository: https://github.com/microsoft/wslg. The ca
 of diagnostics to request for a WSLg bug is the WSLg repo bug report template
 (`.github/ISSUE_TEMPLATE/bug_report.yml` in microsoft/wslg).
 
-`diagnostics/collect-wsl-logs.ps1` collects these automatically into a `wslg/` subfolder of the
-log archive, so a standard WSL log collection already contains everything below.
+`diagnostics/collect-wsl-logs.ps1` collects the logs into a `wslg/` subfolder of the log archive
+(via `wsl.exe --system`, with a timeout so a wedged service can't hang collection), so a standard
+WSL log collection already contains the log files below. Crash dumps (`dumps/`, `wsl-crashes/`) are
+only collected when the script is run with `-Dump`.
 
 ## Architecture (just enough to read the logs)
 
@@ -28,8 +30,8 @@ WSLg runs a **system distro** (a small Azure Linux VM, separate from the user di
 | `wlog.log` | FreeRDP (WLog) log |
 | `pulseaudio.log` | PulseAudio log |
 | `stderr.log` | `WSLGd` and child-process stderr |
-| `dumps/` | Legacy WSLg crash dumps (older builds only) |
-| `wsl-crashes/` | Host-side WSLg crash dumps copied from `%TEMP%\wsl-crashes` (newer builds, e.g. `core.weston`) |
+| `dumps/` | Legacy WSLg crash dumps (older builds only; collected with `-Dump`) |
+| `wsl-crashes/` | Host-side WSLg crash dumps copied from `%TEMP%\wsl-crashes` (newer builds, e.g. `core.weston`; collected with `-Dump`) |
 
 ## Reading tips and common signatures
 
