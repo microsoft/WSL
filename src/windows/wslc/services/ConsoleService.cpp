@@ -39,7 +39,7 @@ namespace {
             return;
         }
 
-        FAIL_FAST_IF(!exitEvent);
+        WI_ASSERT(exitEvent);
         exitEvent.SetEvent();
 
         // Overlapped IO will get terminated by SetEvent(). Synchronous IO will not, so we need to cancel it.
