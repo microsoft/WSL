@@ -715,6 +715,48 @@ class WSLCE2EContainerRunTests
         session.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_InteractiveNoTTY_SelfExitingCommand)
+    {
+        // Same stdin-relay teardown deadlock as WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand (see it
+        // for the root cause), but via `container run -i`. run and exec share the client relay (both route through
+        // AttachToCurrentConsole), so the hang is not exec-specific. The test requires run to exit with the client
+        // still holding stdin open; RunWslcInteractive supplies stdin as a synchronous (non-overlapped) pipe, the
+        // case that triggers the bug.
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session =
+            RunWslcInteractive(std::format(L"container run -i --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+
+        session.ExpectStdout("hello\n");
+
+        // Generous timeout: it only bounds the failure (hang) path.
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        // Closing stdin after exit must stay a clean no-op.
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_InteractiveTTY_SelfExitingCommand)
+    {
+        // TTY counterpart of the above: `-t` routes through ConsoleService::RelayInteractiveTty, a separate
+        // stdin-worker teardown from the non-TTY path, so it could regress independently. Guards the TTY run path.
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session =
+            RunWslcInteractive(std::format(L"container run -it --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+
+        // The TTY translates the trailing LF to CRLF.
+        session.ExpectStdout("hello\r\n");
+
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_TerminalSize)
     {
         VerifyContainerIsNotListed(WslcContainerName);
