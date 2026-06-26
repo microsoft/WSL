@@ -6,14 +6,14 @@ Configures a process before start.
 public sealed class ProcessSettings
 {
     public string WorkingDirectory { get; set; }
-    public IList<string> CmdLine { get; set; }
+    public IList<string> CommandLine { get; set; }
     public IDictionary<string, string> EnvironmentVariables { get; set; }
     public ProcessOutputMode OutputMode { get; set; }
 }
 ```
 
 Notes:
-- `CmdLine` must be non-empty before calling `Process.Start()`.
+- `CommandLine` must be non-empty before calling `Process.Start()`.
 - The init process is started by `Container.Start()`, not by `Process.Start()`.
 - `OutputMode.Event` enables `OutputReceived` / `ErrorReceived`.
 - `OutputMode.Stream` enables `GetOutputStream(...)`.
@@ -24,7 +24,7 @@ Example:
 var processSettings = new ProcessSettings
 {
     WorkingDirectory = "/workspace",
-    CmdLine = new List<string> { "/bin/sh", "-c", "env | sort" },
+    CommandLine = new List<string> { "/bin/sh", "-c", "env | sort" },
     EnvironmentVariables = new Dictionary<string, string>
     {
         ["DEMO"] = "1",

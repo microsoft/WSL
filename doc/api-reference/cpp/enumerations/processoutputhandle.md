@@ -1,13 +1,9 @@
 # ProcessOutputHandle
 
-`Process::GetOutputStream(ProcessOutputHandle)` casts directly to `WslcProcessIOHandle`.
-The underlying C handles are:
-- `0` stdin
-- `1` stdout
-- `2` stderr
-
-
+`Process::GetOutputStream(ProcessOutputHandle)` accepts these values:
+- `StandardOutput = 1`
+- `StandardError = 2`
 
 ```cpp
-auto stdoutStream = process.GetOutputStream(static_cast<ProcessOutputHandle>(1));
+auto stdoutStream = process.GetOutputStream(ProcessOutputHandle::StandardOutput);
 ```

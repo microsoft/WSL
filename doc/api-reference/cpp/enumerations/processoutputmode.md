@@ -1,13 +1,14 @@
 # ProcessOutputMode
 
-- `Discard` (default in `winrt_Process.h` and `winrt_ProcessSettings.h`)
-- `Event` (`winrt_Process.cpp`)
-- `Stream` (`winrt_Process.cpp`, `winrt_Container.cpp`)
+Underlying values:
+- `Discard = 0`
+- `Stream = 1`
+- `Event = 2`
 
 Behavior:
 - `Discard`: no stdout/stderr events or output streams.
-- `Event`: stdout/stderr are delivered by callbacks and `OutputReceived` / `ErrorReceived`.
 - `Stream`: `GetOutputStream(...)` can be used.
+- `Event`: stdout/stderr are delivered by callbacks and `OutputReceived` / `ErrorReceived`.
 
 ```cpp
 procSettings.OutputMode(ProcessOutputMode::Event);

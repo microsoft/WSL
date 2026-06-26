@@ -33,7 +33,7 @@ int main()
 
     // 0. Check prerequisites
     auto missing = WslcService::GetMissingComponents();
-    if (missing != ComponentFlags::None)
+    if (missing != static_cast<Component>(0))
     {
         printf("WSL components are missing. Run: wsl --install\n");
         return 1;
@@ -45,7 +45,7 @@ int main()
     // 1. Create a session
     SessionSettings sessionSettings{ L"MyApp", L"C:\\WslcData" };
     sessionSettings.CpuCount(4);
-    sessionSettings.MemoryMB(4096);
+    sessionSettings.MemorySizeInMB(4096);
 
     Session session{ sessionSettings };
     session.Start();
@@ -61,7 +61,7 @@ int main()
     auto argv = single_threaded_vector<hstring>();
     argv.Append(L"/bin/echo");
     argv.Append(L"Hello from WSL Container!");
-    initProcSettings.CmdLine(argv);
+    initProcSettings.CommandLine(argv);
 
     // 4. Configure and create a container
     ContainerSettings containerSettings{ L"alpine:latest" };
@@ -96,9 +96,9 @@ int main()
     // 8. Clean up
     if (container.State() == ContainerState::Running)
     {
-        container.Stop(Signal::SigTerm, 10s);
+        container.Stop(Signal::SIGTERM, 10s);
     }
-    container.Delete(DeleteContainerFlags::None);
+    container.Delete(DeleteContainerOption::None);
     session.Terminate();
 
     return 0;

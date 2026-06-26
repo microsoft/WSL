@@ -5,8 +5,9 @@ Static entry point for service-level operations.
 ```csharp
 public static class WslcService
 {
-    public static ComponentFlags GetMissingComponents();
+    public static IReadOnlyList<Component> GetMissingComponents();
     public static ServiceVersion GetVersion();
+    public static void InstallWithDependencies();
     public static IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
 }
 ```
@@ -14,14 +15,14 @@ public static class WslcService
 ## WslcService.GetMissingComponents()
 
 ```csharp
-ComponentFlags missing = WslcService.GetMissingComponents();
-if (missing == ComponentFlags.None)
+IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
+if (missing.Count == 0)
 {
     Console.WriteLine("All required components are installed.");
 }
 else
 {
-    Console.WriteLine($"Missing: {missing}");
+    Console.WriteLine($"Missing: {string.Join(", ", missing)}");
 }
 ```
 
@@ -30,6 +31,12 @@ else
 ```csharp
 ServiceVersion version = WslcService.GetVersion();
 Console.WriteLine($"{version.Major}.{version.Minor}.{version.Revision}");
+```
+
+## WslcService.InstallWithDependencies()
+
+```csharp
+WslcService.InstallWithDependencies();
 ```
 
 ## WslcService.InstallWithDependenciesAsync()

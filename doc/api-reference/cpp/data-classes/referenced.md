@@ -3,7 +3,7 @@
 - `Session::PullImageAsync(PullImageOptions)` forwards a struct whose C shape is `{ uri, progressCallback, progressCallbackContext, registryAuth }`.
 - `Session::PushImageAsync(PushImageOptions)` forwards a struct whose C shape is `{ image, registryAuth, progressCallback, progressCallbackContext }`.
 - `Session::TagImage(TagImageOptions)` forwards a struct whose C shape is `{ image, repo, tag }`.
-- `Session::CreateVhdVolume(VhdOptions)` and `SessionSettings::VhdRequirements(VhdOptions)` use the C `WslcVhdRequirements` shape `{ name, sizeBytes, type, flags, uid, gid }`.
+- `Session::CreateVhdVolume(VhdOptions)` and `SessionSettings::VhdRequirements(VhdOptions)` use `VhdOptions` properties `Name`, `Size`, `Type`, and `Owner`.
 - `WslcService::GetVersion()` returns a `ServiceVersion` created from C `major`, `minor`, and `revision` values.
 
 

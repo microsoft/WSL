@@ -13,7 +13,9 @@ public sealed class ContainerSettings
     public ContainerNetworkingMode? NetworkingMode { get; set; }
     public string HostName { get; set; }
     public string DomainName { get; set; }
-    public ContainerFlags Flags { get; set; }
+    public bool EnableAutoRemove { get; set; }
+    public bool EnableGpu { get; set; }
+    public bool Privileged { get; set; }
     public IList<ContainerPortMapping> PortMappings { get; set; }
     public IList<ContainerVolume> Volumes { get; set; }
     public IList<ContainerNamedVolume> NamedVolumes { get; set; }
@@ -30,7 +32,7 @@ Example:
 ```csharp
 var init = new ProcessSettings
 {
-    CmdLine = new List<string> { "/bin/sh", "-c", "echo hello from init" },
+    CommandLine = new List<string> { "/bin/sh", "-c", "echo hello from init" },
     OutputMode = ProcessOutputMode.Event
 };
 
@@ -39,7 +41,7 @@ var containerSettings = new ContainerSettings("docker.io/library/alpine:latest")
     Name = "demo-container",
     InitProcess = init,
     NetworkingMode = ContainerNetworkingMode.Bridged,
-    Flags = ContainerFlags.AutoRemove,
+    EnableAutoRemove = true,
     PortMappings = new List<ContainerPortMapping>
     {
         new(8080, 80, PortProtocol.TCP)

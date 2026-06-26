@@ -8,24 +8,30 @@
 - `Start()`
 - `Terminate()`
 - `CreateContainer(ContainerSettings containerSettings)`
+- `PullImage(PullImageOptions options)`
 - `PullImageAsync(PullImageOptions options)`
+- `ImportImage(hstring path, hstring imageName)`
 - `ImportImageAsync(hstring path, hstring imageName)`
+- `LoadImage(hstring path)`
 - `LoadImageAsync(hstring path)`
+- `PushImage(PushImageOptions options)`
 - `PushImageAsync(PushImageOptions options)`
 - `DeleteImage(hstring nameOrId)`
 - `TagImage(TagImageOptions options)`
 - `CreateVhdVolume(VhdOptions options)`
 - `DeleteVhdVolume(hstring name)`
 - `Authenticate(Uri serverAddress, hstring username, hstring password)`
-- `Images()`
+- `GetImages()`
 - event `Terminated`
+- event `ProcessCrashed`
+- `Close()`
 
 **Behavior notes**
 - `Start()` is one-shot; calling it twice throws.
 - Most methods call `EnsureStarted()` first.
-- `ImportImageAsync` and `LoadImageAsync` are path-based only.
+- `ImportImage` / `ImportImageAsync` and `LoadImage` / `LoadImageAsync` are path-based only.
 - `Authenticate` requires a non-null `Uri` and non-empty username.
-- `Images()` materializes WinRT `ImageInfo` objects from the C array returned by `WslcListSessionImages`.
+- `GetImages()` materializes WinRT `ImageInfo` objects from the C array returned by `WslcListSessionImages`.
 
 **Examples**
 
@@ -34,6 +40,10 @@ Session session{ settings };
 session.Terminated([](SessionTerminationReason reason)
 {
     printf("session terminated: %d\n", static_cast<int>(reason));
+});
+session.ProcessCrashed([](ProcessCrashInformation const& info)
+{
+    printf("process crashed: %ws\n", info.ProcessName().c_str());
 });
 session.Start();
 ```
@@ -65,7 +75,7 @@ auto token = session.Authenticate(
 ```
 
 ```cpp
-auto images = session.Images();
+auto images = session.GetImages();
 for (auto const& image : images)
 {
     printf("%ws\n", image.Name().c_str());

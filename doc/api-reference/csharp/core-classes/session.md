@@ -3,25 +3,31 @@
 Represents a WSL-backed container host session.
 
 ```csharp
-public sealed class Session
+public sealed class Session : IDisposable
 {
     public Session(SessionSettings settings);
 
-    public IReadOnlyList<ImageInfo> Images { get; }
     public event SessionTerminationHandler Terminated;
+    public event ProcessCrashHandler ProcessCrashed;
 
     public void Start();
     public void Terminate();
     public Container CreateContainer(ContainerSettings containerSettings);
+    public void PullImage(PullImageOptions options);
     public IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
+    public void ImportImage(string path, string imageName);
     public IAsyncActionWithProgress<ImageProgress> ImportImageAsync(string path, string imageName);
+    public void LoadImage(string path);
     public IAsyncActionWithProgress<ImageProgress> LoadImageAsync(string path);
+    public void PushImage(PushImageOptions options);
     public IAsyncActionWithProgress<ImageProgress> PushImageAsync(PushImageOptions options);
     public void DeleteImage(string nameOrId);
     public void TagImage(TagImageOptions options);
     public void CreateVhdVolume(VhdOptions options);
     public void DeleteVhdVolume(string name);
     public string Authenticate(Uri serverAddress, string username, string password);
+    public IReadOnlyList<ImageInfo> GetImages();
+    public void Dispose();
 }
 ```
 
@@ -55,6 +61,14 @@ Creates a container object owned by the session.
 Container container = session.CreateContainer(containerSettings);
 ```
 
+## Session.PullImage(PullImageOptions)
+
+Synchronous image pull.
+
+```csharp
+session.PullImage(new PullImageOptions("docker.io/library/alpine:latest"));
+```
+
 ## Session.PullImageAsync(PullImageOptions)
 
 Awaitable pull with progress.
@@ -64,6 +78,14 @@ var pull = session.PullImageAsync(new PullImageOptions("docker.io/library/alpine
 pull.Progress = (op, progress) =>
     Console.WriteLine($"pull: {progress.Status} {progress.Id} {progress.CurrentBytes}/{progress.TotalBytes}");
 await pull;
+```
+
+## Session.ImportImage(string path, string imageName)
+
+Synchronous image import from a file path.
+
+```csharp
+session.ImportImage(@"C:\images\demo.tar", "demo:imported");
 ```
 
 ## Session.ImportImageAsync(string path, string imageName)
@@ -77,6 +99,14 @@ importOp.Progress = (op, progress) =>
 await importOp;
 ```
 
+## Session.LoadImage(string path)
+
+Synchronous image load from disk.
+
+```csharp
+session.LoadImage(@"C:\images\docker-save.tar");
+```
+
 ## Session.LoadImageAsync(string path)
 
 Loads an image archive from disk.
@@ -86,6 +116,14 @@ var loadOp = session.LoadImageAsync(@"C:\images\docker-save.tar");
 loadOp.Progress = (op, progress) =>
     Console.WriteLine($"load: {progress.Status} {progress.Id}");
 await loadOp;
+```
+
+## Session.PushImage(PushImageOptions)
+
+Synchronous image push to a registry.
+
+```csharp
+session.PushImage(new PushImageOptions("registry.example.com/demo:latest", authToken));
 ```
 
 ## Session.PushImageAsync(PushImageOptions)
@@ -120,8 +158,10 @@ session.TagImage(new TagImageOptions("alpine:latest", "registry.example.com/alpi
 Creates a named session VHD volume.
 
 ```csharp
-var vhd = new VhdOptions("cache", 2UL * 1024 * 1024 * 1024, VhdType.Dynamic);
-vhd.SetOwner(1000, 1000);
+var vhd = new VhdOptions("cache", 2UL * 1024 * 1024 * 1024, VhdType.Dynamic)
+{
+    Owner = new VhdOwner { Uid = 1000, Gid = 1000 }
+};
 session.CreateVhdVolume(vhd);
 ```
 
@@ -144,12 +184,12 @@ string token = session.Authenticate(
     "p@ssw0rd");
 ```
 
-## Session.Images
+## Session.GetImages()
 
 Returns a snapshot of images known to the session.
 
 ```csharp
-foreach (var image in session.Images)
+foreach (var image in session.GetImages())
 {
     Console.WriteLine(image.Name);
 }
@@ -162,4 +202,21 @@ Raised when the session termination event is signaled.
 ```csharp
 session.Terminated += reason =>
     Console.WriteLine($"Session terminated: {reason}");
+```
+
+## Session.ProcessCrashed event
+
+Raised when a process crash dump is reported.
+
+```csharp
+session.ProcessCrashed += information =>
+    Console.WriteLine($"Process crashed: {information.ProcessName} ({information.Pid})");
+```
+
+## Session.Dispose()
+
+Releases the underlying WinRT session object.
+
+```csharp
+session.Dispose();
 ```

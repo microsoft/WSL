@@ -5,16 +5,18 @@ Static entry points over the service-level C API.
 **Methods**
 - `GetMissingComponents()`
 - `GetVersion()`
+- `InstallWithDependencies()`
 - `InstallWithDependenciesAsync()`
 
 **Behavior notes**
-- `GetMissingComponents()` returns the direct cast of `WslcComponentFlags`.
+- `GetMissingComponents()` returns a `Component` bitmask.
 - `GetVersion()` returns a `ServiceVersion` constructed from `major`, `minor`, and `revision`.
+- `InstallWithDependencies()` installs dependencies synchronously.
 - `InstallWithDependenciesAsync()` runs on a background thread and reports `InstallProgress`.
 
 ```cpp
 auto missing = WslcService::GetMissingComponents();
-if (missing != static_cast<ComponentFlags>(0))
+if (missing != static_cast<Component>(0))
 {
     auto install = WslcService::InstallWithDependenciesAsync();
     install.Progress([](auto&&, InstallProgress const& p)

@@ -3,12 +3,13 @@
 **Methods**
 - `Start()`
 - `Stop(Signal signal, TimeSpan timeout)`
-- `Delete(DeleteContainerFlags flags)`
+- `Delete(DeleteContainerOption options)`
 - `CreateProcess(ProcessSettings newProcessSettings)`
 - `Inspect()`
 - `Id()`
 - `InitProcess()`
 - `State()`
+- `Close()`
 
 **Behavior notes**
 - `Start()` automatically sets `WSLC_CONTAINER_START_FLAG_ATTACH` if an init process exists and its output mode is `Event` or `Stream`.
@@ -26,7 +27,7 @@ container.Stop(static_cast<Signal>(15), std::chrono::seconds(10));
 ```
 
 ```cpp
-container.Delete(static_cast<DeleteContainerFlags>(0));
+container.Delete(DeleteContainerOption::None);
 ```
 
 ```cpp

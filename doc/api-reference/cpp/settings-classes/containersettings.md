@@ -11,7 +11,9 @@
 - `NetworkingMode()` / setter (`None` and `Bridged` only)
 - `HostName()` / setter
 - `DomainName()` / setter
-- `Flags()` / setter
+- `EnableAutoRemove()` / setter
+- `EnableGpu()` / setter
+- `Privileged()` / setter
 - `PortMappings()` / setter
 - `Volumes()` / setter
 - `NamedVolumes()` / setter
@@ -30,7 +32,9 @@ containerSettings.NetworkingMode(
         .as<winrt::Windows::Foundation::IReference<ContainerNetworkingMode>>());
 containerSettings.HostName(L"demo-host");
 containerSettings.DomainName(L"localdomain");
-containerSettings.Flags(static_cast<ContainerFlags>(0));
+containerSettings.EnableAutoRemove(false);
+containerSettings.EnableGpu(false);
+containerSettings.Privileged(false);
 
 auto ports = single_threaded_vector<ContainerPortMapping>();
 ports.Append(ContainerPortMapping{ 8080, 80, PortProtocol::TCP });

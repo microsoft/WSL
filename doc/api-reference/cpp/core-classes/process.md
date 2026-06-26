@@ -4,21 +4,22 @@
 
 **Methods / events**
 - `Start()`
-- `Pid()`
-- `State()`
-- `ExitCode()`
 - `Signal(Signal signal)`
 - `GetOutputStream(ProcessOutputHandle outputHandle)`
 - `GetInputStream()`
+- `Pid()`
+- `State()`
+- `ExitCode()`
 - event `OutputReceived`
 - event `ErrorReceived`
 - event `Exited`
+- `Close()`
 
 **Behavior notes**
 - `Start()` cannot be called on the init process.
-- `Start()` requires a non-empty `ProcessSettings::CmdLine()`.
-- `GetOutputStream()` requires `OutputMode::Stream`.
-- `OutputReceived` and `ErrorReceived` require `OutputMode::Event`.
+- `Start()` requires a non-empty `ProcessSettings::CommandLine()`.
+- `GetOutputStream()` requires `ProcessOutputMode::Stream`.
+- `OutputReceived` and `ErrorReceived` require `ProcessOutputMode::Event`.
 - `Exited` is raised by the exit callback in event mode, and by waiting on the process exit event in stream/discard mode.
 
 **Examples**
@@ -48,7 +49,7 @@ auto stdinStream = proc.GetInputStream();
 ```cpp
 ProcessSettings streamSettings;
 streamSettings.OutputMode(ProcessOutputMode::Stream);
-// ... set CmdLine ...
+// ... set CommandLine ...
 auto streamProc = container.CreateProcess(streamSettings);
 streamProc.Start();
 auto stdoutStream = streamProc.GetOutputStream(static_cast<ProcessOutputHandle>(1));
@@ -58,7 +59,7 @@ auto stderrStream = streamProc.GetOutputStream(static_cast<ProcessOutputHandle>(
 ```cpp
 ProcessSettings eventSettings;
 eventSettings.OutputMode(ProcessOutputMode::Event);
-// ... set CmdLine ...
+// ... set CommandLine ...
 auto eventProc = container.CreateProcess(eventSettings);
 eventProc.OutputReceived([](auto const& data)
 {

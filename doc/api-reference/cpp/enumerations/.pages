@@ -1,16 +1,16 @@
 title: Enumerations
 nav:
   - index.md
-  - sessionfeatureflags.md
-  - sessionterminationreason.md
+  - component.md
+  - deletecontaineroption.md
+  - error.md
   - containernetworkingmode.md
-  - containerflags.md
   - portprotocol.md
   - containerstate.md
   - signal.md
-  - deletecontainerflags.md
-  - processoutputmode.md
   - processoutputhandle.md
+  - processoutputmode.md
   - processstate.md
+  - vhdtype.md
   - imageprogressstatus.md
-  - componentflags.md
+  - sessionterminationreason.md

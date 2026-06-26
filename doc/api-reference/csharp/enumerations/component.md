@@ -1,10 +1,8 @@
-# ComponentFlags
+# Component
 
 ```csharp
-[Flags]
-public enum ComponentFlags : uint
+public enum Component
 {
-    None = 0,
     VirtualMachinePlatform = 1,
     WslPackage = 2,
     SdkNeedsUpdate = 4

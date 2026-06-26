@@ -4,6 +4,3 @@ nav:
   - wslcgetmissingcomponents.md
   - wslcgetversion.md
   - wslcinstallwithdependencies.md
-  - dllmain.md
-  - dllgetactivationfactory.md
-  - dllcanunloadnow.md

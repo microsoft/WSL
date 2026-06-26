@@ -11,7 +11,7 @@ STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback
 
 Return value: `HRESULT`.
 
-Header note: callbacks are only made for components actively installed by this call. The header comment also says that list can be acquired beforehand with `WslcCanRun`, although `wslcsdk.h` does not declare a public `WslcCanRun` prototype.
+Header note: callbacks are only made for components actively installed by this call. That list can be acquired beforehand with [`WslcGetMissingComponents`](wslcgetmissingcomponents.md).
 
 Example:
 

@@ -3,7 +3,7 @@
 Represents a container inside a session.
 
 ```csharp
-public sealed class Container
+public sealed class Container : IDisposable
 {
     public string Id { get; }
     public Process InitProcess { get; }
@@ -11,9 +11,10 @@ public sealed class Container
 
     public void Start();
     public void Stop(Signal signal, TimeSpan timeout);
-    public void Delete(DeleteContainerFlags flags);
+    public void Delete(DeleteContainerOption option);
     public Process CreateProcess(ProcessSettings newProcessSettings);
     public string Inspect();
+    public void Dispose();
 }
 ```
 
@@ -38,12 +39,12 @@ Stops the container with a signal and timeout.
 container.Stop(Signal.SIGTERM, TimeSpan.FromSeconds(10));
 ```
 
-## Container.Delete(DeleteContainerFlags)
+## Container.Delete(DeleteContainerOption)
 
 Deletes the container.
 
 ```csharp
-container.Delete(DeleteContainerFlags.Force);
+container.Delete(DeleteContainerOption.Force);
 ```
 
 ## Container.CreateProcess(ProcessSettings)
@@ -53,7 +54,7 @@ Creates a secondary process object inside the container.
 ```csharp
 var execSettings = new ProcessSettings
 {
-    CmdLine = new List<string> { "/bin/sh", "-c", "echo secondary process" },
+    CommandLine = new List<string> { "/bin/sh", "-c", "echo secondary process" },
     OutputMode = ProcessOutputMode.Event
 };
 
@@ -91,4 +92,12 @@ Gets the current container state.
 
 ```csharp
 Console.WriteLine(container.State);
+```
+
+## Container.Dispose()
+
+Releases the underlying WinRT container object.
+
+```csharp
+container.Dispose();
 ```

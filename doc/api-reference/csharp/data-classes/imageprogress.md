@@ -5,10 +5,10 @@ Progress payload for pull/import/load/push operations.
 ```csharp
 public sealed class ImageProgress
 {
-    public string Id { get; set; }
-    public ImageProgressStatus Status { get; set; }
-    public ulong CurrentBytes { get; set; }
-    public ulong TotalBytes { get; set; }
+    public string Id { get; }
+    public ImageProgressStatus Status { get; }
+    public ulong CurrentBytes { get; }
+    public ulong TotalBytes { get; }
 }
 ```
 

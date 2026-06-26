@@ -25,7 +25,7 @@ class Program
     {
         // 0. Check prerequisites
         var missing = WslcService.GetMissingComponents();
-        if (missing != ComponentFlags.None)
+        if (missing.Count > 0)
         {
             Console.WriteLine("WSL components are missing. Run: wsl --install");
             return 1;
@@ -38,7 +38,7 @@ class Program
         var sessionSettings = new SessionSettings("MyApp", @"C:\WslcData")
         {
             CpuCount = 4,
-            MemoryMB = 4096
+            MemorySizeInMB = 4096
         };
 
         var session = new Session(sessionSettings);
@@ -53,7 +53,7 @@ class Program
         // 3. Configure an init process
         var initProcSettings = new ProcessSettings
         {
-            CmdLine = new[] { "/bin/echo", "Hello from WSL Container!" },
+            CommandLine = new[] { "/bin/echo", "Hello from WSL Container!" },
             OutputMode = ProcessOutputMode.Event
         };
 
@@ -85,9 +85,9 @@ class Program
         // 8. Clean up
         if (container.State == ContainerState.Running)
         {
-            container.Stop(Signal.SigTerm, TimeSpan.FromSeconds(10));
+            container.Stop(Signal.SIGTERM, TimeSpan.FromSeconds(10));
         }
-        container.Delete(DeleteContainerFlags.None);
+        container.Delete(DeleteContainerOption.None);
         session.Terminate();
 
         return exitCode;
