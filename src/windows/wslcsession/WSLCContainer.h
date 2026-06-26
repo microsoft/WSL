@@ -177,8 +177,8 @@ private:
     void MapPorts();
     void UnmapPorts();
 
-    // Acquires or releases the activity hold so it is held exactly while the container is in an
-    // active (Created/Running) state, keeping the session's VM alive across idle teardown.
+    // Acquires or releases the activity hold so it is held exactly while the container is Running,
+    // keeping the session's VM alive across idle teardown.
     __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
@@ -226,9 +226,9 @@ private:
     IORelay& m_ioRelay;
     std::string m_networkMode;
 
-    // Held (non-empty) exactly while the container is Created/Running so the session's VM stays
-    // alive even when no client holds the wrapper (e.g. a detached `run -d` container). Maintained
-    // by UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
+    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
+    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
     ActivityRef m_activityHold;
 };
 
