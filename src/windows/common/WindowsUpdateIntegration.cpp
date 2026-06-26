@@ -127,17 +127,12 @@ namespace anon {
 } // namespace anon
 
 WindowsUpdateContext::WindowsUpdateContext() :
-    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>(), WslProductIdentifier())
+    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>())
 {
 }
 
-WindowsUpdateContext::WindowsUpdateContext(std::wstring product) :
-    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>(), std::move(product))
-{
-}
-
-WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory, std::wstring product) :
-    m_factory(std::move(factory)), m_product(std::move(product))
+WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory) :
+    m_factory(std::move(factory)), m_product(WslProductIdentifier())
 {
     m_session = m_factory->CreateUpdateSession();
 
@@ -158,9 +153,12 @@ std::wstring WindowsUpdateContext::WslProductIdentifier()
     return STRING_TO_WIDE_STRING(DCAT_PRODUCT_NAME);
 }
 
-void WindowsUpdateContext::EnsureProductRegistryEntry() const
+void WindowsUpdateContext::EnsureProductRegistryEntry(bool reset) const
 {
-    wsl::windows::common::helpers::RegisterWithDcat(false);
+    if (reset || !wsl::windows::common::helpers::VersionRegisteredWithDcat())
+    {
+        wsl::windows::common::helpers::RegisterWithDcat(false);
+    }
 }
 
 size_t WindowsUpdateContext::SearchForUpdates()
@@ -336,14 +334,15 @@ void WindowsUpdateContext::InstallUpdates(const std::function<void(uint32_t)>& p
     THROW_IF_FAILED(installationHResult);
 }
 
-void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<void(uint32_t)>& progress)
+void WindowsUpdateContext::RunUpdateFlow(UpdateOptions options, const std::function<void(uint32_t)>& progress)
 {
     TraceLoggingWriteTagged(
         *m_activity,
         "RunUpdateFlow",
         TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
-        TraceLoggingBool(forceInstall, "forceInstall"));
+        TraceLoggingBool(options == UpdateOptions::ResetProductRegistration, "forceInstall"),
+        TraceLoggingBool(options == UpdateOptions::EnsureProductRegistration, "ensureInstall"));
 
     static_assert(
         DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");
@@ -353,9 +352,9 @@ void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<
         progress(0);
     }
 
-    if (forceInstall)
+    if (options != UpdateOptions::None)
     {
-        EnsureProductRegistryEntry();
+        EnsureProductRegistryEntry(options == UpdateOptions::ResetProductRegistration);
     }
 
     size_t updateCount = SearchForUpdates();

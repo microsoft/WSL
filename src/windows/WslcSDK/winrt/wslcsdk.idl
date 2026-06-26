@@ -249,6 +249,12 @@ namespace Microsoft.WSL.Containers
         UInt32 Revision { get; };
     };
 
+    runtimeclass InstallOptions
+    {
+        IVectorView<Component> Components;
+        Boolean Repair;
+    };
+
     runtimeclass InstallProgress
     {
         Component Component { get; };
@@ -260,8 +266,8 @@ namespace Microsoft.WSL.Containers
     {
         static IVectorView<Component> GetMissingComponents();
         static ServiceVersion GetVersion();
-        static void InstallWithDependencies();
-        static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
+        static void InstallWithDependencies(InstallOptions options);
+        static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync(InstallOptions options);
     };
 
     enum VhdType

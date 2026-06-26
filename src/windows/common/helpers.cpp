@@ -38,6 +38,7 @@ using wsl::windows::common::helpers::LaunchWslRelayFlags;
 
 constexpr auto c_WslSupportInterfaceKey = L"Software\\Classes\\Interface\\{46f3c96d-ffa3-42f0-b052-52f5e7ecbb08}";
 constexpr auto c_WslSupportInterfaceName = L"IWslSupport";
+constexpr auto c_DcatRegistryVersionValueName = L"Version";
 
 namespace {
 
@@ -744,6 +745,18 @@ bool wsl::windows::common::helpers::TryAttachConsole()
     return ReopenStdHandles();
 }
 
+std::optional<std::wstring> wsl::windows::common::helpers::VersionRegisteredWithDcat()
+try
+{
+    auto [dcatKey, result] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_READ);
+    if (SUCCEEDED(result))
+    {
+        return wsl::windows::common::registry::ReadOptionalString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName);
+    }
+    return {};
+}
+CATCH_LOG()
+
 void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
 try
 {
@@ -758,7 +771,7 @@ try
     }
 
     wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
-    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName, registeredVersion.c_str());
 }
 CATCH_LOG()
 

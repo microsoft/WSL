@@ -1728,8 +1728,9 @@ try
             };
         }
 
-        wsl::windows::common::WindowsUpdateContext wuContext;
-        wuContext.RunUpdateFlow(isRepair, callback);
+        using WindowsUpdateContext = wsl::windows::common::WindowsUpdateContext;
+        WindowsUpdateContext wuContext;
+        wuContext.RunUpdateFlow(isRepair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration, callback);
 
         if (wuContext.GetUpdateCount() == 0)
         {

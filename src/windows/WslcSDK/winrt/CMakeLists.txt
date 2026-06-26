@@ -9,6 +9,7 @@ set(SOURCES
     ContainerVolume.cpp
     ImageInfo.cpp
     ImageProgress.cpp
+    InstallOptions.cpp
     InstallProgress.cpp
     Process.cpp
     ProcessCrashInformation.cpp
@@ -33,6 +34,7 @@ set(HEADERS
     Helpers.h
     ImageInfo.h
     ImageProgress.h
+    InstallOptions.h
     InstallProgress.h
     Process.h
     ProcessCrashInformation.h
