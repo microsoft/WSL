@@ -1002,49 +1002,6 @@ class MountTests
         VERIFY_ARE_EQUAL(!offline, wsl::windows::common::disk::IsDiskOnline(disk.get()));
     }
 
-    static std::wstring GetBlockDeviceInWsl()
-    {
-        // Wait for the disk to be attached
-        const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-
-        bool done = false;
-        while (true)
-        {
-            for (wchar_t name = 'a'; name < 'z'; name++)
-            {
-                std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
-                cmd += name;
-
-                std::wstring out;
-                try
-                {
-                    out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
-                }
-                CATCH_LOG()
-
-                Trim(out);
-
-                // Disk size is 20MB, so 20 * 1024 * 1024 bytes
-                if (out == L"20971520")
-                {
-                    return std::wstring(L"/dev/sd") + name;
-                }
-            }
-
-            if (done)
-            {
-                break;
-            }
-
-            done = std::chrono::steady_clock::now() > timeout;
-        }
-
-        VERIFY_FAIL(L"Failed to find the block device in WSL");
-
-        // Unreachable.
-        return {};
-    }
-
     static bool IsBlockDevicePresent(const std::wstring& Device)
     {
         const auto Cmd = L"test -e " + Device;
