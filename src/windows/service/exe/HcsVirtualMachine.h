@@ -103,6 +103,17 @@ private:
     // Shares: key is ShareId, value is nullopt for Plan9 or DeviceInstanceId for VirtioFS
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
 
+    // Aggregate virtio-fs devices shared by every Windows-folder share.
+    // There are two because the device host enforces a single readonly
+    // setting per aggregate: read-write shares are registered as children
+    // of the read-write device and read-only shares as children of the
+    // read-only device (whose backend rejects writes). Each is created
+    // lazily on its first share and torn down with the VM.
+    bool m_virtioFsAggregateCreated{false};
+    GUID m_virtioFsAggregateDevice{};
+    bool m_virtioFsAggregateReadOnlyCreated{false};
+    GUID m_virtioFsAggregateReadOnlyDevice{};
+
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;
     std::atomic<bool> m_vmSavedStateCaptured = false;

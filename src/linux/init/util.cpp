@@ -923,13 +923,30 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            //
+            // For aggregate virtio-fs shares the user-visible mount is a
+            // bind from the aggregate device's child entry, with Root set
+            // to "/<subname>". Strip the leading "/" to recover the
+            // subname; "/" itself means a legacy direct-mount share.
+            //
+            // After QueryVirtiofsMountSource resolves to the Windows path,
+            // overwrite Root to "/" so the bind-mount concatenation below
+            // does not append "/<subname>" onto the Windows source path.
+            //
+            const char* Root = MountEnum.Current().Root;
+            const char* Subname = (Root && Root[0] == '/') ? Root + 1 : (Root ? Root : "");
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, Subname);
             if (MountSource.empty())
             {
                 continue;
             }
 
             MountEnum.Current().Source = MountSource.data();
+            if (Subname != nullptr && *Subname != '\0')
+            {
+                MountEnum.Current().Root[0] = '/';
+                MountEnum.Current().Root[1] = '\0';
+            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
