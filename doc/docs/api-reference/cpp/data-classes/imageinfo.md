@@ -3,6 +3,7 @@
 Read-only wrapper created from `WslcImageInfo`.
 
 **Properties**
+
 - `Name()` → image name
 - `Sha256()` → 32-byte buffer
 - `Size()` → image size

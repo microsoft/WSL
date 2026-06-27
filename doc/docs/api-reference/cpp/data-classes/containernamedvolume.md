@@ -3,6 +3,7 @@
 Attaches a named session VHD volume to a container.
 
 **Constructors / properties**
+
 - `ContainerNamedVolume(hstring name, hstring containerPath, bool readOnly)`
 - `Name()` / setter
 - `ContainerPath()` / setter

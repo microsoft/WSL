@@ -1,6 +1,7 @@
 # SessionTerminationHandler
 
 Observed use:
+
 - `Session::Terminated` raises one argument: `SessionTerminationReason reason`.
 
 ```cpp

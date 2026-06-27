@@ -3,6 +3,7 @@
 Maps a Windows host port to a container port.
 
 **Constructors / properties**
+
 - `ContainerPortMapping(uint16_t windowsPort, uint16_t containerPort, PortProtocol protocol)`
 - `WindowsPort()` / setter
 - `ContainerPort()` / setter
@@ -10,6 +11,7 @@ Maps a Windows host port to a container port.
 - `WindowsAddress()` / setter
 
 **Important notes**
+
 - `WindowsAddress` is implemented.
 - The setter accepts only `Windows::Networking::HostName` values whose type is `Ipv4` or `Ipv6`.
 - `ToStruct()` uses `inet_pton` and stores a real `sockaddr_in` / `sockaddr_in6`.
