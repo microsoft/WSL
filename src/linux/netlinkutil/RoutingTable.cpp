@@ -188,6 +188,42 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
         throw RuntimeErrorWithSourceLocation(std::format("Loopback route {} missing destination or next hop", utils::Stringify(route)));
     }
 
+    if constexpr (std::is_same_v<TAddr, in6_addr>)
+    {
+        // The IPv6 loopback destination (::1) cannot be used as a route preferred source on the GELNIC: unlike IPv4
+        // (where EnableLoopbackRouting turns on route_localnet/accept_local so 127.0.0.1 is a valid source), IPv6 has
+        // no route_localnet equivalent, so the kernel deterministically rejects a route carrying RTA_PREFSRC=::1 with
+        // EINVAL ("Invalid source address"). We therefore omit RTA_PREFSRC entirely for IPv6 loopback routes (the
+        // attribute is left out of the message struct so no stray zero-length attribute is serialized). The route
+        // still installs and steers ::1 traffic onto the GELNIC; outbound source-address selection is left to the
+        // kernel.
+        struct Message : RouteMessage
+        {
+            utils::AddressAttribute<TAddr> to;
+            utils::AddressAttribute<TAddr> via;
+        } __attribute__((packed));
+
+        GNS_LOG_INFO(
+            "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
+            route.to.value().Addr().c_str(),
+            route.via.value().Addr().c_str(),
+            RouteOperationToString(operation),
+            NetLinkFormatFlagsToString(flags).c_str());
+
+        SendMessage<Message>(route, operation, flags, [&](Message& message) {
+            message.route.rtm_flags |= RTNH_F_ONLINK;
+            GNS_LOG_INFO(
+                "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}) RTA_PREFSRC ([not set, IPv6]) RTA_PRIORITY "
+                "([not set])",
+                route.to.value().Addr().c_str(),
+                route.via.value().Addr().c_str());
+            utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
+            utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
+        });
+
+        return;
+    }
+
     struct Message : RouteMessage
     {
         utils::AddressAttribute<TAddr> to;
@@ -208,9 +244,6 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
         // loopback or local packets out of the guest, they won't have different source and destination
         // IPs, since they won't be accepted by the Windows host. Having the routes with source == destination is
         // also consistent with the how routes from the "local" routing table look like.
-        //
-        // Note: Since the IPv6 loopback range is ::1/128, we don't need separate code such as the one below
-        // converting from 127.0.0.0 to 127.0.0.1.
         if (route.to.value().Addr().compare("127.0.0.0") == 0)
         {
             GNS_LOG_INFO(

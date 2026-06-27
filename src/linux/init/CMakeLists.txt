@@ -12,6 +12,7 @@ set(SOURCES
     init.cpp
     localhost.cpp
     Localization.cpp
+    Loopback6Bpf.cpp
     NetworkManager.cpp
     plan9.cpp
     telemetry.cpp
@@ -36,6 +37,7 @@ set(HEADERS
     GnsEngine.h
     GnsPortTracker.h
     localhost.h
+    Loopback6Bpf.h
     NetworkManager.h
     plan9.h
     telemetry.h
@@ -47,6 +49,7 @@ set(HEADERS
     wslpath.h)
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
+set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../bpf")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
 add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${INIT_LIBRARIES}")
 add_dependencies(init localization)

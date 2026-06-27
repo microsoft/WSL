@@ -309,9 +309,18 @@ void ConsommeNetworking::RefreshGuestConnection()
 
 void ConsommeNetworking::SetupLoopbackDevice()
 {
-    const auto* clientIp = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
-    const auto deviceOptions =
+    const bool loopbackClientIp = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LoopbackClientIp);
+    const auto* clientIp = loopbackClientIp ? L"127.0.0.1" : L"169.254.73.250";
+    auto deviceOptions =
         std::format(L"client_ip={};client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248", clientIp);
+
+    // Provision the IPv6 loopback address on the device so the relay backend will inject ::1-destined connections
+    // onto loopback0 (the guest side adds the matching ::1/128 route via the IPv6 loopback gateway). Without this the
+    // backend has no IPv6 address for the device and ::1 traffic is never relayed onto the interface.
+    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6) && loopbackClientIp)
+    {
+        deviceOptions += L";client_ip_ipv6=::1";
+    }
 
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
         VIRTIO_NET_DEVICE_ID,
