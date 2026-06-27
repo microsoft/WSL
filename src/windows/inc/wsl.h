@@ -29,6 +29,8 @@ Abstract:
 #define WSL_EXPORT_ARG_VHD_OPTION L"--vhd"
 #define WSL_HELP_ARG L"--help"
 #define WSL_IMPORT_ARG L"--import"
+#define WSL_IMPORT_ARG_FS_MOUNT_OPTIONS L"--fs-mount-options"
+#define WSL_IMPORT_ARG_FS_TYPE L"--fs-type"
 #define WSL_IMPORT_ARG_STDIN L"-"
 #define WSL_IMPORT_ARG_VERSION L"--version"
 #define WSL_IMPORT_ARG_VHD L"--vhd"
@@ -40,6 +42,8 @@ Abstract:
 #define WSL_INSTALL_ARG_FIXED_VHD L"--fixed-vhd"
 #define WSL_INSTALL_ARG_FROM_FILE_OPTION L'f'
 #define WSL_INSTALL_ARG_FROM_FILE_LONG L"--from-file"
+#define WSL_INSTALL_ARG_FS_MOUNT_OPTIONS L"--fs-mount-options"
+#define WSL_INSTALL_ARG_FS_TYPE L"--fs-type"
 #define WSL_INSTALL_ARG_LEGACY_LONG L"--legacy"
 #define WSL_INSTALL_ARG_LOCATION_OPTION L'l'
 #define WSL_INSTALL_ARG_LOCATION_LONG L"--location"
@@ -75,6 +79,7 @@ Abstract:
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION L's'
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L"--set-sparse"
 #define WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG L"--set-default-user"
+#define WSL_MANAGE_ARG_SET_FS_MOUNT_OPTIONS_LONG L"--set-fs-mount-options"
 #define WSL_MOUNT_ARG L"--mount"
 #define WSL_MOUNT_ARG_VHD_OPTION_LONG L"--vhd"
 #define WSL_MOUNT_ARG_BARE_OPTION_LONG L"--bare"
