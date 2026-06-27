@@ -1,11 +1,3 @@
-# pip install click gitpython
-
-# Usage:
-
-# python tools\devops\validate-line-endings.py src test
-# python tools\devops\validate-line-endings.py src test --fix
-# python tools\devops\validate-line-endings.py src/windows
-
 import click
 import os.path
 from git import Repo
