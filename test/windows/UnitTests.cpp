@@ -1352,6 +1352,29 @@ class UnitTests
         VERIFY_ARE_EQUAL(output, ExpectedOutput);
     }
 
+    static std::wstring ExpectedUsageMessage()
+    {
+        std::wstring expectedUsageMessage;
+        for (auto e : wsl::shared::Localization::MessageWslUsage())
+        {
+            if (e == L'\n')
+            {
+                expectedUsageMessage += L'\r';
+            }
+
+            expectedUsageMessage += e;
+        }
+
+        return expectedUsageMessage + L"\r\n";
+    }
+
+    static void VerifyInvalidUsage(const std::wstring& Cmd)
+    {
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(Cmd.c_str(), -1);
+        VERIFY_ARE_EQUAL(ExpectedUsageMessage(), output);
+        VERIFY_ARE_EQUAL(error, L"");
+    }
+
     TEST_METHOD(ErrorMessages)
     {
         if (LxsstuVmMode()) // wsl --mount and bridged networking only exist in WSL2.
@@ -1429,6 +1452,12 @@ class UnitTests
             // wsl.exe --manage --resize requires WSL2.
             ValidateErrorMessage(
                 L"--manage test_distro --resize 10GB",
+                L"This operation is only supported by WSL2.",
+                L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // wsl.exe --manage --compact requires WSL2.
+            ValidateErrorMessage(
+                L"--manage test_distro --compact",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
@@ -1545,20 +1574,7 @@ class UnitTests
 
         VerifyOutput(L"--install --no-distribution", L"The operation completed successfully. \r\n");
 
-        {
-            std::wstring expectedUsageMessage;
-            for (auto e : wsl::shared::Localization::MessageWslUsage())
-            {
-                if (e == L'\n')
-                {
-                    expectedUsageMessage += L'\r';
-                }
-
-                expectedUsageMessage += e;
-            }
-
-            VerifyOutput(L"--manage --move .", expectedUsageMessage + L"\r\n", -1);
-        }
+        VerifyInvalidUsage(L"--manage --move .");
     }
 
     TEST_METHOD(CommandLineParsing)
@@ -1582,6 +1598,11 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"a\\\"", L"\"a\"");
         VerifyOutput(L"--exec echo -n \"a\"\"b\"", L"a\"b");
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
+    }
+
+    TEST_METHOD(ManageInvalidUsage)
+    {
+        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
     // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.
@@ -1689,6 +1710,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a stopped WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -3217,6 +3241,87 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
+
+    }
+
+    WSL2_TEST_METHOD(Compact)
+    {
+        constexpr auto name = L"compact-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        WslShutdown();
+
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        auto getVhdSizeOnDisk = [](const std::filesystem::path& path) {
+            DWORD highPart{};
+            SetLastError(NO_ERROR);
+            const auto lowPart = GetCompressedFileSizeW(path.c_str(), &highPart);
+            THROW_LAST_ERROR_IF(lowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR);
+
+            ULARGE_INTEGER size{};
+            size.LowPart = lowPart;
+            size.HighPart = highPart;
+            return size.QuadPart;
+        };
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --set-sparse false", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
+        const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+            name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync && fstrim -v /'", name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeBeforeCompact = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        const auto sizeAfterCompact = getVhdSizeOnDisk(vhdPath);
+        LogInfo(
+            "Compact test VHD size on disk: before write=%llu, after write=%llu, before compact=%llu, after compact=%llu",
+            static_cast<unsigned long long>(sizeBeforeWrite),
+            static_cast<unsigned long long>(sizeAfterWrite),
+            static_cast<unsigned long long>(sizeBeforeCompact),
+            static_cast<unsigned long long>(sizeAfterCompact));
+
+        VERIFY_IS_TRUE(sizeBeforeCompact >= sizeAfterCompact);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeAfterCompact + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
     }
 
     WSL2_TEST_METHOD(FileOffsets)
