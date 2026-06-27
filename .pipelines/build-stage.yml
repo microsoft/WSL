@@ -113,6 +113,9 @@ stages:
           - script: python tools\devops\validate-copyright-headers.py test
             displayName: Validate copyright headers (test/)
 
+          - script: python tools\devops\validate-copyright-headers.py
+            displayName: Validate line feeds
+
           - task: CMake@1
             displayName: "CMake ."
             inputs:
