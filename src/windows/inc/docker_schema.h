@@ -297,6 +297,7 @@ struct CreateContainer
     std::string Hostname;
     std::string Domainname;
     std::optional<std::string> StopSignal;
+    std::optional<int> StopTimeout;
     std::optional<std::string> WorkingDir;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
@@ -307,7 +308,7 @@ struct CreateContainer
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
 };
 
 struct ContainerInspectState
@@ -329,8 +330,10 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Env;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
+    std::optional<std::string> StopSignal;
+    std::optional<int> StopTimeout;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout);
 };
 
 struct InspectMount
