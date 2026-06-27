@@ -399,6 +399,31 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(
+    const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    std::map<std::string, std::string> headers = {{"Content-Type", "application/x-tar"}};
+    if (ContentLength.has_value())
+    {
+        headers["Content-Length"] = std::to_string(ContentLength.value());
+    }
+
+    return SendRequestImpl(verb::put, url, {}, headers);
+}
+
+std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket), response.chunked()};
+}
+
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
     return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);

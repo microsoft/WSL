@@ -1092,34 +1092,205 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        // If the export failed, accumulate the error message.
-        errorJson.append(buffer.data(), buffer.size());
-    };
 
     if (SocketCodePair.first != 200)
     {
-        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+        // Read the error body synchronously with a timeout. HTTP/1.1 keep-alive would hang
+        // the async io.Run() path because the socket never closes.
+        lock.reset();
+
+        DWORD timeout = 2000;
+        LOG_LAST_ERROR_IF(
+            setsockopt(SocketCodePair.second.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        std::array<char, 4096> buf{};
+        for (;;)
+        {
+            auto bytesRead = recv(SocketCodePair.second.get(), buf.data(), static_cast<int>(buf.size()), 0);
+            if (bytesRead <= 0)
+            {
+                break;
+            }
+            errorJson.append(buf.data(), bytesRead);
+        }
     }
     else
     {
-        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-            HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
+        io.AddHandle(
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
+            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+
+        // Release the lock so the container can still be interacted with while the export is in progress.
+        // Past this point, no member variables can be accessed.
+        lock.reset();
+
+        io.Run({});
     }
-
-    // Release the lock so the container can still be interacted with while the export is in progress.
-    // Past this point, no member variables can be accessed.
-    lock.reset();
-
-    io.Run({});
 
     if (SocketCodePair.first != 200)
     {
         // Export failed, parse the error message.
-        auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+        try
+        {
+            auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
+        }
+    }
+}
+
+void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const
+{
+    auto lock = m_lock.lock_shared();
+
+    std::optional<uint64_t> contentLength;
+    if (ContentSize > 0)
+    {
+        contentLength = ContentSize;
+    }
+
+    auto requestContext = m_dockerClient.PutArchive(m_id, DestPath, contentLength);
+
+    auto userHandle = m_wslcSession.OpenUserHandle(TarHandle);
+
+    auto io = m_wslcSession.CreateIOContext();
+
+    std::optional<std::string> pendingErrorJson;
+    unsigned int httpStatusCode = 0;
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("ContainerUploadArchiveHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        httpStatusCode = response.result_int();
+        if (httpStatusCode != 200)
+        {
+            pendingErrorJson.emplace();
+        }
+    };
+
+    auto onProgress = [&](const gsl::span<char>& buffer) {
+        if (pendingErrorJson.has_value())
+        {
+            pendingErrorJson->append(buffer.data(), buffer.size());
+        }
+    };
+
+    // Shutdown the Docker stream's write side when the input is fully read.
+    auto onInputComplete = [socket = requestContext->stream.native_handle()]() {
+        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
+    };
+
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(
+        HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, HandleWrapper{requestContext->stream.native_handle()}));
+
+    io.AddHandle(
+        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(*requestContext, std::move(onHttpResponse), std::move(onProgress)),
+        wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+
+    // Release the lock so the container can still be interacted with while the upload is in progress.
+    lock.reset();
+
+    io.Run({});
+
+    if (pendingErrorJson.has_value())
+    {
+        try
+        {
+            auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, httpStatusCode == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, *pendingErrorJson);
+        }
+    }
+}
+
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+{
+    auto lock = m_lock.lock_shared();
+
+    auto [statusCode, socket, isChunked] = m_dockerClient.GetArchive(m_id, SrcPath);
+
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
+
+    wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
+
+    std::string errorJson;
+
+    if (statusCode != 200)
+    {
+        // Read the error body synchronously. Docker error responses are small JSON and already
+        // buffered in the socket. We cannot use the async io.Run() path with a raw ReadHandle
+        // because HTTP/1.1 keep-alive holds the connection open indefinitely, causing a hang.
+        // Use a short receive timeout so we don't block if Docker keeps the connection alive.
+        lock.reset();
+
+        DWORD timeout = 2000; // 2 seconds — more than enough for a buffered error body
+        LOG_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        std::array<char, 4096> buf{};
+        for (;;)
+        {
+            auto bytesRead = recv(socket.get(), buf.data(), static_cast<int>(buf.size()), 0);
+            if (bytesRead <= 0)
+            {
+                break;
+            }
+            errorJson.append(buf.data(), bytesRead);
+        }
+    }
+    else
+    {
+        if (isChunked)
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+        else
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+
+        lock.reset();
+
+        io.Run({});
+    }
+
+    if (statusCode != 200)
+    {
+        try
+        {
+            auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, statusCode == 404);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        }
+        catch (const wil::ResultException&)
+        {
+            throw;
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
+        }
     }
 }
 
@@ -2333,6 +2504,24 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
     WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
+}
+
+HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, DestPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, DestPath[0] == '\0');
+    return CallImpl(&WSLCContainerImpl::UploadArchive, TarHandle, DestPath, ContentSize);
+}
+
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
 }
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
