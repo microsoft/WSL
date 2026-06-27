@@ -1253,6 +1253,11 @@ Return Value:
         return -1;
     }
 
+    if (WriteToFile("/proc/sys/kernel/perf_event_paranoid", "1\n") < 0)
+    {
+        return -1;
+    }
+
     //
     // Set the hostname.
     //
