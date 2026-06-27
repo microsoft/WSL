@@ -2,7 +2,7 @@ import click
 import os.path
 from git import Repo
 
-EXTENSIONS = ['.cpp', '.h', '.hpp', '.idl', '.resw']
+EXTENSIONS = ['.c', '.cpp', '.h', '.hpp', '.idl', '.resw']
 
 def is_source_file(path: str) -> bool:
     return any(path.casefold().endswith(e) for e in EXTENSIONS)
@@ -17,10 +17,10 @@ def to_crlf(content: bytes) -> bytes:
     return content.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n')
 
 @click.command()
-@click.argument('repo', required=True, type=click.Path(exists=True))
+@click.argument('path', required=True, type=click.Path(exists=True))
 @click.option('--fix', is_flag=True, help='Convert mismatching files to CRLF line endings.')
-def main(repo: str, fix: bool):
-    repo = Repo(repo, search_parent_directories=True)
+def main(path: str, fix: bool):
+    repo = Repo(path, search_parent_directories=True)
 
     tracked = repo.git.ls_files('-z').split('\0')
     source_files = [os.path.join(repo.working_tree_dir, e) for e in tracked if e and is_source_file(e)]
