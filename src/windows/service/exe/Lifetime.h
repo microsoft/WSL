@@ -45,6 +45,7 @@ public:
         OwnedProcess(const OwnedProcess&) = delete;
         void operator=(const OwnedProcess&) = delete;
 
+        void CancelWait() const;
         void InitializeListenForTermination(_In_ PTP_WAIT_CALLBACK Callback, _In_ PVOID Context);
         void ListenForTermination() const;
 
