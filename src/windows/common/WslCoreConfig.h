@@ -27,12 +27,13 @@ Abstract:
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
-        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
-        T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
-        T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
-        T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
-        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
+        T_VALUE(c, DrvFsTransports), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), \
+        T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), \
+        T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), \
+        T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), T_ENUM(c, MemoryReclaim), \
+        T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), T_VALUE(c, ProcessorCount), \
+        T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), T_SET(c, SystemDistroPath), \
+        T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
 constexpr auto ToString(ConfigKeyPresence key)
@@ -292,6 +293,7 @@ namespace ConfigSetting {
         static constexpr auto HostAddressLoopback = "experimental.hostAddressLoopback";
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
         static constexpr auto Swiotlb = "experimental.swiotlb";
+        static constexpr auto DrvFsTransports = "experimental.drvFsTransports";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -306,6 +308,22 @@ struct Config
     void ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt_ HANDLE UserToken);
     void SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const;
     static unsigned long WriteConfigFile(_In_ LPCWSTR ConfigFilePath, _In_ ConfigKey KeyToWrite, _In_ bool RemoveKey = false);
+
+    // True when the host should set up the virtio9p plan9 server for DrvFs.
+    // The experimental DrvFsTransports option forces it on so that all three
+    // DrvFs transports can be tested concurrently in a single VM.
+    bool IsVirtio9pTransportAvailable() const noexcept
+    {
+        return EnableVirtio9p || DrvFsTransports;
+    }
+
+    // True when the host should be able to serve virtiofs shares for DrvFs.
+    // The experimental DrvFsTransports option forces it on so that all three
+    // DrvFs transports can be tested concurrently in a single VM.
+    bool IsVirtioFsTransportAvailable() const noexcept
+    {
+        return EnableVirtioFs || DrvFsTransports;
+    }
 
     std::filesystem::path KernelPath;
     std::wstring KernelCommandLine;
@@ -327,6 +345,7 @@ struct Config
     bool EnableVirtio9p = false;
     bool EnableVirtio = !shared::Arm64 || windows::common::helpers::IsWindows11OrAbove();
     bool EnableVirtioFs = false;
+    bool DrvFsTransports = false;
     int KernelDebugPort = 0;
     bool EnableGpuSupport = true;
     bool EnableGuiApps = true;
