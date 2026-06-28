@@ -1,12 +1,14 @@
 # ProcessSettings
 
 **Properties**
+
 - `WorkingDirectory()` / setter
 - `CommandLine()` / setter
 - `EnvironmentVariables()` / setter
 - `OutputMode()` / setter
 
 **Important notes**
+
 - `CommandLine(nullptr)` and `EnvironmentVariables(nullptr)` are rejected.
 - `Process::Start()` later requires a **non-empty** `CommandLine()`.
 - `ProcessOutputMode::Event` installs C callbacks; `ProcessOutputMode::Stream` expects stream access; `Discard` is the default.

@@ -3,6 +3,7 @@
 `Process` objects are returned by `Container::CreateProcess()` and `Container::InitProcess()`.
 
 **Methods / events**
+
 - `Start()`
 - `Signal(Signal signal)`
 - `GetOutputStream(ProcessOutputHandle outputHandle)`
@@ -16,6 +17,7 @@
 - `Close()`
 
 **Behavior notes**
+
 - `Start()` cannot be called on the init process.
 - `Start()` requires a non-empty `ProcessSettings::CommandLine()`.
 - `GetOutputStream()` requires `ProcessOutputMode::Stream`.

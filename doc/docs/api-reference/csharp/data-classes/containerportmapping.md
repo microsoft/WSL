@@ -17,6 +17,7 @@ public sealed class ContainerPortMapping
 ```
 
 Notes:
+
 - `WindowsAddress` **is implemented**.
 - It accepts only `HostNameType.Ipv4` and `HostNameType.Ipv6` values.
 - DNS names are rejected.

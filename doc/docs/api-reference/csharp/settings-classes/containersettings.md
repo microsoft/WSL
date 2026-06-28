@@ -23,6 +23,7 @@ public sealed class ContainerSettings
 ```
 
 Notes:
+
 - `PortMappings`, `Volumes`, and `NamedVolumes` are mutable collections.
 - `InitProcess` is optional.
 - `NetworkingMode` is nullable; `null` means “leave default behavior”.

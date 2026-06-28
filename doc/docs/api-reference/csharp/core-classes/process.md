@@ -23,6 +23,7 @@ public sealed class Process
 ```
 
 Notes:
+
 - Call `Start()` only for **secondary processes** created by `Container.CreateProcess(...)`.
 - The init process is started by `Container.Start()`.
 - `OutputReceived` and `ErrorReceived` require `OutputMode.Event`.

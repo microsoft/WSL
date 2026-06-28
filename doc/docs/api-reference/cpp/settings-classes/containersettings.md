@@ -1,10 +1,12 @@
 # ContainerSettings
 
 **Constructor**
+
 - `ContainerSettings(hstring imageName)`
   - `imageName` must be non-empty.
 
 **Properties**
+
 - `ImageName()` / setter
 - `Name()` / setter
 - `InitProcess()` / setter
@@ -19,6 +21,7 @@
 - `NamedVolumes()` / setter
 
 **Important notes**
+
 - Collection setters reject `nullptr`.
 - When converting to the C struct, null elements inside the collections are rejected.
 

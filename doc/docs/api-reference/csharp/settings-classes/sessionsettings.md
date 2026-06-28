@@ -18,6 +18,7 @@ public sealed class SessionSettings
 ```
 
 Notes:
+
 - `CpuCount`, `MemorySizeInMB`, and `Timeout` are optional nullable values.
 - `Timeout` must be positive and must fit in a `uint32` millisecond count.
 - `VhdRequirements` is optional.

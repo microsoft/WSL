@@ -3,6 +3,7 @@
 `Container::Delete()` takes `DeleteContainerOption`.
 
 Underlying values:
+
 - `None = 0`
 - `Force = 1`
 

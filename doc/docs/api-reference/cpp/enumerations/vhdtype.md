@@ -1,6 +1,7 @@
 # VhdType
 
 Underlying values:
+
 - `Dynamic = 0`
 - `Fixed = 1`
 

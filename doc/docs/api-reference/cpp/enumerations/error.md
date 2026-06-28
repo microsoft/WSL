@@ -1,6 +1,7 @@
 # Error
 
 Underlying HRESULT values:
+
 - `ImageNotFound = -2147219967`
 - `ContainerPrefixAmbiguous = -2147219966`
 - `ContainerNotFound = -2147219965`
