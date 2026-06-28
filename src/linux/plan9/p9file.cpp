@@ -128,9 +128,9 @@ int OpenFlagsToLinuxFlags(OpenFlags flags)
 Expected<struct stat> File::Stat()
 {
     struct stat st;
-    // Acquire the lock to prevent the file name from changing.
+    // Acquire the lock to prevent the held fd from changing.
     std::shared_lock<std::shared_mutex> lock{m_Lock};
-    int result = fstatat(m_Root->RootFd, m_FileName.c_str(), &st, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH);
+    int result = fstatat(PathFd(), "", &st, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH);
     if (result < 0)
     {
         return LxError{-errno};
@@ -144,13 +144,31 @@ bool File::IsOnRoot(const std::shared_ptr<const IRoot>& root)
     return m_Root == root;
 }
 
+// Returns the fd that pins this fid's inode (installed by Walk/Create, or the
+// share RootFd for the root fid). Callers must hold m_Lock once the fid is
+// published; Walk() may call this before publication, while it still has
+// exclusive access to the fid.
+int File::PathFd() const noexcept
+{
+    return m_PathFd ? m_PathFd.get() : m_Root->RootFd;
+}
+
 // Opens the file.
 // N.B. The caller is responsible for setting the right thread uid/gid before calling this.
 Expected<wil::unique_fd> File::OpenFile(int openFlags)
 {
-    // Acquire the lock to prevent the file name from changing.
+    // Acquire the lock to prevent the held fd from changing.
     std::shared_lock<std::shared_mutex> lock{m_Lock};
-    return util::OpenAt(m_Root->RootFd, m_FileName, openFlags | O_NOFOLLOW);
+
+    // Refuse to reopen a symlink: without O_NOFOLLOW, the /proc/self/fd/N
+    // reopen below would follow it.
+    if (WI_IsFlagSet(m_Qid.Type, QidType::Symlink))
+    {
+        return LxError{LX_ELOOP};
+    }
+
+    // Reopen via /proc/self/fd/N so we open the inode pinned by PathFd().
+    return util::Reopen(PathFd(), openFlags & ~O_NOFOLLOW);
 }
 
 // Validates that this file exists and sets the m_Qid member.
@@ -187,22 +205,21 @@ File::File(std::shared_ptr<const Root> root) : m_Root{root}
 {
 }
 
-// Copies a file. This does not clone the open file state, just the name and qid.
-File::File(const File& file) : m_FileName{file.m_FileName}, m_Root{file.m_Root}, m_Qid{file.m_Qid}
+// Copies a file. Clones the path fd and metadata, not the open file state.
+File::File(const File& file) : m_FileName{file.m_FileName}, m_Root{file.m_Root}, m_Qid{file.m_Qid}, m_Device{file.m_Device}
 {
+    if (file.m_PathFd)
+    {
+        int duped = fcntl(file.m_PathFd.get(), F_DUPFD_CLOEXEC, 3);
+        THROW_LAST_ERROR_IF(duped < 0);
+        m_PathFd.reset(duped);
+    }
 }
 
 // Updates the path to a child file entry in a directory. Must be called with a newly
 // constructed file, not one that has been opened.
 Expected<Qid> File::Walk(std::string_view name)
 {
-    // TODO: This is not safe if walk is called multiple times. While
-    // we verify that the item is not a symlink in this step, the file could've
-    // been replaced with a symlink since the qid was determined.
-    // The only way to make this foolproof is to open an fd for every file, and
-    // use fstatat for the next level. A chroot environment can be used to
-    // prevent the links from escaping the share root, but it can't avoid
-    // accidentally following links at all.
     if (!WI_IsFlagSet(m_Qid.Type, QidType::Directory))
     {
         return LxError{LX_ENOTDIR};
@@ -211,36 +228,31 @@ Expected<Qid> File::Walk(std::string_view name)
     // No lock is taken here; this function is only called on fid's that have
     // not yet been inserted in the list and are therefore not reachable from
     // other threads.
-    AppendPath(m_FileName, name);
 
-    // Revert to the old info on error.
-    const auto oldQid = m_Qid;
-    const auto oldDevice = m_Device;
-    auto restoreName = wil::scope_exit([&]() {
-        m_Qid = oldQid;
-        m_Device = oldDevice;
-        const auto index = m_FileName.find_last_of('/');
-        if (index == std::string::npos)
-        {
-            m_FileName.resize(0);
-        }
-        else
-        {
-            m_FileName.resize(index);
-        }
-    });
-
-    // TODO: Maybe handle multiple items in a single walk call so changing ids is done only once.
     util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
-    const auto parentDevice = m_Device;
-    LX_INT err = ValidateExists();
-    if (err != 0)
+
+    // Open the child via the parent's held fd. O_PATH | O_NOFOLLOW pins the
+    // named entry's inode atomically (a later symlink swap can't redirect it)
+    // and returns a handle even if the entry is itself a symlink. All later
+    // ops on this fid use the held fd; subsequent Walks on a symlink fid are
+    // rejected by the ENOTDIR check at the top of this function.
+    const std::string leaf{name};
+    wil::unique_fd childFd{openat(PathFd(), leaf.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC)};
+    if (!childFd)
     {
-        return LxError{err};
+        return LxError{-errno};
+    }
+
+    struct stat st;
+    if (fstatat(childFd.get(), "", &st, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) < 0)
+    {
+        return LxError{-errno};
     }
 
     // Check if this is a mount point, and if so if it's a drvfs or 9p mount.
-    if (parentDevice != m_Device)
+    const auto parentDevice = m_Device;
+    const dev_t newDevice = st.st_dev;
+    if (parentDevice != newDevice)
     {
         try
         {
@@ -248,7 +260,7 @@ Expected<Qid> File::Walk(std::string_view name)
             // look at /proc/<tid>/mountinfo instead of /proc/self/
             const std::string mountInfoPath = std::format("/proc/{}/mountinfo", gettid());
             mountutil::MountEnum mountEnum(mountInfoPath.c_str());
-            bool found = mountEnum.FindMount([this](auto entry) { return entry.Device == m_Device; });
+            bool found = mountEnum.FindMount([newDevice](auto entry) { return entry.Device == newDevice; });
 
             // If the mount was found and it's a drvfs mount, deny access.
             if (found && (mountEnum.Current().FileSystemType == c_drvfsFsType || mountEnum.Current().FileSystemType == c_p9FsType ||
@@ -260,28 +272,32 @@ Expected<Qid> File::Walk(std::string_view name)
         CATCH_LOG()
     }
 
-    restoreName.release();
+    // Commit. The path string is kept for the path-based child ops that
+    // still use it (chmod/chown/etc.).
+    AppendPath(m_FileName, name);
+    m_Qid = StatToQid(st);
+    m_Device = newDevice;
+    m_PathFd = std::move(childFd);
     return m_Qid;
 }
 
 // Reads the attributes of a file or directory.
 Expected<std::tuple<UINT64, Qid, StatResult>> File::GetAttr(UINT64 mask)
 {
-    std::string fileName;
+    struct stat stat;
     Qid qid;
     {
-        // Retrieve the qid and open a handle under lock.
+        // Hold the lock so the path fd cannot change underneath us.
         std::shared_lock<std::shared_mutex> lock{m_Lock};
         qid = m_Qid;
-        fileName = m_FileName;
-    }
 
-    util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
-    struct stat stat;
-    int error = fstatat(m_Root->RootFd, fileName.c_str(), &stat, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH);
-    if (error < 0)
-    {
-        return LxError{-errno};
+        // Override the thread's uid/gid only for the stat call itself.
+        util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
+        int error = fstatat(PathFd(), "", &stat, AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH);
+        if (error < 0)
+        {
+            return LxError{-errno};
+        }
     }
 
     StatResult result{};
@@ -484,10 +500,19 @@ Expected<Qid> File::Open(OpenFlags flags)
         return LxError{LX_EINVAL};
     }
 
+    // Refuse to open a symlink — the /proc/self/fd/N reopen below would follow it.
+    if (WI_IsFlagSet(m_Qid.Type, QidType::Symlink))
+    {
+        return LxError{LX_ELOOP};
+    }
+
     WI_ClearFlag(flags, OpenFlags::Create);
     util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
-    // Don't use OpenHandle because the lock is already held.
-    auto file{util::OpenAt(m_Root->RootFd, m_FileName, OpenFlagsToLinuxFlags(flags) | O_NOFOLLOW)};
+
+    // Reopen via /proc/self/fd/N. Strip O_NOFOLLOW because Reopen's O_NOFOLLOW
+    // branch is path-based and would defeat the TOCTOU guarantee; the
+    // symlink-qid check above ensures we never reopen through a symlink.
+    auto file{util::Reopen(PathFd(), OpenFlagsToLinuxFlags(flags) & ~O_NOFOLLOW)};
     if (!file)
     {
         return file.Unexpected();
@@ -517,23 +542,36 @@ Expected<Qid> File::Create(std::string_view name, OpenFlags flags, UINT32 mode, 
     // The specified gid is currently ignored. Supporting it would be possible, but it would be
     // necessary to make sure that the user is a member of the specified group.
     util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
-    auto newFileName = ChildPathWithLockHeld(name);
-    auto file{util::OpenAt(m_Root->RootFd, newFileName, OpenFlagsToLinuxFlags(flags) | O_CREAT | O_NOFOLLOW, mode)};
+
+    // Create relative to the parent's held fd; O_NOFOLLOW refuses to follow an
+    // existing symlink entry.
+    const std::string leaf{name};
+    wil::unique_fd file{openat(PathFd(), leaf.c_str(), OpenFlagsToLinuxFlags(flags) | O_CREAT | O_NOFOLLOW | O_CLOEXEC, mode)};
     if (!file)
     {
-        return file.Unexpected();
+        return LxError{-errno};
     }
 
     struct stat st;
-    int result = fstat(file->get(), &st);
+    int result = fstat(file.get(), &st);
     if (result < 0)
     {
         return LxError{-errno};
     }
 
+    // Dup the new fd to use as the path fd, pinning the created inode.
+    int dupedFd = fcntl(file.get(), F_DUPFD_CLOEXEC, 3);
+    if (dupedFd < 0)
+    {
+        return LxError{-errno};
+    }
+    wil::unique_fd newPathFd{dupedFd};
+
+    auto newFileName = ChildPathWithLockHeld(name);
     m_FileName = std::move(newFileName);
-    m_Io = CoroutineIoIssuer(file->get());
-    m_File = std::move(file.Get());
+    m_Io = CoroutineIoIssuer(file.get());
+    m_File = std::move(file);
+    m_PathFd = std::move(newPathFd);
     m_Qid = StatToQid(st);
     m_Device = st.st_dev;
     return m_Qid;
