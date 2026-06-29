@@ -61,6 +61,7 @@ _(Since,          "since",               NO_ALIAS,          Kind::Value,       L
 _(Until,          "until",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_UntilArgDescription()) \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
+_(Gateway,        "gateway",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkGatewayArgDescription()) \
 _(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
@@ -70,6 +71,7 @@ _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L
 _(ImportFile,     "file",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImportFileArgDescription()) \
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
+_(Internal,       "internal",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \
@@ -103,6 +105,7 @@ _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription()) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,     "stop-signal",         NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_StopSignalArgDescription()) \
+_(Subnet,         "subnet",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkSubnetArgDescription()) \
 _(Tail,           "tail",                L"n",              Kind::Value,       Localization::WSLCCLI_TailArgDescription()) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \
 _(Target,         "target",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_TargetArgDescription()) \

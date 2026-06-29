@@ -2437,7 +2437,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
     std::string name = Options->Name;
-    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
+    std::string driver = Options->Driver != nullptr ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
@@ -2446,19 +2446,6 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
-
-    // Reject case-mismatches of reserved driver-option keys.
-    static constexpr std::array<std::string_view, 3> c_reservedDriverOpts{"Internal", "Subnet", "Gateway"};
-    for (const auto& [key, _] : driverOpts)
-    {
-        const bool caseMismatch = std::any_of(c_reservedDriverOpts.begin(), c_reservedDriverOpts.end(), [&](std::string_view opt) {
-            return key != opt && wsl::shared::string::IsEqual(key, opt, true);
-        });
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), caseMismatch);
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -2473,20 +2460,19 @@ try
     request.Labels = labels;
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
-    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
-    {
-        request.Internal = (it->second == "true");
-    }
+    request.Internal = static_cast<bool>(Options->Internal);
 
-    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
+
+    if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
-        ipamConfig.Subnet = it->second;
+        ipamConfig.Subnet = Options->Subnet;
 
-        auto gatewayIt = driverOpts.find("Gateway");
-        if (gatewayIt != driverOpts.end())
+        if (Options->Gateway != nullptr)
         {
-            ipamConfig.Gateway = gatewayIt->second;
+            ipamConfig.Gateway = Options->Gateway;
         }
 
         auto& ipam = request.IPAM.emplace();
@@ -2494,16 +2480,11 @@ try
         ipam.Config.emplace().push_back(std::move(ipamConfig));
     }
 
-    // Forward any non-reserved driver options to Docker. Reserved keys (Internal, Subnet, Gateway)
-    // are translated into Docker's typed network fields above and not echoed back here.
-    for (const auto& [key, value] : driverOpts)
+    if (!driverOpts.empty())
     {
-        if (std::none_of(c_reservedDriverOpts.begin(), c_reservedDriverOpts.end(), [&](std::string_view opt) { return key == opt; }))
+        request.Options.emplace();
+        for (const auto& [key, value] : driverOpts)
         {
-            if (!request.Options.has_value())
-            {
-                request.Options.emplace();
-            }
             (*request.Options)[key] = value;
         }
     }
