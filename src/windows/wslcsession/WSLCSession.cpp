@@ -2447,6 +2447,13 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
+    for (const auto& [key, _] : driverOpts)
+    {
+        const bool isReserved = wsl::shared::string::IsEqual(key, "Internal", true) ||
+                                wsl::shared::string::IsEqual(key, "Subnet", true) || wsl::shared::string::IsEqual(key, "Gateway", true);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), isReserved);
+    }
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
