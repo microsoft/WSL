@@ -49,18 +49,19 @@ namespace {
         {
             if (!CancelSynchronousIo(threadHandle))
             {
-                // ERROR_NOT_FOUND just means nothing was in flight to cancel (expected); any other error
-                // means the cancel cannot make progress and would otherwise spin this loop, so throw.
+                // ERROR_NOT_FOUND means nothing to cancel; any other error is a corrupt handle that shouldn't happen.
                 const auto cancelError = GetLastError();
-                THROW_WIN32_IF(cancelError, cancelError != ERROR_NOT_FOUND);
+                if (cancelError != ERROR_NOT_FOUND)
+                {
+                    FAIL_FAST_WIN32(cancelError);
+                }
             }
 
             waitResult = WaitForSingleObject(threadHandle, 50);
         }
 
-        // The loop only breaks on a non-timeout result; anything but WAIT_OBJECT_0 (e.g. WAIT_FAILED) is an
-        // error -- surface it instead of join()ing on a thread we can't confirm has exited.
-        THROW_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
+        // Anything but WAIT_OBJECT_0 (e.g. WAIT_FAILED) means a corrupt handle that shouldn't happen.
+        FAIL_FAST_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
 
         inputThread.join();
     }
