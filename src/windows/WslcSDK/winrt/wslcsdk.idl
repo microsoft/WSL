@@ -251,6 +251,8 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass InstallOptions
     {
+        InstallOptions();
+
         IVectorView<Component> Components;
         Boolean Repair;
     };

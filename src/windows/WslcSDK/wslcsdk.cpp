@@ -1669,7 +1669,7 @@ STDAPI WslcInstallWithDependencies(
 try
 {
     // This API cannot update the SDK that the client is using.
-    RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE));
+    RETURN_HR_IF(WSLC_E_SDK_UPDATE_NEEDED, WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE));
 
     HRESULT result = S_OK;
 

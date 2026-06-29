@@ -746,16 +746,19 @@ bool wsl::windows::common::helpers::TryAttachConsole()
 }
 
 std::optional<std::wstring> wsl::windows::common::helpers::VersionRegisteredWithDcat()
-try
 {
-    auto [dcatKey, result] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_READ);
-    if (SUCCEEDED(result))
+    try
     {
-        return wsl::windows::common::registry::ReadOptionalString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName);
+        auto [dcatKey, result] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_READ);
+        if (SUCCEEDED(result))
+        {
+            return wsl::windows::common::registry::ReadOptionalString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName);
+        }
     }
+    CATCH_LOG()
+
     return {};
 }
-CATCH_LOG()
 
 void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
 try
