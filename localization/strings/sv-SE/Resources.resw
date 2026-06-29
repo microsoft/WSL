@@ -2382,6 +2382,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Det gick inte att skapa volymen {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>För många volymer har monterats (gräns: {}). Starta om sessionen om du vill montera fler volymer. Detta kommer att åtgärdas i en framtida version.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Porten {} används redan. Det går inte att starta containern {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
