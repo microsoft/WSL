@@ -6286,7 +6286,7 @@ class WSLCTests
                     }
                 });
 
-                // Wait for at least 2 seconds for the stop to complete to prove that the default 1 second timeout was correctly overriden.
+                // Wait for at least 2 seconds for the stop to complete to prove that the default 1 second timeout was correctly overridden.
                 auto waitResult = WaitForSingleObject(stopThread.native_handle(), 2000);
 
                 VERIFY_ARE_EQUAL(waitResult, WAIT_TIMEOUT);

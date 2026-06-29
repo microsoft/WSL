@@ -1041,7 +1041,7 @@ class WSLCE2EContainerRunTests
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
-        // Validate that the correct error is displayed is the user passes the exact 'WSLC_STOP_TIMEOUT_DEFAULT' value.
+        // Validate that the correct error is displayed if the user passes the exact 'WSLC_STOP_TIMEOUT_DEFAULT' value.
         {
             auto result = RunWslc(std::format(
                 L"container run --rm --stop-timeout {} --name {} {}", WSLC_STOP_TIMEOUT_DEFAULT, WslcContainerName, DebianImage.NameAndTag()));
