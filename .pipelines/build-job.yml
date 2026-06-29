@@ -313,6 +313,10 @@ jobs:
 
             Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
 
+            mkdir $(ob_outputDirectory)\testbin\devops
+            Copy-Item -Path "tools\devops\Run-AsaInstallDiff.ps1" -Destination "$(ob_outputDirectory)\testbin\devops\Run-AsaInstallDiff.ps1"
+            Copy-Item -Path "tools\devops\asa-expected-findings.json" -Destination "$(ob_outputDirectory)\testbin\devops\asa-expected-findings.json"
+
             Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
             Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
             Move-Item -Path "diagnostics\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
