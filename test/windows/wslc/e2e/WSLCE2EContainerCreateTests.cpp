@@ -772,6 +772,8 @@ class WSLCE2EContainerCreateTests
 
             const auto inspect = InspectContainer(WslcContainerName);
             VERIFY_IS_FALSE(inspect.Config.StopTimeout.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+
         }
     }
 

@@ -1021,6 +1021,7 @@ class WSLCE2EContainerRunTests
 
             const auto inspect = InspectContainer(WslcContainerName);
             VERIFY_IS_FALSE(inspect.Config.StopTimeout.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
 
@@ -1037,6 +1038,14 @@ class WSLCE2EContainerRunTests
             auto result =
                 RunWslc(std::format(L"container run --rm --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // Validate that the correct error is displayed is the user passes the exact 'WSLC_STOP_TIMEOUT_DEFAULT' value.
+        {
+            auto result = RunWslc(std::format(
+                L"container run --rm --stop-timeout {} --name {} {}", WSLC_STOP_TIMEOUT_DEFAULT, WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop timeout value: -2147483648\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }

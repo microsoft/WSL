@@ -71,6 +71,7 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName = {});
 
+void ValidateStopTimeout(const std::vector<std::wstring>& values, const std::wstring& argName);
 void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring& argName);
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName = {});
 

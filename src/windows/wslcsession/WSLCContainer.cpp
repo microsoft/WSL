@@ -67,12 +67,12 @@ using WslcInspectContainer = wsl::windows::common::wslc_schema::InspectContainer
 
 namespace {
 
-void ValidateStopTimeout(LONG TimeoutSeconds)
+void ValidateStopTimeout(LONG TimeoutSeconds, bool allowDefault)
 {
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcInvalidStopTimeout(TimeoutSeconds),
-        TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT);
+        TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && (!allowDefault || TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT));
 }
 
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
@@ -952,7 +952,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         SignalArg = Signal;
     }
 
-    ValidateStopTimeout(TimeoutSeconds);
+    ValidateStopTimeout(TimeoutSeconds, true);
 
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
@@ -1432,9 +1432,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsStopTimeout))
     {
-        ValidateStopTimeout(containerOptions.StopTimeout);
+        ValidateStopTimeout(containerOptions.StopTimeout, false);
 
-        THROW_HR_IF(E_INVALIDARG, containerOptions.StopTimeout == WSLC_STOP_TIMEOUT_DEFAULT);
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 

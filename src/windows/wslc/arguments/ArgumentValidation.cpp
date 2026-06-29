@@ -49,7 +49,7 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::StopTimeout:
-        validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        validation::ValidateIntegerFromString<long>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
         break;
 
     case ArgType::ShmSize:
