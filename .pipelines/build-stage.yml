@@ -104,7 +104,7 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
-          - script: pip install -r tools/devops/requirements.txt --break-system-packages
+          - script: pip install --user -r tools/devops/requirements.txt --break-system-packages
             displayName: Install dependencies
 
           - script: python tools/devops/validate-localization.py
@@ -117,7 +117,7 @@ stages:
             displayName: Validate copyright headers (test/)
 
           - script: python tools\devops\validate-line-endings.py .
-            displayName: Validate line feeds
+            displayName: Validate line endings
 
           - task: CMake@1
             displayName: "CMake ."
