@@ -297,7 +297,7 @@ struct CreateContainer
     std::string Hostname;
     std::string Domainname;
     std::optional<std::string> StopSignal;
-    std::optional<int> StopTimeout;
+    std::optional<long> StopTimeout;
     std::optional<std::string> WorkingDir;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
