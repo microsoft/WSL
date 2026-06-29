@@ -1,19 +1,10 @@
-/*++
-
-Copyright (c) Microsoft. All rights reserved.
-
-Module Name:
-
-    HttpHeaderEndDetector.h
-
-Abstract:
-
-    This file contains a small state machine that detects the end-of-header
-    marker ("\r\n\r\n") in an HTTP message, one byte at a time.
-
---*/
+// Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+
+#include <algorithm>
+#include <deque>
+#include <string_view>
 
 namespace wsl::windows::common {
 
@@ -22,45 +13,32 @@ class HttpHeaderEndDetector
 {
 public:
     // Returns true once the full "\r\n\r\n" terminator has been consumed.
-    bool Consume(char byte) noexcept
+    bool Consume(char byte)
     {
-        switch (m_state)
+        if (m_done)
         {
-        case State::Start:
-            m_state = (byte == '\r') ? State::Cr : State::Start;
-            break;
-        case State::Cr:
-            m_state = (byte == '\n') ? State::CrLf : ((byte == '\r') ? State::Cr : State::Start);
-            break;
-        case State::CrLf:
-            m_state = (byte == '\r') ? State::CrLfCr : State::Start;
-            break;
-        case State::CrLfCr:
-            m_state = (byte == '\n') ? State::Done : ((byte == '\r') ? State::Cr : State::Start);
-            break;
-        case State::Done:
-            break;
+            return true;
         }
 
-        return m_state == State::Done;
+        m_last4Bytes.push_back(byte);
+        if (m_last4Bytes.size() > 4)
+        {
+            m_last4Bytes.pop_front();
+        }
+
+        static constexpr std::string_view c_terminator = "\r\n\r\n";
+        m_done = std::ranges::equal(m_last4Bytes, c_terminator);
+        return m_done;
     }
 
     bool IsDone() const noexcept
     {
-        return m_state == State::Done;
+        return m_done;
     }
 
 private:
-    enum class State
-    {
-        Start,
-        Cr,
-        CrLf,
-        CrLfCr,
-        Done
-    };
-
-    State m_state = State::Start;
+    std::deque<char> m_last4Bytes;
+    bool m_done = false;
 };
 
 } // namespace wsl::windows::common
