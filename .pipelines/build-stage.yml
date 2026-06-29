@@ -104,6 +104,9 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
+          - script: pip install -r tools/devops/requirements.txt --break-system-packages
+            displayName: Install dependencies
+
           - script: python tools/devops/validate-localization.py
             displayName: Validate localization resources
 
