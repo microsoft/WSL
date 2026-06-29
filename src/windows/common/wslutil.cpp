@@ -89,6 +89,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
+    X(WSLC_E_CONTAINER_DISABLED),
+    X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
     X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
@@ -153,14 +155,18 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_IMAGE_NOT_FOUND),
     X(WSLC_E_CONTAINER_NOT_FOUND),
     X(WSLC_E_VOLUME_NOT_FOUND),
+    X(WSLC_E_VOLUME_NOT_AVAILABLE),
     X(WSLC_E_CONTAINER_NOT_RUNNING),
     X(WSLC_E_CONTAINER_IS_RUNNING),
     X(WSLC_E_SESSION_RESERVED),
     X(WSLC_E_INVALID_SESSION_NAME),
     X(WSLC_E_NETWORK_NOT_FOUND),
+    X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
-    X_WIN32(ERROR_ELEVATION_REQUIRED)};
+    X_WIN32(ERROR_ELEVATION_REQUIRED),
+    X_WIN32(WSAEACCES),
+    X_WIN32(WSAEADDRINUSE)};
 
 #undef X
 
@@ -405,15 +411,23 @@ GUID wsl::windows::common::wslutil::CreateV5Uuid(const GUID& namespaceGuid, cons
     return EndianSwap(newGuid);
 }
 
-std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename)
+std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress)
 {
     wsl::windows::common::ConsoleProgressBar progressBar;
     auto progress = [&](auto current, auto total) {
-        progressBar.Print(current, total);
+        if (reportProgress)
+        {
+            progressBar.Print(current, total);
+        }
         return true;
     };
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { progressBar.Clear(); });
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (reportProgress)
+        {
+            progressBar.Clear();
+        }
+    });
 
     return DownloadFileImpl(Url, Filename, progress);
 }
@@ -845,6 +859,9 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 
     case WSL_E_NOT_A_LINUX_DISTRO:
         return Localization::MessageInvalidDistributionTar();
+
+    case WSLC_E_CONTAINER_DISABLED:
+        return Localization::MessageWSLContainerDisabled();
 
     case WSL_E_INVALID_USAGE:
     {
@@ -1598,6 +1615,23 @@ std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValueP
         THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), result.contains(pairs[i].Key), "Duplicate key: '%hs'", pairs[i].Key);
 
         result[pairs[i].Key] = pairs[i].Value;
+    }
+
+    return result;
+}
+
+std::map<std::string, std::vector<std::string>> wsl::windows::common::wslutil::ParseKeyMultiValuePairs(const KeyValuePair* pairs, ULONG count)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::vector<std::string>> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Value, "Value at index %lu is null", i);
+
+        result[pairs[i].Key].emplace_back(pairs[i].Value);
     }
 
     return result;

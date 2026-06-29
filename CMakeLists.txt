@@ -175,8 +175,8 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-if (NOT DEFINED WSL_BUILD_SDKCS)
-    set(WSL_BUILD_SDKCS false)
+if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
+    set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
 find_commit_hash(COMMIT_HASH)
@@ -230,8 +230,18 @@ if (DEFINED PIPELINE_BUILD_ID)
 endif()
 
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
+
+# Link the third-party binaries we ship (and their PDBs) into bin so packaging
+# and the pipeline's symbol publishing step find them. Without the PDBs here,
+# Watson can't resolve function names in their crash frames.
+string(REPLACE ".dll" ".pdb" WSLG_TS_PLUGIN_PDB ${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_PDB} ${BIN}/${WSLG_TS_PLUGIN_PDB})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
+file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
+# wsldevicehost.dll is packaged directly from its NuGet package, so only its PDB
+# needs linking into bin for symbol publishing.
+file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)

@@ -76,12 +76,14 @@ void ReportErrorIfFailed(_In_ LSTATUS Error, _In_ HKEY Key, _In_opt_ LPCWSTR Sub
     auto path = GetKeyPath(Key);
     if (Subkey != nullptr)
     {
-        path += L"\\" + std::wstring(Subkey);
+        path += L'\\';
+        path += Subkey;
     }
 
     if (Value != nullptr)
     {
-        path += L"\\" + std::wstring(Value);
+        path += L'\\';
+        path += Value;
     }
 
     if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage())
@@ -174,6 +176,9 @@ std::vector<std::pair<GUID, std::wstring>> wsl::windows::common::registry::EnumG
     // Iterate through the provided keys and return a list of all sub-keys that are GUIDs.
     WCHAR buffer[39];
     std::vector<std::pair<GUID, std::wstring>> subKeys;
+    DWORD subKeyCount = 0;
+    QueryInfo(Key, nullptr, nullptr, nullptr, &subKeyCount);
+    subKeys.reserve(subKeyCount);
     DWORD index = 0;
     for (;;)
     {
@@ -198,7 +203,7 @@ std::vector<std::pair<GUID, std::wstring>> wsl::windows::common::registry::EnumG
             continue;
         }
 
-        subKeys.emplace_back(std::make_pair(guid.value(), std::wstring(buffer)));
+        subKeys.emplace_back(guid.value(), std::wstring(buffer));
     }
 
     return subKeys;
@@ -208,7 +213,9 @@ std::vector<std::pair<std::wstring, DWORD>> wsl::windows::common::registry::Enum
 {
     std::vector<std::pair<std::wstring, DWORD>> values;
     DWORD maxValueNameSize = 0;
-    QueryInfo(Key, nullptr, &maxValueNameSize);
+    DWORD valueCount = 0;
+    QueryInfo(Key, nullptr, &maxValueNameSize, nullptr, nullptr, &valueCount);
+    values.reserve(valueCount);
 
     for (DWORD Index = 0;; Index++)
     {
@@ -225,6 +232,27 @@ std::vector<std::pair<std::wstring, DWORD>> wsl::windows::common::registry::Enum
 
         valueName.resize(size);
         values.emplace_back(std::move(valueName), type);
+    }
+
+    return values;
+}
+
+std::map<std::wstring, std::wstring> wsl::windows::common::registry::EnumStringValues(_In_ HKEY Key)
+{
+    std::map<std::wstring, std::wstring> values;
+    for (const auto& [name, type] : EnumValues(Key))
+    {
+        // Only return string values; callers that need other types should use EnumValues() directly.
+        // REG_EXPAND_SZ values are returned with environment variables expanded (per ReadOptionalString).
+        if (type != REG_SZ && type != REG_EXPAND_SZ)
+        {
+            continue;
+        }
+
+        if (auto value = ReadOptionalString(Key, nullptr, name.c_str()))
+        {
+            values.emplace(name, std::move(*value));
+        }
     }
 
     return values;
@@ -293,10 +321,16 @@ wil::unique_hkey wsl::windows::common::registry::OpenOrCreateLxssDiskMountsKey(_
     return CreateKey(HKEY_LOCAL_MACHINE, path.c_str(), KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
 }
 
-void wsl::windows::common::registry::QueryInfo(_In_ HKEY Key, _In_opt_ DWORD* MaxSubKeySize, _In_opt_ DWORD* MaxValueNameSize, _In_opt_ DWORD* MaxValueDataSize)
+void wsl::windows::common::registry::QueryInfo(
+    _In_ HKEY Key,
+    _In_opt_ DWORD* MaxSubKeySize,
+    _In_opt_ DWORD* MaxValueNameSize,
+    _In_opt_ DWORD* MaxValueDataSize,
+    _Out_opt_ DWORD* SubKeyCount,
+    _Out_opt_ DWORD* ValueCount)
 {
     const auto error = (RegQueryInfoKeyW(
-        Key, nullptr, nullptr, nullptr, nullptr, MaxSubKeySize, nullptr, nullptr, MaxValueNameSize, MaxValueDataSize, nullptr, nullptr));
+        Key, nullptr, nullptr, nullptr, SubKeyCount, MaxSubKeySize, nullptr, ValueCount, MaxValueNameSize, MaxValueDataSize, nullptr, nullptr));
 
     ReportErrorIfFailed(error, Key, nullptr, nullptr);
 }

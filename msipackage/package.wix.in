@@ -20,7 +20,7 @@
             <Component Id="wsl" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134730" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
                 <File Id="wsl.exe" Name="wsl.exe" Source="${PACKAGE_INPUT_DIR}/wsl.exe" KeyPath="yes">
-                    <Shortcut Id="WSLShortcut" Name="WSL" Description="Windows Subsystem for Linux" Arguments="--cd ~" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
+                    <Shortcut Id="WSLShortcut" Name="WSL" Description="Windows Subsystem for Linux" Arguments="--cd ~" Directory="ProgramMenuFolder" Icon="wsl.ico">
                         <ShortcutProperty Key="System.AppUserModel.ID" Value="Microsoft.WSL"/>
                         <ShortcutProperty Key="System.AppUserModel.ToastActivatorCLSID" Value="{2B9C59C3-98F1-45C8-B87B-12AE3C7927E8}"/>
                     </Shortcut>
@@ -28,17 +28,20 @@
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
                 <File Id="wslc.exe" Name="wslc.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
+                <File Id="container.exe" Name="container.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
+
+                <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${CMAKE_SOURCE_DIR}/NOTICE.txt" />
 
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                     <File Id="libwsl.dll" Name="libwsl.dll" Source="${PACKAGE_INPUT_DIR}/libwsl.dll" />
                 <?endif?>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
-                <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
+                    <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd" />
                 <?endif?>
 
                 <!-- Add INSTALLDIR to system PATH to make wslc.exe and other CLI tools accessible. -->
@@ -220,7 +223,7 @@
                 </RegistryKey>
 
                 <!-- WslDeviceHost_VirtioNet -->
-                <RegistryKey Root="HKCR" Key="CLSID\{16479D2E-F0C3-4DBA-BF7A-04FFF0892B07}">
+                <RegistryKey Root="HKCR" Key="CLSID\{9E0D1898-CA63-424E-8D49-9D6067A36BCE}">
                     <RegistryValue Value="WslDeviceHost_Net" Type="string" />
                     <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string" />
 
@@ -305,9 +308,9 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- ITerminationCallback-->
-                <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
-                    <RegistryValue Value="ITerminationCallback" Type="string" />
+                <!-- ICrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801}">
+                    <RegistryValue Value="ICrashDumpCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -316,6 +319,14 @@
                 <!-- IProgressCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
                     <RegistryValue Value="IProgressCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWarningCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{8153ED5D-8ABB-408B-ADBE-C0F3B13E07C3}">
+                    <RegistryValue Value="IWarningCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -348,6 +359,78 @@
                 <!-- IWSLCVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLCVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCVirtualMachineFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{2E3C9A41-7D58-4B6E-9F12-6C4A2E9B6D3B}">
+                    <RegistryValue Value="IWSLCVirtualMachineFactory" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCPluginNotifier-->
+                <RegistryKey Root="HKCR" Key="Interface\{F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2}">
+                    <RegistryValue Value="IWSLCPluginNotifier" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatCrashDumpCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{EAA15E20-7FCC-485B-B798-ED4095DBACA5}">
+                    <RegistryValue Value="IWSLCCompatCrashDumpCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatProgressCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{06154F2A-ACA7-461E-94FC-92781BA1F6F6}">
+                    <RegistryValue Value="IWSLCCompatProgressCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatWarningCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{290C58A1-328C-4E90-B09B-0A9D32C40074}">
+                    <RegistryValue Value="IWSLCCompatWarningCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatProcess-->
+                <RegistryKey Root="HKCR" Key="Interface\{AC69DD0D-6616-4C4F-91F2-C39D6034EA82}">
+                    <RegistryValue Value="IWSLCCompatProcess" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatContainer-->
+                <RegistryKey Root="HKCR" Key="Interface\{8C3C91FA-D550-41B9-AD9D-23DCBF96F549}">
+                    <RegistryValue Value="IWSLCCompatContainer" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatSession-->
+                <RegistryKey Root="HKCR" Key="Interface\{DD7B2EF9-AA01-4F21-8A3A-29D394CBB579}">
+                    <RegistryValue Value="IWSLCCompatSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatSessionManager-->
+                <RegistryKey Root="HKCR" Key="Interface\{279F2047-DA35-45A3-B671-AFD2302D5D16}">
+                    <RegistryValue Value="IWSLCCompatSessionManager" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -415,9 +498,7 @@
                 <Component Id="wslsettingsnonserver" Guid="AB166073-8855-492B-95C8-C6E5939B66A5" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType = 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutNonServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
                     <File Id="wslsettings.exe_nonserver" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
-                        <Shortcut Id="WSLSettingsShortcutNonServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
-                            <ShortcutProperty Key="System.AppUserModel.IsSystemComponent" Value="true"/>
-                        </Shortcut>
+                        <Shortcut Id="WSLSettingsShortcutNonServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
                     </File>
                     <!-- Protocol registration -->
                     <RegistryKey Root="HKLM" Key="Software">
@@ -446,7 +527,7 @@
                 <Component Id="wslsettingsserver" Guid="EE2D69A0-4F55-4EC5-9576-4FAD70BC798E" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType &gt; 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
                     <File Id="wslsettings.exe_server" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6b.exe">
-                        <Shortcut Id="WSLSettingsShortcutServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
+                        <Shortcut Id="WSLSettingsShortcutServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
                     </File>
                     <!-- Protocol registration -->
                     <RegistryKey Root="HKLM" Key="Software">
@@ -613,6 +694,11 @@
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
         <CustomAction Id="CalculateWslSettingsProtocolIds" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="CalculateWslSettingsProtocolIds" Return="check" Execute='immediate' />
 
+        <!-- Disable WSLService before StopServices so SCM rejects activation attempts
+             from COM clients while it is being stopped on uninstall. -->
+        <CustomAction Id="DisableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="DisableWslService" Return="ignore" Execute="deferred" />
+        <CustomAction Id="EnableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="EnableWslService" Return="ignore" Execute="rollback" />
+
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
@@ -667,6 +753,11 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+
+            <!-- Rollback CA must be sequenced before the forward action so it is registered
+                 in the rollback script first. -->
+            <Custom Action="EnableWslService" Before="DisableWslService" Condition='REMOVE~="ALL"' />
+            <Custom Action="DisableWslService" Before="StopServices" Condition='REMOVE~="ALL"' />
 
         </InstallExecuteSequence>
 

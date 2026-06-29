@@ -72,13 +72,16 @@ private:
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
+            {L"export", Localization::WSLCCLI_ContainerExportDesc()},
             {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
             {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
             {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},
             {L"list", Localization::WSLCCLI_ContainerListDesc()},
+            {L"prune", Localization::WSLCCLI_ContainerPruneDesc()},
             {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
             {L"run", Localization::WSLCCLI_ContainerRunDesc()},
             {L"start", Localization::WSLCCLI_ContainerStartDesc()},
+            {L"stats", Localization::WSLCCLI_ContainerStatsDesc()},
             {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
         };
 

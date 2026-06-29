@@ -212,7 +212,7 @@ std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
 GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> name);
 
-std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
+std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress = true);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
@@ -345,5 +345,6 @@ std::string BuildRegistryAuthHeader(const std::string& username, const std::stri
 std::string BuildRegistryAuthHeader(const std::string& identityToken);
 
 std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
+std::map<std::string, std::vector<std::string>> ParseKeyMultiValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count);
 
 } // namespace wsl::windows::common::wslutil

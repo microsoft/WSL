@@ -28,7 +28,6 @@ std::vector<Argument> VolumeInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::VolumeName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -44,7 +43,7 @@ std::wstring VolumeInspectCommand::LongDescription() const
 
 void VolumeInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << InspectVolumes;
 }
 } // namespace wsl::windows::wslc

@@ -52,32 +52,37 @@ void GuestTelemetryLogger::Start(const wil::unique_event& ExitEvent)
     THROW_LAST_ERROR_IF(!pipe);
 
     wil::unique_handle exitEvent(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
-    m_thread = std::thread([Self = shared_from_this(), Pipe = std::move(pipe), ExitEvent = std::move(exitEvent)]() {
+    m_thread = std::thread([this, Pipe = std::move(pipe), ExitEvent = std::move(exitEvent)]() {
         try
         {
             wsl::windows::common::wslutil::SetThreadDescription(L"GuestTelemetryLogger");
 
             // When the pipe connects, start reading data.
-            const std::vector<HANDLE> exitEvents = {Self->m_threadExit.get(), ExitEvent.get()};
+            const std::vector<HANDLE> exitEvents = {m_threadExit.get(), ExitEvent.get()};
             wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, exitEvents);
 
-            std::vector<gsl::byte> buffer(LX_RELAY_BUFFER_SIZE);
-            OVERLAPPED overlapped = {};
-            const wil::unique_event overlappedEvent(wil::EventOptions::ManualReset);
-            overlapped.hEvent = overlappedEvent.get();
-            for (;;)
-            {
-                overlappedEvent.ResetEvent();
-                const auto bytesRead =
-                    wsl::windows::common::relay::InterruptableRead(Pipe.get(), gsl::make_span(buffer), exitEvents, &overlapped);
+            namespace io = wsl::windows::common::io;
+            io::MultiHandleWait ioWait;
+            ioWait.AddHandle(
+                std::make_unique<io::ReadHandle>(
+                    io::HandleWrapper{Pipe.get()},
+                    [this](const gsl::span<char>& buffer) {
+                        if (!buffer.empty())
+                        {
+                            ProcessInput(std::string_view{buffer.data(), static_cast<size_t>(buffer.size())});
+                        }
+                    }),
+                io::MultiHandleWait::IgnoreErrors);
 
-                if (bytesRead == 0)
-                {
-                    break;
-                }
+            ioWait.AddHandle(
+                std::make_unique<io::EventHandle>(io::HandleWrapper{m_threadExit.get()}),
+                io::MultiHandleWait::CancelOnCompleted | io::MultiHandleWait::NeedNotComplete);
 
-                Self->ProcessInput(std::string_view{reinterpret_cast<const char*>(buffer.data()), bytesRead});
-            }
+            ioWait.AddHandle(
+                std::make_unique<io::EventHandle>(io::HandleWrapper{ExitEvent.get()}),
+                io::MultiHandleWait::CancelOnCompleted | io::MultiHandleWait::NeedNotComplete);
+
+            ioWait.Run(std::nullopt);
         }
         CATCH_LOG()
     });

@@ -188,6 +188,27 @@ private:
     std::optional<std::wstring> m_originalContent;
 };
 
+//
+// RAII wrapper for host file change.
+//
+
+class HostFileChange
+{
+public:
+    HostFileChange(const std::filesystem::path& Path, const std::string& NewContent);
+
+    ~HostFileChange();
+
+    NON_COPYABLE(HostFileChange);
+    NON_MOVABLE(HostFileChange);
+
+    void Update(const std::string& NewContent) const;
+
+private:
+    std::filesystem::path m_path;
+    std::optional<std::string> m_originalContent;
+};
+
 template <typename T>
 class RegistryKeyChange
 {
@@ -309,16 +330,27 @@ private:
 class ScopedEnvVariable
 {
 public:
+    // Captures any existing value and clears the variable.
+    explicit ScopedEnvVariable(const std::wstring& Name);
+
+    // Captures any existing value and sets the variable to Value.
     ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
+
+    // Restores the original value.
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const WslConfigChange&) = delete;
-    ScopedEnvVariable(WslConfigChange&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
+
+    // Sets the variable to a new value.
+    void Set(const std::wstring& Value);
+
+    // Clears (unsets) the variable.
+    void Clear();
 
 private:
     std::wstring m_name;
+    std::optional<std::wstring> m_originalValue;
 };
 
 class UniqueWebServer
@@ -520,6 +552,8 @@ struct TestConfigDefaults
     std::optional<size_t> vmIdleTimeout;
     std::optional<bool> safeMode;
     std::optional<bool> guiApplications;
+    std::optional<bool> earlyBootLogging;
+    std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
@@ -535,6 +569,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernelModules;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
+    std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
@@ -601,6 +636,10 @@ void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, con
 std::string ReadToString(SOCKET Handle);
 std::string ReadToString(HANDLE Handle);
 
+// Connects a pair of overlapped TCP sockets via an anonymous bind on the loopback interface.
+// Returns {client, server}.
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
+
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
@@ -612,7 +651,11 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
+void LoadTestImage(IWSLCSession& session, std::string_view imageName);
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
+
+std::optional<std::string> GetHostAdapterIpv4();
 
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
@@ -671,3 +714,9 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size);
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);

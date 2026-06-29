@@ -41,7 +41,11 @@ WSLCVolumes::WSLCVolumes(
         {
             OpenVolumeExclusiveLockHeld(volume);
         }
-        CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to recover volume: %hs", volume.Name.c_str());
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcFailedToRecoverVolume(volume.Name));
+        }
     }
 }
 
@@ -118,9 +122,6 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
-    // Record that we initiated this create so OnVolumeEvent ignores the matching docker event.
-    m_expectedEvents.emplace_back(name, VolumeEvent::Create);
-
     return info;
 }
 
@@ -140,15 +141,51 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
-std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
+std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const
 {
+    // Pull the driver filter out and forward everything else to docker for filtering.
+    // Driver filter is special-cased because our driver concept doesn't map 1:1 to docker's.
+    std::vector<std::string> drivers;
+    auto it = Filters.find("driver");
+    if (it != Filters.end())
+    {
+        drivers = std::move(it->second);
+        Filters.erase(it);
+    }
+
+    std::vector<wsl::windows::common::docker_schema::Volume> dockerVolumes;
+    try
+    {
+        dockerVolumes = m_dockerClient.ListVolumes(Filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list volumes");
+
+    std::unordered_set<std::string> dockerVolumeNames;
+    dockerVolumeNames.reserve(dockerVolumes.size());
+    for (const auto& vol : dockerVolumes)
+    {
+        dockerVolumeNames.insert(vol.Name);
+    }
+
     auto lock = m_lock.lock_shared();
 
     std::vector<WSLCVolumeInformation> result;
-    result.reserve(m_volumes.size());
+    result.reserve(dockerVolumeNames.size());
 
     for (const auto& [name, vol] : m_volumes)
     {
+        // Must be in docker's filtered list.
+        if (!dockerVolumeNames.contains(name))
+        {
+            continue;
+        }
+
+        // Apply driver filter using the WSLC driver names.
+        if (!drivers.empty() && std::ranges::find(drivers, vol->Driver()) == drivers.end())
+        {
+            continue;
+        }
+
         result.push_back(vol->GetVolumeInformation());
     }
 
@@ -165,10 +202,61 @@ std::string WSLCVolumes::InspectVolume(const std::string& Name) const
     return it->second->Inspect();
 }
 
-bool WSLCVolumes::ContainsVolume(const std::string& Name) const
+std::pair<HRESULT, std::string> WSLCVolumes::GetVolumeStatus(const std::string& Name) const
 {
     auto lock = m_lock.lock_shared();
-    return m_volumes.contains(Name);
+
+    auto it = m_volumes.find(Name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
+
+    return it->second->Status();
+}
+
+WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::string, std::vector<std::string>>& Filters)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    auto dockerResult = m_dockerClient.PruneVolumes(Filters);
+
+    PruneVolumesResult result{};
+    result.SpaceReclaimed = dockerResult.SpaceReclaimed;
+
+    if (!dockerResult.VolumesDeleted.has_value() || dockerResult.VolumesDeleted->empty())
+    {
+        return result;
+    }
+
+    result.Volumes.reserve(dockerResult.VolumesDeleted->size());
+
+    // TODO: VHD volumes are exposed to docker as bind mounts, which docker's volume
+    // prune skips. So this only ever prunes guest volumes today. VHD volume pruning
+    // requires custom handling that's not implemented yet.
+    for (const auto& name : dockerResult.VolumesDeleted.value())
+    {
+        // Only report volumes that we manage.
+        auto it = m_volumes.find(name);
+        if (it == m_volumes.end())
+        {
+            WSL_LOG("PrunedUnknownVolume", TraceLoggingValue(name.c_str(), "name"));
+            continue;
+        }
+
+        try
+        {
+            it->second->OnDeleted();
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to release host resources for pruned volume: %hs", name.c_str());
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeReleaseFailed(name));
+        }
+
+        m_volumes.erase(it);
+        m_expectedEvents.emplace_back(name, VolumeEvent::Destroy);
+        result.Volumes.push_back(name);
+    }
+
+    return result;
 }
 
 __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const std::string& volumeName)
@@ -181,6 +269,16 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     try
     {
         OpenVolumeExclusiveLockHeld(m_dockerClient.InspectVolume(volumeName));
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // A 404 here is expected when a late `create` event arrives after the volume has already
+        // been deleted (e.g. user calls CreateVolume then DeleteVolume; the create event from
+        // docker can race in after the delete has been processed).
+        if (e.StatusCode() != 404)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to open volume: %hs", volumeName.c_str());
+        }
     }
     CATCH_LOG_MSG("Failed to open volume: %hs", volumeName.c_str());
 }

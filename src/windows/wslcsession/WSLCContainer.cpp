@@ -19,19 +19,25 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCContainer.h"
+#include "WSLCExecutionContext.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
+#include "APICompat.h"
+
+namespace apicompat = wsl::windows::common::apicompat;
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
-using wsl::windows::common::relay::DockerIORelayHandle;
-using wsl::windows::common::relay::HandleWrapper;
-using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
-using wsl::windows::common::relay::OverlappedIOHandle;
-using wsl::windows::common::relay::ReadHandle;
-using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::common::io::DockerIORelayHandle;
+using wsl::windows::common::io::HandleWrapper;
+using wsl::windows::common::io::HTTPChunkBasedReadHandle;
+using wsl::windows::common::io::OverlappedIOHandle;
+using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::DockerHTTPClient;
+using wsl::windows::service::wslc::DockerHTTPException;
 using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
@@ -42,12 +48,13 @@ using wsl::windows::service::wslc::WSLCContainer;
 using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
 
-using namespace wsl::windows::common::relay;
+using namespace wsl::windows::common::io;
 using namespace wsl::windows::common::docker_schema;
 using namespace wsl::windows::common::wslutil;
 using namespace std::chrono_literals;
@@ -147,74 +154,166 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
     return port;
 }
 
-// Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
-    std::vector<_WSLCPortMapping>& requestedPorts,
-    WSLCContainerNetworkType networkType,
-    WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
-    LPCSTR containerNetworkName)
+constexpr std::string_view c_containerNetworkPrefix = "container:";
+
+bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
 {
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        containerNetworkName != nullptr && networkType != WSLCContainerNetworkTypeCustom,
-        "ContainerNetworkName must be null when network type is not Custom");
+    return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
+}
 
-    // Determine network mode string.
-    std::string networkMode;
-    if (networkType == WSLCContainerNetworkTypeBridged)
+// Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed
+// modes (`service:`, `ns:`, ...) as special, but WSLC only supports `container:`. Surface the
+// rejection here so both Create() and Open() recovery paths share the same gate.
+void RejectUnsupportedNetworkModes(std::string_view mode)
+{
+    if (mode.starts_with(c_containerNetworkPrefix))
     {
-        networkMode = "bridge";
+        return;
     }
-    else if (networkType == WSLCContainerNetworkTypeHost)
+
+    const auto colon = mode.find(':');
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
+}
+
+std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
+{
+    const std::string_view mode = (networkMode == nullptr || *networkMode == '\0') ? std::string_view{"bridge"} : networkMode;
+
+    // Reject `service:foo` and similar unsupported colon-prefixed modes before any further processing.
+    RejectUnsupportedNetworkModes(mode);
+
+    // N.B. Docker validates incompatible combinations (e.g. host/none/container: with additional networks)
+    // and returns clear error messages, so we don't duplicate that validation here.
+
+    if (mode == "host")
     {
-        networkMode = "host";
+        return "host";
     }
-    else if (networkType == WSLCContainerNetworkTypeNone)
+
+    if (mode == "none")
     {
-        networkMode = "none";
+        THROW_HR_IF_MSG(E_INVALIDARG, hasRequestedPorts, "Port mappings are not supported without networking");
+        return "none";
     }
-    else if (networkType == WSLCContainerNetworkTypeCustom)
+
+    if (mode.starts_with(c_containerNetworkPrefix))
+    {
+        const std::string target{mode.substr(c_containerNetworkPrefix.size())};
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcContainerModeRequiresTarget(), target.empty());
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcContainerModeNoPorts(), hasRequestedPorts);
+
+        try
+        {
+            return std::format("container:{}", dockerClient.InspectContainer(target).Id);
+        }
+        catch (const DockerHTTPException& e)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerModeTargetNotFound(target), e.StatusCode() == 404);
+            throw;
+        }
+    }
+
+    // User-defined network: bridge is the built-in one and bypasses the session lookup.
+    if (mode != "bridge")
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcContainerNetworkNameRequired(), !containerNetworkName || strlen(containerNetworkName) == 0);
-
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(containerNetworkName), !sessionNetworks.contains(containerNetworkName));
-
-        networkMode = containerNetworkName;
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(std::string{mode}), !sessionNetworks.contains(std::string{mode}));
     }
-    else
+    return std::string{mode};
+}
+
+// Parses the primary endpoint's Settings KVP. Today only "Aliases" is recognised; unknown
+// keys are rejected to avoid silently dropping caller data (mirrors the per-connection guard).
+EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkMode)
+{
+    EndpointConfig config{};
+    if (count == 0)
     {
-        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", networkType);
+        return config;
     }
 
-    // Validate port mappings.
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        !requestedPorts.empty() && networkType == WSLCContainerNetworkTypeNone,
-        "Port mappings are not supported without networking");
+    THROW_HR_IF_MSG(E_INVALIDARG, settings == nullptr, "Settings is null with SettingsCount=%lu", count);
 
+    auto parsed = ParseKeyMultiValuePairs(settings, count);
+
+    for (const auto& [key, _] : parsed)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkMode}), key != "Aliases");
+    }
+
+    if (auto it = parsed.find("Aliases"); it != parsed.end())
+    {
+        for (const auto& alias : it->second)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcAliasEmpty(),
+                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
+        }
+        config.Aliases = std::move(it->second);
+    }
+
+    return config;
+}
+
+std::map<std::string, EndpointConfig> ResolveEndpoints(
+    const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
+{
+    std::map<std::string, EndpointConfig> resolved;
+    if (count == 0)
+    {
+        return resolved;
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, connections == nullptr, "Networks is null with NetworksCount=%lu", count);
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        const char* raw = connections[i].NetworkName;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
+
+        std::string name{raw};
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
+
+        auto [it, inserted] = resolved.try_emplace(name);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
+
+        if (name != "bridge")
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
+        }
+
+        // Per-endpoint Settings are reserved for future use (IPAddress, Aliases, ...). No keys
+        // are interpreted today, so reject any non-empty payload rather than silently dropping it.
+        THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(name), connections[i].SettingsCount > 0);
+    }
+    return resolved;
+}
+
+// Builds the port-mapping list from caller-supplied requests.
+std::vector<ContainerPortMapping> BuildPortMappings(std::vector<_WSLCPortMapping>& requestedPorts, std::string_view primary, WSLCVirtualMachine& vm)
+{
     std::vector<ContainerPortMapping> ports;
     ports.reserve(requestedPorts.size());
 
+    const bool allocateVmPorts = NetworkModeAllocatesVmPorts(primary);
     for (auto& e : requestedPorts)
     {
-        if (e.HostPort == WSLC_EPHEMERAL_PORT)
+        if (e.HostPort == WSLC_EPHEMERAL_PORT && vm.NetworkingMode() == WSLCNetworkingModeNAT)
         {
             e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
         }
 
         auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
-
-        // Allocate VM ports for bridged and custom networks. Host mode ports are allocated when the container starts.
-        if (networkType == WSLCContainerNetworkTypeBridged || networkType == WSLCContainerNetworkTypeCustom)
+        if (allocateVmPorts)
         {
-            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(e.Family, e.Protocol));
+            entry.VmMapping.AssignVmPort(vm.AllocatePort(e.Family, e.Protocol));
         }
     }
-
-    return {std::move(ports), std::move(networkMode)};
+    return ports;
 }
 
 void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& parentVM)
@@ -223,9 +322,16 @@ void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& p
     {
         if (volume.Mounted)
         {
-            if (SUCCEEDED(LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()))))
+            auto result = parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str());
+            if (SUCCEEDED(result))
             {
                 volume.Mounted = false;
+            }
+            else
+            {
+                LOG_HR(result);
+                EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
+                    volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
             }
         }
     }
@@ -273,34 +379,6 @@ WSLCContainerState DockerStateToWSLCState(ContainerState state)
     default:
         return WSLCContainerState::WslcContainerStateInvalid;
     }
-}
-
-WSLCContainerNetworkType DockerNetworkModeToWSLCNetworkType(const std::string& mode)
-{
-    if (mode == "bridge")
-    {
-        return WSLCContainerNetworkTypeBridged;
-    }
-    else if (mode == "host")
-    {
-        return WSLCContainerNetworkTypeHost;
-    }
-    else if (mode == "none")
-    {
-        return WSLCContainerNetworkTypeNone;
-    }
-
-    // Docker treats empty NetworkMode as the default (bridged).
-    if (mode.empty())
-    {
-        return WSLCContainerNetworkTypeBridged;
-    }
-
-    // Reject Docker special syntaxes (container:<id>, service:<name>, etc.);
-    // any plain name is treated as a user-defined custom network.
-    THROW_HR_IF_MSG(E_INVALIDARG, mode.find(':') != std::string::npos, "Unsupported Docker network mode: %hs", mode.c_str());
-
-    return WSLCContainerNetworkTypeCustom;
 }
 
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
@@ -381,29 +459,6 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
     }
 }
 
-void ConfigureLdPathForGpu(std::vector<std::string>& Env)
-{
-    static constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
-    auto it = std::ranges::find_if(Env, [](const std::string& e) { return e.starts_with(ldLibraryPathPrefix); });
-
-    if (it != Env.end())
-    {
-        // If the user already has an LD_LIBRARY_PATH, append the GPU library paths to it.
-        auto ldPath = it->substr(ldLibraryPathPrefix.size());
-        if (!ldPath.empty() && !ldPath.ends_with(":"))
-        {
-            it->append(":");
-        }
-
-        it->append(WSLCVirtualMachine::c_gpuLibrariesPath);
-    }
-    else
-    {
-        // Otherwise create a new entry.
-        Env.emplace_back(std::format("LD_LIBRARY_PATH={}", WSLCVirtualMachine::c_gpuLibrariesPath));
-    }
-}
-
 } // namespace
 
 ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
@@ -466,11 +521,14 @@ WSLCPortMapping ContainerPortMapping::Serialize() const
 WSLCContainerImpl::WSLCContainerImpl(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
-    WSLCContainerNetworkType NetworkMode,
+    std::string NetworkMode,
     std::vector<WSLCVolumeMount>&& volumes,
+    std::vector<std::string>&& namedVolumes,
+    WSLCVolumes& Volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
@@ -482,15 +540,18 @@ WSLCContainerImpl::WSLCContainerImpl(
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags) :
     m_wslcSession(wslcSession),
+    m_pluginNotifier(pluginNotifier),
     m_virtualMachine(virtualMachine),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
-    m_networkingMode(NetworkMode),
+    m_networkMode(std::move(NetworkMode)),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
+    m_namedVolumes(std::move(namedVolumes)),
+    m_volumes(Volumes),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
-    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, std::move(onDeleted))),
+    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
@@ -530,7 +591,10 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
     for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
 
     m_containerEvents.Reset();
@@ -543,16 +607,6 @@ WSLCContainerImpl::~WSLCContainerImpl()
         auto lock = m_lock.lock_exclusive();
         wrapper = ReleaseResources();
     }
-}
-
-void WSLCContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
-{
-    std::lock_guard processesLock{m_processesLock};
-
-    auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
-    WI_ASSERT(remove.size() == 1);
-
-    m_processes.erase(remove.begin(), remove.end());
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -671,7 +725,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 }
 
-void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
     // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
     auto lock = m_lock.lock_exclusive();
@@ -685,6 +739,20 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_id.c_str(),
         m_state);
 
+    std::optional<std::string> detachKeys;
+
+    if (StartOptions != nullptr)
+    {
+        detachKeys = StartOptions->DetachKeys != nullptr ? std::optional<std::string>(StartOptions->DetachKeys) : std::nullopt;
+
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && (StartOptions->TtyColumns == 0 || StartOptions->TtyRows == 0),
+            "Invalid tty size: %lu:%lu",
+            StartOptions->TtyRows,
+            StartOptions->TtyColumns);
+    }
+
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLCProcessIO> io;
 
@@ -692,8 +760,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     {
         if (WI_IsFlagSet(Flags, WSLCContainerStartFlagsAttach))
         {
-            auto detachKeys = DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys);
-
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
                 io = std::make_unique<TTYProcessIO>(TypedHandle{
@@ -724,6 +790,23 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_initProcessControl = nullptr;
     });
 
+    // Refuse to start if any referenced named volume is in a failed state.
+    std::vector<std::string> unavailableVolumes;
+    for (const auto& volumeName : m_namedVolumes)
+    {
+        const auto [code, message] = m_volumes.GetVolumeStatus(volumeName);
+        if (FAILED(code))
+        {
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
+            unavailableVolumes.push_back(volumeName);
+        }
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_AVAILABLE,
+        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
+        !unavailableVolumes.empty());
+
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
@@ -734,9 +817,47 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
 
     try
     {
-        m_dockerClient.StartContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
+        m_dockerClient.StartContainer(m_id, detachKeys);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
+
+    if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty) && StartOptions != nullptr)
+    {
+        try
+        {
+            m_dockerClient.ResizeContainerTty(m_id, StartOptions->TtyRows, StartOptions->TtyColumns);
+        }
+        CATCH_LOG();
+    }
+
+    auto inspectJson = InspectLockHeld();
+    const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
+    if (FAILED(pluginResult))
+    {
+        // Forward the COM error message, if available.
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+        LOG_HR_MSG(pluginResult, "Plugin rejected start of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
+        try
+        {
+            m_dockerClient.StopContainer(m_id.c_str(), {}, {});
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(
+                wsl::shared::string::MultiByteToWide(m_id)));
+        }
+
+        if (comError.has_value() && comError->Message)
+        {
+            THROW_HR_WITH_USER_ERROR(pluginResult, comError->Message.get());
+        }
+        else
+        {
+            THROW_HR(pluginResult);
+        }
+    }
 
     portCleanup.release();
     volumeCleanup.release();
@@ -881,6 +1002,16 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 {
     unique_com_disconnect comWrapper;
 
+    // Notify plugin manager that the container is stopping. Errors are ignored.
+    if (m_state == WslcContainerStateRunning)
+    {
+        try
+        {
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
+        }
+        CATCH_LOG();
+    }
+
     ReleaseProcesses();
     ReleaseRuntimeResources();
 
@@ -958,7 +1089,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
-    wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
+    wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
@@ -972,9 +1103,8 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
+            HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
@@ -1014,13 +1144,23 @@ void WSLCContainerImpl::GetInitProcess(IWSLCProcess** Process) const
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLCProcess), (void**)Process));
 }
 
-void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
+void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id), m_state != WslcContainerStateRunning);
+
+    if (StartOptions != nullptr)
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty) && (StartOptions->TtyRows == 0 || StartOptions->TtyColumns == 0),
+            "Invalid tty size: %lu:%lu",
+            StartOptions->TtyRows,
+            StartOptions->TtyColumns);
+    }
 
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
@@ -1042,6 +1182,11 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
     if (WI_IsFlagSet(Options->Flags, WSLCProcessFlagsTty))
     {
         request.Tty = true;
+
+        if (StartOptions != nullptr)
+        {
+            request.ConsoleSize = {StartOptions->TtyRows, StartOptions->TtyColumns};
+        }
     }
 
     if (WI_IsFlagSet(Options->Flags, WSLCProcessFlagsStdin))
@@ -1049,14 +1194,9 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         request.AttachStdin = true;
     }
 
-    if (DetachKeys != nullptr)
+    if (StartOptions != nullptr && StartOptions->DetachKeys != nullptr)
     {
-        request.DetachKeys = DetachKeys;
-    }
-
-    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsGpu))
-    {
-        ConfigureLdPathForGpu(request.Env);
+        request.DetachKeys = StartOptions->DetachKeys;
     }
 
     try
@@ -1080,18 +1220,23 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
             io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
-        auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
+        auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
 
         {
             std::lock_guard processesLock{m_processesLock};
 
-            // Store a non owning reference to the process.
-            m_processes.push_back(control.get());
+            // Drop entries for execs that have since been released, then store a non-owning weak
+            // reference. The owning shared_ptr is moved into the COM WSLCProcess returned below.
+            std::erase_if(m_processes, [](const auto& weak) { return weak.expired(); });
+            m_processes.push_back(control);
         }
 
         // Poll for the exec'd process to either be running, or failed.
         // This is required because StartExec() returns before the process is actually created, and if exec() fails, we'll never
         // get an exec_die notification, so this case needs to be caught before returning the process to the caller.
+        //
+        // N.B. Pid is 0 until runc forks the user process, so a transient {Running=true, Pid=0} response (seen e.g. on a
+        // fast failure such as an invalid user/group) must not be treated as "running" or we'd wait forever.
 
         // TODO: Configurable timeout.
         auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
@@ -1099,9 +1244,9 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         do
         {
             auto state = m_dockerClient.InspectExec(result.Id);
-            if (state.Running && state.Pid.has_value())
+            if (state.Running && state.Pid > 0)
             {
-                control->SetPid(state.Pid.value());
+                control->SetPid(state.Pid);
                 break; // Exec is running, exit.
             }
             else if (state.ExitCode.has_value())
@@ -1161,14 +1306,13 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Config.User = dockerInspect.Config.User;
     wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
 
-    // Map WSLC port mappings (Windows host ports only). HostIp is not set here and will use
-    // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
+    // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
     {
-        // TODO: ipv6 support.
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
 
         wslc_schema::InspectPortBinding portBinding{};
+        portBinding.HostIp = e.VmMapping.BindingAddressString();
         portBinding.HostPort = std::to_string(e.VmMapping.HostPort());
 
         wslcInspect.Ports[portKey].push_back(std::move(portBinding));
@@ -1214,14 +1358,29 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     // Map labels. m_labels should already exclude internal metadata labels.
     wslcInspect.Labels = m_labels;
 
+    // Map per-endpoint network settings from Docker inspect data.
+    for (const auto& [name, endpoint] : dockerInspect.NetworkSettings.Networks)
+    {
+        wslc_schema::InspectEndpointSettings wslcEndpoint{};
+        wslcEndpoint.IPAddress = endpoint.IPAddress;
+        wslcEndpoint.Gateway = endpoint.Gateway;
+        wslcEndpoint.MacAddress = endpoint.MacAddress;
+        wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
+        wslcEndpoint.Aliases = endpoint.Aliases.value_or(std::vector<std::string>{});
+        wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
+    }
+
     return wslcInspect;
 }
 
 std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
+    const std::string& containerName,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    WSLCVolumes& volumesManager,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1336,10 +1495,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.Ulimits = std::move(ulimits);
     }
 
-    if (containerOptions.ShmSize > 0)
-    {
-        request.HostConfig.ShmSize = containerOptions.ShmSize;
-    }
+    request.HostConfig.ShmSize = containerOptions.ShmSize;
 
     if (containerOptions.VolumesCount > 0)
     {
@@ -1433,17 +1589,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             !virtualMachine.FeatureEnabled(WslcFeatureFlagsGPU),
             "WSLCContainerFlagsGpu requires GPU support enabled on the session");
 
-        if (!request.HostConfig.Binds.has_value())
-        {
-            request.HostConfig.Binds = std::vector<std::string>{};
-        }
-
-        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuLibrariesPath));
-        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuDriversPath));
-
-        request.HostConfig.Devices = {{"/dev/dxg", "/dev/dxg", "rwm"}};
-
-        ConfigureLdPathForGpu(request.Env);
+        // Request the WSL GPU device via CDI.
+        request.HostConfig.DeviceRequests = std::vector<common::docker_schema::DeviceRequest>{{"cdi", {LX_WSLC_GPU_CDI_DEVICE}}};
     }
 
     // Prepare port mappings from container options.
@@ -1488,15 +1635,36 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    // Process port mappings from container options.
-    auto [mappedPorts, networkMode] = ProcessPortMappings(
-        ports,
-        containerOptions.ContainerNetwork.ContainerNetworkType,
-        virtualMachine,
-        sessionNetworks,
-        containerOptions.ContainerNetwork.ContainerNetworkName);
+    auto networkMode = ResolveNetworkMode(containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), sessionNetworks, DockerClient);
+
+    auto endpoints = ResolveEndpoints(
+        containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
+
+    auto primaryConfig =
+        ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+
+    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+        primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+
+    auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
+    request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
+
+    // Docker API v1.44 (Docker 25.x) requires the primary network to be present in EndpointsConfig
+    // when EndpointsConfig is non-empty. Insert it so Docker attaches all networks at create time.
+    // Also insert when the caller supplied aliases for the primary endpoint.
+    if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || primaryConfig.Aliases.has_value()))
+    {
+        auto [it, _] = request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
+        if (primaryConfig.Aliases.has_value())
+        {
+            it->second.Aliases = std::move(primaryConfig.Aliases);
+        }
+    }
 
     for (const auto& e : mappedPorts)
     {
@@ -1509,8 +1677,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         // In that networking mode, the host port always matches the vm port.
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
-        portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
+        // Use catch-all binding address based on the address family. :: binds all ipv6 interfaces, and 0:0:0:0 binds all ipv4 interfaces.
+        portEntry.emplace_back(common::docker_schema::PortMapping{
+            .HostIp = e.VmMapping.IsIPv6() ? "::" : "0.0.0.0", .HostPort = std::to_string(hostPort)});
     }
 
     auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
@@ -1530,8 +1699,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
-    auto result =
-        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
+    auto result = DockerClient.CreateContainer(request, containerName);
+
+    // Surface any warnings returned by Docker (e.g., deprecated features, configuration issues).
+    for (const auto& warning : result.Warnings)
+    {
+        EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(warning));
+    }
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
@@ -1542,19 +1716,60 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
+    // Post-create verification: confirm every requested network is actually attached.
+    // If Docker rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
+    // container:<id> mode shares the target's netns, so the mode string is not a network name and
+    // won't appear in NetworkSettings.Networks. Skip the check for that mode.
+    if (!networkMode.starts_with(c_containerNetworkPrefix))
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(networkMode),
+            "Container was created but primary network '%hs' was not attached",
+            networkMode.c_str());
+    }
+
+    for (const auto& [name, _] : request.NetworkingConfig.EndpointsConfig)
+    {
+        // The primary network was auto-inserted into EndpointsConfig for Docker v1.44 compat
+        // and is already verified above. Only check explicitly-requested additional networks here.
+        if (name == networkMode)
+        {
+            continue;
+        }
+
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(name),
+            "Container was created but requested network '%hs' was not attached",
+            name.c_str());
+    }
+
     // Wait for the container create event to be delivered on the Docker event stream so that
     // any events for objects created for the container (e.g. volumes) are delivered before we return
     // from this function.
     EventTracker.WaitForObjectCreated(result.Id);
 
+    // Collect the names of referenced docker named volumes so Start() can verify
+    // they are available before running the container.
+    std::vector<std::string> namedVolumes;
+    namedVolumes.reserve(containerOptions.NamedVolumesCount);
+    for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
+    {
+        namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
+    }
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
+        pluginNotifier,
         std::move(result.Id),
         CleanContainerName(inspectData.Name),
         std::string(containerOptions.Image),
-        containerOptions.ContainerNetwork.ContainerNetworkType,
+        std::move(networkMode),
         std::move(volumes),
+        std::move(namedVolumes),
+        volumesManager,
         std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
@@ -1574,6 +1789,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    IWSLCPluginNotifier* pluginNotifier,
     WSLCVolumes& volumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
@@ -1583,19 +1799,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    // Validate that all named volumes mounted by the container were successfully recovered
-    // by the volumes manager. If any are missing (e.g. backing VHD removed while the service was
-    // down), refuse to open the container so it cannot enter a broken state.
+    // Collect the names of referenced docker named volumes.
+    std::vector<std::string> namedVolumes;
     for (const auto& mount : dockerContainer.Mounts)
     {
         if (mount.Type == "volume" && !mount.Name.empty())
         {
-            THROW_HR_IF_MSG(
-                E_UNEXPECTED,
-                !volumes.ContainsVolume(mount.Name),
-                "Cannot open container %hs: referenced volume '%hs' is not available",
-                dockerContainer.Id.c_str(),
-                mount.Name.c_str());
+            namedVolumes.push_back(mount.Name);
         }
     }
 
@@ -1613,14 +1823,20 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
-    auto networkingMode = DockerNetworkModeToWSLCNetworkType(dockerContainer.HostConfig.NetworkMode);
+    // Docker treats empty NetworkMode as the default (bridge).
+    std::string networkMode = dockerContainer.HostConfig.NetworkMode.empty() ? std::string{"bridge"} : dockerContainer.HostConfig.NetworkMode;
+
+    RejectUnsupportedNetworkModes(networkMode);
+
+    const bool allocateVmPorts = NetworkModeAllocatesVmPorts(networkMode);
+
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
     std::vector<ContainerPortMapping> ports;
     for (const auto& e : metadata.Ports)
     {
         auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        if (networkingMode == WSLCContainerNetworkTypeBridged || networkingMode == WSLCContainerNetworkTypeCustom)
+        if (allocateVmPorts)
         {
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
@@ -1638,11 +1854,14 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
+        pluginNotifier,
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
-        networkingMode,
+        std::move(networkMode),
         std::move(metadata.Volumes),
+        std::move(namedVolumes),
+        volumes,
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
@@ -1666,7 +1885,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
             container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
         }
     }
-    CATCH_LOG();
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+    }
 
     return container;
 }
@@ -1682,17 +1906,21 @@ void WSLCContainerImpl::Inspect(LPSTR* Output) const
 
     try
     {
-        // Get Docker inspect data
-        auto dockerInspect = m_dockerClient.InspectContainer(m_id);
-
-        // Convert to WSLC schema
-        auto wslcInspect = BuildInspectContainer(dockerInspect);
-
-        // Serialize WSLC schema to JSON
-        std::string wslcJson = wsl::shared::ToJson(wslcInspect);
-        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslcJson.c_str()).release();
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectLockHeld().c_str()).release();
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
+}
+
+std::string WSLCContainerImpl::InspectLockHeld() const
+{
+    // Get Docker inspect data
+    auto dockerInspect = m_dockerClient.InspectContainer(m_id);
+
+    // Convert to WSLC schema
+    auto wslcInspect = BuildInspectContainer(dockerInspect);
+
+    // Serialize WSLC schema to JSON
+    return wsl::shared::ToJson(wslcInspect);
 }
 
 void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
@@ -1739,6 +1967,12 @@ void WSLCContainerImpl::Stats(LPSTR* Output) const
     try
     {
         auto stats = m_dockerClient.ContainerStats(m_id);
+
+        // Always inject the authoritative id and name from this instance.
+        // The response may omit them or use inconsistent casing.
+        stats.id = m_id;
+        stats.name = m_name;
+
         std::string json = wsl::shared::ToJson(stats);
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
     }
@@ -1777,7 +2011,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 
@@ -1807,9 +2041,7 @@ void WSLCContainerImpl::MapPorts()
                     m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
                 THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id),
-                    !allocatedPort);
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id), !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
@@ -1827,7 +2059,7 @@ void WSLCContainerImpl::MapPorts()
             if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || result == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
                 THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
             }
             throw;
         }
@@ -1846,7 +2078,7 @@ void WSLCContainerImpl::UnmapPorts()
 
         try
         {
-            if (m_networkingMode == WSLCContainerNetworkTypeHost)
+            if (m_networkMode == "host")
             {
                 e.VmMapping.VmPort.reset();
             }
@@ -1857,16 +2089,22 @@ void WSLCContainerImpl::UnmapPorts()
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
 {
-    std::lock_guard processesLock{m_processesLock};
+    // Snapshot under the lock, then notify outside it, pinning each control via lock() first
+    decltype(m_processes) processes;
+    {
+        std::lock_guard processesLock{m_processesLock};
+        processes = std::exchange(m_processes, {});
+    }
 
     // Notify all processes that the container has exited.
     // The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-    for (auto& process : m_processes)
+    for (auto& process : processes)
     {
-        process->OnContainerReleased();
+        if (auto control = process.lock())
+        {
+            control->OnContainerReleased();
+        }
     }
-
-    m_processes.clear();
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()
@@ -1923,14 +2161,18 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 }
 
-WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
-    COMImplClass<WSLCContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
+WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
+    COMImplClass<WSLCContainerImpl>(impl), m_session(session), m_onDeleted(std::move(OnDeleted))
 {
 }
 
 HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Stdin);
+    RETURN_HR_IF_NULL(E_POINTER, Stdout);
+    RETURN_HR_IF_NULL(E_POINTER, Stderr);
 
     *Stdin = {};
     *Stdout = {};
@@ -1941,7 +2183,7 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* 
 
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF_NULL(E_POINTER, Result);
 
     *Result = WslcContainerStateInvalid;
@@ -1968,7 +2210,9 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Process);
 
     *Process = nullptr;
 
@@ -1992,42 +2236,48 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
     return hr;
 }
 
-HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
+HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     *Process = nullptr;
-    return CallImpl(&WSLCContainerImpl::Exec, Options, DetachKeys, Process);
+    return CallImpl(&WSLCContainerImpl::Exec, Options, StartOptions, Process);
 }
 
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
 }
 
 HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 
-HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session, WarningCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
-    return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
+    return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
 }
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
     *Output = nullptr;
 
@@ -2037,7 +2287,7 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 HRESULT WSLCContainer::Stats(LPSTR* Output)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, Output == nullptr);
 
@@ -2049,7 +2299,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Delete(WSLCDeleteFlags Flags)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
@@ -2080,7 +2330,7 @@ CATCH_LOG();
 
 HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
@@ -2088,7 +2338,7 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
@@ -2103,7 +2353,9 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF_NULL(E_POINTER, Id);
 
     const auto hr = wil::ResultFromException([&] {
         auto [lock, impl] = LockImpl();
@@ -2128,7 +2380,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetName(LPSTR* Name)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
@@ -2188,10 +2440,76 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
     *Labels = labelsArray.release();
 }
 
+void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
+{
+    THROW_HR_IF(E_POINTER, Options == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Options->ContainerIpAddress != nullptr);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkMode == "host" || m_networkMode == "none");
+
+    common::docker_schema::ContainerNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.ConnectContainerToNetwork(Options->NetworkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(Options->NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), Options->NetworkName);
+    }
+
+    WSL_LOG(
+        "ContainerConnectedToNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(Options->NetworkName, "NetworkName"));
+}
+
+void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
+{
+    THROW_HR_IF(E_POINTER, NetworkName == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkName) == 0);
+
+    auto lock = m_lock.lock_shared();
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        m_networkMode == "host" || m_networkMode == "none");
+
+    common::docker_schema::ContainerNetworkRequest request{};
+    request.Container = m_id;
+
+    try
+    {
+        m_dockerClient.DisconnectContainerFromNetwork(NetworkName, request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(NetworkName), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), NetworkName);
+    }
+
+    WSL_LOG(
+        "ContainerDisconnectedFromNetwork",
+        TraceLoggingValue(m_id.c_str(), "ContainerId"),
+        TraceLoggingValue(NetworkName, "NetworkName"));
+}
+
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
-    COMServiceExecutionContext context;
+    WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
 
@@ -2201,7 +2519,59 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
+try
+{
+    COMServiceExecutionContext context;
+    return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkName)
+try
+{
+    COMServiceExecutionContext context;
+    return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
+}
+CATCH_RETURN();
+
 HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCContainer) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) ? S_OK : S_FALSE;
 }
+
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags)
+{
+    return Start(Flags, nullptr, nullptr);
+}
+
+HRESULT WSLCContainer::GetInitProcess(IWSLCCompatProcess** Process)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(GetInitProcess(&process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Exec(const WSLCCompatProcessOptions* Options, IWSLCCompatProcess** Process)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
+    const auto options = apicompat::Convert(*Options);
+
+    Microsoft::WRL::ComPtr<IWSLCProcess> process;
+    RETURN_IF_FAILED(Exec(&options, nullptr, &process));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, process);
+
+    return process.CopyTo(Process);
+}
+CATCH_RETURN();

@@ -26,21 +26,26 @@ Abstract:
 EXTERN_C_START
 
 // WSLC specific error codes
+// Ensure wslc.idl and wslcsdk.idl are also updated.
 #define WSLC_E_BASE (0x0600)
-#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)            /* 0x80040601 */
-#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2) /* 0x80040602 */
-#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)        /* 0x80040603 */
-#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)           /* 0x80040604 */
-#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)      /* 0x80040605 */
-#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)       /* 0x80040606 */
-#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)           /* 0x80040607 */
-#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)       /* 0x80040608 */
-#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)          /* 0x80040609 */
-#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)          /* 0x8004060A */
-#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)         /* 0x8004060B */
+#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)             /* 0x80040601 */
+#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)  /* 0x80040602 */
+#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)         /* 0x80040603 */
+#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)            /* 0x80040604 */
+#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)       /* 0x80040605 */
+#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)        /* 0x80040606 */
+#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)            /* 0x80040607 */
+#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)        /* 0x80040608 */
+#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)           /* 0x80040609 */
+#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)           /* 0x8004060A */
+#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
+#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
+#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
+#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)          /* 0x8004060F */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 80
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -51,7 +56,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 104
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -80,8 +85,18 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1
+    WSLC_VHD_TYPE_FIXED = 1    // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
 } WslcVhdType;
+
+typedef enum WslcVhdRequirementsFlags
+{
+    WSLC_VHD_REQ_FLAG_NONE = 0x00000000,
+    // When set, WslcVhdRequirements::uid and gid are honored. When clear,
+    // those fields are ignored and the volume is left owned by root:root.
+    WSLC_VHD_REQ_FLAG_OWNER = 0x00000001,
+} WslcVhdRequirementsFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcVhdRequirementsFlags);
 
 typedef struct WslcVhdRequirements
 {
@@ -89,6 +104,11 @@ typedef struct WslcVhdRequirements
     _In_z_ PCSTR name;
     _In_ uint64_t sizeBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
+    // The remaining fields are only honored by WslcCreateSessionVhdVolume.
+    // WslcSetSessionSettingsVhd rejects non-NONE flags with E_INVALIDARG.
+    _In_ WslcVhdRequirementsFlags flags;
+    _In_ uint32_t uid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
+    _In_ uint32_t gid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFeatureFlags
@@ -106,7 +126,20 @@ typedef enum WslcSessionTerminationReason
     WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
 } WslcSessionTerminationReason;
 
-typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
+typedef struct WslcSessionCrashDumpInfo
+{
+    _Field_z_ PCWSTR dumpPath;
+    _Field_z_ PCSTR processName;
+    uint32_t pid;
+    uint32_t signal;
+    uint64_t timestamp;
+} WslcSessionCrashDumpInfo;
+
+typedef __callback void(CALLBACK* WslcSessionCrashDumpCallback)(_In_ const WslcSessionCrashDumpInfo* info, _In_opt_ PVOID context);
+
+// Opaque handle returned by WslcRegisterSessionCrashDumpCallback. Holding it keeps the crash dump
+// registration alive; pass it to WslcReleaseCrashDumpSubscription to unsubscribe.
+DECLARE_HANDLE(WslcCrashDumpSubscription);
 
 STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
@@ -121,12 +154,24 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
-// Pass in Null for callback to clear the termination callback
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext);
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);
+
+// Registers a callback invoked when a Linux process crash dump is written for the session.
+// Works for any caller holding a live session. The returned subscription keeps the registration
+// alive; release it with WslcReleaseCrashDumpSubscription to unsubscribe. Multiple subscriptions
+// can be registered against the same session.
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription);
 
 // CONTAINER DEFINITIONS
 
@@ -460,7 +505,7 @@ typedef struct WslcImageInfo
     // we should expose this
     CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
-    uint64_t sizeBytes;
+    int64_t sizeBytes;
     uint64_t createdUnixTime;
 } WslcImageInfo;
 

@@ -63,7 +63,7 @@ class WSLCE2EContainerKillTests
 
         // Kill the container
         result = RunWslc(std::format(L"container kill {}", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -82,7 +82,7 @@ class WSLCE2EContainerKillTests
 
         // Kill by container name
         result = RunWslc(std::format(L"container kill {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
 
         // Verify container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -134,7 +134,7 @@ class WSLCE2EContainerKillTests
 
         // Kill only the first container
         result = RunWslc(std::format(L"container kill {}", firstContainerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", firstContainerId), .Stderr = L"", .ExitCode = 0});
 
         // Verify first exited, second still running
         VerifyContainerIsListed(firstContainerId, L"exited");
@@ -178,7 +178,6 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --session       Specify the session to use\r\n"
                 << L"  -s,--signal     Signal to send\r\n"
                 << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";

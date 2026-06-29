@@ -74,7 +74,8 @@ DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSessi
             {
                 WSL_LOG(
                     "DockerEventParseError",
-                    TraceLoggingValue(buffer.data(), "Data"),
+                    TraceLoggingCountedString(
+                        buffer.data(), static_cast<UINT16>(std::min(buffer.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
                     TraceLoggingValue(m_session.Id(), "SessionId"));
             }
@@ -83,7 +84,7 @@ DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSessi
 
     auto socket = dockerClient.MonitorEvents();
 
-    relay.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
+    relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
 DockerEventTracker::~DockerEventTracker()

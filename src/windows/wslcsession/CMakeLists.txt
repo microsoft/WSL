@@ -26,16 +26,20 @@ set(SOURCES
     DockerEventTracker.cpp
     DockerHTTPClient.cpp
     IORelay.cpp
+    OptionParser.cpp
     ServiceProcessLauncher.cpp
+    WindowsCertStore.cpp
     )
 
 set(HEADERS
     DockerEventTracker.h
     DockerHTTPClient.h
     IORelay.h
+    OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h
     WSLCProcessIO.h

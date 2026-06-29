@@ -57,8 +57,6 @@ std::tuple<WSLCProcessOptions, std::vector<const char*>, std::vector<const char*
     WSLCProcessOptions options{};
     options.CommandLine = {.Values = commandLine.data(), .Count = static_cast<DWORD>(commandLine.size())};
     options.Environment = {.Values = environment.data(), .Count = static_cast<DWORD>(environment.size())};
-    options.TtyColumns = m_columns;
-    options.TtyRows = m_rows;
     options.Flags = m_flags;
 
     if (!m_workingDirectory.empty())
@@ -132,11 +130,11 @@ int RunningWSLCProcess::Wait(DWORD TimeoutMs)
     return GetExitCode();
 }
 
-RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
+RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<io::OverlappedIOHandle>>&& ExtraHandles)
 {
     RunningWSLCProcess::ProcessResult result;
 
-    relay::MultiHandleWait io;
+    io::MultiHandleWait io;
 
     // Add a callback on IO for each std handle.
 
@@ -148,7 +146,7 @@ RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
         };
 
-        io.AddHandle(std::make_unique<relay::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
+        io.AddHandle(std::make_unique<io::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
     };
 
     if (WI_IsFlagSet(m_flags, WSLCProcessFlagsTty))
@@ -169,7 +167,7 @@ RunningWSLCProcess::ProcessResult RunningWSLCProcess::WaitAndCaptureOutput(DWORD
     // Add a callback for when the process exits.
     auto exitCallback = [&]() { result.Code = GetExitCode(); };
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(GetExitEvent(), std::move(exitCallback)));
+    io.AddHandle(std::make_unique<io::EventHandle>(GetExitEvent(), std::move(exitCallback)));
 
     io.Run(std::chrono::milliseconds(TimeoutMs));
 
@@ -182,7 +180,7 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLCProcess>, int> WSLCProcessLau
 
     wil::com_ptr<IWSLCProcess> process;
     int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, &process, &error);
+    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, m_rows, m_columns, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, std::optional<ClientRunningWSLCProcess>(), error);
@@ -198,7 +196,12 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLCProcess>> WSLCProcessLauncher
     auto [options, commandLine, env] = CreateProcessOptions();
 
     wil::com_ptr<IWSLCProcess> process;
-    auto result = Container.Exec(&options, m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr, &process);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+    startOptions.DetachKeys = m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr;
+
+    auto result = Container.Exec(&options, &startOptions, &process);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<ClientRunningWSLCProcess>());

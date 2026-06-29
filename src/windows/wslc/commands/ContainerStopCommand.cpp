@@ -28,7 +28,6 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Signal),
         Argument::Create(ArgType::Time),
     };
@@ -48,7 +47,7 @@ std::wstring ContainerStopCommand::LongDescription() const
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << StopContainers;
 }
 // clang-format on

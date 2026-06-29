@@ -79,7 +79,7 @@ class WSLCE2EContainerStopTests
 
         // Stop the container
         result = RunWslc(std::format(L"container stop {} -t 0", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -98,7 +98,7 @@ class WSLCE2EContainerStopTests
 
         // Stop by container name
         result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
 
         // Verify container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -153,7 +153,7 @@ class WSLCE2EContainerStopTests
 
         // Stop only the first container
         result = RunWslc(std::format(L"container stop {} -t 0", firstContainerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", firstContainerId), .Stderr = L"", .ExitCode = 0});
 
         // Verify first exited, second still running
         VerifyContainerIsListed(firstContainerId, L"exited");
@@ -173,7 +173,7 @@ class WSLCE2EContainerStopTests
 
         // Stop the container using signal name
         result = RunWslc(std::format(L"container stop {} -s SIGKILL -t 0", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -293,7 +293,6 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --session       Specify the session to use\r\n"
                 << L"  -s,--signal     Signal to send\r\n"
                 << L"  -t,--time       Time in seconds to wait before executing (default 5)\r\n"
                 << L"  -?,--help       Shows help about the selected command\r\n"

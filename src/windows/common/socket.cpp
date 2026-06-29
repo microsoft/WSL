@@ -17,34 +17,50 @@ Abstract:
 #include "socket.hpp"
 #pragma hdrstop
 
-bool wsl::windows::common::socket::CancellableAccept(
-    _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
+void wsl::windows::common::socket::SetAcceptContext(_In_ SOCKET AcceptedSocket, _In_ SOCKET ListenSocket, _In_ const std::source_location& Location)
 {
-    relay::MultiHandleWait io;
+    // Set the accept context to mark the socket as connected.
+    THROW_LAST_ERROR_IF_MSG(
+        setsockopt(AcceptedSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&ListenSocket), sizeof(ListenSocket)) == SOCKET_ERROR,
+        "From: %hs",
+        std::format("{}", Location).c_str());
+}
 
-    bool accepted = false;
+std::optional<wil::unique_socket> wsl::windows::common::socket::CancellableAccept(
+    _In_ SOCKET ListenSocket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
+{
+    io::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<relay::SingleAcceptHandle>(ListenSocket, Socket, [&]() { accepted = true; }), relay::MultiHandleWait::CancelOnCompleted);
+    std::optional<wil::unique_socket> accepted;
+
+    io.AddHandle(
+        std::make_unique<io::AcceptHandle>(
+            ListenSocket, true, [&accepted](wil::unique_socket&& socket) { accepted = std::move(socket); }),
+        io::MultiHandleWait::CancelOnCompleted);
 
     if (ExitHandle != nullptr)
     {
-        io.AddHandle(std::make_unique<relay::EventHandle>(ExitHandle), relay::MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::EventHandle>(ExitHandle), io::MultiHandleWait::CancelOnCompleted);
     }
 
-    io.Run(std::chrono::milliseconds(Timeout));
-
-    if (!accepted)
+    std::optional<std::chrono::milliseconds> timeout;
+    if (Timeout != INFINITE)
     {
-        return false; // Accept was cancelled by the exit event.
+        timeout = std::chrono::milliseconds(Timeout);
     }
 
-    // Set the accept context to mark the socket as connected.
-    THROW_LAST_ERROR_IF_MSG(
-        setsockopt(Socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char*>(&ListenSocket), sizeof(ListenSocket)) == SOCKET_ERROR,
-        "From: %hs",
-        std::format("{}", Location).c_str());
+    try
+    {
 
-    return true;
+        io.Run(timeout);
+    }
+    catch (...)
+    {
+        auto hr = wil::ResultFromCaughtException();
+        THROW_HR_MSG(hr, "Failed to accept socket. From: %hs", std::format("{}", Location).c_str());
+    }
+
+    return accepted;
 }
 
 std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(

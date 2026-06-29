@@ -1,0 +1,363 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    WSLCCompat.idl
+
+Abstract:
+
+    This file contains the WSLC SDK-facing COM object definitions.
+    Changes in this file must maintain backwards compatibility
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+// Enums and flags shared with the service API (wslc.idl).
+import "WSLCShared.idl";
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLCCompatSessionManager;")
+cpp_quote("class DECLSPEC_UUID(\"9fcd2067-9fc6-4efa-9eb0-698169ebf7d3\") WSLCCompatSessionManagerFactory;")
+cpp_quote("#endif")
+
+#define WSLCCompat_MAX_IMAGE_NAME_LENGTH 255
+#define WSLCCompat_MAX_VOLUME_NAME_LENGTH 255
+#define WSLCCompat_MAX_VOLUME_DRIVER_LENGTH 255
+#define WSLCCompat_CONTAINER_ID_LENGTH 64
+#define WSLCCompat_MAX_BINDING_ADDRESS_LENGTH 45
+
+typedef
+struct _WSLCCompatVersion {
+    ULONG Major;
+    ULONG Minor;
+    ULONG Revision;
+} WSLCCompatVersion;
+
+[
+    uuid(EAA15E20-7FCC-485B-B798-ED4095DBACA5),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatCrashDumpCallback : IUnknown
+{
+    HRESULT OnCrashDump(
+        [in, string] LPCWSTR DumpPath,
+        [in, unique, string] LPCSTR ProcessName,
+        [in] ULONG Pid,
+        [in] ULONG Signal,
+        [in] ULONGLONG Timestamp);
+};
+
+[
+    uuid(06154F2A-ACA7-461E-94FC-92781BA1F6F6),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatProgressCallback : IUnknown
+{
+    HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
+};
+
+[
+    uuid(290C58A1-328C-4E90-B09B-0A9D32C40074),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatWarningCallback : IUnknown
+{
+    HRESULT OnWarning([in, string] LPCWSTR Message);
+};
+
+typedef struct _WSLCCompatImageInformation
+{
+    char Image[WSLCCompat_MAX_IMAGE_NAME_LENGTH + 1];
+    char Hash[256];
+    char Digest[256];
+    LONGLONG Size; // Matches Docker's int64 image size
+    LONGLONG Created; // Unix timestamp
+    char ParentId[256];
+} WSLCCompatImageInformation;
+
+typedef struct _WSLCCompatKeyValuePair
+{
+    [string] LPCSTR Key;
+    [string] LPCSTR Value;
+} WSLCCompatKeyValuePair;
+
+typedef WSLCCompatKeyValuePair WSLCCompatLabel;
+typedef WSLCCompatKeyValuePair WSLCCompatDriverOption;
+typedef WSLCCompatKeyValuePair WSLCCompatFilter;
+
+typedef struct _WSLCCompatListImagesOptions
+{
+    DWORD Flags; // WSLCListImagesFlags (can combine with bitwise OR)
+    [unique, size_is(FiltersCount)] const WSLCCompatFilter* Filters;
+    ULONG FiltersCount;
+} WSLCCompatListImagesOptions;
+
+typedef struct _WSLCCompatStringArray
+{
+    [unique, size_is(Count)] LPCSTR const* Values;
+    ULONG Count;
+} WSLCCompatStringArray;
+
+typedef struct _WSLCCompatProcessOptions
+{
+    [unique] LPCSTR CurrentDirectory;
+    [unique] LPCSTR User;
+    WSLCCompatStringArray CommandLine;
+    WSLCCompatStringArray Environment;
+    WSLCProcessFlags Flags;
+} WSLCCompatProcessOptions;
+
+typedef struct _WSLCCompatNamedVolume
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLCCompatNamedVolume;
+
+typedef struct _WSLCCompatVolume
+{
+    LPCWSTR HostPath;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLCCompatVolume;
+
+typedef struct _WSLCCompatPortMapping
+{
+    USHORT HostPort;
+    USHORT ContainerPort;
+    int Family;
+    int Protocol;
+    char BindingAddress[WSLCCompat_MAX_BINDING_ADDRESS_LENGTH + 1];
+} WSLCCompatPortMapping;
+
+typedef struct _WSLCCompatTmpfsMount
+{
+    LPCSTR Destination;
+    [unique] LPCSTR Options;
+} WSLCCompatTmpfsMount;
+
+typedef struct _WSLCCompatUlimit
+{
+    [string] LPCSTR Name;
+    LONGLONG Soft;
+    LONGLONG Hard;
+} WSLCCompatUlimit;
+
+typedef struct _WSLCCompatNetworkConnection
+{
+    [string] LPCSTR NetworkName;
+    [unique, size_is(SettingsCount)] const WSLCCompatKeyValuePair* Settings;
+    ULONG SettingsCount;
+} WSLCCompatNetworkConnection;
+
+typedef struct _WSLCCompatContainerNetwork
+{
+    [unique, string] LPCSTR NetworkMode;
+
+    [unique, size_is(NetworksCount)] const WSLCCompatNetworkConnection* Networks;
+    ULONG NetworksCount;
+} WSLCCompatContainerNetwork;
+
+typedef struct _WSLCCompatContainerOptions
+{
+    LPCSTR Image;
+    [unique] LPCSTR Name;
+    WSLCCompatStringArray Entrypoint;
+    WSLCCompatProcessOptions InitProcessOptions;
+    [unique, size_is(VolumesCount)] WSLCCompatVolume* Volumes;
+    ULONG VolumesCount;
+    [unique, size_is(PortsCount)] WSLCCompatPortMapping* Ports;
+    ULONG PortsCount;
+    [unique, size_is(LabelsCount)] const WSLCCompatLabel* Labels;
+    ULONG LabelsCount;
+    WSLCContainerFlags Flags;
+    WSLCSignal StopSignal;
+    [unique] LPCSTR HostName;
+    [unique] LPCSTR DomainName;
+
+    WSLCCompatStringArray DnsServers;
+    WSLCCompatStringArray DnsSearchDomains;
+    WSLCCompatStringArray DnsOptions;
+
+    LONGLONG ShmSize;
+    WSLCCompatContainerNetwork ContainerNetwork;
+    [unique, size_is(TmpfsCount)] const WSLCCompatTmpfsMount* Tmpfs;
+    ULONG TmpfsCount;
+
+    [unique, size_is(NamedVolumesCount)] WSLCCompatNamedVolume* NamedVolumes;
+    ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCCompatUlimit* Ulimits;
+    ULONG UlimitsCount;
+} WSLCCompatContainerOptions;
+
+typedef char WSLCCompatContainerId[WSLCCompat_CONTAINER_ID_LENGTH + 1];
+
+typedef [system_handle(sh_file)] HANDLE WSLCCompatFileHandle;
+typedef [system_handle(sh_pipe)] HANDLE WSLCCompatPipeHandle;
+typedef [system_handle(sh_socket)] HANDLE WSLCCompatSocketHandle;
+
+typedef struct _WSLCCompatHandle
+{
+    WSLCHandleType Type;
+
+    [switch_type(WSLCHandleType), switch_is(Type)]
+    union
+    {
+        [case(WSLCHandleTypeFile)]
+        WSLCCompatFileHandle File;
+        [case(WSLCHandleTypePipe)]
+        WSLCCompatPipeHandle Pipe;
+        [case(WSLCHandleTypeSocket)]
+        WSLCCompatSocketHandle Socket;
+        [default];
+    } Handle;
+} WSLCCompatHandle;
+
+[
+    uuid(AC69DD0D-6616-4C4F-91F2-C39D6034EA82),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatProcess : IUnknown
+{
+    HRESULT Signal([in] int Signal);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCCompatHandle* Handle);
+    HRESULT GetPid([out] int* Pid);
+    HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);
+}
+
+typedef struct _WSLCCompatSessionSettings {
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG CpuCount;
+    ULONG MemoryMb;
+    ULONG BootTimeoutMs;
+    WSLCNetworkingMode NetworkingMode;
+    WSLCFeatureFlags FeatureFlags;
+    WSLCCompatHandle DmesgOutput;
+    WSLCSessionStorageFlags StorageFlags;
+
+    // Below options are used for debugging purposes only.
+    [unique] LPCWSTR RootVhdOverride;
+    [unique] LPCSTR RootVhdTypeOverride;
+} WSLCCompatSessionSettings;
+
+[
+    uuid(8C3C91FA-D550-41B9-AD9D-23DCBF96F549),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatContainer : IUnknown
+{
+    HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
+    HRESULT Start([in] WSLCContainerStartFlags Flags);
+    HRESULT Delete([in] WSLCDeleteFlags Flags);
+    HRESULT GetState([out] WSLCContainerState* State);
+    HRESULT GetInitProcess([out] IWSLCCompatProcess** Process);
+    HRESULT Exec([in, ref] const WSLCCompatProcessOptions* Options, [out] IWSLCCompatProcess** Process);
+    HRESULT Inspect([out] LPSTR* Output);
+    HRESULT GetId([out, string] WSLCCompatContainerId Id);
+}
+
+typedef struct _WSLCCompatDeletedImageInformation
+{
+    char Image[WSLCCompat_MAX_IMAGE_NAME_LENGTH + 1];
+    WSLCDeletedImageType Type;
+} WSLCCompatDeletedImageInformation;
+
+typedef struct _WSLCCompatDeleteImageOptions
+{
+    LPCSTR Image; // Image can be ID or Repo:Tag.
+    DWORD Flags; // WSLCDeleteImageFlags
+} WSLCCompatDeleteImageOptions;
+
+typedef struct _WSLCCompatTagImageOptions
+{
+    LPCSTR Image; // Source image name or ID.
+    LPCSTR Repo;  // Target repository name.
+    LPCSTR Tag;   // Target tag name.
+} WSLCCompatTagImageOptions;
+
+typedef struct _WSLCCompatVolumeOptions
+{
+    [unique] LPCSTR Name;
+    [unique] LPCSTR Driver;
+    [unique, size_is(DriverOptsCount)] const WSLCCompatDriverOption* DriverOpts;
+    ULONG DriverOptsCount;
+    [unique, size_is(LabelsCount)] const WSLCCompatLabel* Labels;
+    ULONG LabelsCount;
+} WSLCCompatVolumeOptions;
+
+typedef char WSLCCompatVolumeName[WSLCCompat_MAX_VOLUME_NAME_LENGTH + 1];
+
+typedef struct _WSLCCompatVolumeInformation
+{
+    WSLCCompatVolumeName Name;
+    char Driver[WSLCCompat_MAX_VOLUME_DRIVER_LENGTH + 1];
+} WSLCCompatVolumeInformation;
+
+[
+    uuid(DD7B2EF9-AA01-4F21-8A3A-29D394CBB579),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSession : IUnknown
+{
+    // Image management.
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
+    HRESULT LoadImage([in] WSLCCompatHandle ImageHandle, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
+    HRESULT ImportImage([in] WSLCCompatHandle ImageHandle, [in, unique] LPCSTR ImageName, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* ImageId);
+    HRESULT ListImages([in, unique] const WSLCCompatListImagesOptions* Options, [out, size_is(, *Count)] WSLCCompatImageInformation** Images, [out] ULONG* Count);
+    HRESULT DeleteImage([in] const WSLCCompatDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCCompatDeletedImageInformation** DeletedImages, [out] ULONG* Count);
+    HRESULT TagImage([in] const WSLCCompatTagImageOptions* Options);
+
+    // Container management.
+    HRESULT CreateContainer([in] const WSLCCompatContainerOptions* Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatContainer** Container);
+
+    // Terminate the VM and containers.
+    HRESULT Terminate();
+
+    // Returns a one-off event that is signaled when the session terminates, whether due to an
+    // explicit Terminate() call or an unexpected VM exit. The returned handle is owned by the
+    // caller and remains valid (and observes the signaled state) even after the session is released.
+    HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
+
+    // Returns the cached termination reason and details. These are only available after the
+    // termination event has been signaled; before that the call fails.
+    HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
+
+    // Volume management.
+    HRESULT CreateVolume([in] const WSLCCompatVolumeOptions* Options, [out] WSLCCompatVolumeInformation* VolumeInfo);
+    HRESULT DeleteVolume([in] LPCSTR Name);
+
+    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
+
+    HRESULT RegisterCrashDumpCallback([in] IWSLCCompatCrashDumpCallback* Callback, [out] IUnknown** Subscription);
+}
+
+[
+    uuid(279F2047-DA35-45A3-B671-AFD2302D5D16),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSessionManager : IUnknown
+{
+    HRESULT GetVersion([out] WSLCCompatVersion* Version);
+    HRESULT IsClientVersionSupported([in] const WSLCCompatVersion* ClientVersion, [out] BOOL* IsSupported);
+
+    // Session management.
+    HRESULT CreateSession([in, unique] const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
+}

@@ -40,10 +40,19 @@ public:
 
     void DeleteVolume(_In_ LPCSTR Name);
 
-    std::vector<WSLCVolumeInformation> ListVolumes() const;
+    std::vector<WSLCVolumeInformation> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;
+
+    struct PruneVolumesResult
+    {
+        std::vector<std::string> Volumes;
+        std::uint64_t SpaceReclaimed{};
+    };
+
+    PruneVolumesResult PruneVolumes(_In_ const std::map<std::string, std::vector<std::string>>& Filters);
+
     std::string InspectVolume(_In_ const std::string& Name) const;
 
-    bool ContainsVolume(_In_ const std::string& Name) const;
+    std::pair<HRESULT, std::string> GetVolumeStatus(_In_ const std::string& Name) const;
 
 private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);

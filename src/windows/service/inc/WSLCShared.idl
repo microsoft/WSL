@@ -1,0 +1,249 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    WSLCShared.idl
+
+Abstract:
+
+    This file contains the enum and flag definitions shared between the WSLC
+    service API (wslc.idl) and the WSLC SDK-facing API (WSLCCompat.idl).
+    Backwards compatibility must be maintained when changes made to this file
+
+--*/
+
+import "wtypes.idl";
+
+typedef enum _WSLCVirtualMachineTerminationReason
+{
+    WSLCVirtualMachineTerminationReasonUnknown,
+    WSLCVirtualMachineTerminationReasonShutdown,
+    WSLCVirtualMachineTerminationReasonCrashed,
+} WSLCVirtualMachineTerminationReason;
+
+typedef enum _WSLCFD
+{
+    WSLCFDStdin = 0,
+    WSLCFDStdout = 1,
+    WSLCFDStderr = 2,
+    WSLCFDTty = 3,
+} WSLCFD;
+
+typedef enum _WSLCSignal
+{
+    WSLCSignalNone = 0,
+    WSLCSignalSIGHUP = 1,
+    WSLCSignalSIGINT = 2,
+    WSLCSignalSIGQUIT = 3,
+    WSLCSignalSIGILL = 4,
+    WSLCSignalSIGTRAP = 5,
+    WSLCSignalSIGABRT = 6,
+    WSLCSignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
+    WSLCSignalSIGBUS = 7,
+    WSLCSignalSIGFPE = 8,
+    WSLCSignalSIGKILL = 9,
+    WSLCSignalSIGUSR1 = 10,
+    WSLCSignalSIGSEGV = 11,
+    WSLCSignalSIGUSR2 = 12,
+    WSLCSignalSIGPIPE = 13,
+    WSLCSignalSIGALRM = 14,
+    WSLCSignalSIGTERM = 15,
+    WSLCSignalSIGTKFLT = 16,
+    WSLCSignalSIGCHLD = 17,
+    WSLCSignalSIGCONT = 18,
+    WSLCSignalSIGSTOP = 19,
+    WSLCSignalSIGTSTP = 20,
+    WSLCSignalSIGTTIN = 21,
+    WSLCSignalSIGTTOU = 22,
+    WSLCSignalSIGURG = 23,
+    WSLCSignalSIGXCPU = 24,
+    WSLCSignalSIGXFSZ = 25,
+    WSLCSignalSIGVTALRM = 26,
+    WSLCSignalSIGPROF = 27,
+    WSLCSignalSIGWINCH = 28,
+    WSLCSignalSIGIO = 29,
+    WSLCSignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
+    WSLCSignalSIGPWR = 30,
+    WSLCSignalSIGSYS = 31
+} WSLCSignal;
+
+typedef enum _WSLCListImagesFlags
+{
+    WSLCListImagesFlagsNone = 0,
+    WSLCListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
+    WSLCListImagesFlagsDigests = 2, // Include digest information
+} WSLCListImagesFlags;
+
+cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
+
+typedef enum _WSLCProcessFlags
+{
+    WSLCProcessFlagsNone = 0,
+    WSLCProcessFlagsStdin = 1,
+    WSLCProcessFlagsTty = 2
+} WSLCProcessFlags;
+
+cpp_quote("#define WSLCProcessFlagsValid (WSLCProcessFlagsStdin | WSLCProcessFlagsTty)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCProcessFlags);")
+
+typedef enum _WSLCContainerFlags
+{
+    WSLCContainerFlagsNone = 0,
+    WSLCContainerFlagsRm = 1, // Delete the container when it exits.
+    WSLCContainerFlagsGpu = 2, // Enable GPU access.
+    WSLCContainerFlagsInit = 4, // Run the container under an init process.
+    WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
+} WSLCContainerFlags;
+
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
+
+typedef enum _WSLCContainerStartFlags
+{
+    WSLCContainerStartFlagsNone = 0,
+    WSLCContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+} WSLCContainerStartFlags;
+
+cpp_quote("#define WSLCContainerStartFlagsValid (WSLCContainerStartFlagsAttach)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerStartFlags);")
+
+typedef enum _WSLCContainerState
+{
+    WslcContainerStateInvalid = 0,
+    WslcContainerStateCreated = 1,
+    WslcContainerStateRunning = 2,
+    WslcContainerStateExited = 3,
+    WslcContainerStateDeleted = 4,
+} WSLCContainerState;
+
+typedef enum _WSLCHandleType
+{
+    WSLCHandleTypeUnknown = 0,
+    WSLCHandleTypeFile = 1,
+    WSLCHandleTypePipe = 2,
+    WSLCHandleTypeSocket = 3
+} WSLCHandleType;
+
+typedef enum _WSLCProcessState
+{
+    WslcProcessStateUnknown = 0,
+    WslcProcessStateRunning = 1,
+    WslcProcessStateExited = 2,
+    WslcProcessStateSignalled = 3
+} WSLCProcessState;
+
+typedef enum _WSLCNetworkingMode
+{
+    WSLCNetworkingModeNone,
+    WSLCNetworkingModeNAT,
+    WSLCNetworkingModeConsomme
+} WSLCNetworkingMode;
+
+typedef enum _WSLCFeatureFlags
+{
+    WslcFeatureFlagsNone = 0,
+    WslcFeatureFlagsDnsTunneling = 1,
+    WslcFeatureFlagsEarlyBootDmesg = 2,
+    WslcFeatureFlagsGPU = 4,
+    WslcFeatureFlagsVirtioFs = 8,
+    WslcFeatureFlagsDebug = 16,
+    WslcFeatureFlagsPortRelayWslRelay = 32, // Use the wslrelay-based localhost port relay in Consomme networking mode.
+} WSLCFeatureFlags;
+
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
+
+typedef enum _WSLCSessionStorageFlags
+{
+    WSLCSessionStorageFlagsNone = 0,
+    WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
+    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate
+} WSLCSessionStorageFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")
+
+typedef enum _WSLCLogsFlags
+{
+    WSLCLogsFlagsNone = 0,
+    WSLCLogsFlagsFollow = 1,
+    WSLCLogsFlagsTimestamps = 2,
+} WSLCLogsFlags;
+
+cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);")
+
+typedef enum _WSLCDeleteFlags
+{
+    WSLCDeleteFlagsNone = 0,
+    WSLCDeleteFlagsForce = 1,
+    WSLCDeleteFlagsDeleteVolumes = 2,
+    // TODO: Flags to remove bridge links, etc.
+} WSLCDeleteFlags;
+
+cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteFlags);")
+
+typedef enum _WSLCDeletedImageType
+{
+    WSLCDeletedImageTypeDeleted = 0,
+    WSLCDeletedImageTypeUntagged = 1
+} WSLCDeletedImageType;
+
+typedef enum _WSLCDeleteImageFlags
+{
+    WSLCDeleteImageFlagsNone = 0,
+    WSLCDeleteImageFlagsForce = 1,
+    WSLCDeleteImageFlagsNoPrune = 2,
+} WSLCDeleteImageFlags;
+
+cpp_quote("#define WSLCDeleteImageFlagsValid (WSLCDeleteImageFlagsForce | WSLCDeleteImageFlagsNoPrune)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteImageFlags);")
+
+typedef enum _WSLCBuildImageFlags
+{
+    WSLCBuildImageFlagsNone = 0,
+    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
+    WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
+    WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
+} WSLCBuildImageFlags;
+
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
+
+typedef enum _WSLCListContainersFlags
+{
+    WSLCListContainersFlagsNone = 0,
+    WSLCListContainersFlagsAll = 1,
+} WSLCListContainersFlags;
+
+cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
+
+typedef enum _WSLCSessionState
+{
+    WSLCSessionStateRunning = 0,
+    WSLCSessionStateTerminated = 1
+} WSLCSessionState;
+
+typedef enum _WSLCSessionFlags
+{
+    WSLCSessionFlagsNone = 0,
+    WSLCSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
+    WSLCSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
+} WSLCSessionFlags;
+
+cpp_quote("#define WSLCSessionFlagsValid (WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting)")
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")

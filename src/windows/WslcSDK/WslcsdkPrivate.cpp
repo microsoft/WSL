@@ -40,6 +40,11 @@ WslcSessionImpl* GetInternalType(WslcSession handle)
     return reinterpret_cast<WslcSessionImpl*>(handle);
 }
 
+WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle)
+{
+    return reinterpret_cast<WslcCrashDumpSubscriptionImpl*>(handle);
+}
+
 WslcContainerImpl* GetInternalType(WslcContainer handle)
 {
     return reinterpret_cast<WslcContainerImpl*>(handle);

@@ -18,7 +18,9 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include <map>
 #include <string>
+#include <utility>
 
 namespace wsl::windows::service::wslc {
 
@@ -34,6 +36,17 @@ public:
     // stored in the WSLC volume metadata label, not the underlying docker
     // driver (which may be "local" for guest volumes).
     virtual const char* Driver() const noexcept = 0;
+
+    // The user-specified labels on this volume (excludes the WSLC metadata label).
+    virtual const std::map<std::string, std::string>& Labels() const noexcept = 0;
+
+    // The status of the volume as {Code, Message}: S_OK with an empty message when the volume
+    // opened successfully and is usable, otherwise a failure HRESULT and a human-readable reason
+    // (e.g. the backing VHD is missing).
+    virtual std::pair<HRESULT, std::string> Status() const
+    {
+        return {S_OK, {}};
+    }
 
     // Remove the volume from docker and release any host-side resources
     // (e.g. detach/delete the VHD for VHD volumes). Throws on failure.

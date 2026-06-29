@@ -116,15 +116,6 @@ DockerExecProcessControl::DockerExecProcessControl(
 {
 }
 
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
-    }
-}
-
 int DockerExecProcessControl::GetPid() const
 {
     std::lock_guard lock{m_lock};
@@ -151,6 +142,12 @@ void DockerExecProcessControl::SetPid(int Pid)
 {
     std::lock_guard lock{m_lock};
 
+    // Pid must be a real (forked) process. Docker reports Pid=0 in the brief
+    // window between StartExec returning and runc actually forking the user
+    // process; treating 0 as a valid PID causes the exec wait to hang forever
+    // because Docker never emits exec_die for a process that never spawned
+    // (see PR #40550). Callers must filter Pid > 0 themselves.
+    WI_ASSERT(Pid > 0);
     WI_ASSERT(!m_pid.has_value());
 
     m_pid = Pid;
@@ -201,7 +198,7 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
 }
 
 VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", VirtualMachine.TerminatingEvent()), m_vm(&VirtualMachine)
+    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}), m_vm(&VirtualMachine)
 {
 }
 

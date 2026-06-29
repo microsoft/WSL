@@ -16,6 +16,7 @@ Abstract:
 // Include all commands that parent to the root.
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
+#include "NetworkCommand.h"
 #include "RegistryCommand.h"
 #include "SettingsCommand.h"
 #include "SystemCommand.h"
@@ -32,6 +33,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
+    commands.push_back(std::make_unique<NetworkCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));
     commands.push_back(std::make_unique<SystemCommand>(FullName()));
@@ -40,7 +42,9 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
+    commands.push_back(std::make_unique<ImageImportCommand>(FullName()));
     commands.push_back(std::make_unique<InspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
@@ -55,6 +59,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ImageSaveCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStatsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
     commands.push_back(std::make_unique<ImageTagCommand>(FullName()));
     commands.push_back(std::make_unique<VersionCommand>(FullName()));
@@ -65,6 +70,24 @@ std::vector<Argument> RootCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Version),
+    };
+}
+
+// Global options apply to the overall invocation and may appear before any
+// subcommand (e.g. `wslc --session foo image list`). Define them here using
+// the Argument::Create factory backed by ArgumentDefinitions.h so help text,
+// aliases, validation, and parsing match subcommand arguments.
+std::vector<Argument> RootCommand::GetGlobalArguments() const
+{
+    return {
+        Argument::Create(ArgType::Session),
+    };
+}
+
+std::vector<Argument> RootCommand::GetEnvArguments() const
+{
+    return {
+        Argument::Create(ArgType::NoColor),
     };
 }
 

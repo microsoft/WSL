@@ -16,11 +16,15 @@ WslcReleaseContainer
 WslcReleaseProcess
 
 WslcSetSessionSettingsFeatureFlags
-WslcSetSessionSettingsTerminationCallback
+WslcGetSessionTerminationEvent
+WslcGetSessionTerminationReason
 WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
+ 
+WslcRegisterSessionCrashDumpCallback
+WslcReleaseCrashDumpSubscription
  
 WslcTerminateSession
 WslcSessionAuthenticate

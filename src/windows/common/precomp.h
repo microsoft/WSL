@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 
-#pragma warning(disable : 4200 4214)
+#pragma warning(disable : 4200 4214 4875)
 
 #ifdef __cplusplus
 #define _WINSOCKAPI_
@@ -135,6 +135,7 @@ Abstract:
 
 // Telemetry Header
 #include "WslTelemetry.h"
+#include "SlowOperationWatcher.h"
 
 // LxCore headers
 #include <lxcoreapi.h>
