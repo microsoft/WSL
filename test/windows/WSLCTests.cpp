@@ -22,6 +22,7 @@ Abstract:
 #include "hcs.hpp"
 #include "ContainerNameGenerator.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
+#include "HttpHeaderEndDetector.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -9218,6 +9219,39 @@ class WSLCTests
 
         VERIFY_ARE_EQUAL(payload.size(), output.size());
         VERIFY_IS_TRUE(payload == output);
+    }
+
+    TEST_METHOD(HttpHeaderEndDetector)
+    {
+        // Returns the index of the byte of header end, or -1 if the header never ends.
+        const auto headerEndIndex = [](std::string_view input) {
+            wsl::windows::common::HttpHeaderEndDetector detector;
+            for (size_t i = 0; i < input.size(); i++)
+            {
+                if (detector.Consume(input[i]))
+                {
+                    return static_cast<int>(i);
+                }
+            }
+
+            return -1;
+        };
+
+        VERIFY_ARE_EQUAL(3, headerEndIndex("\r\n\r\n"));
+        VERIFY_ARE_EQUAL(4, headerEndIndex("a\r\n\r\n"));
+        VERIFY_ARE_EQUAL(7, headerEndIndex("a\r\nb\r\n\r\n"));
+        VERIFY_ARE_EQUAL(4, headerEndIndex("\r\r\n\r\n"));
+        VERIFY_ARE_EQUAL(3, headerEndIndex("\r\n\r\nbody"));
+
+        VERIFY_ARE_EQUAL(-1, headerEndIndex(""));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("Header: value\r\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("HTTP/1.1 200 OK\r\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\r\n\r"));
+
+        // Detection is strict.
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\n\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\r\n\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\n\r\n"));
     }
 
     WSLC_TEST_METHOD(ContainerRecoveryFromStorage)
