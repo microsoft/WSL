@@ -726,6 +726,73 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(ExpectedExitCode, inspect.State.ExitCode);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_StopTimeout)
+    {
+        // A positive value is forwarded to the container configuration.
+        {
+            constexpr int ExpectedStopTimeout = 30;
+            auto result = RunWslc(std::format(
+                L"container create --stop-timeout {} --name {} {}", ExpectedStopTimeout, WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(ExpectedStopTimeout, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // A value of 0 (stop the container immediately) is a valid, explicit timeout.
+        {
+            auto result =
+                RunWslc(std::format(L"container create --stop-timeout 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(0, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // A value of -1 means "no timeout"; it is a valid, explicit value forwarded to the configuration.
+        {
+            auto result =
+                RunWslc(std::format(L"container create --stop-timeout -1 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(-1, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When --stop-timeout is not specified, no timeout is forwarded to the container configuration.
+        {
+            auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.StopTimeout.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_StopTimeout_Invalid)
+    {
+        {
+            auto result =
+                RunWslc(std::format(L"container create --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop-timeout argument value: abc\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container create --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize)
     {
         auto result = RunWslc(
@@ -1225,6 +1292,7 @@ private:
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container\r\n"
+                << L"  --stop-timeout    Timeout (in seconds) to stop the container before killing it (-1 for no timeout)\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  --ulimit          Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"

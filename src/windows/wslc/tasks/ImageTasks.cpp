@@ -260,7 +260,7 @@ void LoadImage(CLIExecutionContext& context)
     {
         auto& input = context.Args.Get<ArgType::Input>();
         auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
-        services::ImageService::Load(session, input, callback.get());
+        services::ImageService::Load(session, input, callback.Get());
         return;
     }
 

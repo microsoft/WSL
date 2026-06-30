@@ -302,7 +302,7 @@ void DockerHTTPClient::StartContainer(const std::string& Id, const std::optional
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds)
+void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds)
 {
     auto url = URL::Create("/containers/{}/stop", Id);
     if (Signal.has_value())
