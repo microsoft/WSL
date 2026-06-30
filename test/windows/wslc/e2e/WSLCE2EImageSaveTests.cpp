@@ -170,9 +170,44 @@ class WSLCE2EImageSaveTests
         VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Load_ReportsLoadedImages)
+    {
+        EnsureImageIsLoaded(HelloWorldImage);
+
+        // Force a pristine re-load of DebianImage at the end so subsequent tests (in fast mode)
+        // see the same on-disk tar as DebianImage.Path (see WSLCE2E_Image_Save_MultipleImages_Load).
+        auto restoreDebian = wil::scope_exit([&]() { EnsureImageIsDeleted(DebianImage); });
+
+        // Save debian:latest and hello-world:latest into a single archive.
+        const auto saveResult = RunWslc(std::format(
+            L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), HelloWorldImage.NameAndTag()));
+        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Delete both source images so the load actually recreates them.
+        EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(HelloWorldImage);
+
+        // Load both images back from the single archive. The CLI should print a "Loaded image:"
+        // line for each image, driven by the IImageLoadCallback.
+        const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
+        loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(loadResult.Stdout.has_value());
+        const auto& output = loadResult.Stdout.value();
+        const auto debianLine = L"Loaded image: " + DebianImage.NameAndTag();
+        const auto helloWorldLine = L"Loaded image: " + HelloWorldImage.NameAndTag();
+        VERIFY_IS_TRUE(
+            output.find(debianLine) != std::wstring::npos,
+            WEX::Common::String().Format(L"Expected '%ls' in load output: '%ls'", debianLine.c_str(), output.c_str()));
+        VERIFY_IS_TRUE(
+            output.find(helloWorldLine) != std::wstring::npos,
+            WEX::Common::String().Format(L"Expected '%ls' in load output: '%ls'", helloWorldLine.c_str(), output.c_str()));
+    }
+
 private:
     const TestImage DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
+    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::filesystem::path SavedArchivePath{};

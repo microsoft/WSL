@@ -231,11 +231,11 @@ std::vector<ImageInformation> ImageService::List(
     return result;
 }
 
-void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
+void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
     auto source = OpenImageInput(input);
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, warningCallback.Get(), callback));
 }
 
 std::string ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
@@ -284,7 +284,7 @@ void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::
 {
     EnumReferenceFormat format;
     auto [repo, tag] = ParseImage(targetImage, &format);
-    if (format == EnumReferenceFormat::Digest)
+    if (format == EnumReferenceFormatDigest)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
     }

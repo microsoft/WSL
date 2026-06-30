@@ -1215,7 +1215,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::LoadImage(
+    const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -1228,7 +1229,7 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    std::ignore = ImportImageImpl(*requestContext, ImageHandle);
+    std::ignore = ImportImageImpl(*requestContext, ImageHandle, LoadCallback);
 
     return S_OK;
 }
@@ -1282,9 +1283,15 @@ try
 }
 CATCH_RETURN();
 
-std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
+
+    std::optional<UserCOMCallback> comCall;
+    if (LoadCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1337,6 +1344,33 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
         else if (parsed.stream.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
+
+            if (LoadCallback != nullptr)
+            {
+                static constexpr std::string_view c_loadedImagePrefix = "Loaded image: ";
+                static constexpr std::string_view c_loadedImageIdPrefix = "Loaded image ID: ";
+
+                for (const auto& entry : shared::string::Split(*parsed.stream, '\n'))
+                {
+                    std::string name;
+                    EnumReferenceFormat format = EnumReferenceFormatNone;
+                    if (entry.starts_with(c_loadedImagePrefix))
+                    {
+                        name = entry.substr(c_loadedImagePrefix.size());
+                        format = EnumReferenceFormatTag;
+                    }
+                    else if (entry.starts_with(c_loadedImageIdPrefix))
+                    {
+                        name = entry.substr(c_loadedImageIdPrefix.size());
+                        format = EnumReferenceFormatDigest;
+                    }
+
+                    if (!name.empty())
+                    {
+                        THROW_IF_FAILED(LoadCallback->OnImageLoaded(name.c_str(), format));
+                    }
+                }
+            }
         }
         else if (parsed.status.has_value())
         {
@@ -3096,7 +3130,7 @@ HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgress
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
+    return LoadImage(handle, progress.Get(), ContentLength, warning.Get(), nullptr);
 }
 
 HRESULT WSLCSession::ImportImage(

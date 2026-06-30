@@ -121,6 +121,12 @@ const TestImage& PythonTestImage()
     return image;
 }
 
+const TestImage& HelloWorldTestImage()
+{
+    static const TestImage image{L"hello-world", L"latest", std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar"};
+    return image;
+}
+
 const TestImage& InvalidTestImage()
 {
     static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};

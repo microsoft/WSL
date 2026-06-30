@@ -71,6 +71,7 @@ struct TestImage
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
 const TestImage& PythonTestImage();
+const TestImage& HelloWorldTestImage();
 const TestImage& InvalidTestImage();
 
 struct TestSession

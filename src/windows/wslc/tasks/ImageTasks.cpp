@@ -20,6 +20,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "ImageProgressCallback.h"
+#include "WSLCImageLoadCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
@@ -223,7 +224,8 @@ void LoadImage(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Input))
     {
         auto& input = context.Args.Get<ArgType::Input>();
-        services::ImageService::Load(session, input);
+        services::WSLCImageLoadCallback callback{context.Reporter};
+        services::ImageService::Load(session, input, &callback);
         return;
     }
 
