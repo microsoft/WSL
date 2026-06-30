@@ -1513,6 +1513,20 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
     }
 
+    WSLC_TEST_METHOD(InstallWithDependencies_NoComponents_Succeeds)
+    {
+        // Passing WSLC_COMPONENT_FLAG_NONE must return S_OK immediately without requiring elevation.
+        VERIFY_SUCCEEDED(WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_NONE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_SdkNeedsUpdate_ReturnsError)
+    {
+        // Passing SDK_NEEDS_UPDATE must always return WSLC_E_SDK_UPDATE_NEEDED — the caller must update their SDK.
+        VERIFY_ARE_EQUAL(
+            WSLC_E_SDK_UPDATE_NEEDED,
+            WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
     // -----------------------------------------------------------------------
     // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
