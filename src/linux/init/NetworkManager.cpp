@@ -2,10 +2,12 @@
 
 #include <iostream>
 #include <filesystem>
+#include <unistd.h>
 #include <lxwil.h>
 #include "lxinitshared.h"
 #include "common.h"
 #include "NetworkManager.h"
+#include "Loopback6Bpf.h"
 #include "util.h"
 #include "address.h"
 #include "conncheckshared.h"
@@ -43,6 +45,11 @@ const Address c_ipv6LoopbackGateway = {AF_INET6, Ipv6MaxPrefixLen, LX_INIT_IPV6_
 // addresses are needed by host<->guest loopback scenarios.
 const Address c_loopbackV4AddressRange = {AF_INET, Ipv4MaxPrefixLen, "127.0.0.1"};
 const Address c_loopbackV6AddressRange = {AF_INET6, Ipv6MaxPrefixLen, "::1"};
+
+// Non-loopback sentinel that the IPv6 relay tc/BPF program substitutes for ::1 on packets it redirects
+// onto lo. Replies carry it as their destination; it must route back out loopback0 so the egress hook can
+// restore the relay's addresses. Must match c_sentinel in src/linux/bpf/loopback6_relay.bpf.c (fd00::1).
+const Address c_sentinelV6AddressRange = {AF_INET6, Ipv6MaxPrefixLen, "fd00::1"};
 
 // 00:11:22:33:44:55 represents the MAC address that all loopback/local packets will have as destination
 // MAC when they are sent out of the guest. This will help Windows to identify which
@@ -304,7 +311,16 @@ void NetworkManager::InitializeLoopbackConfiguration(Interface& gelnic, wsl::sha
     ModifyNetSetting(AF_INET, "rp_filter", "all", c_disableSetting, strlen(c_disableSetting));
 
     InitializeLoopbackConfigurationImpl(gelnic, AF_INET);
-    // InitializeLoopbackConfigurationImpl(gelnic, AF_INET6);
+
+    // Configure the outbound IPv6 (::1) loopback datapath (policy rules + ::1/128 route via the loopback gateway).
+    InitializeLoopbackConfigurationImpl(gelnic, AF_INET6);
+
+    // Configure the inbound IPv6 (::1) loopback datapath. The host relay injects guest-bound packets onto
+    // loopback0 with source ::1, which the Linux stack drops on a non-loopback device (RFC 4291 martian
+    // check in ip6_rcv_core(), no IPv6 equivalent of accept_local). A tc/BPF program on loopback0 rewrites
+    // and redirects those packets onto lo so they are delivered, and restores the relay's addresses on the
+    // replies. This is best-effort: failures are logged and do not affect the rest of the configuration.
+    ConfigureIpv6LoopbackRelay(gelnic);
 }
 
 /*
@@ -370,7 +386,7 @@ void NetworkManager::AddMirroredLoopbackRoutingRules(Interface& gelnic, int addr
 
     // Adding priority 0 rules for the GELNIC interface
     // Similar priority 0 rules will also be added or deleted when an interface is mirrored in Linux, or deleted
-    UpdateMirroredLoopbackRulesForInterface(gelnic.Name(), Operation::Create);
+    UpdateMirroredLoopbackRulesForInterface(gelnic.Name(), addressFamily, Operation::Create);
 
     auto AddPriority1Rule = [&](const Protocol protocol, const int routingTableId) {
         Rule rule = Rule(addressFamily, routingTableId, c_LinuxToWindowsRulePriority, protocol);
@@ -388,21 +404,27 @@ void NetworkManager::AddMirroredLoopbackRoutingRules(Interface& gelnic, int addr
     ruleManager.ModifyRoutingTablePriority(rule, Operation::Create);
 }
 
-void NetworkManager::UpdateMirroredLoopbackRulesForInterface(const std::string& interfaceName, Operation operation)
+void NetworkManager::UpdateMirroredLoopbackRulesForInterface(const std::string& interfaceName, int addressFamily, Operation operation)
 {
     assert(operation == Operation::Create || operation == Operation::Remove);
 
     // Add or remove priority 0 rules needed by mirrored loopback traffic. See the comments in AddMirroredLoopbackRoutingRules for
-    // more details. Currently only IPv4 guest<->host loopback is supported in mirrored mode - adding only IPv4 rules.
+    // more details. The rules are added per address family (the GELNIC loopback path adds both IPv4 and IPv6).
     GNS_LOG_INFO(
-        "{} priority 0 rule for interfaceName {} for TCP", operation == Operation::Create ? "Add" : "Remove", interfaceName.c_str());
-    Rule rule = Rule(AF_INET, RT_TABLE_LOCAL, c_WindowsToLinuxRulePriority, Protocol::Tcp);
+        "{} priority 0 rule for interfaceName {} family {} for TCP",
+        operation == Operation::Create ? "Add" : "Remove",
+        interfaceName.c_str(),
+        addressFamily);
+    Rule rule = Rule(addressFamily, RT_TABLE_LOCAL, c_WindowsToLinuxRulePriority, Protocol::Tcp);
     rule.iif = interfaceName;
     ruleManager.ModifyLoopbackRule(rule, operation);
 
     GNS_LOG_INFO(
-        "{} priority 0 rule for interfaceName {} for UDP", operation == Operation::Create ? "Add" : "Remove", interfaceName.c_str());
-    rule = Rule(AF_INET, RT_TABLE_LOCAL, c_WindowsToLinuxRulePriority, Protocol::Udp);
+        "{} priority 0 rule for interfaceName {} family {} for UDP",
+        operation == Operation::Create ? "Add" : "Remove",
+        interfaceName.c_str(),
+        addressFamily);
+    rule = Rule(addressFamily, RT_TABLE_LOCAL, c_WindowsToLinuxRulePriority, Protocol::Udp);
     rule.iif = interfaceName;
     ruleManager.ModifyLoopbackRule(rule, operation);
 }
@@ -437,20 +459,55 @@ void NetworkManager::InitializeLoopbackConfigurationImpl(Interface& gelnic, int 
 }
 
 /*
+    Configure the inbound IPv6 (::1) loopback datapath using a tc/BPF program on loopback0. See the comment
+    at the call site in InitializeLoopbackConfiguration for the rationale. Best-effort: any failure is logged
+    and swallowed so it cannot break the rest of the networking configuration.
+*/
+void NetworkManager::ConfigureIpv6LoopbackRelay(Interface& gelnic)
+{
+    try
+    {
+        auto programs = LoadLoopback6RelayPrograms();
+        if (!programs)
+        {
+            return;
+        }
+
+        // Attach the programs to a clsact qdisc on loopback0. Ingress rewrites a relay-injected ::1 source to
+        // the sentinel, restores ::1 as the destination, and redirects onto lo (whose IFF_LOOPBACK bypasses
+        // the martian check) so the packet is delivered. Egress restores the relay's addresses on the reply.
+        gelnic.ModifyTcClassifier(true);
+        gelnic.BpfAttachTcClassifier(programs->ingressFd, true);
+        gelnic.BpfAttachTcClassifier(programs->egressFd, false);
+        close(programs->ingressFd);
+        close(programs->egressFd);
+
+        // The ingress hook redirects packets onto lo, so add the priority-0 "iif lo ... lookup local" rule;
+        // otherwise the redirected packets would match the priority-1 "lookup 127" rule and be forwarded
+        // back out instead of delivered locally.
+        UpdateMirroredLoopbackRulesForInterface("lo", AF_INET6, Operation::Create);
+
+        // The egress hook leaves the reply destined to the sentinel; route the sentinel back out loopback0
+        // (table 127) so it egresses where the hook can rewrite it back to ::1 for the relay.
+        Route sentinelRoute = Route(AF_INET6, c_ipv6LoopbackGateway, gelnic.Index(), false, c_sentinelV6AddressRange, 0);
+        sentinelRoute.isLoopbackRoute = true;
+        loopbackRoutingTable.ModifyRoute(sentinelRoute, Operation::Create);
+
+        GNS_LOG_INFO("Configured IPv6 (::1) inbound loopback relay on GELNIC adapter {}", gelnic.Name().c_str());
+    }
+    catch (...)
+    {
+        GNS_LOG_ERROR("Failed to configure the IPv6 (::1) inbound loopback relay; inbound ::1 delivery may not work");
+    }
+}
+
+/*
     Add or remove loopback routes for the set of IP addresses that were added/deleted on an interface. All routes are via the
     same gateway address. The function can be used for both IPv4 and IPv6 addresses.
 */
 void NetworkManager::UpdateLoopbackRoute(Interface& interface, const Address& address, Operation operation)
 {
     assert(operation == Operation::Create || operation == Operation::Remove);
-
-    // For the moment don't process IPv6 addresses, since inbound IPv6 loopback is not supported yet (dropped by
-    // default by the Linux stack). Once that is addressed, this check will be removed.
-    if (address.Family() == AF_INET6)
-    {
-        GNS_LOG_INFO("Ignoring IPv6 address {}", utils::Stringify(address).c_str());
-        return;
-    }
 
     auto gateway = address.Family() == AF_INET ? c_ipv4LoopbackGateway : c_ipv6LoopbackGateway;
 

@@ -61,7 +61,7 @@ public:
 
     void AddMirroredLoopbackRoutingRules(Interface& gelnic, int addressFamily);
 
-    void UpdateMirroredLoopbackRulesForInterface(const std::string& interfaceName, Operation operation);
+    void UpdateMirroredLoopbackRulesForInterface(const std::string& interfaceName, int addressFamily, Operation operation);
 
     void UpdateLoopbackRoute(Interface& interface, const Address& address, Operation operation);
 
@@ -81,6 +81,8 @@ public:
 
 private:
     void InitializeLoopbackConfigurationImpl(Interface& gelnic, int addressFamily);
+
+    void ConfigureIpv6LoopbackRelay(Interface& gelnic);
 
     RoutingTable& routingTable;
     // Custom routing tables used for loopback mirroring. Not to be confused with the Linux "local" table
