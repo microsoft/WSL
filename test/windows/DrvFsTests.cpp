@@ -239,12 +239,6 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug virtiofs handling of //localhost/C$ style paths");
-            return;
-        }
-
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 4'").c_str(), L"drvfs4"));
     }

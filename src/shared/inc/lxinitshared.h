@@ -1156,9 +1156,17 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     int Result;
     unsigned int TagOffset;
     unsigned int SourceOffset;
+    //
+    // Offset of the per-share "subname" (child name within an aggregate
+    // virtio-fs root) inside Buffer. Empty for legacy direct-mount
+    // shares. Appended for wire compatibility: consumers MUST size-gate
+    //   Header.MessageSize >= offsetof(SubnameOffset) + sizeof(unsigned int)
+    // before reading this field.
+    //
+    unsigned int SubnameOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset), STRING_FIELD(SubnameOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
@@ -1183,9 +1191,17 @@ typedef struct _LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE
     MESSAGE_HEADER Header;
     bool Admin;
     unsigned int TagOffset;
+    //
+    // Offset of the original child "subname" inside Buffer. Empty when
+    // the share was a legacy direct-mount virtiofs. Appended for wire
+    // compatibility: consumers MUST size-gate
+    //   Header.MessageSize >= offsetof(SubnameOffset) + sizeof(unsigned int)
+    // before reading this field.
+    //
+    unsigned int SubnameOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Admin), STRING_FIELD(TagOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Admin), STRING_FIELD(TagOffset), STRING_FIELD(SubnameOffset));
 } LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE, *PLX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE;
 
 //
@@ -1594,6 +1610,26 @@ struct WSLC_MOUNT_RESULT
     PRETTY_PRINT(FIELD(Header), FIELD(Result));
 };
 
+//
+// Fixed tags identifying the aggregate virtio-fs devices used to share
+// Windows folders into a WSLc container. Unlike drvfs (which mints a
+// random per-VM tag and returns it to its caller), WSLc has no return
+// channel for AddShare, so host and guest agree on these compile-time
+// constants. Each WSLc VM is a distinct guest, so there is no cross-VM
+// collision on VIRTIOFS_AGGREGATE_ROOT_DIR/<tag>. Per-share entries are
+// addressed by a subname derived independently on both sides from the
+// share's GUID (see GuidToHexString).
+//
+// There are two aggregates because the device host enforces a single
+// readonly setting per aggregate device: read-write shares go in the
+// read-write aggregate and read-only shares go in the read-only aggregate,
+// whose virtio-fs backend rejects writes (EROFS) regardless of the guest's
+// mount options. The guest selects the matching tag from the share's
+// read-only flag, so no return channel is needed.
+//
+inline constexpr GUID c_wslcVirtioFsAggregateTag = {0x3f2a7c84, 0x1b6d, 0x4e29, {0x9a, 0x55, 0x6c, 0x0d, 0x8e, 0x1f, 0x2b, 0x73}};
+inline constexpr GUID c_wslcVirtioFsAggregateReadOnlyTag = {0xa43bebe3, 0xd067, 0x4e0b, {0x96, 0xc8, 0xa2, 0x4e, 0x33, 0xc4, 0x15, 0x6e}};
+
 struct WSLC_MOUNT
 {
     static inline auto Type = LxMessageWSLCMount;
@@ -1607,6 +1643,7 @@ struct WSLC_MOUNT
     unsigned int TypeIndex{};
     unsigned int OptionsIndex{};
     unsigned int Flags{};
+    unsigned int SubnameIndex{};
 
     enum MountType : uint8_t
     {
@@ -1619,7 +1656,7 @@ struct WSLC_MOUNT
 
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex), STRING_FIELD(SubnameIndex));
 };
 
 struct WSLC_EXEC

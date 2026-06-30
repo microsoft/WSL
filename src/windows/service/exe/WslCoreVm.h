@@ -182,8 +182,22 @@ private:
     _Requires_lock_held_(m_guestDeviceLock)
     void AddPlan9Share(_In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ wsl::windows::common::hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_ PCWSTR VirtIoTag);
 
+    //
+    // Add (or look up) a virtio-fs share. Returns {aggregate tag, subname,
+    // canonicalized source path}. The aggregate tag is shared by all
+    // shares in the same Admin bucket on this VM (ReadOnly is not a bucket
+    // axis here -- it is folded into the subname via the normalized
+    // options); the subname is deterministic per (canonical path,
+    // normalized options, Admin)
+    // and identifies the child entry inside the aggregate's synthetic
+    // root directory. The first share added per bucket creates the PCI
+    // device via GuestDeviceManager::AddGuestDevice; subsequent shares
+    // call GuestDeviceManager::ExtendVirtioFsAggregate, which extends
+    // the existing device in-place without creating a new PCI device.
+    //
     _Requires_lock_held_(m_guestDeviceLock)
-    std::pair<std::wstring, std::wstring> AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
+    std::tuple<std::wstring, std::wstring, std::wstring> AddVirtioFsShare(
+        _In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
     ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
@@ -203,7 +217,7 @@ private:
     void EjectVhdLockHeld(_In_ PCWSTR VhdPath);
 
     _Requires_lock_held_(m_guestDeviceLock)
-    std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin = {}) const;
+    std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ PCWSTR Subname, _In_ std::optional<bool> Admin = {}) const;
 
     _Requires_lock_held_(m_lock)
     void FreeLun(_In_ ULONG Lun);
@@ -264,6 +278,26 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
+    //
+    // Aggregate virtio-fs tag per Admin bucket: index 0 = non-admin,
+    // index 1 = admin. Empty until the first share is added to that
+    // bucket; populated lazily by AddVirtioFsShare.
+    //
+    // ReadOnly is NOT a separate bucket axis. The standard drvfs path
+    // routes mount-level "ro" through the Linux-side bind mount (see
+    // drvfs.cpp ConvertDrvfsMountOptionsToPlan9, which classifies "ro"
+    // as a StandardOption rather than a Plan9Option), so the host-side
+    // aggregate device never observes "ro" in normal use. Per-share
+    // distinctions (including any explicitly-supplied "ro" plan9
+    // option) are still preserved within a bucket via
+    // ComputeAggregateSubname, which hashes the full normalized
+    // options string into the synthetic-root child name.
+    //
+    _Guarded_by_(m_guestDeviceLock) std::array<std::wstring, 2> m_drvfsAggregateTag;
+    //
+    // Map from share key to deterministic subname (32 hex chars) inside
+    // the aggregate device's synthetic root directory.
+    //
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
