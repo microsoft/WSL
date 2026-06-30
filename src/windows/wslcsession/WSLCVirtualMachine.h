@@ -197,8 +197,8 @@ private:
     void ConfigureNetworking();
 
     // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
-    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
-    // can include the swiotlb token. Called after the root filesystem is mounted.
+    // reserved at boot) and forwards them to the service before virtio devices are created.
+    // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);

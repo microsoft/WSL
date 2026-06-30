@@ -314,8 +314,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
-    // to the service so virtio device-options (virtiofs shares, Consomme networking) can include
-    // the swiotlb token.
+    // to the service before virtiofs shares or Consomme networking devices are created.
     ReadGuestCapabilities();
 
     // Configure GPU mounts if enabled
@@ -433,9 +432,8 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
 
-    // Forward the values to the service so AddShare and ConfigureNetworking can include the
-    // swiotlb device-options token. Passing zero for both means the guest kernel does not
-    // support hv_pci swiotlb; the service then omits the token.
+    // Forward the values to the service so AddShare and ConfigureNetworking can configure
+    // wsldevicehost. Passing zero for both means the guest kernel does not support hv_pci swiotlb.
     WSLCGuestCapabilities capabilities{};
     capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
     capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
