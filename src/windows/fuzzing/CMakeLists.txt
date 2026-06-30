@@ -11,13 +11,20 @@ if (NOT DEFINED ONEFUZZ_ASSIGNED_TO)
 endif()
 
 function(add_fuzzing_harness TARGET)
-    cmake_parse_arguments(ARG "" "TARGET_NAME" "LINK_LIBRARIES;EXTRA_DEPENDENCIES;INCLUDE_DIRECTORIES" ${ARGN})
+    cmake_parse_arguments(ARG "" "TARGET_NAME" "TARGET_BINARIES;LINK_LIBRARIES;EXTRA_DEPENDENCIES;INCLUDE_DIRECTORIES" ${ARGN})
 
     add_executable(${TARGET} ${TARGET}.cpp)
     target_precompile_headers(${TARGET} REUSE_FROM common)
 
     if (NOT WSL_ENABLE_FUZZING_REPLAY)
         target_compile_options(${TARGET} PRIVATE /fsanitize=fuzzer)
+    endif()
+
+    # This is only for tracking which binaries have fuzzing for compliance
+    set(TARGET_BINARIES "")
+    if (ARG_TARGET_BINARIES)
+        list(JOIN ARG_TARGET_BINARIES "\", \"" TARGET_BINARIES)
+        set(TARGET_BINARIES "\"${TARGET_BINARIES}\"")
     endif()
 
     if(ARG_LINK_LIBRARIES)
@@ -60,16 +67,19 @@ configure_file(setup.ps1 ${FUZZING_OUT_DIR}/setup.ps1 COPYONLY)
 
 add_fuzzing_harness(WslcCliArgumentFuzzing
     TARGET_NAME cliArgumentParser
+    TARGET_BINARIES wslc.exe
     LINK_LIBRARIES wslclib)
 
 add_fuzzing_harness(WslcSdkFuzzing
     TARGET_NAME sdkApiFlow
+    TARGET_BINARIES wslcsdk.dll
     LINK_LIBRARIES wslcsdk
     INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     EXTRA_DEPENDENCIES "wslcsdk.dll" "wslcsdk.pdb")
 
 add_fuzzing_harness(WslcWinRtFuzzing
     TARGET_NAME winrtApiFlow
+    TARGET_BINARIES wslcsdk.dll
     LINK_LIBRARIES wslcsdk
     INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}
     EXTRA_DEPENDENCIES "wslcsdk.dll" "wslcsdk.pdb")

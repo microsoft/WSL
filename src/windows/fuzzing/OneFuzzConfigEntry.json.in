@@ -2,13 +2,15 @@
       "JobNotificationEmail": "${ONEFUZZ_NOTIFICATION_EMAIL}",
       "Skip": false,
       "RebootAfterSetup": true,
+      "SdlWorkItemId": 61752747,
       "Fuzzer": {
         "$type": "libfuzzer",
+        "FuzzingTargetBinaries": [ ${TARGET_BINARIES} ],
         "FuzzingHarnessExecutableName": "${TARGET}.exe"
       },
       "OneFuzzJobs": [
         {
-          "ProjectName": "wslc-fuzzing",
+          "ProjectName": "wsl-fuzzing",
           "TargetName": "${TARGET_NAME}"
         }
       ],
