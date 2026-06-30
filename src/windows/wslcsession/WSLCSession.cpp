@@ -1215,8 +1215,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(
-    const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -1233,8 +1232,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(
-    const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -3130,12 +3128,7 @@ HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgress
 }
 
 HRESULT WSLCSession::ImportImage(
-    WSLCCompatHandle ImageHandle,
-    LPCSTR ImageName,
-    IWSLCCompatProgressCallback*,
-    ULONGLONG ContentLength,
-    IWSLCCompatWarningCallback* WarningCallback,
-    LPSTR* ImageId)
+    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback, LPSTR* ImageId)
 {
     const auto handle = apicompat::Convert(ImageHandle);
     const auto warning = apicompat::Convert(WarningCallback);

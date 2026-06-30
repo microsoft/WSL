@@ -259,8 +259,8 @@ void LoadImage(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Input))
     {
         auto& input = context.Args.Get<ArgType::Input>();
-        WSLCImageLoadCallback callback{context.Reporter};
-        services::ImageService::Load(session, input, &callback);
+        auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
+        services::ImageService::Load(session, input, callback.get());
         return;
     }
 
