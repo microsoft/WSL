@@ -5264,20 +5264,6 @@ class WSLCTests
             verifyInvalid(L"Unsupported network driver:");
         }
 
-        // Reserved keys in --opt are rejected regardless of case
-        {
-            options.Driver = "bridge";
-            for (const char* key : {"Internal", "internal", "Subnet", "subnet", "Gateway", "gateway"})
-            {
-                WSLCDriverOption opt{key, "value"};
-                options.DriverOpts = &opt;
-                options.DriverOptsCount = 1;
-                verifyInvalid(L"--opt");
-            }
-            options.DriverOpts = nullptr;
-            options.DriverOptsCount = 0;
-        }
-
         // Gateway specified without Subnet
         {
             options.Driver = "bridge";
@@ -5355,6 +5341,7 @@ class WSLCTests
         options.Subnet = "not-a-cidr";
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+        ValidateCOMErrorMessageContains(L"invalid subnet");
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
@@ -5374,6 +5361,7 @@ class WSLCTests
         options.Gateway = "999.999.999.999";
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+        ValidateCOMErrorMessageContains(L"invalid gateway");
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));

@@ -2336,8 +2336,8 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>'{}' cannot be set via --opt. Use the dedicated --internal, --subnet, or --gateway option instead.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--opt."}{Locked="--internal,"}{Locked="--subnet,"}{Locked="--gateway "}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Unsupported network driver option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>The '--gateway' option requires '--subnet' to also be specified.</value>
