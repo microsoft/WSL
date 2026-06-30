@@ -1044,10 +1044,10 @@ class NetworkTests
 
     static void ClearHttpProxySettings(bool userScope)
     {
-        auto command = L"Set-WinhttpProxy -SettingScope Machine -Proxy \\\"\\\"";
+        auto command = L"Set-WinhttpProxy -SettingScope Machine -Proxy \\\"\\\" -AutoconfigUrl \\\"\\\"";
         if (userScope)
         {
-            command = L"Set-WinhttpProxy -SettingScope User -Proxy \\\"\\\"";
+            command = L"Set-WinhttpProxy -SettingScope User -Proxy \\\"\\\" -AutoconfigUrl \\\"\\\"";
         }
         LxsstuLaunchPowershellAndCaptureOutput(command);
     }
@@ -1096,7 +1096,9 @@ class NetworkTests
     static constexpr auto c_httpProxyIpV4 = L"http://198.168.1.128:8888";
     static constexpr auto c_httpProxyIpV6 = L"http://[2001::1]:8888";
     static constexpr auto c_httpProxyBypassString = L"test";
-    static constexpr auto c_httpProxyPACurl = L"testpac.pac";
+    static constexpr auto c_pacServerPrefix = L"http://127.0.0.1:12399/";
+    static constexpr auto c_pacUrl = L"http://127.0.0.1:12399/wslproxy.pac";
+    static constexpr auto c_pacScript = LR"(function FindProxyForURL(url, host) { return \"PROXY test.com:8888\"; })";
 
     static void VerifyWslEnvVariable(const std::wstring& envVar, const std::wstring& proxyString)
     {
@@ -1270,6 +1272,27 @@ class NetworkTests
         VerifyHttpProxyFilterByNetworkConfiguration(false);
     }
 
+    static void VerifyHttpProxyPac(bool userScope = true)
+    {
+        UniqueWebServer pacServer(c_pacServerPrefix, c_pacScript);
+
+        auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(userScope); });
+
+        SetHttpProxySettings(L"", L"", c_pacUrl, userScope);
+
+        // The update race condition is more likely to trigger for PAC as there is an additional http round trip.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::wstring(L"echo -n $") + c_httpProxyLower);
+                THROW_HR_IF(E_FAIL, out != c_httpProxyString);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(10));
+
+        VerifyHttpProxyPacUrlMirrored(c_pacUrl);
+        VerifyHttpProxyStringMirrored(c_httpProxyString);
+    }
+
     WSL2_TEST_METHOD(NatHttpProxyVerifyConfigDisabled)
     {
         WINHTTP_PROXY_TEST_ONLY();
@@ -1331,6 +1354,13 @@ class NetworkTests
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyFilterByNetworkConfigurationNAT();
+    }
+
+    WSL2_TEST_METHOD(NatHttpProxyPac)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        VerifyHttpProxyPac();
     }
 
     WSL2_TEST_METHOD(RenameInterface)
@@ -3866,6 +3896,16 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
 
         NetworkTests::VerifyHttpProxyFilterByNetworkConfigurationMirrored();
+    }
+
+    WSL2_TEST_METHOD(HttpProxyPac)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+        WINHTTP_PROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        WaitForMirroredStateInLinux();
+        NetworkTests::VerifyHttpProxyPac();
     }
 
     WSL2_TEST_METHOD(SmokeTest)
