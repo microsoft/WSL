@@ -63,14 +63,14 @@ void EnforceRegistryAllowlist(const std::string& Repo)
     THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
-std::string IndentLines(const std::string& input, const std::string& prefix)
+std::string IndentLines(const std::string& input, const std::string& prefix, bool prefixFirstLine = true)
 {
     if (input.empty())
     {
         return {};
     }
 
-    std::string result = prefix;
+    std::string result = prefixFirstLine ? prefix : "";
     for (size_t i = 0; i < input.size(); i++)
     {
         result.push_back(input[i]);
@@ -1085,6 +1085,10 @@ try
                 std::string decoded = wslutil::Base64Decode(log.data);
                 if (!decoded.empty())
                 {
+                    // The first character of this chunk begins a new line (and so needs a stage prefix) unless it
+                    // continues an unterminated line from the same vertex.
+                    bool continuingLine = needsNewline && log.vertex == lastLogVertex;
+
                     if (log.vertex != lastLogVertex && decoded[0] != '\n')
                     {
                         flushLine();
@@ -1096,11 +1100,13 @@ try
                     {
                         reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
+
+                        continuingLine = false;
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
+                        reportProgress(IndentLines(decoded, logPrefix(it->second), !continuingLine), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
