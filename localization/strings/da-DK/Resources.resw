@@ -2382,6 +2382,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Enheden '{}' kunne ikke oprettes: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Der er tilsluttet for mange diskenheder (grænse: {}). Genstart sessionen for at tilslutte flere diskenheder. Dette vil blive rettet i en fremtidig version.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Porten {} er allerede i brug. Container {} kan ikke startes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
