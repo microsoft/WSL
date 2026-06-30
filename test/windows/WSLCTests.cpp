@@ -1274,7 +1274,6 @@ class WSLCTests
         }
     }
 
-    // COM callback that captures every image name and reference format reported by LoadImage.
     class CapturingImageLoadCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IImageLoadCallback, IFastRundown>
     {
