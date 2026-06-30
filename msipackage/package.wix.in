@@ -306,6 +306,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLCEventStream-->
+                <RegistryKey Root="HKCR" Key="Interface\{7EC66D3B-D098-4D48-B69E-69166F6C4745}">
+                    <RegistryValue Value="IWSLCEventStream" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- ICrashDumpCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{8C5A7B14-9D26-4FAE-AB31-7E5BC23F4801}">
                     <RegistryValue Value="ICrashDumpCallback" Type="string" />

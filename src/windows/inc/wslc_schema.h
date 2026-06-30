@@ -200,4 +200,23 @@ struct Network
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
+struct EventActor
+{
+    std::string ID;
+    std::map<std::string, std::string> Attributes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EventActor, ID, Attributes);
+};
+
+struct Event
+{
+    std::string Type;
+    std::string Action;
+    EventActor Actor;
+    int64_t time{};
+    int64_t timeNano{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time, timeNano);
+};
+
 } // namespace wsl::windows::common::wslc_schema

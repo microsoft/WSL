@@ -24,6 +24,7 @@ Abstract:
 #include "wslc/e2e/WSLCE2EHelpers.h"
 #include <nlohmann/json.hpp>
 
+using namespace std::chrono;
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::RunningWSLCContainer;
@@ -5795,6 +5796,159 @@ class WSLCTests
             auto container = launcher.Create(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.Get().Start(static_cast<WSLCContainerStartFlags>(0x2), nullptr, nullptr), E_INVALIDARG);
         }
+    }
+
+    WSLC_TEST_METHOD(EventStream)
+    {
+        auto now = [] { return duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count(); };
+
+        // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
+        // once the until-time has passed and the backlog is exhausted), parsing each event's JSON.
+        auto drain = [](IWSLCEventStream* stream) {
+            std::vector<wsl::windows::common::wslc_schema::Event> events;
+
+            wil::unique_cotaskmem_ansistring eventJson;
+            HRESULT result;
+            while (SUCCEEDED(result = stream->GetNext(&eventJson)))
+            {
+                events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+            }
+
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
+            return events;
+        };
+
+        // Verifies a drained event vector carries exactly the expected container events, in order:
+        // each is a container event for `actorId` whose seconds and nanosecond timestamps agree.
+        auto verifyEvents = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& events,
+                                const std::string& actorId,
+                                std::initializer_list<const char*> expectedActions) {
+            VERIFY_ARE_EQUAL(events.size(), expectedActions.size());
+
+            size_t i = 0;
+            for (const auto action : expectedActions)
+            {
+                VERIFY_ARE_EQUAL(std::string("container"), events[i].Type);
+                VERIFY_ARE_EQUAL(std::string(action), events[i].Action);
+                VERIFY_ARE_EQUAL(actorId, events[i].Actor.ID);
+
+                // Each event carries Docker's seconds timestamp alongside the nanosecond one; they agree.
+                VERIFY_ARE_EQUAL(events[i].time, events[i].timeNano / 1'000'000'000);
+                ++i;
+            }
+        };
+
+        // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
+        const LONGLONG since = now();
+        std::string id;
+        LONGLONG until = 0;
+        {
+            WSLCContainerLauncher launcher("debian:latest", "wslc-test-events", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            id = container.Id();
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            // Kill (rather than Stop) so Docker emits a 'kill' event ahead of the 'die' that stops it.
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+            until = now();
+        }
+
+        // The container's create, start, kill then stop events are reported in order, each carrying
+        // the container's 64-hex id as the actor.
+        {
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            auto events = drain(stream.get());
+            verifyEvents(events, id, {"create", "start", "kill", "stop"});
+
+            // The whole lifecycle falls inside the requested window.
+            VERIFY_IS_TRUE(events[0].timeNano >= since);
+            VERIFY_IS_TRUE(events[3].timeNano <= until);
+
+            // The start, kill and stop events share Docker's clock, so they are ordered.
+            VERIFY_IS_TRUE(events[2].timeNano >= events[1].timeNano);
+            VERIFY_IS_TRUE(events[3].timeNano >= events[2].timeNano);
+        }
+
+        // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
+        // the container filter, returns exactly that one event out of the four recorded above.
+        auto verifyEventFilter = [&](const char* action) {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"event", action}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            verifyEvents(drain(stream.get()), id, {action});
+        };
+
+        verifyEventFilter("create");
+        verifyEventFilter("start");
+        verifyEventFilter("kill");
+        verifyEventFilter("stop");
+
+        // Image events are not recorded yet, so a 'type=image' filter excludes the container's
+        // events and leaves the stream empty.
+        {
+            WSLCFilter filter{"type", "image"};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
+
+        // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
+        {
+            WSLCFilter filter{"container", "0000000000000000000000000000000000000000000000000000000000000000"};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
+
+        // A since-time later than a non-zero until-time describes a backwards window and is rejected.
+        {
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(until, since, nullptr, 0, &stream));
+        }
+
+        // A bounded window that closed before any event was recorded returns immediately with an
+        // empty stream rather than blocking for events that can never arrive.
+        {
+            constexpr LONGLONG oneSecondNano = 1'000'000'000;
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since - 2 * oneSecondNano, since - oneSecondNano, &filter, 1, &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)
+    {
+        WSLCFilter filter{"type", "container"};
+        const LONGLONG since = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 0, &filter, 1, &stream));
+
+        std::promise<HRESULT> getNextResult;
+        std::thread readerThread([&]() {
+            wil::unique_cotaskmem_ansistring eventJson;
+            getNextResult.set_value(stream->GetNext(&eventJson));
+        });
+        auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
+
+        auto future = getNextResult.get_future();
+
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        auto restore = ResetTestSession();
+
+        // Termination wakes the parked reader; it must finish quickly and report E_ABORT.
+        VERIFY_ARE_EQUAL(std::future_status::ready, future.wait_for(10s));
+        VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
     WSLC_TEST_METHOD(OpenContainer)

@@ -23,6 +23,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include <chrono>
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -787,7 +788,8 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
-    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
+    const auto dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(wsl::shared::ToJson(ConvertInspectImage(dockerInspect)).c_str()));
 }
 CATCH_LOG()
 
@@ -1887,7 +1889,8 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
-            m_ioRelay);
+            m_ioRelay,
+            m_eventStore);
 
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
@@ -2717,6 +2720,9 @@ try
             if (!m_sessionTerminatingEvent.is_signaled())
             {
                 m_sessionTerminatingEvent.SetEvent();
+
+                // Wake any readers parked in an event stream so they abort instead of waiting forever.
+                m_eventStore.OnSessionTerminating();
             }
 
             // Cancel any pending IO on user-provided handles to unblock operations
@@ -3320,6 +3326,26 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::GetEvents(LONGLONG SinceTimeNano, LONGLONG UntilTimeNano, const WSLCFilter* Filters, ULONG FiltersCount, IWSLCEventStream** Stream)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Stream);
+
+    *Stream = nullptr;
+
+    // A non-zero until earlier than since describes a backwards, empty window.
+    RETURN_HR_IF(E_INVALIDARG, UntilTimeNano != 0 && SinceTimeNano > UntilTimeNano);
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTimeNano, UntilTimeNano, std::move(filters));
+
+    *Stream = stream.Detach();
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::RecoverExistingContainers()
 {
     WI_ASSERT(m_dockerClient.has_value());
@@ -3341,7 +3367,8 @@ void WSLCSession::RecoverExistingContainers()
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
-                m_ioRelay);
+                m_ioRelay,
+                m_eventStore);
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);
