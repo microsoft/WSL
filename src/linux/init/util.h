@@ -251,11 +251,19 @@ int UtilMkdir(const char* Path, mode_t Mode);
 
 int UtilMkdirPath(const char* Path, mode_t Mode, bool SkipLast = false);
 
+// Creates a uniquely-named directory under ParentPath, returning its path in Path.
+int UtilCreateTempDirectory(const char* ParentPath, std::string& Path);
+
 int UtilMountFile(const char* Source, const char* Destination);
 
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds = {});
 
-int UtilMountOverlayFs(const char* Target, const char* Lower, unsigned long MountFlags = 0, std::optional<std::chrono::seconds> TimeoutSeconds = {});
+int UtilMountOverlayFs(
+    const char* Target,
+    const char* Lower,
+    unsigned long MountFlags = 0,
+    std::optional<std::chrono::seconds> TimeoutSeconds = {},
+    const std::optional<std::string>& ScratchDevice = {});
 
 int UtilOpenMountNamespace(void);
 

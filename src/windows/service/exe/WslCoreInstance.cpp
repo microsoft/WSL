@@ -329,6 +329,11 @@ GUID WslCoreInstance::GetDistributionId() const
     return m_configuration.DistroId;
 }
 
+GUID WslCoreInstance::GetInstanceId() const
+{
+    return m_instanceId;
+}
+
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
     THROW_HR_IF(HCS_E_TERMINATED, !m_initChannel);

@@ -91,6 +91,10 @@ public:
 
     void EjectVhd(_In_ PCWSTR VhdPath);
 
+    // Ejects and deletes the per-instance overlay scratch vhd (if any) that was
+    // created for the instance with the specified id.
+    void CleanupInstanceScratch(_In_ const GUID& InstanceId);
+
     const wsl::core::Config& GetConfig() const noexcept;
 
     GUID GetRuntimeId() const;
@@ -201,6 +205,14 @@ private:
 
     _Requires_lock_held_(m_lock)
     void EjectVhdLockHeld(_In_ PCWSTR VhdPath);
+
+    _Requires_lock_held_(m_lock)
+    void CleanupInstanceScratchLockHeld(_In_ const GUID& InstanceId);
+
+    // Returns the per-instance overlay scratch vhd path, derived from the instance id. The path
+    // is deterministic so the scratch vhd does not need to be tracked: every cleanup path
+    // recomputes it.
+    std::filesystem::path GetInstanceScratchPath(_In_ const GUID& InstanceId) const;
 
     _Requires_lock_held_(m_guestDeviceLock)
     std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin = {}) const;

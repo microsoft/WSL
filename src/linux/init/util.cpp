@@ -30,6 +30,7 @@ Abstract:
 #include <thread>
 #include <chrono>
 #include <climits>
+#include <cstdlib>
 #include <pthread.h>
 #include "common.h"
 #include "wslpath.h"
@@ -1838,7 +1839,58 @@ Return Value:
     return 0;
 }
 
-int UtilMountOverlayFs(const char* Target, const char* Lower, unsigned long MountFlags, std::optional<std::chrono::seconds> TimeoutSeconds)
+int UtilCreateTempDirectory(const char* ParentPath, std::string& Path)
+
+/*++
+
+Routine Description:
+
+    This routine creates a unique directory under the specified parent path.
+
+Arguments:
+
+    ParentPath - Supplies the path of the parent directory.
+
+    Path - Supplies a buffer to receive the path of the child directory that was
+        created.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+{
+    //
+    // Set the parent path explicitly so the result does not depend on any prior contents of the
+    // caller's buffer when ParentPath is null.
+    //
+
+    Path = ParentPath != nullptr ? ParentPath : "";
+
+    //
+    // Generate a random name for the directory.
+    //
+    // N.B. mkdtemp requires a template string that ends in "XXXXXX".
+    //
+
+    Path += "/wslXXXXXX";
+
+    if (mkdtemp(Path.data()) == NULL)
+    {
+        LOG_ERROR("mkdtemp({}) failed {}", Path.c_str(), errno);
+        return -1;
+    }
+
+    return 0;
+}
+
+int UtilMountOverlayFs(
+    const char* Target,
+    const char* Lower,
+    unsigned long MountFlags,
+    std::optional<std::chrono::seconds> TimeoutSeconds,
+    const std::optional<std::string>& ScratchDevice)
 
 /*++
 
@@ -1857,6 +1909,9 @@ Arguments:
 
     TimeoutSeconds - Supplies an optional timeout if the mount should be retried.
 
+    ScratchDevice - Supplies an optional ext4 scratch block device used to back the
+        read/write layer. When empty, the read/write layer is backed by a tmpfs.
+
 Return Value:
 
     0 on success, < 0 on failure.
@@ -1869,7 +1924,7 @@ try
     // Set up the state required for overlayfs mount:
     //
     // <Target> - mount point for read/write overlayfs (this happens last)
-    // <Target>/rw - tmpfs mount for upper and work dirs
+    // <Target>/rw - read/write layer (scratch device or tmpfs) for upper and work dirs
     // <Target>/rw/upper - upper dir
     // <Target>/rw/work - work dir
     //
@@ -1882,13 +1937,37 @@ try
     auto Path = std::format("{}/rw", Target);
 
     //
-    // Create a tmpfs mount for the read/write layer
+    // Mount the read/write layer at <Target>/rw, backed either by the scratch
+    // device (disk-backed, reclaimable) or, when no scratch device is available,
+    // by a tmpfs (pinned guest memory). It is unwound on a later failure so the
+    // caller is not left with a half-constructed overlay.
     //
 
-    if (UtilMount(nullptr, Path.c_str(), "tmpfs", 0, nullptr) < 0)
+    const std::string rwPath = Path;
+    bool rwMounted = false;
+    auto cleanupRwLayer = wil::scope_exit([&]() {
+        if (rwMounted)
+        {
+            umount2(rwPath.c_str(), MNT_DETACH);
+        }
+    });
+
+    if (ScratchDevice.has_value())
     {
-        return -1;
+        if (UtilMount(ScratchDevice->c_str(), Path.c_str(), "ext4", MS_NOATIME, nullptr) < 0)
+        {
+            return -1;
+        }
     }
+    else
+    {
+        if (UtilMount(nullptr, Path.c_str(), "tmpfs", 0, nullptr) < 0)
+        {
+            return -1;
+        }
+    }
+
+    rwMounted = true;
 
     //
     // Create upper and work directories.
@@ -1908,11 +1987,53 @@ try
     }
 
     MountOptions += std::format("workdir={}", Path);
+
+    //
+    // The scratch-backed read/write layer is reformatted on every launch and discarded on
+    // teardown, so the overlay upper dir is disposable. Mount it "volatile" to skip syncs to the
+    // upper filesystem (supported since overlayfs 5.10), avoiding writeback stalls on a layer
+    // whose contents never need to survive a crash. overlayfs refuses to reuse a volatile upper
+    // dir after an unclean shutdown, but that is moot here because the upper dir is always freshly
+    // created above. A tmpfs read/write layer gains nothing from volatile, so it is only used for
+    // the scratch-backed layer.
+    //
+    // N.B. If the running kernel does not support the volatile option the mount fails with EINVAL;
+    //      retry without it so a disk-backed overlay is still used rather than falling all the way
+    //      back to a tmpfs layer.
+    //
+
+    if (ScratchDevice.has_value())
+    {
+        const auto VolatileOptions = MountOptions + ",volatile";
+        const int VolatileResult = UtilMount(nullptr, Target, "overlay", MountFlags, VolatileOptions.c_str(), TimeoutSeconds);
+        if (VolatileResult >= 0)
+        {
+            cleanupRwLayer.release();
+            return 0;
+        }
+
+        //
+        // A kernel that does not understand the "volatile" option fails the mount with EINVAL;
+        // only that warrants retrying without it. Any other failure (e.g. ENOSPC, EBUSY) would
+        // recur, so surface it to the caller, which falls back to a tmpfs read/write layer.
+        //
+        // N.B. UtilMount returns the negated errno on failure.
+        //
+
+        if (VolatileResult != -EINVAL)
+        {
+            return -1;
+        }
+
+        LOG_ERROR("volatile overlay mount unsupported (errno {}), retrying without volatile", -VolatileResult);
+    }
+
     if (UtilMount(nullptr, Target, "overlay", MountFlags, MountOptions.c_str(), TimeoutSeconds) < 0)
     {
         return -1;
     }
 
+    cleanupRwLayer.release();
     return 0;
 }
 CATCH_RETURN_ERRNO()
