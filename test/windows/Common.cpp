@@ -2601,6 +2601,26 @@ while ($true)
     m_process = LxsstuStartProcess(cmd.data());
 }
 
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, UINT StatusCode)
+{
+    auto cmd = std::format(
+        LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
+$ErrorActionPreference = 'Stop'
+$server = New-Object System.Net.HttpListener
+$server.Prefixes.Add('{}')
+$server.Start()
+while ($true)
+{{
+    $context = $server.GetContext()
+    $context.Response.StatusCode = {}
+    $context.Response.close()
+}}")",
+        Endpoint,
+        StatusCode);
+
+    m_process = LxsstuStartProcess(cmd.data());
+}
+
 UniqueWebServer::~UniqueWebServer()
 {
     if (!TerminateProcess(m_process.get(), 0))
