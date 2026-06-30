@@ -13,20 +13,107 @@ using wsl::core::ConsommeNetworking;
 
 static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
+static constexpr wsl::shared::string::MacAddress c_defaultClientMacAddress{0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
+static constexpr wsl::shared::string::MacAddress c_gatewayMacAddress{0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+
+namespace {
+
+EthernetAddress ToEthernetAddress(const wsl::shared::string::MacAddress& address)
+{
+    EthernetAddress result{};
+    std::copy(address.begin(), address.end(), std::begin(result.bytes));
+    return result;
+}
+
+Ipv4Address ToIpv4Address(const SOCKADDR_INET& address)
+{
+    Ipv4Address result{};
+    if (address.si_family == AF_INET)
+    {
+        result.value = address.Ipv4.sin_addr.S_un.S_addr;
+    }
+
+    return result;
+}
+
+Ipv6Address ToIpv6Address(const SOCKADDR_INET& address)
+{
+    Ipv6Address result{};
+    if (address.si_family == AF_INET6)
+    {
+        std::copy(std::begin(address.Ipv6.sin6_addr.u.Byte), std::end(address.Ipv6.sin6_addr.u.Byte), std::begin(result.bytes));
+    }
+
+    return result;
+}
+
+IpAddress ToIpAddress(const SOCKADDR_INET& address)
+{
+    IpAddress result{};
+    if (address.si_family == AF_INET)
+    {
+        result.family = IpAddressFamily_V4;
+        std::copy(
+            reinterpret_cast<const BYTE*>(&address.Ipv4.sin_addr),
+            reinterpret_cast<const BYTE*>(&address.Ipv4.sin_addr) + sizeof(address.Ipv4.sin_addr),
+            std::begin(result.bytes));
+    }
+    else if (address.si_family == AF_INET6)
+    {
+        result.family = IpAddressFamily_V6;
+        std::copy(std::begin(address.Ipv6.sin6_addr.u.Byte), std::end(address.Ipv6.sin6_addr.u.Byte), std::begin(result.bytes));
+    }
+
+    return result;
+}
+
+std::vector<IpAddress> ToIpAddresses(const DnsInfo& dns)
+{
+    std::vector<IpAddress> result;
+    result.reserve(dns.Servers.size());
+    for (const auto& server : dns.Servers)
+    {
+        if (server.empty())
+        {
+            continue;
+        }
+
+        result.emplace_back(ToIpAddress(wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(server))));
+    }
+
+    return result;
+}
+
+WslVirtioNetConfig BuildVirtioNetConfig(
+    const std::shared_ptr<NetworkSettings>& networkSettings, bool enableIpv6, std::optional<wsl::shared::string::MacAddress> clientMacAddress = {})
+{
+    ULONG netmask{};
+    if (networkSettings->PreferredIpAddress.Address.si_family == AF_INET)
+    {
+        LOG_IF_WIN32_ERROR(ConvertLengthToIpv4Mask(networkSettings->PreferredIpAddress.PrefixLength, &netmask));
+    }
+
+    WslVirtioNetConfig config{};
+    config.clientIp = ToIpv4Address(networkSettings->PreferredIpAddress.Address);
+    config.hasClientIpv6 = enableIpv6 && networkSettings->PreferredIpv6Address.Address.si_family == AF_INET6;
+    config.clientIpv6 = ToIpv6Address(networkSettings->PreferredIpv6Address.Address);
+    config.clientMac = ToEthernetAddress(clientMacAddress.value_or(c_defaultClientMacAddress));
+    config.gatewayIp = ToIpv4Address(networkSettings->GetBestGatewayAddress());
+    config.gatewayMac = ToEthernetAddress(c_gatewayMacAddress);
+    config.gatewayMacIpv6 = ToEthernetAddress(c_gatewayMacAddress);
+    config.netmask.value = netmask;
+    return config;
+}
+
+} // namespace
 
 ConsommeNetworking::ConsommeNetworking(
-    GnsChannel&& gnsChannel,
-    ConsommeNetworkingFlags flags,
-    LPCWSTR dnsOptions,
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-    wil::shared_handle userToken,
-    std::wstring swiotlbConfig) :
+    GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
-    m_dnsOptions(dnsOptions),
-    m_swiotlbOption(std::move(swiotlbConfig))
+    m_dnsOptions(dnsOptions)
 {
 }
 
@@ -159,38 +246,28 @@ uint16_t ConsommeNetworking::ModifyOpenPorts(
         protocol);
 
     auto lock = m_lock.lock_exclusive();
-    const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
-    THROW_HR_IF(E_UNEXPECTED, !server);
+    const auto device = m_guestDeviceManager->GetVirtioNetDevice(tag);
+    const auto transportProtocol = (protocol == IPPROTO_UDP) ? TransportProtocol_Udp : TransportProtocol_Tcp;
+    auto listenAddress = ToIpAddress(hostAddress);
 
-    const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
-
-    std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddressStr.c_str());
-
-    if (HostPort != WSLC_EPHEMERAL_PORT)
+    if (isOpen)
     {
-        portString += std::format(L";host_port={}", HostPort);
+        UINT16 allocatedPort{};
+        THROW_IF_FAILED(device->BindPort(transportProtocol, &listenAddress, HostPort, GuestPort, &allocatedPort));
+        WSL_LOG(
+            "MapVirtioPort",
+            TraceLoggingValue(tag, "Tag"),
+            TraceLoggingValue(HostPort, "HostPort"),
+            TraceLoggingValue(GuestPort, "GuestPort"));
+        return allocatedPort;
     }
 
-    if (!isOpen)
-    {
-        portString += L";allocate=false";
-    }
-
-    if (protocol == IPPROTO_UDP)
-    {
-        portString += L";udp";
-    }
-
-    const HRESULT addShareResult = server->AddShare(portString.c_str(), nullptr, 0);
-    WSL_LOG("MapVirtioPort", TraceLoggingValue(portString.c_str(), "PortString"), TraceLoggingValue(addShareResult, "Result"));
-
-    if (HostPort == WSLC_EPHEMERAL_PORT && isOpen && SUCCEEDED(addShareResult))
-    {
-        // For anonymous binds, the allocated host port is encoded in the return value.
-        return static_cast<uint16_t>(addShareResult - S_OK);
-    }
-
-    THROW_IF_FAILED_MSG(addShareResult, "Failed to set virtionet port mapping: %ls", portString.c_str());
+    THROW_IF_FAILED(device->UnbindPort(transportProtocol, listenAddress.family, GuestPort));
+    WSL_LOG(
+        "UnmapVirtioPort",
+        TraceLoggingValue(tag, "Tag"),
+        TraceLoggingValue(HostPort, "HostPort"),
+        TraceLoggingValue(GuestPort, "GuestPort"));
     return HostPort;
 }
 
@@ -224,29 +301,7 @@ void ConsommeNetworking::RefreshGuestConnection()
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
 
-    std::wstring device_options;
-    auto appendOption = [&device_options](std::wstring_view key, std::wstring_view value) {
-        if (!value.empty())
-        {
-            std::format_to(std::back_inserter(device_options), L"{}{}={}", device_options.empty() ? L"" : L";", key, value);
-        }
-    };
-
-    ULONG net_mask{};
-    if (ConvertLengthToIpv4Mask(networkSettings->PreferredIpAddress.PrefixLength, &net_mask) == 0)
-    {
-        auto net_mask_string =
-            std::format(L"{}.{}.{}.{}", net_mask & 0xFF, (net_mask >> 8) & 0xFF, (net_mask >> 16) & 0xFF, (net_mask >> 24) & 0xFF);
-        appendOption(L"netmask", net_mask_string);
-    }
-
-    appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
-    appendOption(L"gateway_ip", default_route);
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
-    {
-        appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
-    }
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
@@ -261,36 +316,22 @@ void ConsommeNetworking::RefreshGuestConnection()
     }
 
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
+    const auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
 
     // Acquire the lock and perform device updates.
     auto lock = m_lock.lock_exclusive();
 
-    // Add virtio net adapter to guest. If the adapter already exists update adapter state.
-    if (device_options != m_trackedDeviceOptions)
+    // Add virtio net adapter to guest. Subsequent address/route/DNS changes are sent through GNS notifications below.
+    if (!m_adapterId.has_value())
     {
-
-        WSL_LOG("RefreshVirtioNetConnection", TraceLoggingValue(device_options.c_str(), "DeviceOptions"));
-        if (!m_adapterId.has_value())
-        {
-            m_adapterId = m_guestDeviceManager->AddGuestDevice(
-                VIRTIO_NET_DEVICE_ID,
-                VIRTIO_NET_CLASS_ID,
-                c_eth0DeviceName,
-                m_swiotlbOption.c_str(),
-                device_options.c_str(),
-                0,
-                m_userToken.get());
-        }
-        else
-        {
-            const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
-            if (server)
-            {
-                LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, device_options.c_str(), 0));
-            }
-        }
-
-        m_trackedDeviceOptions = device_options;
+        WSL_LOG(
+            "RefreshVirtioNetConnection",
+            TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+            TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
+            TraceLoggingValue(default_route.c_str(), "GatewayIp"),
+            TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"));
+        m_adapterId =
+            m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, ToIpAddresses(currentDns), m_userToken.get());
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
@@ -309,27 +350,22 @@ void ConsommeNetworking::RefreshGuestConnection()
 
 void ConsommeNetworking::SetupLoopbackDevice()
 {
+    auto loopbackSettings = std::make_shared<NetworkSettings>();
     const auto* clientIp = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LoopbackClientIp) ? L"127.0.0.1" : L"169.254.73.250";
-    const auto deviceOptions =
-        std::format(L"client_ip={};client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.249;netmask=255.255.255.248", clientIp);
+    loopbackSettings->PreferredIpAddress.Address = wsl::windows::common::string::StringToSockAddrInet(clientIp);
+    loopbackSettings->PreferredIpAddress.AddressString = clientIp;
+    loopbackSettings->PreferredIpAddress.PrefixLength = 28;
+    loopbackSettings->Routes.emplace(EndpointRoute::DefaultRoute(AF_INET, wsl::windows::common::string::StringToSockAddrInet(L"169.254.73.249")));
+    m_localhostAdapterId = m_guestDeviceManager->AddVirtioNetDevice(
+        c_loopbackDeviceName, BuildVirtioNetConfig(loopbackSettings, false, c_gatewayMacAddress), {}, m_userToken.get());
 
-    m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
-        VIRTIO_NET_DEVICE_ID,
-        VIRTIO_NET_CLASS_ID,
-        c_loopbackDeviceName,
-        m_swiotlbOption.c_str(),
-        deviceOptions.c_str(),
-        0,
-        m_userToken.get());
-
-    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.249, so assign loopback0 an
-    // address of 169.254.73.153 with a netmask of 29 so that the only addresses associated with this adapter are
-    // itself and the gateway.
+    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.249, so use a /28 subnet
+    // that includes both the client and gateway addresses.
     // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId.value();
     endpointProperties.IPAddress = L"169.254.73.250";
-    endpointProperties.PrefixLength = 29;
+    endpointProperties.PrefixLength = 28;
     endpointProperties.PortFriendlyName = c_loopbackDeviceName;
     m_gnsChannel.SendEndpointState(endpointProperties);
 

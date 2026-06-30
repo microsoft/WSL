@@ -81,7 +81,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Store the user token.
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
-    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 
     std::lock_guard lock(m_lock);
@@ -155,8 +154,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 #endif
 
-    // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
-    // command line, virtiofs shares, and the Consomme virtio-net adapter.
+    // Compute a swiotlb size that fits this VM's RAM for the kernel command line.
     // Only needed when a virtio device that requires bounce buffers will be attached.
     ULONG64 swiotlbSizeBytes = 0;
     if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
@@ -503,7 +501,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
     else
     {
@@ -621,31 +619,8 @@ try
     else
     {
         std::wstring options = ReadOnly ? L"ro" : L"";
-        auto appendOption = [&options](const std::wstring& option) {
-            if (option.empty())
-            {
-                return;
-            }
 
-            if (!options.empty())
-            {
-                options += L";";
-            }
-
-            options += option;
-        };
-
-        appendOption(m_swiotlbOption);
-        appendOption(c_vcpusOption);
-
-        it->second = m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID,
-            m_virtioFsClassId,
-            shareName.c_str(),
-            options.c_str(),
-            WindowsPath,
-            VIRTIO_FS_FLAGS_TYPE_FILES,
-            m_userToken.get());
+        it->second = m_guestDeviceManager->AddVirtiofsDevice(shareName.c_str(), options.c_str(), WindowsPath, m_userToken.get());
     }
 
     cleanup.release();
@@ -670,7 +645,7 @@ try
     }
     else
     {
-        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, it->second.value());
+        m_guestDeviceManager->RemoveGuestDevice(it->second.value());
     }
 
     m_shares.erase(it);
@@ -686,11 +661,16 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF(E_INVALIDARG, !m_swiotlbOption.empty());
+    THROW_HR_IF(E_INVALIDARG, m_swiotlbConfigured);
 
     if (Capabilities->HvPciSwiotlbBase != 0 && Capabilities->HvPciSwiotlbSize != 0)
     {
-        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        if (m_guestDeviceManager)
+        {
+            m_guestDeviceManager->SetSwiotlb(Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        }
+
+        m_swiotlbConfigured = true;
     }
 
     WSL_LOG(

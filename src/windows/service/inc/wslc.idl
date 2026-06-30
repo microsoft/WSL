@@ -406,11 +406,10 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT RemoveShare([in] REFGUID ShareId);
 
     // Configures the per-VM state discovered from the guest kernel after boot
-    // (currently the hv_pci swiotlb pool). Subsequent calls to AddShare and
-    // ConfigureNetworking forward these values to wsldevicehost via the
-    // swiotlb device-options token. A capabilities struct whose fields are
-    // all zero means the guest kernel does not support the feature; the
-    // token is then omitted.
+    // (currently the hv_pci swiotlb pool). Non-zero values are forwarded to
+    // wsldevicehost before virtiofs shares or Consomme networking devices are
+    // created. A capabilities struct whose fields are all zero means the guest
+    // kernel does not support the feature.
     HRESULT ApplyGuestCapabilities([in] const WSLCGuestCapabilities* Capabilities);
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
