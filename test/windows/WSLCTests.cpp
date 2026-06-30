@@ -11492,16 +11492,17 @@ class WSLCTests
             wsl::windows::common::security::ConfigureForCOMImpersonation(session2.get());
 
             // The VM (and container recovery) starts lazily on the first operation. Trigger it so
-            // recovery runs and its warning is delivered to the session's warning callback.
+            // recovery runs.
             VERIFY_IS_TRUE(WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "exit 0"}).Launch(*session2).GetExitEvent().wait(30000));
 
-            // Verify the warning matches the expected localized message for the corrupt container.
+            // Recovery runs under the triggering operation's context, which carries no warning
+            // callback, so the warning is logged rather than delivered to the session callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
+            auto recoveryWarning = std::format(
                 L"wsl: {}\n",
                 wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_FALSE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             VERIFY_SUCCEEDED(session2->Terminate());
         }
@@ -11564,15 +11565,16 @@ class WSLCTests
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             // The VM (and volume recovery) starts lazily on the first operation. Trigger it so
-            // recovery runs and its warning is delivered to the session's warning callback.
+            // recovery runs.
             VERIFY_IS_TRUE(WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "exit 0"}).Launch(*session).GetExitEvent().wait(30000));
 
-            // Verify the warning matches the expected localized message for the missing volume.
+            // Recovery runs under the triggering operation's context, which carries no warning
+            // callback, so the warning is logged rather than delivered to the session callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning =
+            auto recoveryWarning =
                 std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery"));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_FALSE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
@@ -11633,13 +11635,15 @@ class WSLCTests
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             // The VM (and guest volume recovery) starts lazily on the first operation. Trigger it so
-            // recovery runs and its warning is delivered to the session's warning callback.
+            // recovery runs.
             VERIFY_IS_TRUE(WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "exit 0"}).Launch(*session).GetExitEvent().wait(30000));
 
+            // Recovery runs under the triggering operation's context, which carries no warning
+            // callback, so the warning is logged rather than delivered to the session callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+            auto recoveryWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_FALSE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the volume from Docker's metadata.
             ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);
