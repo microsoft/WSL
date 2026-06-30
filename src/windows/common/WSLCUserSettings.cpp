@@ -47,8 +47,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size (e.g. 500GB default: 1TB)\n"
     "  # maxStorageSize: default\n"
     "\n"
-    "  # Base directory for the default session's storage; the VHD is created under\n"
-    "  # <storagePath>\\wslc\\sessions. Must be an absolute path (e.g. D:\\data default: %LOCALAPPDATA%)\n"
+    "  # Base directory for the default session's storage; the session VHD is created at\n"
+    "  # <storagePath>\\wslc\\sessions\\<session>\\storage.vhdx. Must be an absolute path (e.g. D:\\data default: "
+    "%LOCALAPPDATA%)\n"
     "  # storagePath: default\n"
     "\n"
     "  # Default host address that published ports bind to when 'container run -p' is\n"
@@ -153,7 +154,7 @@ namespace details {
 
     WSLC_VALIDATE_SETTING(SessionStoragePath)
     {
-        if (value.empty() || !std::filesystem::path(MultiByteToWide(value)).is_absolute())
+        if (value.empty() || !std::filesystem::path(value).is_absolute())
         {
             return std::nullopt;
         }
