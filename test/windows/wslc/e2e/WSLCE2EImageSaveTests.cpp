@@ -180,7 +180,6 @@ class WSLCE2EImageSaveTests
 private:
     const TestImage DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
-    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::filesystem::path SavedArchivePath{};
