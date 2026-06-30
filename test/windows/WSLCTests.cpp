@@ -1287,7 +1287,7 @@ class WSLCTests
 
         const std::vector<std::pair<std::string, EnumReferenceFormat>>& GetImages() const
         {
-            return m_images;    
+            return m_images;
         }
 
     private:

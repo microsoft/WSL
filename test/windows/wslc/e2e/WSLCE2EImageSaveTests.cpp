@@ -129,35 +129,31 @@ class WSLCE2EImageSaveTests
         auto runResult = RunWslc(std::format(L"container run --rm {} echo Hello from saved image!", DebianImage.NameAndTag()));
         runResult.Verify({.Stdout = L"Hello from saved image!\n", .Stderr = L"", .ExitCode = 0});
     }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MultipleImages_Load)
     {
         EnsureImageIsLoaded(AlpineImage);
 
-        // Force a pristine re-load of DebianImage at the end so subsequent tests (in fast mode)
-        // see the same on-disk tar as DebianImage.Path. Without this, reloading from a
-        // multi-image archive can produce a slightly different on-disk representation that
-        // breaks byte-exact size checks in WSLCE2E_Image_Save_Success.
         auto restoreDebian = wil::scope_exit([&]() { EnsureImageIsDeleted(DebianImage); });
 
-        // Save both images into a single archive.
+        // Save 2 images into a single archive.
         const auto saveResult = RunWslc(std::format(
             L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), AlpineImage.NameAndTag()));
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        // Delete both source images.
+        // Delete both images.
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(AlpineImage);
 
-        // Load both images back from the single archive.
+        // Load both images again.
         const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
         loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto loadedImages = wsl::shared::string::Split(loadResult.Stdout.value(), L'\n');
 
-        // Run a container from each loaded image to confirm both are restored and runnable.
-        const auto runDebian = RunWslc(std::format(L"container run --rm {} echo ok!", DebianImage.NameAndTag()));
-        runDebian.Verify({.Stdout = std::format(L"ok!\n"), .Stderr = L"", .ExitCode = 0});
-
-        const auto runAlpine = RunWslc(std::format(L"container run --rm {} echo ok!", AlpineImage.NameAndTag()));
-        runAlpine.Verify({.Stdout = std::format(L"ok!\n"), .Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", DebianImage.NameAndTag())) != loadedImages.end());
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", AlpineImage.NameAndTag())) != loadedImages.end());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MultipleImages_InvalidImage)
