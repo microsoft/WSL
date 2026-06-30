@@ -58,7 +58,6 @@ endif()
 # set(WSL_PRE_COMMIT_MODE "warn")
 
 # # Uncomment to build fuzzing targets with ASAN and SanitizerCoverage for OneFuzz.
-# # Harness binaries are written to bin/<platform>/<config>/ alongside OneFuzzConfig.json.
 # # See src/windows/fuzzing/README.md for details.
 # set(WSL_BUILD_FUZZING true)
 #
