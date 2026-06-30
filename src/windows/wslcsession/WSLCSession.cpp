@@ -1216,11 +1216,9 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::LoadImage(
-    const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
+    const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
 try
 {
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
     WSLCExecutionContext context(this, WarningCallback);
 
     auto lock = m_lock.lock_shared();
@@ -1236,11 +1234,9 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::ImportImage(
-    const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+    const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
 try
 {
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
     WSLCExecutionContext context(this, WarningCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageId);
@@ -1345,7 +1341,6 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
 
-            if (LoadCallback != nullptr)
             {
                 static constexpr std::string_view c_loadedImagePrefix = "Loaded image: ";
                 static constexpr std::string_view c_loadedImageIdPrefix = "Loaded image ID: ";
@@ -1365,7 +1360,9 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
                         format = EnumReferenceFormatDigest;
                     }
 
-                    if (!name.empty())
+                    OnImageCreated(name);
+
+                    if (LoadCallback != nullptr && !name.empty())
                     {
                         THROW_IF_FAILED(LoadCallback->OnImageLoaded(name.c_str(), format));
                     }
@@ -3124,28 +3121,26 @@ HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
 }
 
-HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
 {
     const auto handle = apicompat::Convert(ImageHandle);
-    const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return LoadImage(handle, progress.Get(), ContentLength, warning.Get(), nullptr);
+    return LoadImage(handle, ContentLength, warning.Get(), nullptr);
 }
 
 HRESULT WSLCSession::ImportImage(
     WSLCCompatHandle ImageHandle,
     LPCSTR ImageName,
-    IWSLCCompatProgressCallback* ProgressCallback,
+    IWSLCCompatProgressCallback*,
     ULONGLONG ContentLength,
     IWSLCCompatWarningCallback* WarningCallback,
     LPSTR* ImageId)
 {
     const auto handle = apicompat::Convert(ImageHandle);
-    const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get(), ImageId);
+    return ImportImage(handle, ImageName, ContentLength, warning.Get(), ImageId);
 }
 
 HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)

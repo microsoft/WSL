@@ -112,14 +112,12 @@ public:
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(LoadImage)(
         _In_ const WSLCHandle ImageHandle,
-        _In_ IProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
         _In_opt_ IWarningCallback* WarningCallback,
         _In_opt_ IImageLoadCallback* LoadCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
         _In_opt_ LPCSTR ImageName,
-        _In_ IProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
         _In_opt_ IWarningCallback* WarningCallback,
         _Out_ LPSTR* ImageId) override;

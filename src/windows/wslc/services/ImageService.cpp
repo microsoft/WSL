@@ -235,7 +235,7 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
 {
     auto source = OpenImageInput(input);
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength, warningCallback.Get(), callback));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, warningCallback.Get(), callback));
 }
 
 std::string ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
@@ -246,7 +246,6 @@ std::string ImageService::Import(wsl::windows::wslc::models::Session& session, c
     THROW_IF_FAILED(session.Get()->ImportImage(
         ToCOMInputHandle(source.Handle.Get()),
         imageName.empty() ? nullptr : imageName.c_str(),
-        nullptr,
         source.ContentLength,
         warningCallback.Get(),
         &imageId));
