@@ -1364,11 +1364,14 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
                         format = EnumReferenceFormatDigest;
                     }
 
-                    OnImageCreated(name);
-
-                    if (LoadCallback != nullptr && !name.empty())
+                    if (!name.empty())
                     {
-                        THROW_IF_FAILED(LoadCallback->OnImageLoaded(name.c_str(), format));
+                        OnImageCreated(name);
+
+                        if (LoadCallback != nullptr)
+                        {
+                            THROW_IF_FAILED(LoadCallback->OnImageLoaded(name.c_str(), format));
+                        }
                     }
                 }
             }
