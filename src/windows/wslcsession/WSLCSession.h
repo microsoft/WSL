@@ -253,13 +253,6 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
-    // Returns the warning callback supplied when the session was created/entered, re-marshalled
-    // into the calling apartment. Used as a fallback by WSLCExecutionContext so that warnings
-    // emitted by operations that carry no explicit callback (e.g. resource recovery during the
-    // lazy VM start) still reach the session creator. Returns null if no callback was supplied
-    // or the creating client's proxy is no longer reachable.
-    wil::com_ptr<IWarningCallback> AcquireWarningCallback() const;
-
     HANDLE SessionTerminatingEvent() const noexcept
     {
         return m_sessionTerminatingEvent.get();
@@ -405,11 +398,6 @@ private:
     // re-fetched (re-marshalled into the calling apartment) each time a VM is created.
     wil::com_ptr<IGlobalInterfaceTable> m_git;
     DWORD m_vmFactoryGitCookie{};
-
-    // The warning callback supplied at Initialize() is parked in the GIT for the same reason as
-    // the VM factory: it is used later, on demand, from other threads/apartments (a directly
-    // stored proxy would fail with RPC_E_WRONG_THREAD). Zero if no callback was supplied.
-    DWORD m_warningCallbackGitCookie{};
 
     std::optional<WSLCVirtualMachine> m_virtualMachine;
     std::optional<DockerEventTracker> m_eventTracker;

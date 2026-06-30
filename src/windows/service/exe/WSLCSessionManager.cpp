@@ -113,6 +113,7 @@ private:
         Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefaultMemoryMb();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
+        Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
 
         // TODO: Add a config setting to opt-out of GPU support.
@@ -464,6 +465,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
+    sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
     return sessionSettings;
 }
 

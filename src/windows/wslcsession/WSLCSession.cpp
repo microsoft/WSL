@@ -42,10 +42,11 @@ constexpr auto c_storageVhdFilename = L"storage.vhdx";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
-// Grace period to keep an otherwise-idle VM running before tearing it down. This avoids
-// thrashing the VM (repeated teardown/recreate) when containers are created and destroyed,
-// or operations issued, in quick succession. The clock restarts whenever the VM is observed
-// to be non-idle, so a full grace period of continuous idleness is required before teardown.
+// Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
+// session's settings.yaml does not override it). This avoids thrashing the VM (repeated
+// teardown/recreate) when containers are created and destroyed, or operations issued, in quick
+// succession. The clock restarts whenever the VM is observed to be non-idle, so a full grace period
+// of continuous idleness is required before teardown.
 constexpr auto c_vmIdleGracePeriod = std::chrono::seconds(30);
 
 namespace {
@@ -414,14 +415,6 @@ try
     m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
     THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(VmFactory, __uuidof(IWSLCVirtualMachineFactory), &m_vmFactoryGitCookie));
 
-    // Park the warning callback too. The VM (and resource recovery) is created lazily on the
-    // first operation, which may not carry its own warning callback, so recovery warnings are
-    // routed back to this callback via AcquireWarningCallback()/WSLCExecutionContext.
-    if (WarningCallback != nullptr)
-    {
-        THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(WarningCallback, __uuidof(IWarningCallback), &m_warningCallbackGitCookie));
-    }
-
     // Persist a deep copy of the settings (and the creating user's SID) required to
     // (re)create the VM on demand.
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
@@ -437,7 +430,8 @@ try
     // torn down once the session has been continuously idle (activity count zero) for the grace
     // period. Wire up the idle-teardown timer; IdleState arms it whenever the activity count drops
     // to zero and cancels it when activity resumes, so no dedicated worker thread is needed.
-    m_idleState->Initialize(c_vmIdleGracePeriod, [this]() { OnIdleTimer(); });
+    const auto idleGracePeriod = m_settings.IdleTimeoutSec > 0 ? std::chrono::seconds(m_settings.IdleTimeoutSec) : c_vmIdleGracePeriod;
+    m_idleState->Initialize(idleGracePeriod, [this]() { OnIdleTimer(); });
 
     return S_OK;
 }
@@ -480,16 +474,11 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
         m_settings.RootVhdTypeOverride = nullptr;
     }
 
-    if (UserSid != nullptr)
-    {
-        const auto length = GetLengthSid(UserSid);
-        const auto* bytes = reinterpret_cast<const BYTE*>(UserSid);
-        m_userSid.assign(bytes, bytes + length);
-    }
-    else
-    {
-        m_userSid.clear();
-    }
+    THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
+
+    const auto length = GetLengthSid(UserSid);
+    const auto* bytes = reinterpret_cast<const BYTE*>(UserSid);
+    m_userSid.assign(bytes, bytes + length);
 }
 
 bool WSLCSession::IdleTerminationEnabled() const noexcept
@@ -3364,28 +3353,9 @@ try
         m_vmFactoryGitCookie = 0;
     }
 
-    if (m_warningCallbackGitCookie != 0)
-    {
-        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_warningCallbackGitCookie));
-        m_warningCallbackGitCookie = 0;
-    }
-
     return S_OK;
 }
 CATCH_RETURN();
-
-wil::com_ptr<IWarningCallback> WSLCSession::AcquireWarningCallback() const
-{
-    wil::com_ptr<IWarningCallback> callback;
-    if (m_warningCallbackGitCookie != 0)
-    {
-        // Best-effort: the creating client's proxy may already be gone (e.g. the CLI exited before
-        // a later VM restart), in which case the warning falls through to the default sink.
-        LOG_IF_FAILED(m_git->GetInterfaceFromGlobal(m_warningCallbackGitCookie, __uuidof(IWarningCallback), callback.put_void()));
-    }
-
-    return callback;
-}
 
 HRESULT WSLCSession::RegisterCrashDumpCallback(_In_ ICrashDumpCallback* Callback, _Out_ IUnknown** Subscription)
 try
