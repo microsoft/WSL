@@ -72,7 +72,8 @@ public static class WslConfigEntryExtensions
         WslConfigEntry.IgnoredPorts or
         WslConfigEntry.KernelPath or
         WslConfigEntry.SystemDistroPath or
-        WslConfigEntry.KernelModulesPath => WslConfigValueKind.String,
+        WslConfigEntry.KernelModulesPath or
+        WslConfigEntry.KernelHeadersPath => WslConfigValueKind.String,
 
         WslConfigEntry.ProcessorCount or
         WslConfigEntry.InitialAutoProxyTimeout or

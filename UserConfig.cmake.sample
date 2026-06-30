@@ -12,6 +12,8 @@ if(WSL_DEV_BINARY_PATH)
     file(COPY_FILE "${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd" "${WSL_DEV_BINARY_PATH}/system.vhd" ONLY_IF_DIFFERENT)
     file(COPY_FILE "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/modules.vhd" "${WSL_DEV_BINARY_PATH}/modules.vhd" ONLY_IF_DIFFERENT)
 
+    file(CREATE_LINK "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/linux-headers" "${WSL_DEV_BINARY_PATH}/linux-headers" SYMBOLIC)
+
     # read-only VHDs need to be world readable to mount successfully.
     execute_process(
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/system.vhd" "/grant:r" "Everyone:(R)" /Q

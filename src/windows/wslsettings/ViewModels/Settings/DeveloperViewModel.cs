@@ -10,6 +10,7 @@ public partial class DeveloperViewModel : WslConfigSettingViewModel
     private IWslConfigSetting? _hWPerfCounters;
     private IWslConfigSetting? _kernelPath;
     private IWslConfigSetting? _kernelModulesPath;
+    private IWslConfigSetting? _kernelHeadersPath;
     private IWslConfigSetting? _systemDistroPath;
 
     public DeveloperViewModel()
@@ -24,6 +25,7 @@ public partial class DeveloperViewModel : WslConfigSettingViewModel
         _hWPerfCounters = wslConfigService.GetWslConfigSetting(WslConfigEntry.HardwarePerformanceCountersEnabled);
         _kernelPath = wslConfigService.GetWslConfigSetting(WslConfigEntry.KernelPath);
         _kernelModulesPath = wslConfigService.GetWslConfigSetting(WslConfigEntry.KernelModulesPath);
+        _kernelHeadersPath = wslConfigService.GetWslConfigSetting(WslConfigEntry.KernelHeadersPath);
         _systemDistroPath = wslConfigService.GetWslConfigSetting(WslConfigEntry.SystemDistroPath);
     }
 
@@ -49,6 +51,12 @@ public partial class DeveloperViewModel : WslConfigSettingViewModel
     {
         get { return _kernelModulesPath!.StringValue; }
         set { Set(ref _kernelModulesPath!, value); }
+    }
+
+    public string CustomKernelHeadersPath
+    {
+        get { return _kernelHeadersPath!.StringValue; }
+        set { Set(ref _kernelHeadersPath!, value); }
     }
 
     public string CustomSystemDistroPath

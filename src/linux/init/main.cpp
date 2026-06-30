@@ -85,6 +85,8 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
+#define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -112,6 +114,7 @@ struct VmConfiguration
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
+    std::string KernelHeadersTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
@@ -1608,6 +1611,19 @@ try
     {
         AddTemporaryMount(LX_WSL2_KERNEL_MODULES_MOUNT_ENV, Config.KernelModulesPath.c_str(), (MS_MOVE | MS_REC));
         AddEnvironmentVariable(LX_WSL2_KERNEL_MODULES_PATH_ENV, Config.KernelModulesPath.c_str());
+    }
+
+    //
+    // If kernel headers were mounted, move them to a temporary location and pass the desired
+    // target path to the distro init via an environment variable. Distro init will move the
+    // mount to /usr/src/linux-headers-<uname -r>/include and create the
+    // /lib/modules/<release>/build symlink.
+    //
+
+    if (!Config.KernelHeadersTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, Config.KernelHeadersTarget.c_str());
     }
 
     //
@@ -3204,6 +3220,18 @@ try
                 {
                     return -1;
                 }
+            }
+        }
+
+        if (ConfigMessage->MountKernelHeaders)
+        {
+            utsname UnameBuffer{};
+            THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+
+            if (MountPlan9(LXSS_KERNEL_HEADERS_SHARE, KERNEL_HEADERS_TEMP_PATH, true) == 0)
+            {
+                const std::string release{UnameBuffer.release};
+                Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, release);
             }
         }
 

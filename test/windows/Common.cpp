@@ -1560,6 +1560,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"kernelModules=" + EscapePath(Default.kernelModules.value()) + L"\n";
     }
 
+    if (Default.kernelHeaders.has_value())
+    {
+        newConfig += L"kernelHeaders=" + EscapePath(Default.kernelHeaders.value()) + L"\n";
+    }
+
     if (Default.loadKernelModules.has_value())
     {
         newConfig += L"loadKernelModules=" + Default.loadKernelModules.value() + L"\n";

@@ -73,6 +73,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Kernel, KernelPath),
         ConfigKey(ConfigSetting::KernelCommandLine, KernelCommandLine),
         ConfigKey(ConfigSetting::KernelModules, KernelModulesPath),
+        ConfigKey(ConfigSetting::KernelHeaders, KernelHeadersPath),
         ConfigKey(ConfigSetting::Memory, MemoryString(MemorySizeBytes)),
         ConfigKey(ConfigSetting::Processors, ProcessorCount),
         ConfigKey(ConfigSetting::DebugConsole, EnableDebugConsole),
@@ -340,6 +341,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     applyOverride(wsl::windows::policies::c_allowCustomKernelUserSetting, L"wsl2.kernel", KernelPath);
     applyOverride(wsl::windows::policies::c_allowCustomKernelUserSetting, L"wsl2.kernelModules", KernelModulesPath);
+    applyOverride(wsl::windows::policies::c_allowCustomKernelUserSetting, L"wsl2.kernelHeaders", KernelHeadersPath);
     applyOverride(wsl::windows::policies::c_allowCustomSystemDistroUserSetting, L"wsl2.systemDistro", SystemDistroPath);
     applyOverride(wsl::windows::policies::c_allowCustomKernelCommandLineUserSetting, L"wsl2.kernelCommandLine", KernelCommandLine);
     applyOverride(wsl::windows::policies::c_allowKernelDebuggingUserSetting, L"wsl2.kernelDebugPort", KernelDebugPort);
@@ -431,6 +433,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, SwapSizeBytes, 0);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, KernelPath, std::filesystem::path{});
         VALIDATE_CONFIG_OPTION(EnableSafeMode, KernelModulesPath, std::filesystem::path{});
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, KernelHeadersPath, std::filesystem::path{});
         VALIDATE_CONFIG_OPTION(EnableSafeMode, NetworkingMode, NetworkingMode::None);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableDnsTunneling, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableAutoProxy, false);
