@@ -1,6 +1,7 @@
 # VhdOptions
 
 **Properties**
+
 - `Name()` / setter
 - `Size()` / setter
 - `Type()` / setter

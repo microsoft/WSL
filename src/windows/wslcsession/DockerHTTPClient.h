@@ -20,6 +20,7 @@ Abstract:
 #include <boost/beast/http.hpp>
 #include "relay.hpp"
 #include "docker_schema.h"
+#include "HttpHeaderEndDetector.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
@@ -199,7 +200,7 @@ public:
         std::function<void(const gsl::span<char>&)> OnResponse;
         std::function<void()> OnCompleted;
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
-        size_t LineFeeds = 0;
+        common::HttpHeaderEndDetector HeaderEnd;
         std::optional<size_t> RemainingContentLength;
         std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };

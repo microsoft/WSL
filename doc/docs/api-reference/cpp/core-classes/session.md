@@ -1,10 +1,12 @@
 # Session
 
 **Constructor**
+
 - `Session(SessionSettings settings)`
   - rejects `nullptr` settings.
 
 **Methods**
+
 - `Start()`
 - `Terminate()`
 - `CreateContainer(ContainerSettings containerSettings)`
@@ -27,6 +29,7 @@
 - `Close()`
 
 **Behavior notes**
+
 - `Start()` is one-shot; calling it twice throws.
 - Most methods call `EnsureStarted()` first.
 - `ImportImage` / `ImportImageAsync` and `LoadImage` / `LoadImageAsync` are path-based only.
@@ -83,18 +86,18 @@ for (auto const& image : images)
 ```
 
 ```cpp
-PullImageOptions pullOptions = ;
+PullImageOptions pullOptions = {};
 auto pullOp = session.PullImageAsync(pullOptions);
 pullOp.Progress([](auto&&, ImageProgress const& p) { /* progress */ });
 co_await pullOp;
 
-PushImageOptions pushOptions = ;
+PushImageOptions pushOptions = {};
 co_await session.PushImageAsync(pushOptions);
 
-TagImageOptions tagOptions = ;
+TagImageOptions tagOptions = {};
 session.TagImage(tagOptions);
 
-VhdOptions vhdOptions = ;
+VhdOptions vhdOptions = {};
 session.CreateVhdVolume(vhdOptions);
 session.DeleteVhdVolume(L"build-cache");
 ```

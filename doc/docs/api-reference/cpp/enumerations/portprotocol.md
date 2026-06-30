@@ -4,6 +4,7 @@
 - The value is passed directly to `WslcContainerPortMapping::protocol`.
 
 Underlying C values:
+
 - `TCP = 0`
 - `UDP = 1`
 
