@@ -2419,7 +2419,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcSessionStorageOrphaned" xml:space="preserve">
     <value>Existing WSLC session storage was found at '{}'. Because session.storagePath is set, a new session will be created at '{}'; the existing session, containers, and images will not be migrated. To keep using the existing data, remove the session.storagePath setting or move the storage to the new location.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="session.storagePath"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Invalid image tag format: '{}'. Expected format is 'name:tag'</value>
