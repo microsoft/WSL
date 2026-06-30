@@ -56,15 +56,14 @@ Session SessionService::OpenOrCreateDefaultSession()
 {
     auto manager = CreateSessionManager();
 
-    // Null Settings = default session with server-determined name and settings.
+    // Null Settings = default session with server-determined name and settings. The warning callback
+    // is consumed during CreateSession (session initialization); it is not retained afterwards.
     wil::com_ptr<IWSLCSession> session;
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    // Hold the warning callback for the session's lifetime so warnings emitted by a lazy VM start
-    // (e.g. resource recovery) are still delivered to this CLI invocation.
-    return Session(std::move(session), wil::com_ptr<IWarningCallback>(warningCallback.Get()));
+    return Session(std::move(session));
 }
 
 int SessionService::Attach(const Session& session)

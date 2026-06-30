@@ -709,6 +709,7 @@ void WSLCSession::TearDownVmLockHeld(bool CaptureTerminationReason)
     m_dockerdProcess.reset();
     m_containerdProcess.reset();
     m_virtualMachine.reset();
+    m_storageMounted = false;
 
     // Destroy the relay unless we're on its own thread (~IORelay joins the thread, which would
     // deadlock). On unexpected-VM-exit path (runs on relay thread), leave it for ~WSLCSession.
@@ -2517,6 +2518,10 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Operation);
     *Operation = nullptr;
+
+    // Do not start a new operation (which would hold the VM alive) once the session is terminating
+    // or has terminated. Mirrors the gate in EnsureVmRunning().
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating.load() || m_sessionTerminatedEvent.is_signaled());
 
     // Record the in-flight operation up front so the VM cannot idle-terminate before the client
     // resolves the container and issues the operation (and streams any output).
