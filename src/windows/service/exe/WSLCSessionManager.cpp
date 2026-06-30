@@ -63,6 +63,8 @@ struct SessionSettings
     std::wstring StoragePath;
     WSLCSessionSettings Settings{};
 
+    std::optional<std::wstring> OrphanedStoragePath;
+
     NON_COPYABLE(SessionSettings);
     NON_MOVABLE(SessionSettings);
 
@@ -88,14 +90,30 @@ struct SessionSettings
         auto userSettings = LoadUserSettings(UserToken);
 
         auto configuredStorageBase = userSettings.Get<settings::Setting::SessionStoragePath>();
+        const bool customConfigured = !configuredStorageBase.empty();
+        const std::filesystem::path defaultBase = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
         const std::filesystem::path storageBase =
-            configuredStorageBase.empty() ? wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken)
-                                          : std::filesystem::path(wsl::shared::string::MultiByteToWide(configuredStorageBase));
+            customConfigured ? std::filesystem::path(wsl::shared::string::MultiByteToWide(configuredStorageBase)) : defaultBase;
 
-        auto storagePath = (storageBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName).wstring();
+        const auto storageDir = storageBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
 
-        return std::unique_ptr<SessionSettings>(
-            new SessionSettings(std::wstring(ResolvedName), std::move(storagePath), WSLCSessionStorageFlagsNone, userSettings));
+        auto result = std::unique_ptr<SessionSettings>(
+            new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), WSLCSessionStorageFlagsNone, userSettings));
+
+        if (customConfigured)
+        {
+            const auto defaultDir = defaultBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
+            auto runAsUser = wil::impersonate_token(UserToken);
+            std::error_code ec;
+            const bool defaultHasStorage = std::filesystem::exists(defaultDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
+            const bool configuredHasStorage = std::filesystem::exists(storageDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
+            if (defaultHasStorage && !configuredHasStorage)
+            {
+                result->OrphanedStoragePath = defaultDir.wstring();
+            }
+        }
+
+        return result;
     }
 
     // Custom session: caller provides name and storage path.
@@ -244,6 +262,14 @@ void WSLCSessionManagerImpl::CreateSession(
     {
         defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
         Settings = &defaultSettings->Settings;
+
+        if (WarningCallback != nullptr && defaultSettings->OrphanedStoragePath)
+        {
+            LOG_IF_FAILED(
+                WarningCallback->OnWarning(wsl::shared::Localization::MessageWslcSessionStorageOrphaned(
+                                               defaultSettings->OrphanedStoragePath->c_str(), defaultSettings->StoragePath.c_str())
+                                               .c_str()));
+        }
     }
 
     std::wstring callerFileName;
