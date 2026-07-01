@@ -3045,7 +3045,7 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
 std::optional<std::wstring> GetHostAdapterIpv4()
 {
     auto endpoint = wsl::core::networking::GetHostEndpointSettings();
-    if (!endpoint)
+    if (!endpoint || endpoint->PreferredIpAddress.AddressString.empty())
     {
         return {};
     }
