@@ -537,7 +537,7 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 
-std::string LxssWriteWslDistroConfig(const std::string& Content);
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 enum class DrvFsMode
 {
@@ -574,6 +574,7 @@ struct TestConfigDefaults
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
+    std::optional<bool> isolateDistroCgroup;
 };
 
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default = {});
@@ -611,16 +612,16 @@ void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 void Trim(std::wstring& string);
 
-inline auto EnableSystemd(const std::string& extraConfig = "")
+inline auto EnableSystemd(const std::string& extraConfig = "", LPCWSTR distroName = LXSS_DISTRO_NAME_TEST_L)
 {
     // enable systemd on the test distro by editing /etc/wsl.conf
-    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig);
-    TerminateDistribution();
+    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig, distroName);
+    TerminateDistribution(distroName);
 
-    return wil::scope_exit([] {
+    return wil::scope_exit([distroName] {
         // clean up wsl.conf file
-        LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-        TerminateDistribution();
+        LxsstuLaunchWsl(std::format(L"-d {} " LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE, distroName));
+        TerminateDistribution(distroName);
     });
 }
 
