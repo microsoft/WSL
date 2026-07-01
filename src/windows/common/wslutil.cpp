@@ -380,14 +380,45 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    const auto downloadFolder =
-        winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(std::filesystem::temp_directory_path().wstring()).get();
+    // GetFolderFromPathAsync won't work if the folder is hidden or system.
+    auto downloadFolderPath = std::filesystem::temp_directory_path();
+    auto filenameStem = std::filesystem::path(Filename).stem().wstring();
+    auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
+    std::wstring filePath{};
+    winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
+    for (int suffix = 1; outputStream == nullptr; suffix++)
+    {
+        if (suffix == 1)
+        {
+            filePath = (downloadFolderPath / Filename).wstring();
+        }
+        else
+        {
+            filePath = (downloadFolderPath / std::format(L"{} ({}){}", filenameStem, suffix, filenameExtension)).wstring();
+        }
+        try
+        {
+            outputStream = winrt::Windows::Storage::Streams::FileRandomAccessStream::OpenAsync(
+                               filePath,
+                               winrt::Windows::Storage::FileAccessMode::ReadWrite,
+                               winrt::Windows::Storage::StorageOpenOptions::None,
+                               winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
+                               .get();
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            {
+                throw;
+            }
+        }
+    }
 
-    const auto file =
-        downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
-    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { file.DeleteAsync().get(); });
-
-    const auto outputStream = file.OpenAsync(winrt::Windows::Storage::FileAccessMode::ReadWrite).get().GetOutputStreamAt(0);
+    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        outputStream.Close();
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    });
 
     // By default downloaded files are cached in %appdata%/local/packages/{package-family}/AC/InetCache .
     // Disable caching since there's no reason to keep local copies of .msixbundle files.
@@ -421,7 +452,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     download.get();
     deleteFileOnFailure.release();
 
-    return file.Path().c_str();
+    return filePath;
 }
 
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
