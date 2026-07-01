@@ -24,6 +24,7 @@ Abstract:
 #include "TableOutput.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
+#include <filesystem>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -274,6 +275,260 @@ void ExportContainer(CLIExecutionContext& context)
         }
 
         ContainerService::Export(session, containerId, stdoutHandle);
+    }
+}
+
+void ContainerCp(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::Source));
+    WI_ASSERT(context.Args.Contains(ArgType::Target));
+
+    auto& session = context.Data.Get<Data::Session>();
+    auto source = WideToMultiByte(context.Args.Get<ArgType::Source>());
+    auto target = WideToMultiByte(context.Args.Get<ArgType::Target>());
+
+    // Determine copy direction by looking for CONTAINER:PATH patterns.
+    // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
+    auto isContainerPath = [](const std::string& path) -> bool {
+        auto colonPos = path.find(':');
+        if (colonPos == std::string::npos || colonPos == 0)
+        {
+            return false;
+        }
+
+        // Single letter before colon is a Windows drive path
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            return false;
+        }
+
+        return true;
+    };
+
+    auto parseContainerPath = [](const std::string& path) -> std::pair<std::string, std::string> {
+        auto colonPos = path.find(':');
+        // Skip Windows drive letter if present
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            colonPos = path.find(':', 2);
+        }
+
+        return {path.substr(0, colonPos), path.substr(colonPos + 1)};
+    };
+
+    bool sourceIsStdin = (source == "-");
+    bool sourceIsContainer = !sourceIsStdin && isContainerPath(source);
+    bool targetIsContainer = isContainerPath(target);
+
+    if ((sourceIsStdin || !sourceIsContainer) && targetIsContainer)
+    {
+        // stdin/local → container
+        auto [containerId, destPath] = parseContainerPath(target);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
+
+        if (sourceIsStdin)
+        {
+            auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
+
+            LARGE_INTEGER fileSize{};
+            ULONGLONG contentSize = 0;
+            if (GetFileSizeEx(inputHandle, &fileSize))
+            {
+                contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
+            }
+
+            // Note: The --archive/-a flag is accepted for CLI compatibility with docker cp, but is a
+            // no-op here. Since the tar archive contains uid/gid ownership in its headers, and Docker's
+            // PUT /archive extracts preserving that metadata.
+            ContainerService::CopyToContainer(session, containerId, destPath, inputHandle, contentSize);
+        }
+        else
+        {
+            // Local path → container: create tar from local path using tar.exe
+            auto widePath = MultiByteToWide(source);
+            std::error_code fsError;
+            bool pathExists = std::filesystem::exists(widePath, fsError);
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), fsError || !pathExists);
+
+            auto absPath = std::filesystem::absolute(widePath);
+            auto parentDir = absPath.parent_path().wstring();
+            auto fileName = absPath.filename().wstring();
+
+            // Create a temp tar file
+            wchar_t tempDir[MAX_PATH]{};
+            THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+            wchar_t tempFile[MAX_PATH]{};
+            THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
+            auto tempPath = std::wstring(tempFile);
+            auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
+
+            // Create tar archive — strip trailing separator to avoid the CRT parsing '\"' as an escaped quote
+            auto parentDirStr = parentDir;
+            while (parentDirStr.size() > 1 && (parentDirStr.back() == L'\\' || parentDirStr.back() == L'/'))
+            {
+                parentDirStr.pop_back();
+            }
+
+            auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDirStr, fileName);
+            STARTUPINFOW si{sizeof(si)};
+            PROCESS_INFORMATION pi{};
+            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+            {
+                auto lastError = GetLastError();
+                THROW_HR_WITH_USER_ERROR_IF(
+                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                    Localization::WSLCCLI_CpTarNotFoundError(),
+                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
+                THROW_WIN32(lastError);
+            }
+            wil::unique_handle tarProcess(pi.hProcess);
+            wil::unique_handle tarThread(pi.hThread);
+
+            WaitForSingleObject(tarProcess.get(), INFINITE);
+            DWORD exitCode = 0;
+            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+            // Open the tar file and upload
+            wil::unique_hfile tarFileHandle(
+                CreateFileW(tempPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!tarFileHandle);
+
+            LARGE_INTEGER fileSize{};
+            THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFileHandle.get(), &fileSize));
+
+            ContainerService::CopyToContainer(session, containerId, destPath, tarFileHandle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+        }
+    }
+    else if (sourceIsContainer && !targetIsContainer)
+    {
+        // container → local
+        auto [containerId, srcPath] = parseContainerPath(source);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
+
+        auto wideTarget = MultiByteToWide(target);
+        auto absTarget = std::filesystem::absolute(wideTarget);
+
+        // Determine if target is a directory or a file destination.
+        // Treat as directory if: ends with separator, or already exists as a directory.
+        bool targetIsDir = (!wideTarget.empty() && (wideTarget.back() == L'\\' || wideTarget.back() == L'/')) ||
+                           std::filesystem::is_directory(absTarget);
+
+        // Download archive from container to a temp file
+        wchar_t tempDir[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
+        wchar_t tempFile[MAX_PATH]{};
+        THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
+        auto tempPath = std::wstring(tempFile);
+        auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
+
+        {
+            wil::unique_hfile tarFileHandle(
+                CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!tarFileHandle);
+
+            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFileHandle.get());
+        }
+
+        if (targetIsDir)
+        {
+            // Extract directly into the target directory.
+            std::error_code dirError;
+            std::filesystem::create_directories(absTarget, dirError);
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
+
+            // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote
+            auto targetDir = absTarget.wstring();
+            while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
+            {
+                targetDir.pop_back();
+            }
+
+            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, targetDir);
+            STARTUPINFOW si{sizeof(si)};
+            PROCESS_INFORMATION pi{};
+            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+            {
+                auto lastError = GetLastError();
+                THROW_HR_WITH_USER_ERROR_IF(
+                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                    Localization::WSLCCLI_CpTarNotFoundError(),
+                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
+                THROW_WIN32(lastError);
+            }
+            wil::unique_handle tarProcess(pi.hProcess);
+            wil::unique_handle tarThread(pi.hThread);
+
+            WaitForSingleObject(tarProcess.get(), INFINITE);
+            DWORD exitCode = 0;
+            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+        }
+        else
+        {
+            // Target is a file path. Extract to a temp directory, then move to the target.
+            auto extractDir = std::filesystem::path(tempDir) / L"wslc-cp-extract";
+            std::filesystem::create_directories(extractDir);
+            auto cleanupExtract = wil::scope_exit([&] { std::filesystem::remove_all(extractDir); });
+
+            auto extractDirStr = extractDir.wstring();
+            while (extractDirStr.size() > 1 && (extractDirStr.back() == L'\\' || extractDirStr.back() == L'/'))
+            {
+                extractDirStr.pop_back();
+            }
+
+            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, extractDirStr);
+            STARTUPINFOW si{sizeof(si)};
+            PROCESS_INFORMATION pi{};
+            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+            {
+                auto lastError = GetLastError();
+                THROW_HR_WITH_USER_ERROR_IF(
+                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                    Localization::WSLCCLI_CpTarNotFoundError(),
+                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
+                THROW_WIN32(lastError);
+            }
+            wil::unique_handle tarProcess(pi.hProcess);
+            wil::unique_handle tarThread(pi.hThread);
+
+            WaitForSingleObject(tarProcess.get(), INFINITE);
+            DWORD exitCode = 0;
+            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+            // Find the extracted file and move it to the target path.
+            // Docker's archive API returns a tar with the file at its basename.
+            std::filesystem::path extractedFile;
+            for (const auto& entry : std::filesystem::directory_iterator(extractDir))
+            {
+                extractedFile = entry.path();
+                break;
+            }
+
+            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, "No file extracted from container archive", extractedFile.empty());
+
+            // Ensure parent directory of target exists.
+            std::error_code dirError;
+            std::filesystem::create_directories(absTarget.parent_path(), dirError);
+
+            std::error_code moveError;
+            std::filesystem::rename(extractedFile, absTarget, moveError);
+            if (moveError)
+            {
+                // rename can fail across volumes; fall back to copy+delete.
+                std::filesystem::copy_file(extractedFile, absTarget, std::filesystem::copy_options::overwrite_existing, moveError);
+                THROW_HR_IF_MSG(
+                    HRESULT_FROM_WIN32(moveError.value()), !!moveError, "Failed to copy file to target: %ls", absTarget.c_str());
+            }
+        }
+    }
+    else
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
     }
 }
 
