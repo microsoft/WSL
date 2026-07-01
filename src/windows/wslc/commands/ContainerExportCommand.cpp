@@ -44,8 +44,8 @@ std::wstring ContainerExportCommand::LongDescription() const
 
 void ContainerExportCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ExportContainer;
 }
 } // namespace wsl::windows::wslc

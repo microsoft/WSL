@@ -1130,9 +1130,9 @@ Poging tot downloaden van web...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p is uitgeschakeld en valt terug naar 9p met vsock-transport.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy netwerken wordt niet ondersteund wanneer wsl2.virtio is uitgeschakeld; terugvallen op networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme netwerken wordt niet ondersteund wanneer wsl2.virtio is uitgeschakeld; terugvallen op networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>De actieve kernel mist een patch die de prestaties van virtio-apparaten aanzienlijk verbetert. Werk bij naar een recentere WSL-kernel om deze optimalisatie in te schakelen.</value>
@@ -1774,9 +1774,10 @@ Binaire Linux-bestanden die worden uitgevoerd in WSL kunnen automatisch je GPU i
     <value>Installatie-instructies</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Nadat u VS Code hebt geïnstalleerd, kunt u de externe WSL-extensie installeren vanuit Windows Terminal:
+    <value>Nadat je VS Code hebt geïnstalleerd, kun je de externe WSL-extensie installeren vanuit Windows Terminal:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Open een WSL-project in Visual Studio Code</value>
@@ -2062,9 +2063,17 @@ Gebruik:
     <value>Ongeldig IP-adres: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Poort '{}' kan niet worden toegewezen, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName({}) is mislukt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>De optie --session kan niet worden gebruikt met deze opdracht.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Opdracht {} kan niet worden gestart. Errno = {}</value>
@@ -2326,6 +2335,14 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Niet-ondersteund netwerkstuurprogramma: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Niet-ondersteunde optie voor netwerkstuurprogramma: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>De netwerkstuurprogrammaoptie 'Gateway' vereist dat 'Subnet' ook wordt opgegeven.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Het netwerk {} heeft actieve eindpunten.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2365,6 +2382,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Kan volume '{}' niet maken: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Er zijn te veel volumes gekoppeld (limiet: {}). Start de sessie opnieuw om meer volumes te koppelen. Dit wordt in een toekomstige release opgelost.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Poort {} is al in gebruik, kan container {} niet starten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2386,6 +2407,14 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Geen WSLC-sessie gevonden in '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Kan '{}' niet gebruiken als sessieopslag omdat de map niet leeg is</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Kan '{}' niet gebruiken als sessieopslag omdat het geen map is</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2844,6 +2873,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Een container verbinden met een netwerk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Geef geen foutmelding als het netwerk niet bestaat</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ongeldige {}-waarde: de netwerknaam mag niet leeg zijn of een spatie bevatten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2892,9 +2924,6 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Grootte van /dev/shm (bijv. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Sessie-id</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Pad naar sessieopslag</value>
   </data>
@@ -2914,10 +2943,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Tijdstempels weergeven in logboekuitvoer</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Logboeken sinds tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
+    <value>Logboeken weergeven vanaf tijdstempel (Unix-tijdvak, seconden of RFC3339, bijvoorbeeld 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Logboeken vóór tijdstempel weergeven (bijv. unix-tijdvakseconden)</value>
+    <value>Logboeken weergeven vóór tijdstempel (Unix-tijdvak, seconden of RFC3339, bijvoorbeeld 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>
@@ -2937,6 +2966,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Een volume koppelen aan de container</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Meld geen fout als het volume niet bestaat</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Werkmap binnen de container</value>
@@ -3025,6 +3057,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Ongeldige {} parameterwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} valt buiten het geldige bereik ({}-{}).</value>

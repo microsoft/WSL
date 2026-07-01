@@ -323,7 +323,7 @@ class WslcSdkTests
         {
             std::wstring DumpPath;
             std::string ProcessName;
-            uint64_t Pid;
+            uint32_t Pid;
             uint32_t Signal;
             uint64_t Timestamp;
         };
@@ -372,7 +372,7 @@ class WslcSdkTests
         VERIFY_IS_GREATER_THAN(std::filesystem::file_size(invocation.DumpPath), 0ull);
         VERIFY_IS_TRUE(invocation.ProcessName.find("sh") != std::string::npos);
         VERIFY_ARE_EQUAL(invocation.Signal, static_cast<uint32_t>(WSLCSignalSIGSEGV));
-        VERIFY_IS_GREATER_THAN(invocation.Pid, 0ull);
+        VERIFY_IS_GREATER_THAN(invocation.Pid, 0u);
         VERIFY_IS_GREATER_THAN(invocation.Timestamp, 0ull);
     }
 
@@ -2299,6 +2299,9 @@ class WslcSdkTests
 
         auto image = std::format("{}/hello-world:latest", registryAddress);
 
+        auto imageCleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr)); });
+
         // Pulling with credentials should succeed.
         {
             WslcPullImageOptions opts{};
@@ -2352,6 +2355,9 @@ class WslcSdkTests
             PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
             auto image = std::format("{}/hello-world:latest", registryAddress);
+
+            auto imageCleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr)); });
 
             // Delete the image locally so the pull is a real pull.
             WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr);
@@ -2747,6 +2753,58 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
             VERIFY_IS_TRUE(HasImage(registryImage));
             VERIFY_IS_TRUE(ctx.sawKnownStatus);
+        }
+    }
+
+    WSLC_TEST_METHOD(ResourceReuseAfterCleanup)
+    {
+        // Each iteration exercises the complete lifecycle: create session → load image → run container
+        // → terminate session → release session. Running 10 times on the same storage path verifies
+        // that all resources (VHD locks, image store, container overlays, process handles, VM) are
+        // fully freed by the time WslcReleaseSession returns, so the next iteration can reuse them
+        // without errors.
+        std::filesystem::path sessionStorage = m_storagePath / "wslc-resource-reuse-storage";
+
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(sessionStorage, ec);
+        });
+
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-resource-reuse", sessionStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsCpuCount(&sessionSettings, 2));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsMemory(&sessionSettings, 1024));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+
+        WslcVhdRequirements vhdReqs{};
+        vhdReqs.sizeBytes = 2048ull * 1024 * 1024; // 2 GB
+        vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
+
+        constexpr auto c_imageName = "hello-world:latest";
+        constexpr int c_iterationCount = 10;
+
+        for (int i = 0; i < c_iterationCount; ++i)
+        {
+            LogInfo("ResourceReuseAfterCleanup: iteration %d / %d", i + 1, c_iterationCount);
+
+            // Create the session, reusing the same storage path every iteration.
+            UniqueSession session;
+            VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+            VERIFY_IS_NOT_NULL(session.get());
+
+            // Load the test image into the session.
+            VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath(c_imageName).c_str(), nullptr, nullptr));
+
+            // Run a container using the image's default entrypoint and capture its output.
+            auto output = RunContainerAndCapture(session.get(), c_imageName, {});
+            VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
+
+            // Terminate the session, then release it. WslcReleaseSession must return only after all
+            // resources are freed so that the next iteration can reopen the same storage without error.
+            VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
+            VERIFY_SUCCEEDED(WslcReleaseSession(session.get()));
+            session.release(); // explicit calls above
         }
     }
 

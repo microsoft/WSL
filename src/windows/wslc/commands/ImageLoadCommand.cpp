@@ -43,8 +43,8 @@ std::wstring ImageLoadCommand::LongDescription() const
 
 void ImageLoadCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << LoadImage;
 }
 } // namespace wsl::windows::wslc

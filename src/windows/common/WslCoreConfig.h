@@ -88,7 +88,7 @@ enum NetworkingMode
     Nat = 1,
     Bridged = 2,
     Mirrored = 3,
-    VirtioProxy = 4
+    Consomme = 4
 };
 
 // Ensure the WslCoreConfig versions of the enum match the version that's used in mini init.
@@ -96,7 +96,7 @@ static_assert(static_cast<ULONG>(NetworkingMode::None) == LxMiniInitNetworkingMo
 static_assert(static_cast<ULONG>(NetworkingMode::Nat) == LxMiniInitNetworkingModeNat);
 static_assert(static_cast<ULONG>(NetworkingMode::Bridged) == LxMiniInitNetworkingModeBridged);
 static_assert(static_cast<ULONG>(NetworkingMode::Mirrored) == LxMiniInitNetworkingModeMirrored);
-static_assert(static_cast<ULONG>(NetworkingMode::VirtioProxy) == LxMiniInitNetworkingModeVirtioProxy);
+static_assert(static_cast<ULONG>(NetworkingMode::Consomme) == LxMiniInitNetworkingModeConsomme);
 
 constexpr auto ToString(NetworkingMode config) noexcept
 {
@@ -110,8 +110,8 @@ constexpr auto ToString(NetworkingMode config) noexcept
         return "Bridged";
     case NetworkingMode::Mirrored:
         return "Mirrored";
-    case NetworkingMode::VirtioProxy:
-        return "VirtioProxy";
+    case NetworkingMode::Consomme:
+        return "Consomme";
     default:
         return "Invalid";
     }
@@ -122,7 +122,9 @@ const std::map<std::string, wsl::core::NetworkingMode, shared::string::CaseInsen
     {ToString(NetworkingMode::Nat), NetworkingMode::Nat},
     {ToString(NetworkingMode::Bridged), NetworkingMode::Bridged},
     {ToString(NetworkingMode::Mirrored), NetworkingMode::Mirrored},
-    {ToString(NetworkingMode::VirtioProxy), NetworkingMode::VirtioProxy}};
+    {ToString(NetworkingMode::Consomme), NetworkingMode::Consomme},
+    // Legacy alias: the Consomme networking mode was previously named "VirtioProxy".
+    {"VirtioProxy", NetworkingMode::Consomme}};
 
 enum class FirewallAction
 {

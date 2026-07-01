@@ -154,6 +154,63 @@ class WSLCE2EContainerExecTests
         session.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand)
+    {
+        // Regression test for a stdin deadlock. When stdin is a synchronous (non-overlapped) anonymous pipe, the client
+        // relays it on a worker thread parked in a blocking ReadFile() that the exit event cannot interrupt. With
+        // `echo hello` (which exits without reading stdin), teardown's join() on that worker blocks until stdin closes,
+        // so wslc hangs. The test exercises this by running `exec -i echo hello` and requiring it to exit while the
+        // client keeps stdin open.
+        //
+        // If this regresses, look at the client-side stdin relay teardown: InterruptAndJoinInputThread
+        // (the CancelSynchronousIo retry loop that unblocks the worker) and relay.cpp's InterruptableRead (which maps
+        // the resulting ERROR_OPERATION_ABORTED to EOF).
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // RunWslcInteractive wires wslc's stdin to the read end of a synchronous (non-overlapped) anonymous pipe, which
+        // is what triggers the blocking-ReadFile relay path under test.
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} echo hello", containerId));
+
+        // The command's output must arrive without the client closing stdin first.
+        session.ExpectStdout("hello\n");
+
+        // Long timeout: this only bounds the failure (hang) path, so it is generous to avoid false positives under CI load.
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        // Closing stdin after the process has already exited must remain a clean no-op with no errors emitted.
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveTTY_SelfExitingCommand)
+    {
+        // TTY counterpart to WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand (see that test for the full
+        // explanation of the deadlock). The -t flag routes wslc through ConsoleService::RelayInteractiveTty, whose
+        // stdin worker teardown is a separate scope-exit from the non-TTY path, so a regression could be introduced
+        // in one path and not the other. This test guards the TTY call site.
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // -t sets the TTY flag; the harness still wires stdin as a synchronous pipe, so wslc takes the vulnerable
+        // RelayInteractiveTty else-branch (its input handle is a pipe, not a console).
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} echo hello", containerId));
+
+        // The TTY translates the trailing LF to CRLF, so the exact output is "hello\r\n".
+        session.ExpectStdout("hello\r\n");
+
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_PseudoConsole_TerminalSize)
     {
         VerifyContainerIsNotListed(WslcContainerName);

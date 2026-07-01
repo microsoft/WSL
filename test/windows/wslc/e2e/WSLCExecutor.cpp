@@ -231,6 +231,27 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
     return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
 }
 
+void WaitForContainerOutput(const std::wstring& containerName, std::string_view expected, std::chrono::milliseconds timeout)
+{
+    auto cmd = std::format(L"\"{}\" container logs -f {}", GetWslcPath(), containerName);
+
+    auto [parentStdoutRead, childStdoutWrite] = wslutil::OpenAnonymousPipe(65536, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    SubProcess process(nullptr, cmd.c_str());
+    process.SetStdHandles(nullptr, childStdoutWrite.get(), nullptr);
+
+    wil::unique_handle processHandle = process.Start();
+    childStdoutWrite.reset();
+
+    auto terminate = wil::scope_exit([&]() {
+        LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(processHandle.get(), 1));
+        LOG_LAST_ERROR_IF(WaitForSingleObject(processHandle.get(), DefaultWaitTimeoutMs) != WAIT_OBJECT_0);
+    });
+
+    WaitForOutput(wil::unique_handle{parentStdoutRead.release()}, expected, timeout);
+}
+
 std::wstring GetWslcHeader()
 {
     std::wstringstream header;

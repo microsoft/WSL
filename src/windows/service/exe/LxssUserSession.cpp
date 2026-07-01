@@ -3210,10 +3210,20 @@ try
 
     // Attach the disk to the VM, reusing the same LUN if possible.
     //
-    // N.B. The user token is not provided because the key that holds the disk
-    // state can only be written by elevated users.
+    // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
+    // registry key, so the disk being restored here was mounted earlier in this same boot
+    // by this same user. For a VHD we therefore pass the user token so the access grant and
+    // the path resolution run under the mounting user's identity: a privileged operation can
+    // only ever touch a file that user can already reach, which closes the restore-time
+    // junction/symlink swap (TOCTOU) without re-resolving the path as SYSTEM.
+    //
+    // A pass-through (raw block device) attach is elevation-gated and the reconnecting user
+    // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
+    // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
+    // against.
     auto lun = std::stoul(LunStr);
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, nullptr);
+    const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
+    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))

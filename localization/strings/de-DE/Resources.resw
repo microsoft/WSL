@@ -379,7 +379,8 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux
+aus
 
 Verbrauch:
     /l, /list [Option]
@@ -1136,9 +1137,9 @@ Es wird versucht,...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p ist deaktiviert und fällt mit vsock-Transport auf 9p zurück.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy-Netzwerkfunktionen werden nicht unterstützt, wenn wsl2.virtio deaktiviert ist; es wird auf networkingMode {} zurückgegriffen.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme-Netzwerk wird nicht unterstützt, wenn wsl2.virtio deaktiviert ist; es wird auf networkingMode {} zurückgegriffen.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Dem laufenden Kernel fehlt ein Patch, der die Leistung von virtio-Geräten deutlich verbessert. Aktualisieren Sie auf einen neueren WSL-Kernel, um diese Optimierung zu aktivieren.</value>
@@ -1584,7 +1585,8 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, 
+auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
@@ -1782,7 +1784,8 @@ Linux-Binärdateien, die in WSL ausgeführt werden, können Ihre GPU in Windows 
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Nachdem Sie VS Code installiert haben, können Sie die Remote-WSL-Erweiterung über das Windows-Terminal installieren:
 
-„code –install-extension ms-vscode-remote.remote-wsl“</value>
+„code --install-extension ms-vscode-remote.remote-wsl“</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>WSL-Projekt in Visual Studio Code öffnen</value>
@@ -2068,9 +2071,17 @@ Verwendung:
     <value>Ungültige IP-Adresse „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Fehler beim Zuordnen von Port „{}“, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>Fehler bei OpenSessionByName('{}')</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>Die Option --session kann nicht mit diesem Befehl verwendet werden.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
     <value>Fehler beim Starten des Befehls {}. Fehler = {}</value>
@@ -2332,6 +2343,14 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Nicht unterstützter Netzwerktreiber: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>Nicht unterstützte Netzwerktreiberoption: „{}“</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>Die Netzwerktreiberoption 'Gateway' erfordert, dass auch 'Subnet' angegeben wird.</value>
+    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Das Netzwerk „{}“ hat aktive Endpunkte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2371,6 +2390,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Fehler beim Erstellen des Volumes „{}“: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Es wurden zu viele Volumes bereitgestellt (Limit: {}). Starten Sie die Sitzung neu, um weitere Volumes bereitzustellen. Dies wird in einer zukünftigen Version behoben.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Port {} wird bereits verwendet, der Container {} kann nicht gestartet werden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2392,6 +2415,14 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Keine WSLC-Sitzung in „{}“ gefunden</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Kann '{}' nicht als Sitzungspeicher verwenden, da das Verzeichnis nicht leer ist.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>'{}' kann nicht als Sitzungsspeicher verwendet werden, da es kein Verzeichnis ist.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2850,6 +2881,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>Verbinden eines Containers mit einem Netzwerk</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>Kein Fehler, wenn das Netzwerk nicht vorhanden ist</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ungültiger {}-Wert: Der Netzwerkname darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2898,9 +2932,6 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Größe von /dev/shm (z. B. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Sitzungskennung</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Pfad für den Sitzungsspeicher</value>
   </data>
@@ -2920,10 +2951,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Zeitstempel in der Protokollausgabe anzeigen</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Protokolle seit dem Zeitstempel anzeigen (z. B. Unix-Epochensekunden)</value>
+    <value>Protokolle seit Zeitstempel anzeigen (Unix-Epochensekunden oder RFC3339, z. B. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Protokolle vor dem Zeitstempel anzeigen (z. B. Unix-Epoche-Sekunden)</value>
+    <value>Protokolle vor Zeitstempel anzeigen (Unix-Epochensekunden oder RFC3339, z. B. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Neue Bildreferenz im Format image-name[:tag]</value>
@@ -2943,6 +2974,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Ein Volume an den Container binden</value>
+  </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>Keinen Fehler ausgeben, wenn das Volume nicht vorhanden ist</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeitsverzeichnis im Container</value>
@@ -3031,6 +3065,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
     <value>Ungültiger {}-Argumentwert: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>Ungültiger {}-Argumentwert: "{}". Es wurde ein Unix-Epochenzeitstempel oder ein RFC3339 Datum/Uhrzeit erwartet (z. B. 2024-01-15T10:30:00Z).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ungültiger {}-Wert: {} liegt außerhalb des gültigen Bereichs ({}-{}).</value>

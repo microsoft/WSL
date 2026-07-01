@@ -28,5 +28,6 @@ if (WSL_INCLUDE_SDK_CSHARP)
 endif()
 
 add_dependencies(wslcsdk wslserviceidl wslcsdkwinrt)
-target_link_libraries(wslcsdk ${COMMON_LINK_LIBRARIES} legacy_stdio_definitions common wslcsdkwinrt)
+target_link_libraries(wslcsdk ${COMMON_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} legacy_stdio_definitions common wslcsdkwinrt delayimp.lib)
+set_target_properties(wslcsdk PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 target_precompile_headers(wslcsdk REUSE_FROM common)

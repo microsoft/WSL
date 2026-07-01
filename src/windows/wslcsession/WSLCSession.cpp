@@ -38,6 +38,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
+constexpr auto c_storageVhdFilename = L"storage.vhdx";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -62,14 +63,14 @@ void EnforceRegistryAllowlist(const std::string& Repo)
     THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
-std::string IndentLines(const std::string& input, const std::string& prefix)
+std::string IndentLines(const std::string& input, const std::string& prefix, bool prefixFirstLine = true)
 {
     if (input.empty())
     {
         return {};
     }
 
-    std::string result = prefix;
+    std::string result = prefixFirstLine ? prefix : "";
     for (size_t i = 0; i < input.size(); i++)
     {
         result.push_back(input[i]);
@@ -439,13 +440,14 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     {
         // If no storage path is specified, use a tmpfs for convenience.
         m_virtualMachine->Mount("", c_containerdStorage, "tmpfs", "", 0);
+        m_storageMounted = true;
         return;
     }
 
     std::filesystem::path storagePath{Settings.StoragePath};
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings.StoragePath), !storagePath.is_absolute());
 
-    m_storageVhdPath = storagePath / "storage.vhdx";
+    m_storageVhdPath = storagePath / c_storageVhdFilename;
 
     std::string diskDevice;
     std::optional<ULONG> diskLun{};
@@ -474,10 +476,30 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             "Failed to attach vhd: %ls",
             m_storageVhdPath.c_str());
 
+        // No existing VHD — this is a new session. Reject if the caller forbade creation.
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
             Localization::MessageWslcSessionStorageNotFound(Settings.StoragePath),
             WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
+
+        // Reject any non-empty existing path so we don't mix user files with session storage.
+        // status's error_code distinguishes "doesn't exist yet" (OK, we'll create it) from other I/O errors.
+        std::error_code ec;
+        const auto status = std::filesystem::status(storagePath, ec);
+        if (ec && ec.value() != ERROR_FILE_NOT_FOUND && ec.value() != ERROR_PATH_NOT_FOUND)
+        {
+            THROW_IF_WIN32_ERROR_MSG(ec.value(), "status failed for %ls", storagePath.c_str());
+        }
+
+        if (std::filesystem::exists(status))
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeDirectory(storagePath.c_str()), !std::filesystem::is_directory(status));
+
+            const bool empty = std::filesystem::is_empty(storagePath, ec);
+            THROW_IF_WIN32_ERROR_MSG(ec.value(), "is_empty failed for %ls", storagePath.c_str());
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(storagePath.c_str()), !empty);
+        }
 
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
@@ -495,6 +517,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
     // Mount the device to /root.
     m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_storageMounted = true;
 
     // Configure swap on a separate ephemeral VHD.
     if (Settings.SwapSizeMb > 0)
@@ -530,6 +553,17 @@ HRESULT WSLCSession::GetId(ULONG* Id)
 
     return S_OK;
 }
+
+HRESULT WSLCSession::GetDisplayName(_Out_ LPWSTR* DisplayName)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, DisplayName);
+    *DisplayName = nullptr;
+
+    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
+    return S_OK;
+}
+CATCH_RETURN();
 
 void WSLCSession::OnDockerdExited()
 {
@@ -741,10 +775,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         }
     };
 
-    auto onCompleted = [&]() { io.Cancel(); };
-
-    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(requestContext, std::move(onHttpResponse), std::move(onChunk)));
 
     io.Run({});
 
@@ -842,6 +873,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->Labels.Count > 0 && Options->Labels.Values == nullptr);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
@@ -904,6 +936,13 @@ try
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
+    for (ULONG i = 0; i < Options->Labels.Count; i++)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Labels.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, Options->Labels.Values[i][0] == '-');
+        buildArgs.push_back("--label");
+        buildArgs.push_back(Options->Labels.Values[i]);
+    }
 
     buildArgs.push_back("-f");
     buildArgs.push_back("-");
@@ -916,8 +955,18 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+    io.AddHandle(
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
+        MultiHandleWait::NeedNotComplete,
+        [&buildProcess]() {
+            // If we receive an error relaying stdin, it could be because the process exited.
+            // Wait up to one second for the process to exit so errors in this relay don't override the actual build result.
+            if (!buildProcess.GetExitEvent().wait(1000))
+            {
+                // Otherwise, throw the error and cancel the build.
+                throw;
+            }
+        });
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
@@ -1036,6 +1085,10 @@ try
                 std::string decoded = wslutil::Base64Decode(log.data);
                 if (!decoded.empty())
                 {
+                    // The first character of this chunk begins a new line (and so needs a stage prefix) unless it
+                    // continues an unterminated line from the same vertex.
+                    bool continuingLine = needsNewline && log.vertex == lastLogVertex;
+
                     if (log.vertex != lastLogVertex && decoded[0] != '\n')
                     {
                         flushLine();
@@ -1047,11 +1100,13 @@ try
                     {
                         reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
+
+                        continuingLine = false;
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
+                        reportProgress(IndentLines(decoded, logPrefix(it->second), !continuingLine), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
@@ -1086,10 +1141,8 @@ try
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(
-        std::make_unique<io::ReadHandle>(
-            buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }),
-        io::MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<io::ReadHandle>(
+        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -1181,40 +1234,61 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    std::ignore = ImportImageImpl(*requestContext, ImageHandle);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::ImportImage(
+    const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     WSLCExecutionContext context(this, WarningCallback);
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageName);
-    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, ImageId);
+    *ImageId = nullptr;
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageName);
+    std::string repo;
+    std::string tag;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
+    if (ImageName != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
+
+        auto [parsedRepo, tagOrDigest] = wslutil::ParseImage(ImageName);
+        THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
+        repo = parsedRepo;
+        tag = tagOrDigest.value();
+    }
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    auto imageId = ImportImageImpl(*requestContext, ImageHandle);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !imageId.has_value(), "Docker import succeeded but did not return an image ID");
 
-    OnImageCreated(ImageName);
+    if (ImageName != nullptr && strlen(ImageName) > 0)
+    {
+        OnImageCreated(ImageName);
+    }
+    else
+    {
+        OnImageCreated(imageId->c_str());
+    }
+
+    *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId->c_str()).release();
+
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
 
@@ -1223,6 +1297,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     auto io = CreateIOContext();
 
     std::optional<std::string> pendingErrorJson;
+    std::optional<std::string> imageId;
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
@@ -1272,6 +1347,11 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         else if (parsed.status.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.status->c_str(), "Status"));
+            if (parsed.status->starts_with("sha256:"))
+            {
+                THROW_HR_IF_MSG(E_UNEXPECTED, imageId.has_value(), "Received duplicate image ID in import status");
+                imageId = *parsed.status;
+            }
         }
         else
         {
@@ -1286,12 +1366,12 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-        common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, common::io::HandleWrapper{Request.stream.native_handle()}));
-
     io.AddHandle(
-        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
-        MultiHandleWait::CancelOnCompleted);
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, common::io::HandleWrapper{Request.stream.native_handle()}),
+        MultiHandleWait::NeedNotComplete);
+
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)));
 
     io.Run({});
 
@@ -1305,6 +1385,8 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
+
+    return imageId;
 }
 
 HRESULT WSLCSession::SaveImage(WSLCHandle OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
@@ -1376,16 +1458,12 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
             errorJson.append(buffer.data(), buffer.size());
         };
 
-        io.AddHandle(
-            std::make_unique<io::ReadHandle>(common::io::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
-            MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::ReadHandle>(common::io::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
-                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+            common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     io.Run({});
@@ -1394,6 +1472,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, error.message, SocketCodePair.first == 404);
         THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
     }
 }
@@ -2362,10 +2441,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Driver);
 
     std::string name = Options->Name;
-    std::string driver = Options->Driver;
+    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
@@ -2374,6 +2452,17 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
+
+    static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
+    for (const auto& [key, _] : driverOpts)
+    {
+        const bool supported = std::any_of(
+            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -2802,11 +2891,15 @@ try
             }
 
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-            try
+            if (m_storageMounted)
             {
-                m_virtualMachine->Unmount(c_containerdStorage);
+                try
+                {
+                    m_virtualMachine->Unmount(c_containerdStorage);
+                    m_storageMounted = false;
+                }
+                CATCH_LOG();
             }
-            CATCH_LOG();
         }
     }
 
@@ -2861,7 +2954,7 @@ void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) no
     m_crashDumpCallbacks.erase(It);
 }
 
-void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)
+void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)
 try
 {
     // Snapshot the callback list under the lock so that cross-process callback invocations don't
@@ -2936,7 +3029,7 @@ try
     {
         // No existing port allocation, create a new one.
         auto allocated = std::make_pair(m_virtualMachine->TryAllocatePort(LinuxPort, Family, IPPROTO_TCP), static_cast<size_t>(0));
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.first == nullptr);
+        THROW_HR_IF(HRESULT_FROM_WIN32(WSAEADDRINUSE), allocated.first == nullptr);
 
         it = m_allocatedPorts.emplace(LinuxPort, allocated).first;
         inserted = true;
@@ -3013,13 +3106,18 @@ HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgress
 }
 
 HRESULT WSLCSession::ImportImage(
-    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+    WSLCCompatHandle ImageHandle,
+    LPCSTR ImageName,
+    IWSLCCompatProgressCallback* ProgressCallback,
+    ULONGLONG ContentLength,
+    IWSLCCompatWarningCallback* WarningCallback,
+    LPSTR* ImageId)
 {
     const auto handle = apicompat::Convert(ImageHandle);
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get());
+    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get(), ImageId);
 }
 
 HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
@@ -3163,17 +3261,22 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     io::MultiHandleWait io;
 
     // Cancel with E_ABORT if the session is terminating.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
+    io.AddHandle(
+        std::make_unique<io::EventHandle>(
+            m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }),
+        io::MultiHandleWait::NeedNotComplete);
 
     // Cancel with E_ABORT if the client process exits.
-    io.AddHandle(std::make_unique<io::EventHandle>(
-        wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+    io.AddHandle(
+        std::make_unique<io::EventHandle>(
+            wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
+        io::MultiHandleWait::NeedNotComplete);
 
     if (CancelHandle != nullptr)
     {
         io.AddHandle(
-            std::make_unique<io::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+            std::make_unique<io::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }),
+            io::MultiHandleWait::NeedNotComplete);
     }
 
     return io;
