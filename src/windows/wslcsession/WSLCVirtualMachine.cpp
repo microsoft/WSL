@@ -1185,8 +1185,8 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     std::optional<std::string> inboxLibMountPoint;
     if (std::filesystem::is_directory(inboxLibPath))
     {
-        // inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
-        // THROW_IF_FAILED(MountWindowsFolderImpl(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), WSLCMountFlagsReadOnly));
+        inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
+        THROW_IF_FAILED(MountWindowsFolderImpl(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), WSLCMountFlagsReadOnly));
     }
 
     // Mount the packaged libraries.
