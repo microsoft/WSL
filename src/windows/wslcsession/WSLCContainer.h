@@ -33,6 +33,7 @@ namespace wsl::windows::service::wslc {
 class WSLCContainer;
 class WSLCSession;
 class WSLCVolumes;
+class EventStore;
 
 class unique_com_disconnect
 {
@@ -87,6 +88,7 @@ public:
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
+        EventStore& eventStore,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
@@ -118,7 +120,7 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAtSeconds = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -140,7 +142,8 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        IORelay& Relay,
+        EventStore& eventStore);
 
     static std::unique_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
@@ -151,7 +154,8 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        IORelay& Relay,
+        EventStore& eventStore);
 
 private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
@@ -164,7 +168,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::uint64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::uint64_t> stopTimestampSeconds);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -219,6 +223,7 @@ private:
     DockerEventTracker& m_eventTracker;
     DockerEventTracker::EventTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
+    EventStore& m_eventStore;
     std::string m_networkMode;
 };
 
