@@ -105,6 +105,7 @@ _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription()) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,     "stop-signal",         NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_StopSignalArgDescription()) \
+_(StopTimeout,    "stop-timeout",        NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_StopTimeoutArgDescription()) \
 _(Subnet,         "subnet",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkSubnetArgDescription()) \
 _(Tail,           "tail",                L"n",              Kind::Value,       Localization::WSLCCLI_TailArgDescription()) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \

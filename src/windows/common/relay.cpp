@@ -133,7 +133,7 @@ wsl::windows::common::relay::InterruptableRead(
     if (!ReadFile(InputHandle, Buffer.data(), gsl::narrow_cast<DWORD>(Buffer.size()), &bytesRead, Overlapped))
     {
         auto lastError = GetLastError();
-        if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE))
+        if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE) || (lastError == ERROR_OPERATION_ABORTED))
         {
             return 0;
         }

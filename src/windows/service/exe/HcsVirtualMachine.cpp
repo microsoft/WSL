@@ -60,7 +60,7 @@ SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
 // vmmem-XXX process name visible in Task Manager and parsed by various tooling).
 std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
 {
-    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::wstring sanitized{name};
     for (auto& c : sanitized)
     {

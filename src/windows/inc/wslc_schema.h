@@ -76,8 +76,9 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Entrypoint;
     std::string User;
     std::string WorkingDir;
+    std::optional<int> StopTimeout;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout);
 };
 
 struct InspectEndpointSettings

@@ -139,12 +139,8 @@ void WriteTestFileContent(const std::filesystem::path& filePath, const std::stri
 // Sets up a clean test directory and returns a scope_exit to remove it.
 inline auto SetupTestDirectory(const std::filesystem::path& directory)
 {
-    std::error_code ec;
-    std::filesystem::remove_all(directory, ec);
-    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(directory), "%hs", ec.message().c_str());
-
-    std::filesystem::create_directories(directory, ec);
-    THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(directory), "%hs", ec.message().c_str());
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
 
     return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directory]() {
         std::error_code removeError;

@@ -59,6 +59,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
+        Argument::Create(ArgType::StopTimeout),
         Argument::Create(ArgType::TMPFS, false, NO_LIMIT),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::Ulimit, false, NO_LIMIT),
