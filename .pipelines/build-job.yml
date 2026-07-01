@@ -64,20 +64,32 @@ jobs:
       pool: ${{ parameters.pool }}
 
     variables:
-      NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS: 60
-      NUGET_PLUGIN_REQUEST_TIMEOUT_IN_SECONDS: 60
-      ob_outputDirectory: '$(Build.SourcesDirectory)\out'
-      ob_artifactBaseName: 'drop_wsl'
-      ob_artifactSuffix: '${{ parameters.artifactSuffix }}'
-      packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
-      ob_sdl_codeSignValidation_excludes: -|**\*.ps1;-|**\testbin\**
-      ${{ if parameters.includeCodeQL }}:
-        Codeql.PublishDatabaseLog: true
-        Codeql.SourceRoot: src
-      ${{ if eq(parameters.isRelease, true) }}:
-        packageInputDirArg: '-DPACKAGE_INPUT_DIR=$(packageStagingDir)'
-      ${{ else }}:
-        packageInputDirArg: ''
+      - template: variables.yml
+      - name: NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS
+        value: 60
+      - name: NUGET_PLUGIN_REQUEST_TIMEOUT_IN_SECONDS
+        value: 60
+      - name: ob_outputDirectory
+        value: '$(Build.SourcesDirectory)\out'
+      - name: ob_artifactBaseName
+        value: 'drop_wsl'
+      - name: ob_artifactSuffix
+        value: '${{ parameters.artifactSuffix }}'
+      - name: packageStagingDir
+        value: '$(Build.SourcesDirectory)\packageStagingDir'
+      - name: ob_sdl_codeSignValidation_excludes
+        value: -|**\*.ps1;-|**\testbin\**
+      - ${{ if parameters.includeCodeQL }}:
+        - name: Codeql.PublishDatabaseLog
+          value: true
+        - name: Codeql.SourceRoot
+          value: src
+      - ${{ if eq(parameters.isRelease, true) }}:
+        - name: packageInputDirArg
+          value: '-DPACKAGE_INPUT_DIR=$(packageStagingDir)'
+      - ${{ else }}:
+        - name: packageInputDirArg
+          value: ''
 
     steps:
 
@@ -124,7 +136,7 @@ jobs:
         displayName: "CMake ${{ parameters.platform }}"
         inputs:
           workingDirectory: "."
-          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true $(packageInputDirArg)\${{ parameters.platform }}
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=$(cmakeSystemVersion) -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true $(packageInputDirArg)\${{ parameters.platform }}
 
       # Workaround for WSL Settings NuGet restore authentication issue
       - script: _deps\nuget.exe restore -NonInteractive
