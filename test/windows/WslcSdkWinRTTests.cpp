@@ -1164,8 +1164,44 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(InstallWithDependencies)
     {
-        WSLCSDK::WslcService::InstallWithDependenciesAsync().get();
+        // Pass null options to auto-detect and install any missing components (same behavior as the old no-arg call).
+        WSLCSDK::WslcService::InstallWithDependenciesAsync(nullptr).get();
         VERIFY_ARE_EQUAL(WSLCSDK::WslcService::GetMissingComponents().Size(), 0u);
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_DefaultValues)
+    {
+        // Default-constructed InstallOptions must have null Components and Repair=false.
+        auto options = WSLCSDK::InstallOptions();
+        VERIFY_IS_NULL(options.Components());
+        VERIFY_IS_FALSE(options.Repair());
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_SetRepair)
+    {
+        auto options = WSLCSDK::InstallOptions();
+        options.Repair(true);
+        VERIFY_IS_TRUE(options.Repair());
+        options.Repair(false);
+        VERIFY_IS_FALSE(options.Repair());
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_SetComponents)
+    {
+        auto options = WSLCSDK::InstallOptions();
+        auto components = winrt::single_threaded_vector<WSLCSDK::Component>({WSLCSDK::Component::WslPackage});
+        options.Components(components.GetView());
+        VERIFY_ARE_EQUAL(1u, options.Components().Size());
+        VERIFY_ARE_EQUAL(WSLCSDK::Component::WslPackage, options.Components().GetAt(0));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_SdkNeedsUpdate_Throws)
+    {
+        // Passing SdkNeedsUpdate in the component list must throw WSLC_E_SDK_UPDATE_NEEDED.
+        auto options = WSLCSDK::InstallOptions();
+        auto components = winrt::single_threaded_vector<WSLCSDK::Component>({WSLCSDK::Component::SdkNeedsUpdate});
+        options.Components(components.GetView());
+        VERIFY_THROWS_HR(WSLCSDK::WslcService::InstallWithDependenciesAsync(options).get(), WSLC_E_SDK_UPDATE_NEEDED);
     }
 
     // -----------------------------------------------------------------------

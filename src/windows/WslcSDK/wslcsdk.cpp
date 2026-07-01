@@ -1664,33 +1664,43 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
+STDAPI WslcInstallWithDependencies(
+    _In_ WslcComponentFlags components, _In_ WslcInstallOptions options, _In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
-    HRESULT result = S_OK;
-    bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    auto runtimeResult = CreateSessionManagerRaw().second;
+    // Reject unknown flag bits.
+    constexpr WslcComponentFlags c_knownComponents =
+        WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM | WSLC_COMPONENT_FLAG_WSL_PACKAGE | WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE;
+    RETURN_HR_IF(E_INVALIDARG, (components & ~c_knownComponents) != WSLC_COMPONENT_FLAG_NONE);
+    constexpr WslcInstallOptions c_knownOptions = WSLC_INSTALL_OPTION_REPAIR;
+    RETURN_HR_IF(E_INVALIDARG, (options & ~c_knownOptions) != WSLC_INSTALL_OPTION_NONE);
 
-    if (!needsVirtualMachine && SUCCEEDED(runtimeResult))
+    // This API cannot update the SDK that the client is using.
+    RETURN_HR_IF(WSLC_E_SDK_UPDATE_NEEDED, WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE));
+
+    HRESULT result = S_OK;
+
+    if (components == WSLC_COMPONENT_FLAG_NONE)
     {
         return result;
     }
 
-    THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
-
-    // Installing these components requires elevation.
+    // Installing components requires elevation.
     RETURN_HR_IF(
         HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
         !wsl::windows::common::security::IsTokenElevated(GetCurrentThreadEffectiveToken()) &&
             !wsl::windows::common::security::IsTokenLocalSystem(nullptr));
 
-    if (needsVirtualMachine)
+    bool isRepair = WI_IsFlagSet(options, WSLC_INSTALL_OPTION_REPAIR);
+
+    if (WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM))
     {
         if (progressCallback)
         {
             progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 0, 1, context);
         }
 
+        // No difference between install and repair, just let DISM attempt to enable the feature.
         auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
@@ -1707,9 +1717,15 @@ try
         {
             progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 1, 1, context);
         }
+
+        // If a reboot is required, we need the reboot to happen before attempting to install the WSL package.
+        if (result == HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED))
+        {
+            return result;
+        }
     }
 
-    if (!SUCCEEDED(runtimeResult))
+    if (WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_WSL_PACKAGE))
     {
         std::function<void(uint32_t)> callback;
         if (progressCallback)
@@ -1719,14 +1735,16 @@ try
             };
         }
 
-        wsl::windows::common::WindowsUpdateContext wuContext;
-        wuContext.RunUpdateFlow(true, callback);
+        using WindowsUpdateContext = wsl::windows::common::WindowsUpdateContext;
+        WindowsUpdateContext wuContext;
+        wuContext.RunUpdateFlow(
+            isRepair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration,
+            callback);
 
-        // Because we do a forced install here, we expect an update.
         if (wuContext.GetUpdateCount() == 0)
         {
             // During the preview period, the package may not be published yet, so fall back to getting it from GH.
-            // When moving to GA, change this to a hard error to indicate a service configuration issue.
+            // When moving to GA, change this to an error like WSL_E_NO_UPDATE_AVAILABLE or similar.
             if (callback)
             {
                 callback(0);

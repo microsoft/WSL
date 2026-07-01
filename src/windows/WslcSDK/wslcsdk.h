@@ -624,8 +624,18 @@ STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 typedef __callback void(CALLBACK* WslcInstallCallback)(
     _In_ WslcComponentFlags component, _In_ uint32_t progressSteps, _In_ uint32_t totalSteps, _In_opt_ PVOID context);
 
+typedef enum WslcInstallOptions
+{
+    WSLC_INSTALL_OPTION_NONE = 0,
+    // Allows components to be reinstalled.
+    WSLC_INSTALL_OPTION_REPAIR = 1,
+} WslcInstallOptions;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcInstallOptions);
+
 // Callbacks will only be made for components that are actively installed by this call.
-// That list can be acquired prior to this call with `WslcCanRun`.
-STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
+// The list of required components can be acquired prior to this call with `WslcGetMissingComponents`.
+STDAPI WslcInstallWithDependencies(
+    _In_ WslcComponentFlags components, _In_ WslcInstallOptions options, _In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 
 EXTERN_C_END

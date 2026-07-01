@@ -1513,6 +1513,60 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
     }
 
+    WSLC_TEST_METHOD(InstallWithDependencies_NoComponents_Succeeds)
+    {
+        // Passing WSLC_COMPONENT_FLAG_NONE must return S_OK immediately without requiring elevation.
+        VERIFY_SUCCEEDED(WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_NONE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_SdkNeedsUpdate_ReturnsError)
+    {
+        // Passing SDK_NEEDS_UPDATE must always return WSLC_E_SDK_UPDATE_NEEDED — the caller must update their SDK.
+        VERIFY_ARE_EQUAL(
+            WSLC_E_SDK_UPDATE_NEEDED,
+            WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_WslPackage_GhFallback404)
+    {
+        // Without repair semantics, DCAT uses EnsureProductRegistration so it should find no update
+        // (the product is already registered at the current version). The code then falls back to the
+        // GitHub release endpoint. This test intercepts that fallback: the fake API server returns a
+        // release whose asset URL points at a second local server that always responds with HTTP 404,
+        // so the download fails and WslcInstallWithDependencies surfaces an error HRESULT.
+        constexpr auto apiEndpoint = L"http://127.0.0.1:12345/";
+        constexpr auto assetEndpoint = L"http://127.0.0.1:12346/";
+
+        RegistryKeyChange<std::wstring> urlOverride(
+            HKEY_LOCAL_MACHINE,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+            wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue,
+            apiEndpoint);
+
+        // Version 1.0.0 is below the current package version, so without repair=true the version
+        // check in UpdatePackageImpl would short-circuit and return early. Using a sub-2.0 version
+        // here confirms that the repair flag (always set in the GH fallback) is what drives the
+        // download attempt rather than the version being newer than the installed one.
+        constexpr auto GitHubApiResponse =
+            LR"([{
+                \"name\": \"1.0.0\",
+                \"created_at\": \"2023-06-14T16:56:30Z\",
+                \"assets\": [
+                    {
+                        \"url\": \"http://127.0.0.1:12346/fake.msixbundle\",
+                        \"id\": 1,
+                        \"name\": \"Microsoft.WSL_1.0.0.0_x64_ARM64.msixbundle\"
+                    }
+                ]
+            }])";
+
+        UniqueWebServer apiServer(apiEndpoint, GitHubApiResponse);
+        UniqueWebServer assetServer(assetEndpoint, 404u);
+
+        VERIFY_ARE_EQUAL(
+            HTTP_E_STATUS_NOT_FOUND, WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_WSL_PACKAGE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
     // -----------------------------------------------------------------------
     // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
