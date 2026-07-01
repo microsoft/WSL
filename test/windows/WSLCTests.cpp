@@ -8141,6 +8141,11 @@ class WSLCTests
         auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeConsomme);
 
         auto hostIp = GetHostAdapterIpv4();
+        std::optional<std::string> hostIpNarrow;
+        if (hostIp.has_value())
+        {
+            hostIpNarrow = wsl::shared::string::WideToMultiByte(hostIp.value());
+        }
 
         struct PortMapping
         {
@@ -8152,7 +8157,7 @@ class WSLCTests
         };
 
         auto runCustomBindingTests = [&](const std::string& containerNetworkType) {
-            LogInfo("Container network type: %s", containerNetworkType.c_str());
+            LogInfo("Container network type: %hs", containerNetworkType.c_str());
 
             auto createTcpContainer = [&](const std::vector<PortMapping>& ports) {
                 static int containerIndex = 0;
@@ -8217,7 +8222,7 @@ class WSLCTests
                 // Verify reachable via host adapter IP to confirm wildcard semantics.
                 if (hostIp.has_value())
                 {
-                    auto url = std::format(L"http://{}:1261", wsl::shared::string::MultiByteToWide(hostIp.value()));
+                    auto url = std::format(L"http://{}:1261", hostIp.value());
                     ExpectHttpResponse(url.c_str(), 200);
                 }
                 else
@@ -8230,10 +8235,10 @@ class WSLCTests
             {
                 if (hostIp.has_value())
                 {
-                    auto container = createTcpContainer({{1262, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
-                    validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIp.value(), 1262);
+                    auto container = createTcpContainer({{1262, 8000, AF_INET, IPPROTO_TCP, hostIpNarrow.value()}});
+                    validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIpNarrow.value(), 1262);
 
-                    auto url = std::format(L"http://{}:1262", wsl::shared::string::MultiByteToWide(hostIp.value()));
+                    auto url = std::format(L"http://{}:1262", hostIp.value());
                     ExpectHttpResponse(url.c_str(), 200);
                 }
                 else
@@ -8254,8 +8259,8 @@ class WSLCTests
             {
                 if (hostIp.has_value())
                 {
-                    auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
-                    auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIp.value(), std::nullopt);
+                    auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIpNarrow.value()}});
+                    auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIpNarrow.value(), std::nullopt);
 
                     ExpectHttpResponse(std::format(L"http://{}:{}", hostIp.value(), hostPort).c_str(), 200);
                 }

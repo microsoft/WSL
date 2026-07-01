@@ -655,7 +655,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName);
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
-std::optional<std::string> GetHostAdapterIpv4();
+std::optional<std::wstring> GetHostAdapterIpv4();
 
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
