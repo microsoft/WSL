@@ -788,8 +788,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
-    const auto dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
-    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(wsl::shared::ToJson(ConvertInspectImage(dockerInspect)).c_str()));
+    LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
 }
 CATCH_LOG()
 
@@ -3326,7 +3325,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::GetEvents(LONGLONG SinceTimeNano, LONGLONG UntilTimeNano, const WSLCFilter* Filters, ULONG FiltersCount, IWSLCEventStream** Stream)
+HRESULT WSLCSession::GetEvents(ULONGLONG SinceTime, ULONGLONG UntilTime, const WSLCFilter* Filters, ULONG FiltersCount, IWSLCEventStream** Stream)
 try
 {
     WSLCExecutionContext context(this);
@@ -3336,10 +3335,10 @@ try
     *Stream = nullptr;
 
     // A non-zero until earlier than since describes a backwards, empty window.
-    RETURN_HR_IF(E_INVALIDARG, UntilTimeNano != 0 && SinceTimeNano > UntilTimeNano);
+    RETURN_HR_IF(E_INVALIDARG, UntilTime != 0 && SinceTime > UntilTime);
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
-    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTimeNano, UntilTimeNano, std::move(filters));
+    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTime, UntilTime, std::move(filters));
 
     *Stream = stream.Detach();
     return S_OK;

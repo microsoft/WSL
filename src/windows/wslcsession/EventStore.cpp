@@ -10,16 +10,15 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    // Converts a nanoseconds-since-epoch bound from the COM boundary into a timestamp, treating zero as
-    // "unset".
-    std::optional<EventTime> ToEventTime(int64_t TimeNano)
+    // Normalizes a seconds-since-epoch window bound from the COM boundary, treating zero as "unset".
+    std::optional<uint64_t> ToTimeBound(uint64_t TimeSeconds)
     {
-        if (TimeNano == 0)
+        if (TimeSeconds == 0)
         {
             return std::nullopt;
         }
 
-        return EventTime{std::chrono::nanoseconds{TimeNano}};
+        return TimeSeconds;
     }
 
 } // namespace
@@ -39,7 +38,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string Type, std::string Action, const std::string& ActorId, std::optional<int64_t> TimeSeconds, std::optional<int64_t> TimeNano) noexcept
+void EventStore::Record(std::string Type, std::string Action, const std::string& ActorId, std::optional<uint64_t> TimeSeconds) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -47,9 +46,8 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
 
-    const auto now = std::chrono::system_clock::now().time_since_epoch();
-    event.time = TimeSeconds.value_or(std::chrono::duration_cast<std::chrono::seconds>(now).count());
-    event.timeNano = TimeNano.value_or(std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
+    event.time = TimeSeconds.value_or(static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count()));
 
     Append(std::move(event));
 }
@@ -98,7 +96,7 @@ namespace {
 } // namespace
 
 Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
-    Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTimeNano, int64_t UntilTimeNano, std::map<std::string, std::vector<std::string>> Filters)
+    Microsoft::WRL::ComPtr<WSLCSession> Session, uint64_t SinceTime, uint64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
 {
     // Start the reader at the oldest event still buffered so it sees all the buffered history.
     uint64_t startSequenceNumber;
@@ -109,7 +107,7 @@ Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
 
     Microsoft::WRL::ComPtr<EventStream> stream;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(
-        &stream, std::move(Session), this, startSequenceNumber, SinceTimeNano, UntilTimeNano, std::move(Filters)));
+        &stream, std::move(Session), this, startSequenceNumber, SinceTime, UntilTime, std::move(Filters)));
 
     return stream;
 }
@@ -130,7 +128,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
     return m_events[index];
 }
 
-std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(uint64_t SequenceNumber, std::optional<EventTime> Until)
+std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(uint64_t SequenceNumber, std::optional<uint64_t> Until)
 {
     std::unique_lock lock(m_lock);
 
@@ -139,8 +137,10 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(uint64_t
 
     if (Until.has_value())
     {
-        // Round the deadline up to system_clock's coarser tick so the wait never ends early.
-        const auto deadline = std::chrono::ceil<std::chrono::system_clock::duration>(Until.value());
+        // The bound is Unix seconds and system_clock shares that epoch, so it doubles as a wall-clock
+        // deadline. Round it up to system_clock's finer tick so the wait never ends early.
+        const std::chrono::sys_seconds untilTime{std::chrono::seconds{static_cast<int64_t>(Until.value())}};
+        const auto deadline = std::chrono::ceil<std::chrono::system_clock::duration>(untilTime);
         if (!m_updated.wait_until(lock, deadline, ready))
         {
             return std::nullopt;
@@ -169,15 +169,15 @@ HRESULT EventStream::RuntimeClassInitialize(
     Microsoft::WRL::ComPtr<WSLCSession> Session,
     EventStore* Store,
     uint64_t StartSequenceNumber,
-    int64_t SinceTimeNano,
-    int64_t UntilTimeNano,
+    uint64_t SinceTime,
+    uint64_t UntilTime,
     std::map<std::string, std::vector<std::string>> Filters)
 {
     m_session = std::move(Session);
     m_store = Store;
     m_nextSequenceNumber = StartSequenceNumber;
-    m_since = ToEventTime(SinceTimeNano);
-    m_until = ToEventTime(UntilTimeNano);
+    m_since = ToTimeBound(SinceTime);
+    m_until = ToTimeBound(UntilTime);
     m_filters = std::move(Filters);
     return S_OK;
 }
@@ -199,7 +199,7 @@ try
 
         ++m_nextSequenceNumber;
 
-        const EventTime eventTime{std::chrono::nanoseconds{event.value().timeNano}};
+        const uint64_t eventTime = event.value().time;
 
         if (m_until.has_value() && eventTime > m_until.value())
         {

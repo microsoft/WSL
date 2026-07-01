@@ -161,7 +161,7 @@ private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTimeSeconds, std::uint64_t eventTimeNano);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();

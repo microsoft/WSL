@@ -106,8 +106,8 @@ public:
     // Event streaming. Opens a stream object that yields matching events one at a time via
     // IWSLCEventStream::GetNext.
     IFACEMETHOD(GetEvents)(
-        _In_ LONGLONG SinceTimeNano,
-        _In_ LONGLONG UntilTimeNano,
+        _In_ ULONGLONG SinceTime,
+        _In_ ULONGLONG UntilTime,
         _In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
         _In_ ULONG FiltersCount,
         _Outptr_ IWSLCEventStream** Stream) override;

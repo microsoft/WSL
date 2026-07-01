@@ -213,10 +213,9 @@ struct Event
     std::string Type;
     std::string Action;
     EventActor Actor;
-    int64_t time{};
-    int64_t timeNano{};
+    uint64_t time{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time, timeNano);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time);
 };
 
 } // namespace wsl::windows::common::wslc_schema

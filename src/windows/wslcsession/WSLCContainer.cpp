@@ -558,7 +558,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_ioRelay(Relay),
     m_eventStore(eventStore),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
     m_state(InitialState),
     m_createdAt(CreatedAt),
     m_initProcessFlags(InitProcessFlags),
@@ -868,7 +868,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     cleanup.release();
 }
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTimeSeconds, std::uint64_t eventTimeNano)
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
 {
     // We must release m_lock and m_stopLock before the wrapper's destructor calls
     // Disconnect(), so in-flight COM callers can drain from COMImplClass::m_callers.
@@ -878,22 +878,22 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     // timestamps and the same ordering Docker observed.
     if (event == ContainerEvent::Start)
     {
-        m_eventStore.Record("container", "start", m_id, static_cast<int64_t>(eventTimeSeconds), static_cast<int64_t>(eventTimeNano));
+        m_eventStore.Record("container", "start", m_id, eventTime);
     }
     else if (event == ContainerEvent::Kill)
     {
-        m_eventStore.Record("container", "kill", m_id, static_cast<int64_t>(eventTimeSeconds), static_cast<int64_t>(eventTimeNano));
+        m_eventStore.Record("container", "kill", m_id, eventTime);
     }
     else if (event == ContainerEvent::Stop)
     {
-        m_eventStore.Record("container", "stop", m_id, static_cast<int64_t>(eventTimeSeconds), static_cast<int64_t>(eventTimeNano));
+        m_eventStore.Record("container", "stop", m_id, eventTime);
 
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         SetExitCode(exitCode.value());
 
         std::unique_lock stopGuard{m_stopLock, std::try_to_lock};
 
-        m_stopNotification.EventTime.store(eventTimeSeconds, std::memory_order_release);
+        m_stopNotification.EventTime.store(eventTime, std::memory_order_release);
         m_stopNotification.Event.SetEvent();
 
         // If Stop() is already in flight, it will wake when the stop event is signaled and take care of cleanup.
@@ -903,7 +903,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         auto lock = m_lock.lock_exclusive();
-        comWrapper = OnStopped(eventTimeSeconds);
+        comWrapper = OnStopped(eventTime);
     }
     else if (event == ContainerEvent::Destroy)
     {
@@ -914,7 +914,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         if (m_state != WslcContainerStateDeleted)
         {
-            Transition(WslcContainerStateDeleted, eventTimeSeconds);
+            Transition(WslcContainerStateDeleted, eventTime);
             comWrapper = ReleaseResources();
         }
 
@@ -1775,6 +1775,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
     }
 
+    auto createTime = ParseDockerTimestamp(inspectData.Created);
+    eventStore.Record("container", "create", result.Id, createTime);
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
@@ -1799,12 +1802,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.Flags);
 
     deleteOnFailure.release();
-
-    // The create event is not delivered on Docker's event stream the way start/kill/stop are, so
-    // record it directly now that the container is committed.
-    const int64_t createTimeNano =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    eventStore.Record("container", "create", container->ID(), createTimeNano / 1'000'000'000, createTimeNano);
 
     return container;
 }

@@ -592,11 +592,12 @@ interface IWSLCSession : IUnknown
 
     // Opens an event stream that mirrors `docker events`. The window and filters are captured by the
     // returned stream object; events are then pulled one at a time via IWSLCEventStream::GetNext.
-    // SinceTimeNano / UntilTimeNano bound the window by event time. 0 means unbounded on that end.
+    // SinceTime / UntilTime bound the window by event time, in seconds since the Unix epoch. 0 means
+    // unbounded on that end.
     // Filters are key/value pair. Values sharing a key are OR'd, distinct keys are AND'd.
     HRESULT GetEvents(
-        [in] LONGLONG SinceTimeNano,
-        [in] LONGLONG UntilTimeNano,
+        [in] ULONGLONG SinceTime,
+        [in] ULONGLONG UntilTime,
         [in, unique, size_is(FiltersCount)] const WSLCFilter* Filters,
         [in] ULONG FiltersCount,
         [out] IWSLCEventStream** Stream);

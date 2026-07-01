@@ -110,16 +110,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto timeEntry = parsed.find("time");
     THROW_HR_IF_MSG(
         E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
-    std::uint64_t eventTimeSeconds = timeEntry->get<std::uint64_t>();
-
-    auto timeNanoEntry = parsed.find("timeNano");
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        timeNanoEntry == parsed.end(),
-        "Failed to parse timeNano from event: %.*hs",
-        static_cast<int>(event.size()),
-        event.data());
-    std::uint64_t eventTimeNano = timeNanoEntry->get<std::uint64_t>();
+    std::uint64_t eventTime = timeEntry->get<std::uint64_t>();
 
     auto actionStr = action->get<std::string>();
 
@@ -129,11 +120,11 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     if (typeStr == "container")
     {
-        OnContainerEvent(parsed, actionStr, eventTimeSeconds, eventTimeNano);
+        OnContainerEvent(parsed, actionStr, eventTime);
     }
     else if (typeStr == "volume")
     {
-        OnVolumeEvent(parsed, actionStr, eventTimeNano);
+        OnVolumeEvent(parsed, actionStr, eventTime);
     }
 
     // Track object creation for WaitForObjectCreated.
@@ -159,7 +150,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     }
 }
 
-void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTimeSeconds, std::uint64_t eventTimeNano)
+void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime)
 {
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start},
@@ -206,12 +197,12 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     {
         if (e.ContainerId == containerId && (!e.ExecId.has_value() || e.ExecId == execId))
         {
-            e.Callback(it->second, exitCode, eventTimeSeconds, eventTimeNano);
+            e.Callback(it->second, exitCode, eventTime);
         }
     }
 }
 
-void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTimeNano)
+void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime)
 {
     static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
 
@@ -233,7 +224,7 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
 
     for (const auto& e : m_volumeCallbacks)
     {
-        e.Callback(volumeName, it->second, eventTimeNano);
+        e.Callback(volumeName, it->second, eventTime);
     }
 }
 
