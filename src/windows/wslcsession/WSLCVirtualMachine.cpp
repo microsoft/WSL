@@ -1185,8 +1185,8 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     std::optional<std::string> inboxLibMountPoint;
     if (std::filesystem::is_directory(inboxLibPath))
     {
-        inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
-        THROW_IF_FAILED(MountWindowsFolderImpl(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), WSLCMountFlagsReadOnly));
+        // inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
+        // THROW_IF_FAILED(MountWindowsFolderImpl(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), WSLCMountFlagsReadOnly));
     }
 
     // Mount the packaged libraries.
@@ -1200,19 +1200,26 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
 
 #endif
 
-    auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
-    THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
-
-    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
-    std::string options = "lowerdir=" + packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
-        options += ":" + inboxLibMountPoint.value();
+        // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
+        auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
+
+        Mount(
+            m_initChannel,
+            "none",
+            LibrariesMountPoint,
+            "overlay",
+            std::format("lowerdir={}:{}", packagedLibMountPoint, inboxLibMountPoint.value()).c_str(),
+            0);
     }
-
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
+    else
+    {
+        // If the inbox libraries are not present, mount the packaged libraries directly at final location (no overlay needed).
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), LibrariesMountPoint, WSLCMountFlagsReadOnly));
+    }
 }
-
 void WSLCVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_trackedProcessesLock};
