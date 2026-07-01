@@ -2355,6 +2355,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>不受支持的网络模式: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Invalid stop timeout value: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
     <value>当主网络模式为 'host' 或 'none' 时，不允许添加其他网络。</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2919,6 +2923,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>停止容器的信号</value>
+  </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Timeout (in seconds) to stop the container before killing it (-1 for no timeout)</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>/dev/shm 的大小(例如 64M、1G)</value>

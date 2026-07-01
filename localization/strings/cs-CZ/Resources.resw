@@ -2355,6 +2355,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Nepodporovaný režim sítě: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Invalid stop timeout value: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
     <value>Další sítě nejsou povoleny, pokud je primární síťový režim 'host' nebo 'none'.</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2919,6 +2923,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signál k zastavení kontejneru</value>
+  </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Timeout (in seconds) to stop the container before killing it (-1 for no timeout)</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Velikost /dev/shm (např. 64 mil., 1G)</value>

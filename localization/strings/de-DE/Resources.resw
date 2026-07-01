@@ -379,8 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux
-aus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
 
 Verbrauch:
     /l, /list [Option]
@@ -1585,8 +1584,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, 
-auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
@@ -2363,6 +2361,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Nicht unterstützter Netzwerkmodus: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Invalid stop timeout value: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
     <value>Zusätzliche Netzwerke sind nicht zulässig, wenn der primäre Netzwerkmodus „host“ oder „none“ ist.</value>
     <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2927,6 +2929,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal zum Beenden des Containers</value>
+  </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Timeout (in Sekunden) zum Beenden des Containers vor dem Beenden (-1 ohne Timeout)</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Größe von /dev/shm (z. B. 64M, 1G)</value>
