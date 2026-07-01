@@ -2985,7 +2985,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
