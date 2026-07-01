@@ -136,6 +136,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetDefaultStopSignal(options.StopSignal);
     }
 
+    if (options.StopTimeout.has_value())
+    {
+        containerLauncher.SetStopTimeout(options.StopTimeout.value());
+    }
+
     if (options.ShmSize.has_value())
     {
         containerLauncher.SetShmSize(options.ShmSize.value());

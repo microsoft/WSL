@@ -1774,7 +1774,7 @@ WSL'de çalışan Linux ikili dosyaları, performanslarını hızlandırmak içi
     <value>Yükleme</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>VS Code'u yükledikten sonra Remote WSL uzantısını Windows Terminal'den yükleyebilirsiniz:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2380,6 +2380,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>'{}': {} disk birimi oluşturulamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Aşırı sayıda birim bağlandı (sınır: {}). Daha fazla birim bağlamak için oturumu yeniden başlatın. Bu sorun gelecekteki bir sürümde düzeltilecektir.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">

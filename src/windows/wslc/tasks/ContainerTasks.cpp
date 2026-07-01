@@ -698,6 +698,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.StopSignal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::StopSignal>());
     }
 
+    if (context.Args.Contains(ArgType::StopTimeout))
+    {
+        options.StopTimeout = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::StopTimeout>());
+    }
+
     if (context.Args.Contains(ArgType::ShmSize))
     {
         options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());

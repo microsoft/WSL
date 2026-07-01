@@ -1774,7 +1774,7 @@ Binære Linux-filer, der kører i WSL, kan automatisk bruge din GPU i Windows ti
     <value>Sådan installeres</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>After you’ve installed VS Code, you can install the Remote WSL extension from Windows Terminal:
+    <value>Når du har installeret VS-kode, kan du installere Fjern-WSL-udvidelsen fra Windows Terminal:
 
 'code --install-extension ms-vscode-remote.remote-wsl'</value>
     <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2380,6 +2380,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Enheden '{}' kunne ikke oprettes: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Der er tilsluttet for mange diskenheder (grænse: {}). Genstart sessionen for at tilslutte flere diskenheder. Dette vil blive rettet i en fremtidig version.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">

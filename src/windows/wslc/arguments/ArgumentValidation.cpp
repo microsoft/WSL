@@ -48,6 +48,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
         break;
 
+    case ArgType::StopTimeout:
+        validation::ValidateIntegerFromString<long>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        break;
+
     case ArgType::ShmSize:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
         break;

@@ -60,7 +60,7 @@ SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
 // vmmem-XXX process name visible in Task Manager and parsed by various tooling).
 std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
 {
-    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::wstring sanitized{name};
     for (auto& c : sanitized)
     {
@@ -259,7 +259,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Setup boot VHDs
     hcs::Scsi scsiController{};
-    auto attachScsiDisk = [&](PCWSTR path) {
+    auto attachScsiDisk = [&](PCWSTR path, bool grantUserAccess) {
         const ULONG lun = AllocateLun();
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
@@ -269,12 +269,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         disk.AlwaysAllowSparseFiles = true;
         disk.SupportEncryptedFiles = true;
         scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+
         DiskInfo diskInfo{path};
+
+        if (grantUserAccess)
+        {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
+            hcs::GrantVmAccess(m_vmIdString.c_str(), path);
+            diskInfo.AccessGranted = true;
+        }
+
         m_attachedDisks.emplace(lun, std::move(diskInfo));
     };
 
-    attachScsiDisk(rootVhdPath.c_str());
-    attachScsiDisk(kernelModulesPath.c_str());
+    attachScsiDisk(rootVhdPath.c_str(), Settings->RootVhdOverride != nullptr);
+    attachScsiDisk(kernelModulesPath.c_str(), false);
 
     vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 

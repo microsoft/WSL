@@ -22,6 +22,7 @@ Abstract:
 #include "hcs.hpp"
 #include "ContainerNameGenerator.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
+#include "HttpHeaderEndDetector.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -3612,6 +3613,56 @@ class WSLCTests
         }
     }
 
+    // Validate that the correct error is returned when too many virtiofs shares are mounted.
+    WSLC_TEST_METHOD(VirtiofsVolumesLimit)
+    {
+        constexpr size_t c_maxVirtioFsShares = wsl::shared::c_maxVirtioFsShares;
+
+        auto settings = GetDefaultSessionSettings(L"virtiofs-share-limit-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        // Use a dedicated session so the share count starts at zero (no GPU libraries are mounted).
+        auto session = CreateSession(settings);
+
+        auto testRoot = std::filesystem::current_path() / "test-folder-share-limit";
+        std::filesystem::create_directories(testRoot);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testRoot); });
+
+        auto folderForIndex = [&](size_t index) {
+            auto folder = testRoot / std::to_string(index);
+            std::filesystem::create_directories(folder);
+            return folder;
+        };
+
+        // Mount distinct Windows folders (each creates a new share) until the limit is reached.
+        size_t mounted = 0;
+        HRESULT lastResult = S_OK;
+        for (size_t i = 0; i <= c_maxVirtioFsShares; ++i)
+        {
+            auto folder = folderForIndex(i);
+            auto mountPoint = std::format("/vfs-limit-{}", i);
+
+            lastResult = session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false);
+            if (FAILED(lastResult))
+            {
+                break;
+            }
+
+            mounted++;
+        }
+
+        VERIFY_ARE_EQUAL(mounted, c_maxVirtioFsShares);
+        VERIFY_ARE_EQUAL(lastResult, E_OUTOFMEMORY);
+        ValidateCOMErrorMessage(
+            L"Too many volumes have been mounted (limit: 15). Restart the session to mount more volumes. This will be fixed in a "
+            L"future release.");
+
+        // Reusing an already-created share must still succeed.
+        auto reusedFolder = folderForIndex(0);
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(reusedFolder.c_str(), "/vfs-limit-reuse", false));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/vfs-limit-reuse"));
+    }
+
     // This test case validates that no file descriptors are leaked to user processes.
     WSLC_TEST_METHOD(Fd)
     {
@@ -3718,6 +3769,28 @@ class WSLCTests
             // Validate that the dynamic linker is configured to resolve the WSL GPU libraries.
             expect({"/bin/sh", "-c", "cat /etc/ld.so.conf.d/ld.wsl.conf"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
             expect({"/bin/sh", "-c", "ldconfig -p | grep -q ' => /usr/lib/wsl/lib/'"}, 0);
+
+            std::vector<std::string> expectedBinaries;
+            for (const auto& entry : std::filesystem::directory_iterator("C:\\Windows\\system32\\lxss\\lib"))
+            {
+                const auto fileName = entry.path().filename().wstring();
+                if (entry.is_regular_file() && fileName.find(L".so") == std::wstring::npos)
+                {
+                    expectedBinaries.push_back(wsl::shared::string::WideToMultiByte(fileName));
+                }
+            }
+
+            if (expectedBinaries.empty())
+            {
+                LogWarning("No executables found in C:\\Windows\\system32\\lxss\\lib. Skipping GPU executable bind mount test");
+            }
+            else
+            {
+                for (const auto& e : expectedBinaries)
+                {
+                    expect({"test", "-x", std::format("/usr/bin/{}", e)}, 0);
+                }
+            }
         }
 
         // Validate that containers without the GPU flag do not have GPU resources.
@@ -5500,7 +5573,7 @@ class WSLCTests
 
             // Invalid container flags are rejected with E_INVALIDARG.
             options.Image = "debian:latest";
-            options.Flags = static_cast<WSLCContainerFlags>(0x10);
+            options.Flags = static_cast<WSLCContainerFlags>(0x20);
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
 
             // Invalid init process flags are rejected with E_INVALIDARG.
@@ -5575,7 +5648,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(process.Wait(), WSLCSignalSIGHUP + 128);
         }
 
-        // Validate that the default stop signal can be overriden.
+        // Validate that the default stop signal can be overridden.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-stop-signal-2", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
             launcher.SetDefaultStopSignal(WSLCSignalSIGHUP);
@@ -6158,6 +6231,67 @@ class WSLCTests
             // Verify that deleting a container stopped via Stop() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
             expectContainerList({});
+        }
+
+        // test StopContainer with custom timeouts.
+        // N.B. We can't validate the actual timeouts since the tests environment will affect container stop times.
+        {
+            {
+                // Create a container with a no stop timeout.
+                WSLCContainerLauncher launcher("debian:latest", "test-container-stop-timeout-1", {"sleep", "99999"});
+                launcher.SetStopTimeout(WSLC_STOP_TIMEOUT_NONE);
+
+                auto container = launcher.Launch(*m_defaultSession);
+
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Config.StopTimeout.value_or(0), WSLC_STOP_TIMEOUT_NONE);
+
+                // Validate that passing '0' as the stop timeout overrides the default
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalNone, 0));
+            }
+
+            {
+                // Create a container with an instant stop timeout.
+                WSLCContainerLauncher launcher("debian:latest", "test-container-stop-timeout-2", {"sleep", "99999"});
+                launcher.SetStopTimeout(0);
+
+                auto container = launcher.Create(*m_defaultSession);
+
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Config.StopTimeout.value_or(-1), 0);
+            }
+
+            {
+                // Create a container with an short stop timeout.
+                WSLCContainerLauncher launcher("debian:latest", "test-container-stop-timeout-3", {"sleep", "99999"});
+                launcher.SetStopTimeout(1);
+
+                auto container = launcher.Launch(*m_defaultSession);
+
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Config.StopTimeout.value_or(0), 1);
+
+                auto initProcess = container.GetInitProcess();
+                std::thread stopThread([&]() { VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalNone, -1)); });
+
+                auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    // TODO: calling Kill() here hangs since Stop() holds the container lock.
+                    // Update this once fixed to:
+                    // LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGKILL));
+
+                    LOG_IF_FAILED(initProcess.Get().Signal(WSLCSignalSIGKILL));
+
+                    if (stopThread.joinable())
+                    {
+                        stopThread.join();
+                    }
+                });
+
+                // Wait for at least 2 seconds for the stop to complete to prove that the default 1 second timeout was correctly overridden.
+                auto waitResult = WaitForSingleObject(stopThread.native_handle(), 2000);
+
+                VERIFY_ARE_EQUAL(waitResult, WAIT_TIMEOUT);
+            }
         }
 
         // Validate that Kill() works as expected
@@ -9146,6 +9280,39 @@ class WSLCTests
 
         VERIFY_ARE_EQUAL(payload.size(), output.size());
         VERIFY_IS_TRUE(payload == output);
+    }
+
+    TEST_METHOD(HttpHeaderEndDetector)
+    {
+        // Returns the index of the byte of header end, or -1 if the header never ends.
+        const auto headerEndIndex = [](std::string_view input) {
+            wsl::windows::common::HttpHeaderEndDetector detector;
+            for (size_t i = 0; i < input.size(); i++)
+            {
+                if (detector.Consume(input[i]))
+                {
+                    return static_cast<int>(i);
+                }
+            }
+
+            return -1;
+        };
+
+        VERIFY_ARE_EQUAL(3, headerEndIndex("\r\n\r\n"));
+        VERIFY_ARE_EQUAL(4, headerEndIndex("a\r\n\r\n"));
+        VERIFY_ARE_EQUAL(7, headerEndIndex("a\r\nb\r\n\r\n"));
+        VERIFY_ARE_EQUAL(4, headerEndIndex("\r\r\n\r\n"));
+        VERIFY_ARE_EQUAL(3, headerEndIndex("\r\n\r\nbody"));
+
+        VERIFY_ARE_EQUAL(-1, headerEndIndex(""));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("Header: value\r\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("HTTP/1.1 200 OK\r\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\r\n\r"));
+
+        // Detection is strict.
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\n\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\r\n\n"));
+        VERIFY_ARE_EQUAL(-1, headerEndIndex("\n\r\n"));
     }
 
     WSLC_TEST_METHOD(ContainerRecoveryFromStorage)
