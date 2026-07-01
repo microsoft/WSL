@@ -22,9 +22,11 @@ Abstract:
 #include "config.h"
 #include "message.h"
 #include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <mutex>
 #include <optional>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -36,10 +38,6 @@ using namespace std::chrono_literals;
 #define PLAN9_UNC_PREFIX_LENGTH (2)
 
 #define VIRTIOFS_TAG_DIR "/run/wsl/virtiofs"
-
-// Hidden per-device mountpoints for aggregate virtio-fs devices. The device is
-// mounted here once; each share is then bind-mounted from a synthetic subdir.
-#define VIRTIOFS_DEVICE_DIR "/run/wsl/virtiofs-dev"
 
 namespace {
 // Serializes aggregate virtio-fs device mounts within this process.
@@ -576,6 +574,121 @@ try
 }
 CATCH_RETURN_ERRNO()
 
+int MountVirtioFsAggregateChild(const char* Tag, const char* Subname, const char* Target, const char* MountOptions, int* ExitCode)
+
+/*++
+
+Routine Description:
+
+    This routine mounts one child of an aggregate virtio-fs device onto Target.
+    The aggregate device (identified by Tag) exposes a synthetic root whose
+    named children are independent Windows folders; the device is mounted once
+    at a hidden well-known location and each child is bind-mounted from there.
+
+Arguments:
+
+    Tag - Supplies the aggregate device tag (a GUID) to mount.
+
+    Subname - Supplies the child name within the aggregate's synthetic root.
+
+    Target - Supplies the mount target.
+
+    MountOptions - Supplies the standard mount options to apply to this child
+        (the raw option string is parsed here for the VFS flags).
+
+    ExitCode - Supplies an optional pointer that receives the exit code.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+try
+{
+    const std::string DeviceMountPoint = std::format("{}/{}", VIRTIOFS_DEVICE_DIR, Tag);
+    {
+        // A virtio-fs device can only be mounted once, but each mount request
+        // may run in its own process (and shares are added incrementally), so
+        // the device may already be mounted. Mount it only if it is not already
+        // a mountpoint, and tolerate a concurrent race. The device mount itself
+        // is hidden; per-share options are applied on the bind below.
+        std::lock_guard<std::mutex> Lock(g_virtiofsDeviceMutex);
+        if (!IsMountPoint(DeviceMountPoint))
+        {
+            UtilMkdirPath(DeviceMountPoint.c_str(), 0755);
+            if (MountWithRetry(Tag, DeviceMountPoint.c_str(), VIRTIO_FS_TYPE, "", ExitCode) < 0)
+            {
+                // Another process may have mounted the device first; that is
+                // fine as long as it is now mounted.
+                THROW_LAST_ERROR_IF(!IsMountPoint(DeviceMountPoint));
+            }
+        }
+    }
+
+    //
+    // Bind-mount this child's synthetic-root entry onto the target. A bounded
+    // retry absorbs the brief lag between the share being registered on the
+    // host and the FUSE LOOKUP on the synthetic root resolving the new child.
+    //
+
+    UtilMkdirPath(Target, 0755);
+    const std::string ShareSource = std::format("{}/{}", DeviceMountPoint, Subname);
+
+    constexpr int c_maxAttempts = 5;
+    int LastErrno = 0;
+    for (int Attempt = 0; Attempt < c_maxAttempts; ++Attempt)
+    {
+        if (mount(ShareSource.c_str(), Target, nullptr, MS_BIND, nullptr) == 0)
+        {
+            LastErrno = 0;
+            break;
+        }
+
+        LastErrno = errno;
+        if (LastErrno != ENOENT)
+        {
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    }
+
+    if (LastErrno != 0)
+    {
+        errno = LastErrno;
+        THROW_LAST_ERROR();
+    }
+
+    //
+    // A bind mount initially inherits the per-mount flags (e.g. atime behavior)
+    // of the shared aggregate device mount, which may differ from this share's
+    // requested options. Re-apply this share's flags with a bind remount so the
+    // mount reflects the requested behavior. Default to relatime when no atime
+    // option was specified, since otherwise the bind would keep the device's
+    // setting instead of the mount(8) default.
+    //
+
+    {
+        auto Parsed = mountutil::MountParseFlags(MountOptions ? MountOptions : "");
+        unsigned long BindFlags = Parsed.MountFlags;
+        if ((BindFlags & (MS_NOATIME | MS_STRICTATIME)) == 0)
+        {
+            BindFlags |= MS_RELATIME;
+        }
+
+        THROW_LAST_ERROR_IF(mount(nullptr, Target, nullptr, MS_BIND | MS_REMOUNT | BindFlags, nullptr) < 0);
+    }
+
+    if (ExitCode)
+    {
+        *ExitCode = 0;
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
 int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
 
 /*++
@@ -664,87 +777,45 @@ try
     auto* ShareName = wsl::shared::string::FromSpan(ResponseSpan, Response.NameOffset);
     auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
 
-    const std::string DeviceMountPoint = std::format("{}/{}", VIRTIOFS_DEVICE_DIR, DeviceTag);
+    //
+    // Mount the aggregate device (once) and bind-mount this share's synthetic
+    // root onto Target, applying this share's options.
+    //
+
+    if (MountVirtioFsAggregateChild(DeviceTag, ShareName, Target, MountOptions.c_str(), ExitCode) < 0)
     {
-        // A virtio-fs device can only be mounted once, but each `mount -t drvfs`
-        // runs in its own process (and the per-drive shares are mounted at VM
-        // startup), so the device may already be mounted. Mount it only if it is
-        // not already a mountpoint, and tolerate a concurrent race.
-        std::lock_guard<std::mutex> Lock(g_virtiofsDeviceMutex);
-        if (!IsMountPoint(DeviceMountPoint))
-        {
-            UtilMkdirPath(DeviceMountPoint.c_str(), 0755);
-            if (MountWithRetry(DeviceTag, DeviceMountPoint.c_str(), VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0)
-            {
-                // Another process may have mounted the device first; that is
-                // fine as long as it is now mounted.
-                THROW_LAST_ERROR_IF(!IsMountPoint(DeviceMountPoint));
-            }
-        }
+        return -1;
     }
 
     //
-    // Bind-mount this share's synthetic root onto the target.
-    //
-
-    const std::string ShareSource = std::format("{}/{}", DeviceMountPoint, ShareName);
-    THROW_LAST_ERROR_IF(mount(ShareSource.c_str(), Target, nullptr, MS_BIND | MS_REC, nullptr) < 0);
-
-    //
-    // A bind mount initially inherits the per-mount flags (e.g. atime behavior)
-    // of the shared aggregate device mount, which may differ from this share's
-    // requested options. Re-apply this share's flags with a bind remount so the
-    // mount reflects the requested behavior. Default to relatime when no atime
-    // option was specified, since otherwise the bind would keep the device's
-    // (noatime) setting instead of the mount(8) default.
-    //
-
-    {
-        auto Parsed = mountutil::MountParseFlags(MountOptions);
-        unsigned long BindFlags = Parsed.MountFlags;
-        if ((BindFlags & (MS_NOATIME | MS_STRICTATIME)) == 0)
-        {
-            BindFlags |= MS_RELATIME;
-        }
-
-        THROW_LAST_ERROR_IF(mount(nullptr, Target, nullptr, MS_BIND | MS_REMOUNT | BindFlags, nullptr) < 0);
-    }
-
-    //
-    // Save the tag mapping, keyed by the share's synthetic root name.
+    // Save the tag mapping, keyed by the share's synthetic root name. This lets
+    // path translation (e.g. for /mnt/c) recover the Windows source.
     //
     // N.B. Use the source path from the response since the service canonicalizes it.
     //
 
     SaveVirtiofsTagMapping(ShareName, ResponseSource);
 
-    //
-    // The device may already have been mounted (it is shared by all shares of
-    // this elevation), in which case MountWithRetry was skipped and ExitCode was
-    // never set. Report success now that the bind-mount has completed.
-    //
-
-    if (ExitCode)
-    {
-        *ExitCode = 0;
-    }
-
     return 0;
 }
 CATCH_RETURN_ERRNO()
 
-int RemountVirtioFs(const char* Tag, const char* Target, const char* Options, bool Admin)
+int RemountVirtioFs(const char* Subname, const char* Target, const char* Options, bool Admin)
 
 /*++
 
 Routine Description:
 
-    This routine translates DrvFs mount options into Plan9 mount options and
-    mounts the share.
+    This routine remounts an aggregate virtio-fs share into the current mount
+    namespace using the server of the requested elevation. It is used when
+    setting up the elevated / non-elevated drvfs mount namespaces, where each
+    namespace must see the share backed by the matching-elevation host server.
 
 Arguments:
 
-    Tag - Supplies the virtiofs tag to remount.
+    Subname - Supplies the share's synthetic root name (the per-share GUID) that
+        identifies which share to remount. The aggregate device tag itself is
+        fixed per elevation and is not sufficient to identify a single share.
 
     Target - Supplies the mount target.
 
@@ -764,7 +835,15 @@ try
 
     wsl::shared::MessageWriter<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE> RemountShare(LxInitMessageRemountVirtioFsDevice);
     RemountShare->Admin = Admin;
-    RemountShare.WriteString(RemountShare->TagOffset, Tag);
+
+    //
+    // The service identifies the share to remount by its synthetic root name
+    // (the per-share GUID), since the aggregate device tag is fixed per
+    // elevation and shared by every share. The name is carried in the request's
+    // TagOffset field.
+    //
+
+    RemountShare.WriteString(RemountShare->TagOffset, Subname);
 
     //
     // Connect to the host and send the remount request.
@@ -780,15 +859,43 @@ try
     const auto& Response = Channel.Transaction<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE>(RemountShare.Span(), &ResponseSpan);
     if (Response.Result != 0)
     {
-        LOG_ERROR("Remount virtiofs share for {} failed {}", Tag, Response.Result);
+        LOG_ERROR("Remount virtiofs share for {} failed {}", Subname, Response.Result);
         return -1;
     }
 
-    auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
-    auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+    //
+    // The service returns the (correct-elevation) aggregate device tag, the
+    // synthetic root name to bind-mount under it, and the source path.
+    //
 
-    SaveVirtiofsTagMapping(NewTag, Source);
+    auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* NewSubname = wsl::shared::string::FromSpan(ResponseSpan, Response.NameOffset);
+    auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
+
+    if (NewSubname != nullptr && *NewSubname != '\0')
+    {
+        //
+        // Aggregate model: mount the (correct-elevation) aggregate device and
+        // bind-mount this share's synthetic root onto the target.
+        //
+
+        if (MountVirtioFsAggregateChild(NewTag, NewSubname, Target, Options, nullptr) < 0)
+        {
+            return -1;
+        }
+
+        SaveVirtiofsTagMapping(NewSubname, Source);
+    }
+    else
+    {
+        //
+        // Legacy (non-aggregate) reply: mount the device directly.
+        //
+
+        THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+
+        SaveVirtiofsTagMapping(NewTag, Source);
+    }
 
     return 0;
 }

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <set>
 #include "DeviceHostProxy.h"
 
 // Flags for virtiofs vdev device creation.
@@ -64,6 +65,24 @@ public:
         _In_ UINT32 Flags,
         _In_ HANDLE UserToken);
 
+    // Aggregate virtio-fs addressed by a caller-supplied fixed device tag
+    // (rather than a minted one). Used by the WSLc container path, which has no
+    // return channel to communicate a minted tag to the guest and instead has
+    // host and guest agree on compile-time tags. Each distinct tag is its own
+    // aggregate device (so read-write and read-only shares use separate tags),
+    // created on first use; subsequent shares for the same tag add a named root.
+    _Requires_lock_not_held_(m_lock)
+    void AddVirtioFsAggregateShareWithTag(
+        _In_ const GUID& DeviceId,
+        _In_ const GUID& ImplementationClsid,
+        _In_ PCWSTR Tag,
+        _In_ PCWSTR Subname,
+        _In_opt_ PCWSTR RootOptions,
+        _In_opt_ PCWSTR DeviceOptions,
+        _In_ PCWSTR Path,
+        _In_ UINT32 Flags,
+        _In_ HANDLE UserToken);
+
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
 
     void AddSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
@@ -101,4 +120,7 @@ private:
     // Per implementation-class aggregate virtio-fs device tag (the tag the guest
     // mounts). Created on the first share for each class.
     _Guarded_by_(m_lock) std::map<GUID, std::wstring, wsl::windows::common::helpers::GuidLess> m_aggregateDeviceTags;
+    // Fixed-tag aggregate virtio-fs devices (WSLc container path) already
+    // created, keyed by the guest-facing device tag string.
+    _Guarded_by_(m_lock) std::set<std::wstring> m_fixedAggregateTags;
 };

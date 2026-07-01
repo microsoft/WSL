@@ -17,6 +17,7 @@ Abstract:
 #include "message.h"
 #include "localhost.h"
 #include "common.h"
+#include "drvfs.h"
 #include <utmp.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -652,8 +653,23 @@ void HandleMessageImpl(
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
-        auto type = readField(Message.TypeIndex);
-        THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        const char* type = readField(Message.TypeIndex);
+        const char* subname = readField(Message.SubnameIndex);
+        if (*subname != '\0' && wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE))
+        {
+            //
+            // Windows-folder share routed through an aggregate virtio-fs
+            // device: the Source is the aggregate tag and Subname identifies
+            // the child within its synthetic root. Bind-mount the child rather
+            // than mounting a dedicated device. The helper re-parses the raw
+            // option string itself, so pass it through unparsed.
+            //
+            THROW_LAST_ERROR_IF(MountVirtioFsAggregateChild(source, subname, target, readField(Message.OptionsIndex)) < 0);
+        }
+        else
+        {
+            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        }
 
         // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
         // TODO: Remove once fixed upstream.

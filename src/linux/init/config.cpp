@@ -1706,10 +1706,16 @@ Return Value:
     while (MountEnum.Next())
     {
         //
-        // Do not consider bind mounts.
+        // Skip non-root mounts (bind mounts), with one exception: aggregate
+        // virtio-fs shares are always bind-mounts of a child of the aggregate
+        // device's synthetic root, so virtio-fs entries with Root != "/" are
+        // legitimate drvfs mounts whose subname is encoded in Root. Recognizing
+        // them here is required so they are not re-mounted (stacked) on top of
+        // the existing mount.
         //
 
-        if (strcmp(MountEnum.Current().Root, "/") != 0)
+        const bool IsVirtioFs = wsl::shared::string::IsEqual(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE);
+        if (!IsVirtioFs && !wsl::shared::string::IsEqual(MountEnum.Current().Root, "/"))
         {
             continue;
         }
@@ -1732,8 +1738,13 @@ Return Value:
             MountSource = MountEnum.Current().Source;
             UtilCanonicalisePathSeparator(MountSource, PATH_SEP_NT);
         }
-        else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
+        else if (IsVirtioFs)
         {
+            //
+            // Aggregate-device root mounts (the hidden device mounted at its
+            // own root) have Root == "/" and resolve to an empty source; they
+            // are skipped below. User-visible shares have Root == "/<subname>".
+            //
             MountSource = QueryVirtiofsMountSource(MountEnum.Current().Root);
         }
         else
@@ -2325,12 +2336,17 @@ try
         }
 
         //
-        // Bind mounts which have a root other than / are currently not supported.
+        // Bind mounts which have a root other than / are currently not
+        // supported, with the exception of aggregate virtio-fs shares: those
+        // are intentionally bind mounts of an aggregate device (their root is
+        // "/<synthetic-root-name>") and must be remounted in the new namespace
+        // using the matching-elevation host server.
         //
         // TODO_LX: Support bind mounts.
         //
 
-        if (strcmp(MountEntry.Root, "/") != 0)
+        const bool IsVirtioFs = (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0);
+        if (!IsVirtioFs && strcmp(MountEntry.Root, "/") != 0)
         {
             continue;
         }
@@ -2348,7 +2364,21 @@ try
                 continue;
             }
         }
-        else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) != 0)
+        else if (IsVirtioFs)
+        {
+            //
+            // Skip the hidden aggregate device mounts (mounted at
+            // VIRTIOFS_DEVICE_DIR/<tag>). Only the per-share bind mounts are
+            // tracked; remounting a share re-establishes its device mount as
+            // needed.
+            //
+
+            if (wsl::shared::string::StartsWith(std::string_view{MountEntry.MountPoint}, VIRTIOFS_DEVICE_DIR))
+            {
+                continue;
+            }
+        }
+        else
         {
             continue;
         }
@@ -2447,7 +2477,14 @@ try
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            //
+            // For aggregate virtio-fs the share is a bind mount whose root is
+            // "/<synthetic-root-name>"; that name identifies the share to the
+            // host. Strip the leading '/' to recover it.
+            //
+
+            const char* Subname = (MountEntry.Root[0] == '/') ? (MountEntry.Root + 1) : MountEntry.Root;
+            RemountVirtioFs(Subname, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
         }
         else
         {
