@@ -166,8 +166,8 @@ class WSLCE2ENetworkCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_WithOpt_Success)
     {
-        auto result = RunWslc(
-            std::format(L"network create --opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450 {}", TestNetworkName));
+        constexpr auto c_opts = L"--opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450";
+        auto result = RunWslc(std::format(L"network create {} {}", c_opts, TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
 
