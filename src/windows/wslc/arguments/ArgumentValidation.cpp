@@ -127,12 +127,11 @@ void Argument::Validate(const ArgMap& execArgs) const
             }
             else if (parsed.Error == models::NetworkArgumentParseError::DuplicateNetworkName)
             {
-                throw ArgumentException(std::format(L"Invalid {} value: network name can only be specified once", m_name));
+                throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(m_name));
             }
             else if (parsed.Error == models::NetworkArgumentParseError::UnsupportedOption)
             {
-                throw ArgumentException(
-                    std::format(L"Invalid {} value: unsupported network option '{}'", m_name, parsed.ErrorValue));
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(m_name, parsed.ErrorValue));
             }
 
             if (IsEqual(parsed.Name, L"host", true))
@@ -370,8 +369,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(
+            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 
