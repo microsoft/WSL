@@ -63,6 +63,8 @@ struct SessionSettings
     std::wstring StoragePath;
     WSLCSessionSettings Settings{};
 
+    bool WarnCustomStorageLocation = false;
+
     NON_COPYABLE(SessionSettings);
     NON_MOVABLE(SessionSettings);
 
@@ -86,12 +88,26 @@ struct SessionSettings
     static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName)
     {
         auto userSettings = LoadUserSettings(UserToken);
-        auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
 
-        auto storagePath = (localAppData / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName).wstring();
+        auto configuredStorageBase = userSettings.Get<settings::Setting::SessionStoragePath>();
+        const bool customConfigured = !configuredStorageBase.empty();
+        const std::filesystem::path defaultBase = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
+        const std::filesystem::path storageBase =
+            customConfigured ? std::filesystem::path(wsl::shared::string::MultiByteToWide(configuredStorageBase)) : defaultBase;
 
-        return std::unique_ptr<SessionSettings>(
-            new SessionSettings(std::wstring(ResolvedName), std::move(storagePath), WSLCSessionStorageFlagsNone, userSettings));
+        const auto storageDir = storageBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
+
+        auto result = std::unique_ptr<SessionSettings>(
+            new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), WSLCSessionStorageFlagsNone, userSettings));
+
+        if (customConfigured)
+        {
+            auto runAsUser = wil::impersonate_token(UserToken);
+            std::error_code ec;
+            result->WarnCustomStorageLocation = !std::filesystem::exists(storageDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
+        }
+
+        return result;
     }
 
     // Custom session: caller provides name and storage path.
@@ -240,6 +256,12 @@ void WSLCSessionManagerImpl::CreateSession(
     {
         defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
         Settings = &defaultSettings->Settings;
+
+        if (WarningCallback != nullptr && defaultSettings->WarnCustomStorageLocation)
+        {
+            LOG_IF_FAILED(WarningCallback->OnWarning(
+                wsl::shared::Localization::MessageWslcSessionStorageCustomLocation(defaultSettings->StoragePath.c_str()).c_str()));
+        }
     }
 
     std::wstring callerFileName;
