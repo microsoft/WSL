@@ -116,13 +116,25 @@ void Argument::Validate(const ArgMap& execArgs) const
     {
         for (const auto& value : execArgs.GetAll<ArgType::Network>())
         {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            const auto parsed = models::ParseNetworkArgument(value);
+            if (parsed.Error == models::NetworkArgumentParseError::EmptyNetworkName)
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
             }
+            else if (parsed.Error == models::NetworkArgumentParseError::EmptyAlias)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
+            }
+            else if (parsed.Error == models::NetworkArgumentParseError::DuplicateNetworkName)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(m_name));
+            }
+            else if (parsed.Error == models::NetworkArgumentParseError::UnsupportedOption)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(m_name, parsed.ErrorValue));
+            }
 
-            if (IsEqual(value, L"host", true))
+            if (IsEqual(parsed.Name, L"host", true))
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
@@ -357,8 +369,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(
+            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 

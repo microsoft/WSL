@@ -6743,9 +6743,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsNotImplementedTest)
     {
-        // Per-endpoint Settings (Aliases, IPAMConfig, etc.) are reserved for a future PR.
-        // Until that lands, any non-empty Settings payload must be rejected with E_NOTIMPL
-        // so callers don't silently lose data.
+        // Unsupported per-endpoint settings must be rejected with E_NOTIMPL so callers
+        // don't silently lose data.
         const std::string networkName = "custom-net-settings";
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
@@ -6756,7 +6755,7 @@ class WSLCTests
         auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         LPCSTR args[] = {"sleep", "99999"};
-        KeyValuePair settings[] = {{"Aliases", "my-alias"}};
+        KeyValuePair settings[] = {{"IPAddress", "10.0.0.5"}};
         WSLCNetworkConnection connection{};
         connection.NetworkName = networkName.c_str();
         connection.Settings = settings;
@@ -7285,6 +7284,34 @@ class WSLCTests
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "backup") != endpoint.Aliases.end());
+        }
+
+        // Aliases on primary and additional user-defined networks — all present.
+        {
+            const std::string primaryNetworkName = "alias-net-primary";
+            const std::string additionalNetworkName = "alias-net-additional";
+            createNetwork(primaryNetworkName, "172.64.0.0/16");
+            createNetwork(additionalNetworkName, "172.65.0.0/16");
+            auto primaryNetCleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetworkName.c_str()));
+            });
+            auto additionalNetCleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(additionalNetworkName.c_str()));
+            });
+
+            WSLCContainerLauncher launcher("debian:latest", "alias-ctr-additional", {"sleep", "99999"}, {}, primaryNetworkName);
+            launcher.AddPrimaryNetworkAlias("db");
+            launcher.AddAdditionalNetwork(additionalNetworkName, {"cache", "replica"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(primaryNetworkName));
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(additionalNetworkName));
+            const auto& primaryEndpoint = inspect.NetworkSettings.Networks.at(primaryNetworkName);
+            const auto& additionalEndpoint = inspect.NetworkSettings.Networks.at(additionalNetworkName);
+            VERIFY_IS_TRUE(std::ranges::find(primaryEndpoint.Aliases, "db") != primaryEndpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(additionalEndpoint.Aliases, "cache") != additionalEndpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(additionalEndpoint.Aliases, "replica") != additionalEndpoint.Aliases.end());
         }
 
         // Alias on 'host' mode — rejected at the IDL layer.

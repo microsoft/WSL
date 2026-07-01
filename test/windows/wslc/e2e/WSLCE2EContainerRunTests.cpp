@@ -917,6 +917,41 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_DockerStyleMultiNetwork_Success)
+    {
+        const auto secondNetworkName = TestNetworkName + L"-2";
+        EnsureNetworkDoesNotExist(secondNetworkName);
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(L"network create --driver bridge {}", secondNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupSecondNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(secondNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --name {} --network name={},alias=db,alias=primary "
+            L"--network name={},alias=cache,alias=replica {} true",
+            WslcContainerName,
+            TestNetworkName,
+            secondNetworkName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        const auto secondNetwork = wsl::shared::string::WideToMultiByte(secondNetworkName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(secondNetwork));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        const auto& secondEndpoint = inspect.NetworkSettings.Networks.at(secondNetwork);
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "cache") != secondEndpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "replica") != secondEndpoint.Aliases.end());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoNetwork_Rejected)
     {
         auto result =
