@@ -907,6 +907,8 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
     else if (event == ContainerEvent::Destroy)
     {
+        m_eventStore.Record("container", "destroy", m_id, eventTime);
+
         WI_ASSERT(!m_destroyEvent.is_signaled());
         m_destroyEvent.SetEvent();
 

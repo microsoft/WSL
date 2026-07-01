@@ -3,8 +3,11 @@
 #include "precomp.h"
 #include "EventStore.h"
 #include "WSLCSession.h"
+#include "WSLCExecutionContext.h"
 #include <chrono>
 #include "wslc_schema.h"
+
+using wsl::shared::Localization;
 
 namespace wsl::windows::service::wslc {
 
@@ -98,26 +101,20 @@ namespace {
 Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
     Microsoft::WRL::ComPtr<WSLCSession> Session, uint64_t SinceTime, uint64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
 {
-    // Start the reader at the oldest event still buffered so it sees all the buffered history.
-    uint64_t startSequenceNumber;
-    {
-        std::lock_guard lock(m_lock);
-        startSequenceNumber = m_firstSequenceNumber;
-    }
+    // A non-zero until earlier than since describes a backwards, empty window.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime), UntilTime != 0 && SinceTime > UntilTime);
 
     Microsoft::WRL::ComPtr<EventStream> stream;
-    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(
-        &stream, std::move(Session), this, startSequenceNumber, SinceTime, UntilTime, std::move(Filters)));
+    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(&stream, std::move(Session), this, SinceTime, UntilTime, std::move(Filters)));
 
     return stream;
 }
 
 std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(uint64_t SequenceNumber)
 {
-    if (SequenceNumber < m_firstSequenceNumber)
-    {
-        THROW_HR(WSLC_E_EVENTS_LOST);
-    }
+    // Callers resync a lagging reader before reaching here, so the requested event is never evicted.
+    WI_ASSERT(SequenceNumber >= m_firstSequenceNumber);
 
     const uint64_t index = SequenceNumber - m_firstSequenceNumber;
     if (index >= m_events.size())
@@ -128,31 +125,88 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
     return m_events[index];
 }
 
-std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(uint64_t SequenceNumber, std::optional<uint64_t> Until)
+bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<uint64_t> Until)
 {
-    std::unique_lock lock(m_lock);
-
-    // Checked before parking, so a termination that already latched is seen without sleeping.
-    const auto ready = [&] { return m_terminating || GetLockHeld(SequenceNumber).has_value(); };
+    // Ready once the reader's event is buffered, its slot is evicted, or the session terminates.
+    // Eviction while parked wakes us too, so the caller reports the gap on its next pass.
+    const auto ready = [&] {
+        return m_terminating || SequenceNumber < m_firstSequenceNumber || GetLockHeld(SequenceNumber).has_value();
+    };
 
     if (Until.has_value())
     {
-        // The bound is Unix seconds and system_clock shares that epoch, so it doubles as a wall-clock
-        // deadline. Round it up to system_clock's finer tick so the wait never ends early.
-        const std::chrono::sys_seconds untilTime{std::chrono::seconds{static_cast<int64_t>(Until.value())}};
-        const auto deadline = std::chrono::ceil<std::chrono::system_clock::duration>(untilTime);
-        if (!m_updated.wait_until(lock, deadline, ready))
+        // Until is Unix seconds and system_clock shares that epoch, so it doubles as the wait deadline.
+        const std::chrono::sys_seconds deadline{std::chrono::seconds{static_cast<int64_t>(Until.value())}};
+        if (!m_updated.wait_until(Lock, deadline, ready))
         {
-            return std::nullopt;
+            return false;
         }
     }
     else
     {
-        m_updated.wait(lock, ready);
+        m_updated.wait(Lock, ready);
     }
 
     THROW_HR_IF(E_ABORT, m_terminating);
-    return GetLockHeld(SequenceNumber);
+    return true;
+}
+
+std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
+    std::optional<uint64_t>& SequenceNumber,
+    std::optional<uint64_t> Since,
+    std::optional<uint64_t> Until,
+    const std::map<std::string, std::vector<std::string>>& Filters)
+{
+    std::unique_lock lock(m_lock);
+
+    // Position the reader. A first read (no sequence number yet) starts at the oldest buffered
+    // event
+    SequenceNumber = SequenceNumber.value_or(m_firstSequenceNumber);
+
+    while (true)
+    {
+        // A reader that has fallen behind the ring missed events to eviction: reset it so the
+        // next call starts fresh at the oldest buffered event, and report the gap.
+        if (SequenceNumber.value() < m_firstSequenceNumber)
+        {
+            SequenceNumber = std::nullopt;
+            THROW_HR(WSLC_E_EVENTS_LOST);
+        }
+
+        if (!WaitForEvent(lock, SequenceNumber.value(), Until))
+        {
+            // The until window elapsed with no further event: the stream is finished.
+            return std::nullopt;
+        }
+
+        // Evicted while parked: loop back to reset and report the gap.
+        // TODO: A burst of more than c_eventRingCapacity events between the wake and reacquiring the
+        // lock can evict this reader's event before it is read, forcing a WSLC_E_EVENTS_LOST. Redesign
+        // so that every parked reader is guaranteed to observe an event before the next write can evict
+        // it.
+        if (SequenceNumber.value() < m_firstSequenceNumber)
+        {
+            continue;
+        }
+
+        const auto event = GetLockHeld(SequenceNumber.value()).value();
+
+        // An event past the until-bound closes the window: the stream is finished.
+        if (Until.has_value() && event.time > Until.value())
+        {
+            return std::nullopt;
+        }
+
+        // Advance past this event so the next read resumes at the following one.
+        SequenceNumber.value()++;
+
+        // Return the event if it falls within the since-bound and matches the caller's filters;
+        // otherwise loop to skip it.
+        if ((!Since.has_value() || event.time >= Since.value()) && EventMatchesFilters(event, Filters))
+        {
+            return event;
+        }
+    }
 }
 
 void EventStore::OnSessionTerminating()
@@ -168,14 +222,12 @@ void EventStore::OnSessionTerminating()
 HRESULT EventStream::RuntimeClassInitialize(
     Microsoft::WRL::ComPtr<WSLCSession> Session,
     EventStore* Store,
-    uint64_t StartSequenceNumber,
     uint64_t SinceTime,
     uint64_t UntilTime,
     std::map<std::string, std::vector<std::string>> Filters)
 {
     m_session = std::move(Session);
     m_store = Store;
-    m_nextSequenceNumber = StartSequenceNumber;
     m_since = ToTimeBound(SinceTime);
     m_until = ToTimeBound(UntilTime);
     m_filters = std::move(Filters);
@@ -188,37 +240,14 @@ try
     RETURN_HR_IF_NULL(E_POINTER, EventJson);
     *EventJson = nullptr;
 
-    // Read forward until an event lands inside the time window and matches the filters.
-    while (true)
+    const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters);
+    if (!event.has_value())
     {
-        const auto event = m_store->Get(m_nextSequenceNumber, m_until);
-        if (!event.has_value())
-        {
-            return WSLC_E_EVENT_STREAM_FINISHED;
-        }
-
-        ++m_nextSequenceNumber;
-
-        const uint64_t eventTime = event.value().time;
-
-        if (m_until.has_value() && eventTime > m_until.value())
-        {
-            return WSLC_E_EVENT_STREAM_FINISHED;
-        }
-
-        if (m_since.has_value() && eventTime < m_since.value())
-        {
-            continue;
-        }
-
-        if (!EventMatchesFilters(event.value(), m_filters))
-        {
-            continue;
-        }
-
-        *EventJson = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wsl::shared::ToJson(event.value()).c_str()).release();
-        return S_OK;
+        return WSLC_E_EVENT_STREAM_FINISHED;
     }
+
+    *EventJson = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wsl::shared::ToJson(event.value()).c_str()).release();
+    return S_OK;
 }
 CATCH_RETURN();
 

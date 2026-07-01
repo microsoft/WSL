@@ -3334,9 +3334,6 @@ try
 
     *Stream = nullptr;
 
-    // A non-zero until earlier than since describes a backwards, empty window.
-    RETURN_HR_IF(E_INVALIDARG, UntilTime != 0 && SinceTime > UntilTime);
-
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
     auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTime, UntilTime, std::move(filters));
 

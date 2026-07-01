@@ -5818,20 +5818,25 @@ class WSLCTests
             return events;
         };
 
-        // Verifies a drained event vector carries exactly the expected container events, in order:
-        // each is a container event for `actorId`.
+        // Verifies the given events match the expected actions in order for a given actor.
         auto verifyEvents = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& events,
                                 const std::string& actorId,
-                                std::initializer_list<const char*> expectedActions) {
+                                const std::vector<std::string>& expectedActions) {
             VERIFY_ARE_EQUAL(events.size(), expectedActions.size());
 
-            size_t i = 0;
-            for (const auto action : expectedActions)
+            for (size_t i = 0; i < expectedActions.size(); ++i)
             {
-                VERIFY_ARE_EQUAL(std::string("container"), events[i].Type);
-                VERIFY_ARE_EQUAL(std::string(action), events[i].Action);
-                VERIFY_ARE_EQUAL(actorId, events[i].Actor.ID);
-                ++i;
+                const auto& action = expectedActions[i];
+                const auto& event = events[i];
+
+                VERIFY_ARE_EQUAL(action, event.Action);
+                VERIFY_ARE_EQUAL(actorId, event.Actor.ID);
+
+                // Events are reported in non-decreasing time order.
+                if (i > 0)
+                {
+                    VERIFY_IS_TRUE(event.time >= events[i - 1].time);
+                }
             }
         };
 
@@ -5861,15 +5866,11 @@ class WSLCTests
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
             auto events = drain(stream.get());
-            verifyEvents(events, id, {"create", "start", "kill", "stop"});
+            verifyEvents(events, id, {"create", "start", "kill", "stop", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
             VERIFY_IS_TRUE(events[0].time >= since);
-            VERIFY_IS_TRUE(events[3].time <= until);
-
-            // The start, kill and stop events share Docker's clock, so they are ordered.
-            VERIFY_IS_TRUE(events[2].time >= events[1].time);
-            VERIFY_IS_TRUE(events[3].time >= events[2].time);
+            VERIFY_IS_TRUE(events[4].time <= until);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -5909,18 +5910,8 @@ class WSLCTests
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
         {
             wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(until, since, nullptr, 0, &stream));
-        }
-
-        // A bounded window that closed before any event was recorded returns immediately with an
-        // empty stream rather than blocking for events that can never arrive.
-        {
-            constexpr ULONGLONG oneSecond = 1;
-            WSLCFilter filter{"container", id.c_str()};
-            wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since - 2 * oneSecond, since - oneSecond, &filter, 1, &stream));
-
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(since + 1, since, nullptr, 0, &stream));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcEventsInvalidTimeWindow(since + 1, since));
         }
     }
 

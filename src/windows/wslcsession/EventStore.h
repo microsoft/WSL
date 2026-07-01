@@ -27,12 +27,26 @@ public:
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
         Microsoft::WRL::ComPtr<WSLCSession> Session, uint64_t SinceTime, uint64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
 
-    std::optional<wsl::windows::common::wslc_schema::Event> Get(uint64_t SequenceNumber, std::optional<uint64_t> Until);
+    // Returns the next event at or after SequenceNumber that falls within [Since, Until] and matches
+    // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
+    // oldest buffered event (no gap is reported). If the reader has since fallen behind the ring,
+    // resyncs SequenceNumber to the oldest buffered event and throws WSLC_E_EVENTS_LOST. Returns
+    // nullopt once the Until window has closed.
+    std::optional<wsl::windows::common::wslc_schema::Event> Get(
+        std::optional<uint64_t>& SequenceNumber,
+        std::optional<uint64_t> Since,
+        std::optional<uint64_t> Until,
+        const std::map<std::string, std::vector<std::string>>& Filters);
 
     void OnSessionTerminating();
 
 private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
+
+    // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
+    // terminates. Returns false only when Until (Unix seconds) elapsed with no event ready. Throws
+    // E_ABORT if the session terminated while waiting.
+    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<uint64_t> Until);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
 
@@ -52,7 +66,6 @@ public:
     HRESULT RuntimeClassInitialize(
         Microsoft::WRL::ComPtr<WSLCSession> Session,
         EventStore* Store,
-        uint64_t StartSequenceNumber,
         uint64_t SinceTime,
         uint64_t UntilTime,
         std::map<std::string, std::vector<std::string>> Filters);
@@ -67,7 +80,7 @@ private:
     std::optional<uint64_t> m_until;
     std::map<std::string, std::vector<std::string>> m_filters;
 
-    uint64_t m_nextSequenceNumber = 0;
+    std::optional<uint64_t> m_nextSequenceNumber;
 };
 
 } // namespace wsl::windows::service::wslc
