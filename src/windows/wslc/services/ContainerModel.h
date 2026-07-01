@@ -26,30 +26,30 @@ Abstract:
 namespace wsl::windows::wslc::models {
 
 namespace details {
-inline std::wstring ToWideString(std::wstring_view value)
-{
-    return {value.data(), value.size()};
-}
-
-inline std::vector<std::wstring_view> SplitPreserveEmpty(std::wstring_view value, wchar_t delimiter)
-{
-    std::vector<std::wstring_view> parts;
-    size_t start = 0;
-    while (start <= value.size())
+    inline std::wstring ToWideString(std::wstring_view value)
     {
-        const auto end = value.find(delimiter, start);
-        if (end == std::wstring_view::npos)
-        {
-            parts.emplace_back(value.substr(start));
-            break;
-        }
-
-        parts.emplace_back(value.substr(start, end - start));
-        start = end + 1;
+        return {value.data(), value.size()};
     }
 
-    return parts;
-}
+    inline std::vector<std::wstring_view> SplitPreserveEmpty(std::wstring_view value, wchar_t delimiter)
+    {
+        std::vector<std::wstring_view> parts;
+        size_t start = 0;
+        while (start <= value.size())
+        {
+            const auto end = value.find(delimiter, start);
+            if (end == std::wstring_view::npos)
+            {
+                parts.emplace_back(value.substr(start));
+                break;
+            }
+
+            parts.emplace_back(value.substr(start, end - start));
+            start = end + 1;
+        }
+
+        return parts;
+    }
 } // namespace details
 
 // Valid formats for container list output.
@@ -130,7 +130,7 @@ inline ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
         }
     };
 
-    if (value.starts_with(L"name="))
+    if (value.find(L'=') != std::wstring_view::npos)
     {
         parseOptions(value, true);
     }
@@ -141,11 +141,9 @@ inline ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
 
     if (result.Error == NetworkArgumentParseError::None)
     {
-        const auto nameIsEmpty =
-            result.Name.empty() ||
-            std::all_of(result.Name.begin(), result.Name.end(), [](wchar_t c) {
-                return std::iswspace(static_cast<wint_t>(c));
-            });
+        const auto nameIsEmpty = result.Name.empty() || std::all_of(result.Name.begin(), result.Name.end(), [](wchar_t c) {
+                                     return std::iswspace(static_cast<wint_t>(c));
+                                 });
         if (nameIsEmpty)
         {
             result.Error = NetworkArgumentParseError::EmptyNetworkName;
@@ -154,11 +152,9 @@ inline ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
 
         for (const auto& alias : result.Aliases)
         {
-            const auto aliasIsEmpty =
-                alias.empty() ||
-                std::all_of(alias.begin(), alias.end(), [](wchar_t c) {
-                    return std::iswspace(static_cast<wint_t>(c));
-                });
+            const auto aliasIsEmpty = alias.empty() || std::all_of(alias.begin(), alias.end(), [](wchar_t c) {
+                                          return std::iswspace(static_cast<wint_t>(c));
+                                      });
             if (aliasIsEmpty)
             {
                 result.Error = NetworkArgumentParseError::EmptyAlias;
