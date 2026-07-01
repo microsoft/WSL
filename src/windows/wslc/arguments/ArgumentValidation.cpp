@@ -116,13 +116,26 @@ void Argument::Validate(const ArgMap& execArgs) const
     {
         for (const auto& value : execArgs.GetAll<ArgType::Network>())
         {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            const auto parsed = models::ParseNetworkArgument(value);
+            if (parsed.Error == models::NetworkArgumentParseError::EmptyNetworkName)
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
             }
+            else if (parsed.Error == models::NetworkArgumentParseError::EmptyAlias)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
+            }
+            else if (parsed.Error == models::NetworkArgumentParseError::DuplicateNetworkName)
+            {
+                throw ArgumentException(std::format(L"Invalid {} value: network name can only be specified once", m_name));
+            }
+            else if (parsed.Error == models::NetworkArgumentParseError::UnsupportedOption)
+            {
+                throw ArgumentException(
+                    std::format(L"Invalid {} value: unsupported network option '{}'", m_name, parsed.ErrorValue));
+            }
 
-            if (IsEqual(value, L"host", true))
+            if (IsEqual(parsed.Name, L"host", true))
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }

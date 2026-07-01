@@ -231,9 +231,9 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     return std::string{mode};
 }
 
-// Parses the primary endpoint's Settings KVP. Today only "Aliases" is recognised; unknown
-// keys are rejected to avoid silently dropping caller data (mirrors the per-connection guard).
-EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkMode)
+// Parses an endpoint's Settings KVP. Today only "Aliases" is recognised; unknown keys are rejected
+// to avoid silently dropping caller data.
+EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkName)
 {
     EndpointConfig config{};
     if (count == 0)
@@ -248,7 +248,7 @@ EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG 
     for (const auto& [key, _] : parsed)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkMode}), key != "Aliases");
+            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkName}), key != "Aliases");
     }
 
     if (auto it = parsed.find("Aliases"); it != parsed.end())
@@ -294,9 +294,13 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
                 WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
         }
 
-        // Per-endpoint Settings are reserved for future use (IPAddress, Aliases, ...). No keys
-        // are interpreted today, so reject any non-empty payload rather than silently dropping it.
-        THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(name), connections[i].SettingsCount > 0);
+        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            config.Aliases.has_value() && name == "bridge");
+
+        it->second = std::move(config);
     }
     return resolved;
 }
@@ -1659,7 +1663,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
 
     auto primaryConfig =
-        ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+        ResolveEndpointConfig(
+            containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
 
     // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
     THROW_HR_WITH_USER_ERROR_IF(
