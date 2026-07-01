@@ -19,8 +19,7 @@ CrashDumpCallback::CrashDumpCallback(WslcSessionCrashDumpCallback callback, PVOI
 {
 }
 
-HRESULT STDMETHODCALLTYPE CrashDumpCallback::OnCrashDump(
-    _In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONGLONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp)
+HRESULT STDMETHODCALLTYPE CrashDumpCallback::OnCrashDump(_In_ LPCWSTR DumpPath, _In_opt_ LPCSTR ProcessName, _In_ ULONG Pid, _In_ ULONG Signal, _In_ ULONGLONG Timestamp)
 try
 {
     if (m_callback)

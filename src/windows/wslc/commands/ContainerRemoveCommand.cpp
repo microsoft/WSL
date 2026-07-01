@@ -44,8 +44,8 @@ std::wstring ContainerRemoveCommand::LongDescription() const
 
 void ContainerRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << RemoveContainers;
 }
 } // namespace wsl::windows::wslc

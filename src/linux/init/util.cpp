@@ -1276,7 +1276,7 @@ try
     const auto& response = transaction.Receive<RESULT_MESSAGE<uint8_t>>();
     auto NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(response.Result);
 
-    THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy);
+    THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme);
 
     return NetworkingMode;
 }

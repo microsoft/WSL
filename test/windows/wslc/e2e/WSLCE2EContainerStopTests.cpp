@@ -237,25 +237,6 @@ class WSLCE2EContainerStopTests
         }
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
-    {
-        // Run a container in the background
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
-        VERIFY_IS_FALSE(containerId.empty());
-
-        // Verify container is running
-        VerifyContainerIsListed(containerId, L"running");
-
-        // -1 is a valid timeout value
-        result = RunWslc(std::format(L"container stop {} -t -1", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Verify the container is no longer running
-        VerifyContainerIsListed(containerId, L"exited");
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";

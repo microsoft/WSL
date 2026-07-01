@@ -26,6 +26,7 @@ public:
         const std::wstring& contextPath,
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
+        const std::vector<std::wstring>& labels,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
         WSLCBuildImageFlags flags,
@@ -35,7 +36,7 @@ public:
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(
         wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
-    static void Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
+    static std::string Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);

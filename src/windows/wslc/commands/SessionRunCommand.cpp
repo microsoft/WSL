@@ -42,6 +42,6 @@ std::wstring SessionRunCommand::LongDescription() const
 
 void SessionRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << RunInSession;
+    context << ResolveSession << RunInSession;
 }
 } // namespace wsl::windows::wslc

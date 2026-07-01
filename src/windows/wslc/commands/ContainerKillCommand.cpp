@@ -46,7 +46,7 @@ std::wstring ContainerKillCommand::LongDescription() const
 void ContainerKillCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << KillContainers;
 }
 // clang-format on

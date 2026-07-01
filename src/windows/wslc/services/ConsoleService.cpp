@@ -24,6 +24,50 @@ using wsl::windows::common::io::ReadConsoleHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 
+namespace {
+
+    // Interrupts and joins the stdin-relay worker thread at teardown.
+    //
+    // The worker only exists when stdin is not a character device (any non-FILE_TYPE_CHAR handle, e.g. a
+    // redirected pipe), so this no-ops (not joinable) for a console. When stdin is a non-overlapped
+    // (synchronous) pipe the worker blocks in a ReadFile() that neither the exit event nor CancelIoEx() can
+    // interrupt, so the join() below would hang until stdin is closed -- the bug this guards against.
+    void InterruptAndJoinInputThread(std::thread& inputThread, wil::unique_event& exitEvent)
+    {
+        if (!inputThread.joinable())
+        {
+            return;
+        }
+
+        WI_ASSERT(exitEvent);
+        exitEvent.SetEvent();
+
+        // Overlapped IO will get terminated by SetEvent(). Synchronous IO will not, so we need to cancel it.
+        const auto threadHandle = static_cast<HANDLE>(inputThread.native_handle());
+        DWORD waitResult = WAIT_TIMEOUT;
+        while (waitResult == WAIT_TIMEOUT)
+        {
+            if (!CancelSynchronousIo(threadHandle))
+            {
+                // ERROR_NOT_FOUND means nothing to cancel; any other error is a corrupt handle that shouldn't happen.
+                const auto cancelError = GetLastError();
+                if (cancelError != ERROR_NOT_FOUND)
+                {
+                    FAIL_FAST_WIN32(cancelError);
+                }
+            }
+
+            waitResult = WaitForSingleObject(threadHandle, 50);
+        }
+
+        // Anything but WAIT_OBJECT_0 (e.g. WAIT_FAILED) means a corrupt handle that shouldn't happen.
+        FAIL_FAST_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
+
+        inputThread.join();
+    }
+
+} // namespace
+
 bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Console, ClientRunningWSLCProcess& Process, HANDLE Tty, bool TriggerRefresh)
 {
     // Configure the console for interactive usage.
@@ -43,13 +87,7 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
     wil::unique_event exitEvent;
     std::thread inputThread;
 
-    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (inputThread.joinable())
-        {
-            exitEvent.SetEvent();
-            inputThread.join();
-        }
-    });
+    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InterruptAndJoinInputThread(inputThread, exitEvent); });
 
     bool detached = false;
     MultiHandleWait io;
@@ -99,13 +137,7 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
     wil::unique_event exitEvent;
     std::thread inputThread;
 
-    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (inputThread.joinable())
-        {
-            exitEvent.SetEvent();
-            inputThread.join();
-        }
-    });
+    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InterruptAndJoinInputThread(inputThread, exitEvent); });
 
     if (Stdin.is_valid())
     {

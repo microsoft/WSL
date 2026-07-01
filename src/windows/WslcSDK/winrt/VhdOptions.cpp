@@ -18,10 +18,10 @@ Abstract:
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
-VhdOptions::VhdOptions(hstring const& name, uint64_t sizeInBytes, VhdType const& type) :
-    m_name(winrt::to_string(name)), m_sizeInBytes(sizeInBytes), m_type(type)
+VhdOptions::VhdOptions(hstring const& name, uint64_t size, VhdType const& type) :
+    m_name(winrt::to_string(name)), m_size(size), m_type(type)
 {
-    if (sizeInBytes == 0)
+    if (size == 0)
     {
         throw hresult_invalid_argument(L"VHD size cannot be zero");
     }
@@ -42,12 +42,12 @@ void VhdOptions::Name(hstring const& value)
     m_name = winrt::to_string(value);
 }
 
-uint64_t VhdOptions::SizeInBytes()
+uint64_t VhdOptions::Size()
 {
-    return m_sizeInBytes;
+    return m_size;
 }
 
-void VhdOptions::SizeInBytes(uint64_t value)
+void VhdOptions::Size(uint64_t value)
 {
     if (m_vhdOptions)
     {
@@ -59,7 +59,7 @@ void VhdOptions::SizeInBytes(uint64_t value)
         throw hresult_invalid_argument(L"VHD size cannot be zero");
     }
 
-    m_sizeInBytes = value;
+    m_size = value;
 }
 
 VhdType VhdOptions::Type()
@@ -77,14 +77,19 @@ void VhdOptions::Type(VhdType const& value)
     m_type = value;
 }
 
-void VhdOptions::SetOwner(uint32_t uid, uint32_t gid)
+winrt::Windows::Foundation::IReference<winrt::Microsoft::WSL::Containers::VhdOwner> VhdOptions::Owner()
+{
+    return m_owner;
+}
+
+void VhdOptions::Owner(winrt::Windows::Foundation::IReference<winrt::Microsoft::WSL::Containers::VhdOwner> const& value)
 {
     if (m_vhdOptions)
     {
         throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
     }
 
-    m_owner = {uid, gid};
+    m_owner = value;
 }
 
 WslcVhdRequirements* VhdOptions::ToStructPointer()
@@ -93,13 +98,14 @@ WslcVhdRequirements* VhdOptions::ToStructPointer()
     {
         m_vhdOptions = std::make_unique<WslcVhdRequirements>();
         m_vhdOptions->name = m_name.c_str();
-        m_vhdOptions->sizeBytes = m_sizeInBytes;
+        m_vhdOptions->sizeBytes = m_size;
         m_vhdOptions->type = static_cast<WslcVhdType>(m_type);
 
-        if (m_owner)
+        if (m_owner != nullptr)
         {
-            m_vhdOptions->uid = m_owner->first;
-            m_vhdOptions->gid = m_owner->second;
+            auto owner = m_owner.Value();
+            m_vhdOptions->uid = owner.Uid;
+            m_vhdOptions->gid = owner.Gid;
             WI_SetFlag(m_vhdOptions->flags, WSLC_VHD_REQ_FLAG_OWNER);
         }
     }

@@ -43,7 +43,7 @@ std::wstring NetworkInspectCommand::LongDescription() const
 
 void NetworkInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << InspectNetworks;
 }
 } // namespace wsl::windows::wslc
