@@ -129,9 +129,7 @@ bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t Seque
 {
     // Ready once the reader's event is buffered, its slot is evicted, or the session terminates.
     // Eviction while parked wakes us too, so the caller reports the gap on its next pass.
-    const auto ready = [&] {
-        return m_terminating || SequenceNumber < m_firstSequenceNumber || GetLockHeld(SequenceNumber).has_value();
-    };
+    const auto ready = [&] { return m_terminating || SequenceNumber < m_firstSequenceNumber + m_events.size(); };
 
     if (Until.has_value())
     {
