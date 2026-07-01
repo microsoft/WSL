@@ -569,10 +569,7 @@ typedef struct _WSLCListContainersOptions
 interface IWSLCEventStream : IUnknown
 {
     // Blocks until the next matching event, the until-time is reached, or the session terminates,
-    // then returns the event as a JSON object following the wslc_schema::Event format, which matches
-    // docker's `events --format json` shape: {"Type","Action","Actor":{"ID","Attributes":{...}},"time","timeNano"}.
-    // JSON rather than a struct so future fields (Actor.Attributes, exec/image specifics) need no
-    // IDL change and the whole event is one allocation the caller frees with a single CoTaskMemFree.
+    // then returns the event as a JSON object following the wslc_schema::Event format.
     HRESULT GetNext([out, string] LPSTR* EventJson);
 }
 

@@ -6059,7 +6059,6 @@ class WSLCTests
         // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
         const ULONGLONG since = now();
         std::string id;
-        ULONGLONG until = 0;
         {
             WSLCContainerLauncher launcher("debian:latest", "wslc-test-events", {"sleep", "99999"});
             auto container = launcher.Launch(*m_defaultSession);
@@ -6070,14 +6069,13 @@ class WSLCTests
             // Kill (rather than Stop) so Docker emits a 'kill' event ahead of the 'die' that stops it.
             VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
-
-            until = now();
         }
 
         // The container's create, start, kill then stop events are reported in order, each carrying
         // the container's 64-hex id as the actor.
         {
             WSLCFilter filter{"container", id.c_str()};
+            ULONGLONG until = now();
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
