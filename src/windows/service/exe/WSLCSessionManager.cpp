@@ -63,7 +63,7 @@ struct SessionSettings
     std::wstring StoragePath;
     WSLCSessionSettings Settings{};
 
-    std::optional<std::wstring> OrphanedStoragePath;
+    bool WarnCustomStorageLocation = false;
 
     NON_COPYABLE(SessionSettings);
     NON_MOVABLE(SessionSettings);
@@ -102,15 +102,9 @@ struct SessionSettings
 
         if (customConfigured)
         {
-            const auto defaultDir = defaultBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
             auto runAsUser = wil::impersonate_token(UserToken);
             std::error_code ec;
-            const bool defaultHasStorage = std::filesystem::exists(defaultDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
-            const bool configuredHasStorage = std::filesystem::exists(storageDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
-            if (defaultHasStorage && !configuredHasStorage)
-            {
-                result->OrphanedStoragePath = defaultDir.wstring();
-            }
+            result->WarnCustomStorageLocation = !std::filesystem::exists(storageDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
         }
 
         return result;
@@ -263,12 +257,10 @@ void WSLCSessionManagerImpl::CreateSession(
         defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
         Settings = &defaultSettings->Settings;
 
-        if (WarningCallback != nullptr && defaultSettings->OrphanedStoragePath)
+        if (WarningCallback != nullptr && defaultSettings->WarnCustomStorageLocation)
         {
-            LOG_IF_FAILED(
-                WarningCallback->OnWarning(wsl::shared::Localization::MessageWslcSessionStorageOrphaned(
-                                               defaultSettings->OrphanedStoragePath->c_str(), defaultSettings->StoragePath.c_str())
-                                               .c_str()));
+            LOG_IF_FAILED(WarningCallback->OnWarning(
+                wsl::shared::Localization::MessageWslcSessionStorageCustomLocation(defaultSettings->StoragePath.c_str()).c_str()));
         }
     }
 
