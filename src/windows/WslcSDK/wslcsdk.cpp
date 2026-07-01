@@ -1668,6 +1668,13 @@ STDAPI WslcInstallWithDependencies(
     _In_ WslcComponentFlags components, _In_ WslcInstallOptions options, _In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
+    // Reject unknown flag bits.
+    constexpr WslcComponentFlags c_knownComponents =
+        WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM | WSLC_COMPONENT_FLAG_WSL_PACKAGE | WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE;
+    RETURN_HR_IF(E_INVALIDARG, (components & ~c_knownComponents) != WSLC_COMPONENT_FLAG_NONE);
+    constexpr WslcInstallOptions c_knownOptions = WSLC_INSTALL_OPTION_REPAIR;
+    RETURN_HR_IF(E_INVALIDARG, (options & ~c_knownOptions) != WSLC_INSTALL_OPTION_NONE);
+
     // This API cannot update the SDK that the client is using.
     RETURN_HR_IF(WSLC_E_SDK_UPDATE_NEEDED, WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE));
 

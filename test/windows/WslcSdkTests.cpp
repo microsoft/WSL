@@ -1534,7 +1534,7 @@ class WslcSdkTests
         // GitHub release endpoint. This test intercepts that fallback: the fake API server returns a
         // release whose asset URL points at a second local server that always responds with HTTP 404,
         // so the download fails and WslcInstallWithDependencies surfaces an error HRESULT.
-        constexpr auto apiEndpoint   = L"http://127.0.0.1:12345/";
+        constexpr auto apiEndpoint = L"http://127.0.0.1:12345/";
         constexpr auto assetEndpoint = L"http://127.0.0.1:12346/";
 
         RegistryKeyChange<std::wstring> urlOverride(
@@ -1563,7 +1563,8 @@ class WslcSdkTests
         UniqueWebServer apiServer(apiEndpoint, GitHubApiResponse);
         UniqueWebServer assetServer(assetEndpoint, 404u);
 
-        VERIFY_ARE_EQUAL(HTTP_E_STATUS_NOT_FOUND, WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_WSL_PACKAGE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(
+            HTTP_E_STATUS_NOT_FOUND, WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_WSL_PACKAGE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
     }
 
     // -----------------------------------------------------------------------
