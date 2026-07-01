@@ -51,6 +51,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # used without an explicit address (default: 127.0.0.1)\n"
     "  # defaultBindingAddress: default\n"
     "\n"
+    "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
+    "  # idleTimeout: default\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -145,6 +148,11 @@ namespace details {
         }
 
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionIdleTimeout)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

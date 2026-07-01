@@ -56,11 +56,13 @@ Session SessionService::OpenOrCreateDefaultSession()
 {
     auto manager = CreateSessionManager();
 
-    // Null Settings = default session with server-determined name and settings.
+    // Null Settings = default session with server-determined name and settings. The warning callback
+    // is consumed during CreateSession (session initialization); it is not retained afterwards.
     wil::com_ptr<IWSLCSession> session;
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
     return Session(std::move(session));
 }
 

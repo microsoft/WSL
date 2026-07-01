@@ -68,10 +68,19 @@ void IORelay::Stop()
     }
 }
 
+bool IORelay::IsRelayThread() const noexcept
+{
+    return m_thread.get_id() == std::this_thread::get_id();
+}
+
 void IORelay::Run()
 try
 {
     common::wslutil::SetThreadDescription(L"IORelay");
+
+    // Handle callbacks dispatched from this thread (e.g. unexpected VM exit) can tear the VM down,
+    // releasing cross-process COM proxies, so join the process MTA to avoid RPC_E_WRONG_THREAD.
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
 
     windows::common::io::MultiHandleWait io;
 

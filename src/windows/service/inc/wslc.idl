@@ -444,6 +444,7 @@ typedef struct _WSLCSessionSettings {
     WSLCFeatureFlags FeatureFlags;
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
+    ULONG IdleTimeoutSec;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -575,6 +576,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
+    ULONG IdleTimeoutSec;
 } WSLCSessionInitSettings;
 
 [
@@ -613,6 +615,14 @@ interface IWSLCSession : IUnknown
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
+
+    // Keeps the VM alive for the duration of a client-side container operation. The CLI performs
+    // each mutation as two round-trips (OpenContainer followed by the operation) and may stream
+    // output afterwards. With on-demand VM idle-termination the VM could otherwise tear down
+    // between those calls, disconnecting the container wrapper and failing the second call with
+    // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
+    // it (or the client exiting) lets the VM idle-terminate again.
+    HRESULT BeginContainerOperation([out] IUnknown** Operation);
     HRESULT ListContainers([in, unique] const WSLCListContainersOptions* Options,[out, size_is(, *Count)] WSLCContainerEntry** Containers,[out] ULONG* Count, [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports, [out] ULONG* PortsCount);
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
