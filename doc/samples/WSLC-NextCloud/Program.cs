@@ -18,10 +18,6 @@ string sessionPath = Path.Combine(baseDir, "WslcNextcloudStorage");
 string volumePath = Path.Combine(baseDir, "WslcNextcloudData");
 Directory.CreateDirectory(volumePath);
 
-Session? session = null;
-Container? container = null;
-Process? process = null;
-
 int exitCode = 1;
 using var stopEvent = new ManualResetEventSlim(false);
 var consoleLock = new object();
@@ -49,7 +45,7 @@ try
         VhdRequirements = new VhdOptions(string.Empty, 10UL * 1024 * 1024 * 1024, VhdType.Dynamic),
     };
 
-    session = new Session(sessionSettings);
+    using var session = new Session(sessionSettings);
     session.Start();
 
     // ---- Pull image ----
@@ -78,7 +74,7 @@ try
         Volumes = new List<ContainerVolume> { new(volumePath, "/var/www/html/data", false) },
     };
 
-    container = session.CreateContainer(containerSettings);
+    using var container = session.CreateContainer(containerSettings);
     container.Start();
 
     // ---- Exec the Nextcloud entrypoint ----
@@ -89,7 +85,7 @@ try
         OutputMode = ProcessOutputMode.Event,
     };
 
-    process = container.CreateProcess(processSettings);
+    using var process = container.CreateProcess(processSettings);
     process.OutputReceived += data => Write(stdout, data);
     process.ErrorReceived += data => Write(stderr, data);
     process.Exited += code =>
@@ -119,29 +115,15 @@ try
     inputThread.Start();
 
     stopEvent.Wait();
+
+    Console.Error.WriteLine("[wslc] Shutting down...");
+    container.Stop(Signal.SIGTERM, TimeSpan.FromSeconds(10));
+    session.Terminate();
+    Console.Error.WriteLine("[wslc] Done.");
 }
 catch (Exception ex)
 {
     Console.Error.WriteLine($"[wslc] Error: {ex.Message}");
-}
-finally
-{
-    // ---- Cleanup (single path for both success and failure) ----
-    Console.Error.WriteLine("[wslc] Shutting down...");
-
-    process?.Dispose();
-    if (container is not null)
-    {
-        try { container.Stop(Signal.SIGTERM, TimeSpan.FromSeconds(10)); } catch { /* best effort */ }
-        container.Dispose();
-    }
-    if (session is not null)
-    {
-        try { session.Terminate(); } catch { /* best effort */ }
-        session.Dispose();
-    }
-
-    Console.Error.WriteLine("[wslc] Done.");
 }
 
 return exitCode;

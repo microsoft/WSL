@@ -27,10 +27,10 @@ namespace
     constexpr std::wstring_view c_imageName = L"anrginit/ubuntu-neofetch:1.0";
 
     // Forward a chunk of container stdout/stderr straight to the Windows console.
-    void WriteToConsole(DWORD stdHandle, array_view<uint8_t const> data)
+    void WriteToConsole(FILE* stream, array_view<uint8_t const> data)
     {
-        DWORD written = 0;
-        WriteFile(GetStdHandle(stdHandle), data.data(), static_cast<DWORD>(data.size()), &written, nullptr);
+        fprintf(stream, "%.*s", static_cast<int>(data.size()), reinterpret_cast<const char*>(data.data()));
+        fflush(stream);
     }
 
     // Build a storage path in a "WslcStorage" folder next to the executable, so
@@ -97,17 +97,32 @@ int wmain(int argc, wchar_t* argv[])
         Process process = container.CreateProcess(processSettings);
 
         handle exitEvent{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+        if (!exitEvent)
+        {
+            throw_last_error();
+        }
         int32_t exitCode = -1;
 
-        process.OutputReceived([](array_view<uint8_t const> data) { WriteToConsole(STD_OUTPUT_HANDLE, data); });
-        process.ErrorReceived([](array_view<uint8_t const> data) { WriteToConsole(STD_ERROR_HANDLE, data); });
+        process.OutputReceived([](array_view<uint8_t const> data) { WriteToConsole(stdout, data); });
+        process.ErrorReceived([](array_view<uint8_t const> data) { WriteToConsole(stderr, data); });
         process.Exited([&](int32_t code) {
             exitCode = code;
-            SetEvent(exitEvent.get());
+            if (!SetEvent(exitEvent.get()))
+            {
+                fwprintf(stderr, L"[wslc] Warning: SetEvent failed (0x%08X)\n", GetLastError());
+            }
         });
 
         process.Start();
-        WaitForSingleObject(exitEvent.get(), 30000);
+        DWORD waitResult = WaitForSingleObject(exitEvent.get(), 30000);
+        if (waitResult == WAIT_TIMEOUT)
+        {
+            fwprintf(stderr, L"[wslc] Error: Timed out waiting for the process to exit.\n");
+        }
+        else if (waitResult != WAIT_OBJECT_0)
+        {
+            throw_last_error();
+        }
 
         // ---- Cleanup ----
         fwprintf(stderr, L"[wslc] Shutting down...\n");

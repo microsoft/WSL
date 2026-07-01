@@ -34,10 +34,10 @@ static void PrintError(const wchar_t* context, HRESULT hr, PWSTR error)
 // Forward container stdout/stderr straight to the Windows console.
 static void CALLBACK OnStdIO(WslcProcessIOHandle ioHandle, const BYTE* data, uint32_t dataSize, PVOID context)
 {
-    HANDLE output = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? GetStdHandle(STD_OUTPUT_HANDLE) : GetStdHandle(STD_ERROR_HANDLE);
-    DWORD written = 0;
+    FILE* output = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? stdout : stderr;
     (void)context;
-    WriteFile(output, data, dataSize, &written, NULL);
+    fprintf(output, "%.*s", (int)dataSize, (const char*)data);
+    fflush(output);
 }
 
 // Record the exit code and wake up wmain.
@@ -45,7 +45,10 @@ static void CALLBACK OnProcessExit(INT32 exitCode, PVOID context)
 {
     (void)context;
     g_exitCode = exitCode;
-    SetEvent(g_exitEvent);
+    if (!SetEvent(g_exitEvent))
+    {
+        fwprintf(stderr, L"[wslc] Warning: SetEvent failed (0x%08X)\n", GetLastError());
+    }
 }
 
 // Build a storage path in a "WslcStorage" folder next to the executable, so the
@@ -80,13 +83,16 @@ int wmain(void)
     WslcProcessCallbacks callbacks;
     WslcPullImageOptions pullOptions;
     wchar_t storagePath[MAX_PATH];
+    DWORD waitResult;
 
     PCSTR initArgv[2] = { "/bin/sleep", "60" };
     PCSTR echoArgv[2] = { "/bin/echo", "Hello, World from a WSL container!" };
 
-    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    if (FAILED(hr)) { PrintError(L"Initialize COM", hr, NULL); return 1; }
 
     g_exitEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (g_exitEvent == NULL) { PrintError(L"Create exit event", HRESULT_FROM_WIN32(GetLastError()), NULL); goto cleanup; }
 
     // ---- Session ----
     fwprintf(stderr, L"[wslc] Creating session...\n");
@@ -134,8 +140,19 @@ int wmain(void)
     hr = WslcCreateContainerProcess(container, &execProcess, &process, &error);
     if (FAILED(hr)) { PrintError(L"Run echo", hr, error); goto cleanup; }
 
-    WaitForSingleObject(g_exitEvent, 30000);
-    result = g_exitCode;
+    waitResult = WaitForSingleObject(g_exitEvent, 30000);
+    if (waitResult == WAIT_OBJECT_0)
+    {
+        result = g_exitCode;
+    }
+    else if (waitResult == WAIT_TIMEOUT)
+    {
+        fwprintf(stderr, L"[wslc] Error: Timed out waiting for the process to exit.\n");
+    }
+    else
+    {
+        PrintError(L"Wait for process exit", HRESULT_FROM_WIN32(GetLastError()), NULL);
+    }
 
 cleanup:
     fwprintf(stderr, L"[wslc] Shutting down...\n");
