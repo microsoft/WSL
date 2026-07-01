@@ -166,8 +166,8 @@ class WSLCE2ENetworkCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_WithOpt_Success)
     {
-        auto result = RunWslc(std::format(
-            L"network create --opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450 {}", TestNetworkName));
+        auto result = RunWslc(
+            std::format(L"network create --opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450 {}", TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
 
@@ -219,9 +219,9 @@ private:
                 << L"  -d,--driver     Specify network driver name (default: bridge)\r\n"           //
                 << L"  -o,--opt        Set driver specific options\r\n"                             //
                 << L"  -l,--label      Network metadata setting\r\n"                                //
+                << L"  --gateway       IPv4 or IPv6 gateway for the subnet\r\n"                     //
                 << L"  --internal      Restrict external access to the network\r\n"                 //
                 << L"  --subnet        Subnet in CIDR format that represents a network segment\r\n" //
-                << L"  --gateway       IPv4 or IPv6 gateway for the subnet\r\n"                     //
                 << L"  -?,--help       Shows help about the selected command\r\n"                   //
                 << L"\r\n";
         return options.str();

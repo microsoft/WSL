@@ -3000,8 +3000,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(Invocation{
-                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(
+                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -5457,6 +5457,8 @@ class WSLCTests
         // Verify arbitrary driver options survive session recovery.
         wil::unique_cotaskmem_ansistring output;
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
         auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_IS_TRUE(inspect.Options.has_value());
         VERIFY_IS_TRUE(inspect.Options->contains("recovery.test.key"));
@@ -7345,10 +7347,10 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(std::format(
-                                        L"Endpoint settings are not yet supported (network '{}').",
-                                        std::wstring(networkName.begin(), networkName.end()))
-                                        .c_str());
+            ValidateCOMErrorMessage(
+                std::format(
+                    L"Endpoint settings are not yet supported (network '{}').", std::wstring(networkName.begin(), networkName.end()))
+                    .c_str());
         }
     }
 
@@ -9133,15 +9135,18 @@ class WSLCTests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(
+                std::make_unique<DockerIORelayHandle>(
+                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                readStdout.append(buffer.data(), buffer.size());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
+                readStderr.append(buffer.data(), buffer.size());
+            }));
 
             io.Run({});
 
@@ -9220,8 +9225,9 @@ class WSLCTests
                 std::string output;
                 MultiHandleWait io;
 
-                io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+                io.AddHandle(
+                    std::make_unique<DockerIORelayHandle>(
+                        std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
                 io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
                     output.append(buffer.data(), buffer.size());
@@ -9261,8 +9267,9 @@ class WSLCTests
 
         // Collect the relayed output.
         std::string output;
-        io.AddHandle(std::make_unique<ReadHandle>(
-            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+        io.AddHandle(std::make_unique<ReadHandle>(std::move(dstRead), [&](const gsl::span<char>& buffer) {
+            output.append(buffer.data(), buffer.size());
+        }));
 
         io.Run({});
 
