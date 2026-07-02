@@ -30,6 +30,7 @@ using helpers::WindowsBuildNumbers;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
+constexpr auto MAX_STORAGE_HW_QUEUES = 4;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
@@ -168,6 +169,12 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
     helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes);
+
+    // Cap the storage hw queue count. Default is CPU count.
+    if (Settings->CpuCount > MAX_STORAGE_HW_QUEUES)
+    {
+        kernelCmdLine += std::format(L" hv_storvsc.storvsc_max_hw_queues={}", MAX_STORAGE_HW_QUEUES);
+    }
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
