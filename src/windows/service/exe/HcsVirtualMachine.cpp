@@ -30,7 +30,7 @@ using helpers::WindowsBuildNumbers;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
-constexpr auto MAX_STORAGE_HW_QUEUES = 4;
+constexpr ULONG MAX_STORAGE_HW_QUEUES = 4;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
