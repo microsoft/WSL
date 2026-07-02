@@ -95,6 +95,18 @@ void CreateNetwork(CLIExecutionContext& context)
         options.Driver = WideToMultiByte(context.Args.Get<ArgType::Driver>());
     }
 
+    options.Internal = context.Args.Contains(ArgType::Internal);
+
+    if (context.Args.Contains(ArgType::Subnet))
+    {
+        options.Subnet = WideToMultiByte(context.Args.Get<ArgType::Subnet>());
+    }
+
+    if (context.Args.Contains(ArgType::Gateway))
+    {
+        options.Gateway = WideToMultiByte(context.Args.Get<ArgType::Gateway>());
+    }
+
     NetworkService::Create(context.Data.Get<Data::Session>(), options);
     PrintMessage(MultiByteToWide(options.Name));
 }
