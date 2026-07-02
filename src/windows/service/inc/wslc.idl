@@ -534,6 +534,9 @@ typedef struct _WSLCNetworkOptions
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
     ULONG LabelsCount;
+    BOOL Internal;
+    [unique] LPCSTR Subnet;
+    [unique] LPCSTR Gateway;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
