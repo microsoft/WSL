@@ -1105,8 +1105,9 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
 
     if (SocketCodePair.first != 200)
     {
-        // Read the error body synchronously with a timeout. HTTP/1.1 keep-alive would hang
-        // the async io.Run() path because the socket never closes.
+        // Read the error body synchronously with a timeout. The async ReadHandle + io.Run()
+        // path causes a ~5 second stall because overlapped ReadFile on hvsockets has delayed
+        // EOF detection compared to synchronous Winsock recv, even though Connection: close is set.
         lock.reset();
 
         DWORD timeout = 2000;
@@ -1246,8 +1247,9 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
     {
         // Read the error body synchronously. Docker error responses are small JSON and already
         // buffered in the socket. We cannot use the async io.Run() path with a raw ReadHandle
-        // because HTTP/1.1 keep-alive holds the connection open indefinitely, causing a hang.
-        // Use a short receive timeout so we don't block if Docker keeps the connection alive.
+        // because overlapped ReadFile on hvsockets has delayed EOF detection (~5s stall) compared
+        // to synchronous Winsock recv, even though Connection: close is set.
+        // Use a short receive timeout as a safety net.
         lock.reset();
 
         DWORD timeout = 2000; // 2 seconds — more than enough for a buffered error body
