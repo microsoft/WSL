@@ -513,6 +513,8 @@ void ContainerCp(CLIExecutionContext& context)
             // Ensure parent directory of target exists.
             std::error_code dirError;
             std::filesystem::create_directories(absTarget.parent_path(), dirError);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.parent_path().c_str());
 
             std::error_code moveError;
             std::filesystem::rename(extractedFile, absTarget, moveError);
