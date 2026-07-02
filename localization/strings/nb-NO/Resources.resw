@@ -2340,8 +2340,8 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Alternativet Gateway for nettverksdriveren krever at Subnet også angis.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Alternativet '--gateway' krever at '--subnet' også spesifiseres.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Nettverk {} har aktive endepunkter.</value>
@@ -2353,6 +2353,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nettverksmodusen støttes ikke: «{}»</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Ugyldig verdi for stopptidsavbrudd: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2920,6 +2924,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal for å stoppe beholderen</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Tidsavbrudd (i sekunder) for å stoppe beholderen før den avsluttes (-1 for ingen tidsavbrudd)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Størrelse på /dev/shm (f.eks. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3107,6 +3114,17 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Innstilling for nettverksmetadata</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Restrict external access to the network</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Delnett i CIDR format som representerer et nettverkssegment</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>IPv4- eller IPv6-gateway for delnettet</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Fjern ett eller flere nettverk.</value>

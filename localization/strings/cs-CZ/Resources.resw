@@ -2340,8 +2340,8 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Možnost síťového ovladače Gateway vyžaduje, aby se zadala i 'Subnet.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Možnost '--gateway' vyžaduje, aby byla zadaná také možnost '--subnet'.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Síť {} má aktivní koncové body.</value>
@@ -2353,6 +2353,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nepodporovaný režim sítě: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Neplatná hodnota časového limitu zastavení: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2920,6 +2924,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signál k zastavení kontejneru</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Časový limit (v sekundách) pro zastavení kontejneru před jeho ukončením (-1 bez časového limitu)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Velikost /dev/shm (např. 64 mil., 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3107,6 +3114,17 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Nastavení metadat sítě</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Omezit externí přístup k síti</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Podsíť ve formátu CIDR, která představuje síťový segment</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Brána IPv4 nebo IPv6 pro podsíť</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Odeberte jednu nebo více sítí.</value>
