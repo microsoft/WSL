@@ -81,7 +81,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"tar") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stderr->find(L"Cannot read tar data from terminal") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_SourceNotStdin)
@@ -92,7 +92,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"somefile.tar") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stderr->find(L"Source path not found: somefile.tar") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidTargetFormat_NoColon)
