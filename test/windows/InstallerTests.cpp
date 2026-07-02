@@ -147,7 +147,7 @@ class InstallerTests
         return m_packageManager.FindPackagesForUser(L"", wsl::windows::common::wslutil::c_msixPackageFamilyName).First().HasCurrent();
     }
 
-    static void CallMsiExec(const std::wstring& Args)
+    static DWORD RunMsiExec(const std::wstring& Args)
     {
         std::wstring commandLine;
         THROW_IF_FAILED(wil::GetSystemDirectoryW(commandLine));
@@ -170,7 +170,12 @@ class InstallerTests
             std::chrono::minutes(2),
             []() { return wil::ResultFromCaughtException() == E_ABORT; });
 
-        VERIFY_ARE_EQUAL(0L, exitCode);
+        return exitCode;
+    }
+
+    static void CallMsiExec(const std::wstring& Args)
+    {
+        VERIFY_ARE_EQUAL(0L, RunMsiExec(Args));
     }
 
     std::wstring GetMsiProductCode() const
@@ -720,14 +725,9 @@ class InstallerTests
 
     TEST_METHOD(MsiRemoveExistingProductsScheduledInsideTransaction)
     {
-        // Verify that RemoveExistingProducts is scheduled inside the MSI transaction
-        // (between InstallInitialize and InstallFinalize). This is the effect of
+        // Verify that RemoveExistingProducts is scheduled between InstallInitialize
+        // and InstallFinalize in the MSI sequence table. This is the effect of
         // Schedule="afterInstallInitialize" on <MajorUpgrade> in package.wix.in.
-        //
-        // When RemoveExistingProducts runs inside the transaction, a failed upgrade
-        // triggers rollback that restores the previous installation's files.
-        // Without this scheduling, the old product is removed outside the transaction
-        // and cannot be restored on failure — leaving no WSL files on disk.
 
         unique_msi_handle database;
         THROW_IF_WIN32_ERROR(MsiOpenDatabaseW(m_msiPath.c_str(), MSIDBOPEN_READONLY, &database));
@@ -742,17 +742,55 @@ class InstallerTests
         VERIFY_ARE_NOT_EQUAL(-1, removeExistingProducts);
         VERIFY_ARE_NOT_EQUAL(-1, installFinalize);
 
-        // RemoveExistingProducts must be after InstallInitialize (inside the transaction)
         VERIFY_IS_GREATER_THAN(
-            removeExistingProducts,
-            installInitialize,
-            L"RemoveExistingProducts must be scheduled after InstallInitialize for rollback protection");
+            removeExistingProducts, installInitialize, L"RemoveExistingProducts must be after InstallInitialize");
 
-        // RemoveExistingProducts must be before InstallFinalize (still inside the transaction)
-        VERIFY_IS_LESS_THAN(
-            removeExistingProducts,
-            installFinalize,
-            L"RemoveExistingProducts must be scheduled before InstallFinalize for rollback protection");
+        VERIFY_IS_LESS_THAN(removeExistingProducts, installFinalize, L"RemoveExistingProducts must precede InstallFinalize");
+    }
+
+    TEST_METHOD(MsiUpgradeFailureRestoresFiles)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
+        return;
+#else
+        // End-to-end rollback test: install an older version, then attempt a major
+        // upgrade that fails inside the transaction. Verify the old version's files
+        // are restored by MSI rollback.
+
+        UninstallMsi();
+        InstallGitHubRelease(L"2.0.2");
+
+        auto restore = wil::scope_exit([this]() { InstallMsi(); });
+
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        const auto wslExe = m_installedPath / L"wsl.exe";
+        const auto wslService = m_installedPath / L"wslservice.exe";
+        const auto systemVhd = m_installedPath / L"system.vhd";
+
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExe), L"wsl.exe must exist before upgrade");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslService), L"wslservice.exe must exist before upgrade");
+        VERIFY_IS_TRUE(std::filesystem::exists(systemVhd), L"system.vhd must exist before upgrade");
+
+        // Attempt a major upgrade forced to fail after RemoveExistingProducts.
+        PrepareForMsiOperation();
+        auto msiArgs = std::format(
+            L"/qn /norestart /i \"{}\" WSL_TEST_FORCE_INSTALL_FAILURE=1 SKIPVALIDATION=1 "
+            L"/L*V \"{}\"",
+            m_msiPath,
+            GenerateMsiLogPath());
+        auto exitCode = RunMsiExec(msiArgs);
+
+        VERIFY_ARE_NOT_EQUAL(0L, exitCode, L"Upgrade should have failed due to forced failure CA");
+
+        // Verify rollback restored the previous installation
+        VERIFY_IS_TRUE(IsMsiPackageInstalled(), L"MSI package must still be installed after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExe), L"wsl.exe must be restored after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslService), L"wslservice.exe must be restored after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(systemVhd), L"system.vhd must be restored after rollback");
+        ValidateInstalledVersion(L"2.0.2");
+#endif
     }
 
     TEST_METHOD(WslUpdateNoNewVersion)

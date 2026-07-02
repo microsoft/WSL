@@ -707,6 +707,17 @@
         <CustomAction Id="DisableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="DisableWslService" Return="ignore" Execute="deferred" />
         <CustomAction Id="EnableWslService" Impersonate="no" BinaryRef="wslinstall.dll" DllEntry="EnableWslService" Return="ignore" Execute="rollback" />
 
+        <!-- Test-only: forces install failure when WSL_TEST_FORCE_INSTALL_FAILURE=1 is passed to msiexec -->
+        <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
+        <CustomAction Id="TestForceInstallFailure"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="WslTestForceInstallFailure"
+            Return="check"
+            Execute="deferred"
+        />
+        <?endif?>
+
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
@@ -761,6 +772,9 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+            <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
+            <Custom Action="TestForceInstallFailure" After="FinalizeInstall" Condition='WSL_TEST_FORCE_INSTALL_FAILURE = 1 and (not UPGRADINGPRODUCTCODE)' />
+            <?endif?>
 
             <!-- Rollback CA must be sequenced before the forward action so it is registered
                  in the rollback script first. -->
@@ -782,6 +796,11 @@
              See: https://learn.microsoft.com/en-us/windows/win32/msi/msirmshutdown
         -->
         <Property Id="MSIRMSHUTDOWN" Value="1" Secure="yes" />
+
+        <!-- Test-only: allows forcing install failure for rollback validation -->
+        <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
+        <Property Id="WSL_TEST_FORCE_INSTALL_FAILURE" Secure="yes" />
+        <?endif?>
     </Package>
 </Wix>
 
