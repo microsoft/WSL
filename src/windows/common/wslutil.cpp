@@ -1320,17 +1320,17 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
-    EnumReferenceFormat referenceFormat = EnumReferenceFormat::None;
+    EnumReferenceFormat referenceFormat = EnumReferenceFormatNone;
     std::optional<std::string> tagOrDigest;
     if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
     {
         tagOrDigest = digest.str();
-        referenceFormat = EnumReferenceFormat::Digest;
+        referenceFormat = EnumReferenceFormatDigest;
     }
     else if (tag.matched) // <repo>:<tag>
     {
         tagOrDigest = tag.str();
-        referenceFormat = EnumReferenceFormat::Tag;
+        referenceFormat = EnumReferenceFormatTag;
     }
 
     if (Format)
