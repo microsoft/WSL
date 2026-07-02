@@ -147,7 +147,7 @@ bool WSLCExecutionResult::StdoutContainsSubstring(const std::wstring& substring)
     return Stdout.value().find(substring) != std::wstring::npos;
 }
 
-WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType, std::optional<HANDLE> stdinHandle)
+WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType, HANDLE stdinHandle)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
@@ -162,22 +162,21 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType eleva
 
     wil::unique_hfile nul;
     wil::unique_hfile stdinDup;
-    HANDLE effectiveStdin = nullptr;
-    if (stdinHandle.has_value())
+    if (stdinHandle)
     {
         // Duplicate as inheritable to avoid mutating the caller's handle state.
-        THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-            GetCurrentProcess(), stdinHandle.value(), GetCurrentProcess(), stdinDup.put(), 0, TRUE, DUPLICATE_SAME_ACCESS));
-        effectiveStdin = stdinDup.get();
+        THROW_IF_WIN32_BOOL_FALSE(
+            DuplicateHandle(GetCurrentProcess(), stdinHandle, GetCurrentProcess(), stdinDup.put(), 0, TRUE, DUPLICATE_SAME_ACCESS));
+        stdinHandle = stdinDup.get();
     }
     else
     {
         nul = wsl::windows::common::filesystem::OpenNulDevice(GENERIC_READ);
         THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(nul.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-        effectiveStdin = nul.get();
+        stdinHandle = nul.get();
     }
 
-    process.SetStdHandles(effectiveStdin, nullptr, nullptr);
+    process.SetStdHandles(stdinHandle, nullptr, nullptr);
 
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};

@@ -126,8 +126,7 @@ private:
     std::optional<std::string> m_ignoreSequence;
 };
 
-WSLCExecutionResult RunWslc(
-    const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<HANDLE> stdinHandle = std::nullopt);
+WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, HANDLE stdinHandle = nullptr);
 WSLCExecutionResult RunWslcAndRedirectToFile(
     const std::wstring& commandLine,
     std::optional<std::filesystem::path> outputPath = std::nullopt,

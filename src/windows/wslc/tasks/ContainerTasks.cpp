@@ -285,14 +285,14 @@ void ContainerCp(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::Target));
 
     auto& session = context.Data.Get<Data::Session>();
-    auto source = WideToMultiByte(context.Args.Get<ArgType::Source>());
-    auto target = WideToMultiByte(context.Args.Get<ArgType::Target>());
+    const auto& source = context.Args.Get<ArgType::Source>();
+    const auto& target = context.Args.Get<ArgType::Target>();
 
     // Determine copy direction by looking for CONTAINER:PATH patterns.
     // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
-    auto isContainerPath = [](const std::string& path) -> bool {
-        auto colonPos = path.find(':');
-        if (colonPos == std::string::npos || colonPos == 0)
+    auto isContainerPath = [](const std::wstring& path) -> bool {
+        auto colonPos = path.find(L':');
+        if (colonPos == std::wstring::npos || colonPos == 0)
         {
             return false;
         }
@@ -306,18 +306,20 @@ void ContainerCp(CLIExecutionContext& context)
         return true;
     };
 
-    auto parseContainerPath = [](const std::string& path) -> std::pair<std::string, std::string> {
-        auto colonPos = path.find(':');
+    auto parseContainerPath = [](const std::wstring& path) -> std::pair<std::string, std::string> {
+        auto colonPos = path.find(L':');
         // Skip Windows drive letter if present
         if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
         {
-            colonPos = path.find(':', 2);
+            colonPos = path.find(L':', 2);
         }
 
-        return {path.substr(0, colonPos), path.substr(colonPos + 1)};
+        auto container = WideToMultiByte(path.substr(0, colonPos));
+        auto containerPath = WideToMultiByte(path.substr(colonPos + 1));
+        return {container, containerPath};
     };
 
-    bool sourceIsStdin = (source == "-");
+    bool sourceIsStdin = (source == L"-");
     bool sourceIsContainer = !sourceIsStdin && isContainerPath(source);
     bool targetIsContainer = isContainerPath(target);
 
@@ -348,12 +350,11 @@ void ContainerCp(CLIExecutionContext& context)
         else
         {
             // Local path → container: create tar from local path using tar.exe
-            auto widePath = MultiByteToWide(source);
             std::error_code fsError;
-            bool pathExists = std::filesystem::exists(widePath, fsError);
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(widePath), fsError || !pathExists);
+            bool pathExists = std::filesystem::exists(source, fsError);
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
 
-            auto absPath = std::filesystem::absolute(widePath);
+            auto absPath = std::filesystem::absolute(source);
             auto parentDir = absPath.parent_path().wstring();
             auto fileName = absPath.filename().wstring();
 
@@ -409,13 +410,11 @@ void ContainerCp(CLIExecutionContext& context)
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
-        auto wideTarget = MultiByteToWide(target);
-        auto absTarget = std::filesystem::absolute(wideTarget);
+        auto absTarget = std::filesystem::absolute(target);
 
         // Determine if target is a directory or a file destination.
         // Treat as directory if: ends with separator, or already exists as a directory.
-        bool targetIsDir = (!wideTarget.empty() && (wideTarget.back() == L'\\' || wideTarget.back() == L'/')) ||
-                           std::filesystem::is_directory(absTarget);
+        bool targetIsDir = (!target.empty() && (target.back() == L'\\' || target.back() == L'/')) || std::filesystem::is_directory(absTarget);
 
         // Download archive from container to a temp file
         wchar_t tempDir[MAX_PATH]{};

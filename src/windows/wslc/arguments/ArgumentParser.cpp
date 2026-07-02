@@ -18,23 +18,6 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-// Parses a boolean string value (true/false/1/0, case-insensitive).
-// Returns the parsed value, or std::nullopt if the string is not a valid boolean.
-static std::optional<bool> ParseBoolValue(std::wstring_view value)
-{
-    if (string::IsEqual(value, L"true") || value == L"1")
-    {
-        return true;
-    }
-
-    if (string::IsEqual(value, L"false") || value == L"0")
-    {
-        return false;
-    }
-
-    return std::nullopt;
-}
-
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
     m_invocation(inv),
@@ -362,7 +345,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
     if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
     {
-        auto boolVal = ParseBoolValue(currArg.substr(currentPos + 1));
+        auto boolVal = string::ParseBool(std::wstring(currArg.substr(currentPos + 1)).c_str());
         if (!boolVal.has_value())
         {
             return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
@@ -415,7 +398,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         // Boolean flag in chain — check for adjoined boolean value.
         if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
         {
-            auto boolVal = ParseBoolValue(currArg.substr(nextPos + 1));
+            auto boolVal = string::ParseBool(std::wstring(currArg.substr(nextPos + 1)).c_str());
             if (!boolVal.has_value())
             {
                 return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
@@ -480,7 +463,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
             {
                 if (hasAdjoinedValue)
                 {
-                    auto boolVal = ParseBoolValue(argValue);
+                    auto boolVal = string::ParseBool(std::wstring(argValue).c_str());
                     if (!boolVal.has_value())
                     {
                         return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
