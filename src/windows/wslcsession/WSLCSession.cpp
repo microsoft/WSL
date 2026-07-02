@@ -2443,7 +2443,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
     std::string name = Options->Name;
-    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
+    std::string driver = Options->Driver != nullptr ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
@@ -2452,17 +2452,6 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
-
-    static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
-    for (const auto& [key, _] : driverOpts)
-    {
-        const bool supported = std::any_of(
-            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -2477,25 +2466,29 @@ try
     request.Labels = labels;
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
-    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
-    {
-        request.Internal = (it->second == "true");
-    }
+    request.Internal = static_cast<bool>(Options->Internal);
 
-    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
+
+    if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
-        ipamConfig.Subnet = it->second;
+        ipamConfig.Subnet = Options->Subnet;
 
-        auto gatewayIt = driverOpts.find("Gateway");
-        if (gatewayIt != driverOpts.end())
+        if (Options->Gateway != nullptr)
         {
-            ipamConfig.Gateway = gatewayIt->second;
+            ipamConfig.Gateway = Options->Gateway;
         }
 
         auto& ipam = request.IPAM.emplace();
         ipam.Driver = "default";
         ipam.Config.emplace().push_back(std::move(ipamConfig));
+    }
+
+    if (!driverOpts.empty())
+    {
+        request.Options = std::move(driverOpts);
     }
 
     docker_schema::CreateNetworkResponse createResult;
@@ -2535,6 +2528,10 @@ try
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
     entry.Labels = full.Labels;
+    if (full.Options)
+    {
+        entry.Options = *full.Options;
+    }
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
@@ -2659,6 +2656,10 @@ try
     result.Scope = entry.Scope;
     result.Internal = entry.Internal;
     result.Labels = entry.Labels;
+    if (!entry.Options.empty())
+    {
+        result.Options = entry.Options;
+    }
 
     result.IPAM.Driver = entry.IPAM.Driver;
     if (entry.IPAM.Config)
@@ -3489,6 +3490,10 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
             entry.Labels = network.Labels;
+            if (network.Options)
+            {
+                entry.Options = *network.Options;
+            }
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {

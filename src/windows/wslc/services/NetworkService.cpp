@@ -50,6 +50,17 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
     options.Labels = labels.data();
     options.LabelsCount = static_cast<ULONG>(labels.size());
 
+    options.Internal = createOptions.Internal ? TRUE : FALSE;
+    if (createOptions.Subnet.has_value())
+    {
+        options.Subnet = createOptions.Subnet->c_str();
+    }
+
+    if (createOptions.Gateway.has_value())
+    {
+        options.Gateway = createOptions.Gateway->c_str();
+    }
+
     auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
 }

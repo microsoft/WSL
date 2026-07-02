@@ -109,6 +109,76 @@ class WSLCE2ENetworkCreateTests
             {.Stdout = L"", .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Internal_Success)
+    {
+        auto result = RunWslc(std::format(L"network create --internal {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.Internal);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Subnet_Success)
+    {
+        const std::wstring subnet = L"172.45.0.0/16";
+        auto result = RunWslc(std::format(L"network create --subnet {} {}", subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(subnet), (*inspect.IPAM.Config)[0].Subnet);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_SubnetAndGateway_Success)
+    {
+        const std::wstring subnet = L"172.46.0.0/16";
+        const std::wstring gateway = L"172.46.0.1";
+        auto result = RunWslc(std::format(L"network create --subnet {} --gateway {} {}", subnet, gateway, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(subnet), (*inspect.IPAM.Config)[0].Subnet);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(gateway), (*inspect.IPAM.Config)[0].Gateway);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_GatewayWithoutSubnet_Fail)
+    {
+        auto result = RunWslc(std::format(L"network create --gateway 172.47.0.1 {}", TestNetworkName));
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = L"The '--gateway' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_WithOpt_Success)
+    {
+        constexpr auto c_opts = L"--opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450";
+        auto result = RunWslc(std::format(L"network create {} {}", c_opts, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.Options.has_value());
+        VERIFY_ARE_EQUAL("true", (*inspect.Options)["com.docker.network.bridge.enable_icc"]);
+        VERIFY_ARE_EQUAL("1450", (*inspect.Options)["com.docker.network.driver.mtu"]);
+    }
+
 private:
     const std::wstring TestNetworkName = L"wslc-e2e-network-create";
 
@@ -145,11 +215,14 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                            //
-                << L"  -d,--driver     Specify network driver name (default: bridge)\r\n" //
-                << L"  -o,--opt        Set driver specific options\r\n"                   //
-                << L"  -l,--label      Network metadata setting\r\n"                      //
-                << L"  -?,--help       Shows help about the selected command\r\n"         //
+        options << L"The following options are available:\r\n"                                      //
+                << L"  -d,--driver     Specify network driver name (default: bridge)\r\n"           //
+                << L"  -o,--opt        Set driver specific options\r\n"                             //
+                << L"  -l,--label      Network metadata setting\r\n"                                //
+                << L"  --gateway       IPv4 or IPv6 gateway for the subnet\r\n"                     //
+                << L"  --internal      Restrict external access to the network\r\n"                 //
+                << L"  --subnet        Subnet in CIDR format that represents a network segment\r\n" //
+                << L"  -?,--help       Shows help about the selected command\r\n"                   //
                 << L"\r\n";
         return options.str();
     }
