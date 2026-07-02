@@ -6071,11 +6071,12 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
         }
 
+        ULONGLONG until = now();
+
         // The container's create, start, kill then stop events are reported in order, each carrying
         // the container's 64-hex id as the actor.
         {
             WSLCFilter filter{"container", id.c_str()};
-            ULONGLONG until = now();
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
