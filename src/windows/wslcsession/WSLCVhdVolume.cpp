@@ -84,6 +84,31 @@ namespace {
         return name;
     }
 
+    void RemoveLostFoundDirectory(WSLCVirtualMachine& VirtualMachine, const std::string& VolumeName, const std::string& MountPath)
+    try
+    {
+        constexpr auto c_lostFoundDir = "lost+found";
+        const auto entries = VirtualMachine.ListDirectory(MountPath);
+
+        // Only remove lost+found if the disk is empty besides that directory.
+        if (entries.size() != 1 || entries.front() != c_lostFoundDir)
+        {
+            return;
+        }
+
+        try
+        {
+            VirtualMachine.RemoveDirectory(std::format("{}/{}", MountPath, c_lostFoundDir));
+        }
+        catch (...)
+        {
+            // rmdir only removes an empty directory, so reaching here means the
+            // lone lost+found captured recovered data. Leave it and warn.
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeLostFoundNotEmpty(VolumeName));
+        }
+    }
+    CATCH_LOG();
 } // namespace
 
 WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
@@ -150,6 +175,13 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
 
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
+
+    // mkfs.ext4 always creates a lost+found directory at the filesystem root,
+    // which makes a freshly formatted volume look non-empty to Docker and
+    // suppresses the copy-up that seeds image data on first use. Drop it so
+    // Docker seeds the volume with the image's contents. No-op when the volume
+    // already contains data.
+    RemoveLostFoundDirectory(VirtualMachine, name, virtualMachinePath);
 
     WSLCVolumeMetadata metadata;
     metadata.Driver = WSLCVhdVolumeDriver;
@@ -245,6 +277,8 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
 
         VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
         auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
+
+        RemoveLostFoundDirectory(VirtualMachine, Volume.Name, virtualMachinePath);
 
         lun = attachedLun;
         attached = true;

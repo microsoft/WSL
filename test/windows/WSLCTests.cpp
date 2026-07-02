@@ -4165,6 +4165,47 @@ class WSLCTests
         VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
     }
 
+    WSLC_TEST_METHOD(NamedVolumesVhdSeedsImageData)
+    {
+        // A freshly formatted VHD volume must be seeded with the image's content
+        // on first use, just like a guest volume. mkfs.ext4 creates a lost+found
+        // directory at the volume root; if it isn't removed, Docker treats the
+        // volume as non-empty and skips the copy-up that seeds image data.
+        // Mounting the empty volume over a directory the image is guaranteed to
+        // populate (/etc) exercises that copy-up.
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        const std::string volumeName = "wslc-test-named-volume-vhd-seed";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Driver = "vhd";
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-vhd-seed-container", {"/bin/sh", "-c", "ls -A /etc"});
+        launcher.AddNamedVolume(volumeName, "/etc", false);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+
+        // Image content was seeded into the volume...
+        VERIFY_IS_TRUE(
+            result.Output[1].find("passwd") != std::string::npos,
+            L"Image's /etc content should be seeded into the fresh VHD volume");
+
+        // ...and the ext4 lost+found is gone, so it never blocked copy-up.
+        VERIFY_IS_TRUE(
+            result.Output[1].find("lost+found") == std::string::npos, L"lost+found should have been removed from the volume root");
+    }
+
     WSLC_TEST_METHOD(NamedVolumesGuest)
     {
         ValidateNamedVolumeContract("guest", nullptr, 0);
