@@ -508,7 +508,7 @@ void ContainerCp(CLIExecutionContext& context)
                 break;
             }
 
-            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, "No file extracted from container archive", extractedFile.empty());
+            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpNoFileExtractedError(), extractedFile.empty());
 
             // Ensure parent directory of target exists.
             std::error_code dirError;

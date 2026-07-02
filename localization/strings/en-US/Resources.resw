@@ -2522,6 +2522,10 @@ Usage: wslc container cp [OPTIONS] SOURCE DEST
 Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
   </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>No file extracted from container archive</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspect a container.</value>
   </data>
