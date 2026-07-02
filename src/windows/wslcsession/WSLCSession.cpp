@@ -388,15 +388,18 @@ try
         const std::filesystem::path storagePath{Settings->StoragePath};
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings->StoragePath), !storagePath.is_absolute());
 
+        const auto vhdPath = storagePath / c_storageVhdFilename;
+        std::error_code existsError;
+        const bool vhdExists = std::filesystem::exists(vhdPath, existsError);
+        THROW_IF_WIN32_ERROR_MSG(existsError.value(), "exists failed for %ls", vhdPath.c_str());
+
         if (WI_IsFlagSet(Settings->StorageFlags, WSLCSessionStorageFlagsNoCreate))
         {
             // The storage VHD must already exist (ConfigureStorage will not create it).
             THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
-                Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath),
-                !std::filesystem::exists(storagePath / c_storageVhdFilename));
+                HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), Localization::MessageWslcSessionStorageNotFound(Settings->StoragePath), !vhdExists);
         }
-        else if (!std::filesystem::exists(storagePath / c_storageVhdFilename))
+        else if (!vhdExists)
         {
             // New session: the target path (if it exists) must be an empty directory.
             ValidateNewSessionStorageDirectory(storagePath);
