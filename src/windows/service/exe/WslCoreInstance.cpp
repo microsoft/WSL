@@ -309,6 +309,8 @@ void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::
             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(oobeResult->DefaultUid));
             m_defaultUid = static_cast<int>(oobeResult->DefaultUid);
         }
+
+        RegisterPlan9ConnectionTarget(m_userToken.get());
     }
 }
 
@@ -530,6 +532,12 @@ void WslCoreInstance::Stop()
 
 void WslCoreInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    // m_defaultUid is not set before OOBE is complete.
+    if (m_configuration.RunOOBE)
+    {
+        return;
+    }
+
     // If Plan 9 is running, add a connection target to the P9Rdr driver.
     if (m_plan9Port != LX_INIT_UTILITY_VM_INVALID_PORT)
     {
