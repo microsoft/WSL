@@ -633,7 +633,7 @@ class WSLCE2EContainerRunTests
         auto portBindings = inspectContainer.Ports[portKey];
         VERIFY_ARE_EQUAL(1u, portBindings.size());
         VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
-        VERIFY_ARE_EQUAL(*hostIp, portBindings[0].HostIp);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(*hostIp), portBindings[0].HostIp);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
