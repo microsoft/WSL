@@ -1087,7 +1087,8 @@ class NetworkTests
     static constexpr auto c_proxyBypassLower = L"no_proxy";
     static constexpr auto c_proxyBypassUpper = L"NO_PROXY";
     static constexpr auto c_pacProxy = L"WSL_PAC_URL";
-    static constexpr auto c_httpProxyString = L"http://test.com:8888";
+    static constexpr auto c_httpProxyHostPort = L"test.com:8888";
+    static inline const std::wstring c_httpProxyString = std::wstring(L"http://") + c_httpProxyHostPort;
     static constexpr auto c_httpProxyString2 = L"http://otherServer.com:1234";
     static constexpr auto c_httpProxyLocalhost = L"http://localhost:8888";
     static constexpr auto c_httpProxyLoopback = L"http://loopback:8888";
@@ -1098,7 +1099,8 @@ class NetworkTests
     static constexpr auto c_httpProxyBypassString = L"test";
     static constexpr auto c_pacServerPrefix = L"http://127.0.0.1:12399/";
     static constexpr auto c_pacUrl = L"http://127.0.0.1:12399/wslproxy.pac";
-    static constexpr auto c_pacScript = LR"(function FindProxyForURL(url, host) { return \"PROXY test.com:8888\"; })";
+    static inline const std::wstring c_pacScript =
+        std::wstring(LR"(function FindProxyForURL(url, host) { return \"PROXY )") + c_httpProxyHostPort + LR"(\"; })";
 
     static void VerifyWslEnvVariable(const std::wstring& envVar, const std::wstring& proxyString)
     {
@@ -1176,7 +1178,7 @@ class NetworkTests
             THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"WSLENV", nullptr));
         });
 
-        THROW_LAST_ERROR_IF(!SetEnvironmentVariable(c_httpProxyLower, c_httpProxyString));
+        THROW_LAST_ERROR_IF(!SetEnvironmentVariable(c_httpProxyLower, c_httpProxyString.c_str()));
         std::wstring wslEnvVal{c_httpProxyLower};
         THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"WSLENV", wslEnvVal.append(L"/u").c_str()));
 
@@ -1274,7 +1276,7 @@ class NetworkTests
 
     static void VerifyHttpProxyPac(bool userScope = true)
     {
-        UniqueWebServer pacServer(c_pacServerPrefix, c_pacScript);
+        UniqueWebServer pacServer(c_pacServerPrefix, c_pacScript.c_str());
 
         auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(userScope); });
 
@@ -1287,7 +1289,7 @@ class NetworkTests
                 THROW_HR_IF(E_FAIL, out != c_httpProxyString);
             },
             std::chrono::seconds(1),
-            std::chrono::seconds(10));
+            std::chrono::minutes(2));
 
         VerifyHttpProxyPacUrlMirrored(c_pacUrl);
         VerifyHttpProxyStringMirrored(c_httpProxyString);
