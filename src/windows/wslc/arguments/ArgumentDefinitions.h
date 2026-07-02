@@ -63,6 +63,11 @@ _(Format,         "format",              NO_ALIAS,          Kind::Value,       L
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
 _(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
+_(HealthCmd,      "health-cmd",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthCmdArgDescription()) \
+_(HealthInterval, "health-interval",     NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthIntervalArgDescription()) \
+_(HealthRetries,  "health-retries",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthRetriesArgDescription()) \
+_(HealthStartPeriod, "health-start-period", NO_ALIAS,       Kind::Value,       Localization::WSLCCLI_HealthStartPeriodArgDescription()) \
+_(HealthTimeout,  "health-timeout",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthTimeoutArgDescription()) \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ImageForceArgDescription()) \

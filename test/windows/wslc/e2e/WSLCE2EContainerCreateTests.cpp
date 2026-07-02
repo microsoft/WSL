@@ -821,6 +821,83 @@ class WSLCE2EContainerCreateTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_HealthCheck)
+    {
+        // All health-check options are forwarded to the container configuration.
+        {
+            auto result = RunWslc(std::format(
+                LR"(container create --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {})",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 0"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // Durations are reported in nanoseconds.
+            VERIFY_IS_TRUE(health.Interval.has_value());
+            VERIFY_ARE_EQUAL(5'000'000'000LL, health.Interval.value());
+            VERIFY_IS_TRUE(health.Timeout.has_value());
+            VERIFY_ARE_EQUAL(3'000'000'000LL, health.Timeout.value());
+            VERIFY_IS_TRUE(health.StartPeriod.has_value());
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value());
+            VERIFY_IS_TRUE(health.Retries.has_value());
+            VERIFY_ARE_EQUAL(2, health.Retries.value());
+
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // Only --health-cmd: the command is forwarded, other fields fall back to the daemon default.
+        {
+            auto result = RunWslc(
+                std::format(LR"(container create --health-cmd "exit 1" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 1"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When no health option is specified, no health check is forwarded.
+        {
+            auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.Healthcheck.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_HealthCheck_Invalid)
+    {
+        {
+            auto result = RunWslc(std::format(
+                L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = L"Invalid health-interval argument value: 'notaduration'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container create --health-retries abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid health-retries argument value: abc\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_StopSignal_Invalid)
     {
         {
@@ -1269,38 +1346,45 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n" //
-                << L"  --cidfile         Write the container ID to the provided path\r\n"
-                << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
-                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
-                << L"  --dns-option      Set DNS options\r\n"
-                << L"  --dns-search      Set DNS search domains\r\n"
-                << L"  --domainname      Container domain name\r\n"
-                << L"  --entrypoint      Specifies the container init process executable\r\n"
-                << L"  -e,--env          Key=Value pairs for environment variables\r\n"
-                << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  --gpus            Add GPU devices to the container ('all' to pass all GPUs)\r\n"
-                << L"  -h,--hostname     Container host name\r\n"
-                << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  -l,--label        Set metadata on an object\r\n"
-                << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
-                << L"  --name            Name of the container\r\n"
-                << L"  --network         Connect a container to a network\r\n"
-                << L"  --network-alias   Add a network-scoped alias for the container\r\n"
-                << L"  -p,--publish      Publish a port from a container to host\r\n"
-                << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
-                << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
-                << L"  --stop-signal     Signal to stop the container\r\n"
-                << L"  --stop-timeout    Timeout (in seconds) to stop the container before killing it (-1 for no timeout)\r\n"
-                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
-                << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  --ulimit          Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
-                << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -?,--help         Shows help about the selected command\r\n"
-                << L"\r\n";
+        options
+            << L"The following options are available:\r\n" //
+            << L"  --cidfile              Write the container ID to the provided path\r\n"
+            << L"  --cpus                 Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
+            << L"  --dns                  IP address of the DNS nameserver in resolv.conf\r\n"
+            << L"  --dns-option           Set DNS options\r\n"
+            << L"  --dns-search           Set DNS search domains\r\n"
+            << L"  --domainname           Container domain name\r\n"
+            << L"  --entrypoint           Specifies the container init process executable\r\n"
+            << L"  -e,--env               Key=Value pairs for environment variables\r\n"
+            << L"  --env-file             File containing key=value pairs of env variables\r\n"
+            << L"  --gpus                 Add GPU devices to the container ('all' to pass all GPUs)\r\n"
+            << L"  --health-cmd           Command to run to check container health\r\n"
+            << L"  --health-interval      Time between running the health check (e.g. 30s, 1m30s)\r\n"
+            << L"  --health-retries       Consecutive failures needed to report the container as unhealthy\r\n"
+            << L"  --health-start-period  Start period for the container to initialize before health-check countdown (e.g. 30s, "
+               L"1m30s)\r\n"
+            << L"  --health-timeout       Maximum time to allow one health check to run (e.g. 30s, 1m30s)\r\n"
+            << L"  -h,--hostname          Container host name\r\n"
+            << L"  -i,--interactive       Attach to stdin and keep it open\r\n"
+            << L"  -l,--label             Set metadata on an object\r\n"
+            << L"  -m,--memory            Memory limit (e.g. 512M, 1G)\r\n"
+            << L"  --name                 Name of the container\r\n"
+            << L"  --network              Connect a container to a network\r\n"
+            << L"  --network-alias        Add a network-scoped alias for the container\r\n"
+            << L"  -p,--publish           Publish a port from a container to host\r\n"
+            << L"  -P,--publish-all       Publish all exposed ports to random host ports\r\n"
+            << L"  --rm                   Remove the container after it stops\r\n"
+            << L"  --shm-size             Size of /dev/shm (e.g. 64M, 1G)\r\n"
+            << L"  --stop-signal          Signal to stop the container\r\n"
+            << L"  --stop-timeout         Timeout (in seconds) to stop the container before killing it (-1 for no timeout)\r\n"
+            << L"  --tmpfs                Mount tmpfs to the container at the given path\r\n"
+            << L"  -t,--tty               Open a TTY with the container process.\r\n"
+            << L"  --ulimit               Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
+            << L"  -u,--user              User ID for the process (name|uid|uid:gid)\r\n"
+            << L"  -v,--volume            Bind mount a volume to the container\r\n"
+            << L"  -w,--workdir           Working directory inside the container\r\n"
+            << L"  -?,--help              Shows help about the selected command\r\n"
+            << L"\r\n";
         return options.str();
     }
 };

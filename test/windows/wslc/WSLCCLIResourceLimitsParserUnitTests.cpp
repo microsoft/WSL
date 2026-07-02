@@ -124,6 +124,56 @@ class WSLCCLIResourceLimitsParserUnitTests
         VERIFY_NO_THROW(validation::ValidateUlimit({L"nofile=1024", L"core=-1"}, L"ulimit"));
         VERIFY_THROWS(validation::ValidateUlimit({L"nofile=1024", L"bad"}, L"ulimit"), ArgumentException);
     }
+
+    TEST_METHOD(Duration_Valid)
+    {
+        // (input, expected nanoseconds)
+        std::vector<std::pair<std::wstring, int64_t>> valid = {
+            {L"0", 0LL},
+            {L"1ns", 1LL},
+            {L"500ms", 500'000'000LL},
+            {L"30s", 30'000'000'000LL},
+            {L"1m", 60'000'000'000LL},
+            {L"1m30s", 90'000'000'000LL},
+            {L"1h", 3'600'000'000'000LL},
+            {L"1.5h", 5'400'000'000'000LL},
+            {L"2h45m", 9'900'000'000'000LL},
+            {L"100us", 100'000LL},
+        };
+
+        for (const auto& [input, expected] : valid)
+        {
+            const auto actual = validation::GetDurationNanosFromString(input, L"health-interval");
+            VERIFY_ARE_EQUAL(expected, actual);
+        }
+    }
+
+    TEST_METHOD(Duration_Invalid)
+    {
+        // Each value should be rejected as an invalid duration.
+        const std::vector<std::wstring> invalid = {
+            L"",
+            L"abc",
+            L"30",    // missing unit
+            L"30sec", // unknown unit
+            L"30x",   // unknown unit
+            L"-30s",  // negative durations are rejected
+            L"30 s",  // embedded whitespace
+            L"s",     // missing number
+            L"1.2.3s" // multiple dots
+        };
+
+        for (const auto& input : invalid)
+        {
+            VERIFY_THROWS(validation::GetDurationNanosFromString(input, L"health-interval"), ArgumentException);
+        }
+    }
+
+    TEST_METHOD(Duration_Validator)
+    {
+        VERIFY_NO_THROW(validation::ValidateDuration({L"30s", L"1m30s", L"0"}, L"health-interval"));
+        VERIFY_THROWS(validation::ValidateDuration({L"30s", L"bad"}, L"health-interval"), ArgumentException);
+    }
 };
 
 } // namespace WSLCCLIResourceLimitsParserUnitTests

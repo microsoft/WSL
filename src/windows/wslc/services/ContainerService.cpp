@@ -146,6 +146,31 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetShmSize(options.ShmSize.value());
     }
 
+    if (options.HealthCmd.has_value())
+    {
+        containerLauncher.SetHealthCmd(std::string(options.HealthCmd.value()));
+    }
+
+    if (options.HealthInterval.has_value())
+    {
+        containerLauncher.SetHealthInterval(options.HealthInterval.value());
+    }
+
+    if (options.HealthTimeout.has_value())
+    {
+        containerLauncher.SetHealthTimeout(options.HealthTimeout.value());
+    }
+
+    if (options.HealthStartPeriod.has_value())
+    {
+        containerLauncher.SetHealthStartPeriod(options.HealthStartPeriod.value());
+    }
+
+    if (options.HealthRetries.has_value())
+    {
+        containerLauncher.SetHealthRetries(options.HealthRetries.value());
+    }
+
     if (options.MemoryBytes.has_value())
     {
         containerLauncher.SetMemoryLimit(options.MemoryBytes.value());

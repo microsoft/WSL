@@ -40,6 +40,11 @@ struct ContainerOptions
     WSLCSignal StopSignal = WSLCSignalNone;
     std::optional<int> StopTimeout{};
     std::optional<int64_t> ShmSize{};
+    std::optional<std::string> HealthCmd{};
+    std::optional<int64_t> HealthInterval{};    // nanoseconds
+    std::optional<int64_t> HealthTimeout{};     // nanoseconds
+    std::optional<int64_t> HealthStartPeriod{}; // nanoseconds
+    std::optional<int> HealthRetries{};
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;

@@ -1297,6 +1297,24 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.State.StartedAt = dockerInspect.State.StartedAt;
     wslcInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
 
+    // Map the runtime health status, which Docker only reports when a health check is configured.
+    if (dockerInspect.State.Health.has_value())
+    {
+        const auto& dockerHealth = dockerInspect.State.Health.value();
+
+        wslc_schema::Health health{};
+        health.Status = dockerHealth.Status;
+        health.FailingStreak = dockerHealth.FailingStreak;
+
+        health.Log.reserve(dockerHealth.Log.size());
+        for (const auto& entry : dockerHealth.Log)
+        {
+            health.Log.push_back({entry.Start, entry.End, entry.ExitCode, entry.Output});
+        }
+
+        wslcInspect.State.Health = std::move(health);
+    }
+
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
@@ -1316,6 +1334,20 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Config.User = dockerInspect.Config.User;
     wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
     wslcInspect.Config.StopTimeout = dockerInspect.Config.StopTimeout;
+
+    if (dockerInspect.Config.Healthcheck.has_value())
+    {
+        const auto& dockerHealth = dockerInspect.Config.Healthcheck.value();
+
+        wslc_schema::HealthConfig health{};
+        health.Test = dockerHealth.Test;
+        health.Interval = dockerHealth.Interval;
+        health.Timeout = dockerHealth.Timeout;
+        health.StartPeriod = dockerHealth.StartPeriod;
+        health.Retries = dockerHealth.Retries;
+
+        wslcInspect.Config.Healthcheck = std::move(health);
+    }
 
     // Map WSLC port mappings (Windows host ports only).
     for (const auto& e : m_mappedPorts)
@@ -1514,6 +1546,42 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.HostConfig.ShmSize = containerOptions.ShmSize;
+
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsHealthCheck))
+    {
+        common::docker_schema::HealthConfig health{};
+
+        // A custom command maps to Docker's ["CMD-SHELL", <cmd>]. When no command is provided the
+        // Test field is left unset so the image's health check command (if any) is preserved.
+        if (containerOptions.HealthCmd != nullptr)
+        {
+            health.Test = std::vector<std::string>{"CMD-SHELL", containerOptions.HealthCmd};
+        }
+
+        // Durations are already in nanoseconds; 0 means "use the daemon default", so only forward
+        // explicit non-zero values.
+        if (containerOptions.HealthIntervalNs != 0)
+        {
+            health.Interval = containerOptions.HealthIntervalNs;
+        }
+
+        if (containerOptions.HealthTimeoutNs != 0)
+        {
+            health.Timeout = containerOptions.HealthTimeoutNs;
+        }
+
+        if (containerOptions.HealthStartPeriodNs != 0)
+        {
+            health.StartPeriod = containerOptions.HealthStartPeriodNs;
+        }
+
+        if (containerOptions.HealthRetries != 0)
+        {
+            health.Retries = containerOptions.HealthRetries;
+        }
+
+        request.Healthcheck = std::move(health);
+    }
 
     if (containerOptions.VolumesCount > 0)
     {
