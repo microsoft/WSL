@@ -2347,8 +2347,8 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>A opção de driver de rede 'Gateway' exige que 'Subnet' também seja especificada.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>A opção '--gateway' requer que '--subnet' também seja especificado.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>A rede '{}' tem pontos de extremidade ativos.</value>
@@ -2360,6 +2360,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Modo de rede sem suporte: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Valor de tempo limite de parada inválido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2927,6 +2931,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Sinal para parar o contêiner</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Tempo limite (em segundos) para interromper o contêiner antes de encerrá-lo (-1 para nenhum tempo limite)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Tamanho do /dev/shm (por exemplo, 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3114,6 +3121,17 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Configuração de metadados da rede</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Restrict external access to the network</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Sub-rede em formato CIDR que representa um segmento de rede</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Gateway IPv4 ou IPv6 para a sub-rede</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Remova uma ou mais redes.</value>
