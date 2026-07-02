@@ -446,6 +446,18 @@ public:
     HRESULT MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
     /// <summary>
+    /// Attempts to run Work while holding m_instanceLock, acquired with the
+    /// given timeout. Returns true and sets Result to Work()'s HRESULT if the
+    /// lock was acquired and Work ran; returns false (without running Work) if
+    /// the lock could not be acquired within Timeout. Used by the plugin
+    /// callback pump to run an out-of-hook callback directly without blocking
+    /// indefinitely on the instance lock — a notification thread may hold it in
+    /// its pre-notification phase and later wait for this very callback, which
+    /// would deadlock if we blocked on the lock unconditionally.
+    /// </summary>
+    bool TryInvokeUnderInstanceLock(std::chrono::milliseconds Timeout, const std::function<HRESULT()>& Work, _Out_ HRESULT& Result);
+
+    /// <summary>
     /// Registers a distribution.
     /// </summary>
     HRESULT
