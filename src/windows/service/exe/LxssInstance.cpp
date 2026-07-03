@@ -425,6 +425,12 @@ void LxssInstance::Stop()
 
 void LxssInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    // m_defaultUid is not set before OOBE is complete.
+    if (m_configuration.RunOOBE)
+    {
+        return;
+    }
+
     const auto path = m_configuration.BasePath / LXSS_PLAN9_UNIX_SOCKET;
     using unique_unicode_string = wil::unique_struct<UNICODE_STRING, decltype(RtlFreeUnicodeString), RtlFreeUnicodeString>;
     unique_unicode_string socketPath;
@@ -577,6 +583,8 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
                             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
                             m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
                         }
+
+                        RegisterPlan9ConnectionTarget(m_userToken.get());
                     }
                 }
                 CATCH_LOG()
