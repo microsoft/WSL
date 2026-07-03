@@ -16,41 +16,11 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslc.h>
-#include <algorithm>
-#include <cwctype>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace wsl::windows::wslc::models {
-
-namespace details {
-    inline std::wstring ToWideString(std::wstring_view value)
-    {
-        return {value.data(), value.size()};
-    }
-
-    inline std::vector<std::wstring_view> SplitPreserveEmpty(std::wstring_view value, wchar_t delimiter)
-    {
-        std::vector<std::wstring_view> parts;
-        size_t start = 0;
-        while (start <= value.size())
-        {
-            const auto end = value.find(delimiter, start);
-            if (end == std::wstring_view::npos)
-            {
-                parts.emplace_back(value.substr(start));
-                break;
-            }
-
-            parts.emplace_back(value.substr(start, end - start));
-            start = end + 1;
-        }
-
-        return parts;
-    }
-} // namespace details
 
 // Valid formats for container list output.
 enum class FormatType
@@ -59,112 +29,11 @@ enum class FormatType
     Json,
 };
 
-enum class NetworkArgumentParseError
-{
-    None,
-    EmptyNetworkName,
-    EmptyAlias,
-    DuplicateNetworkName,
-    UnsupportedOption,
-};
-
-struct ParsedNetworkArgument
-{
-    std::wstring Name;
-    std::vector<std::wstring> Aliases;
-    NetworkArgumentParseError Error = NetworkArgumentParseError::None;
-    std::wstring ErrorValue;
-};
-
 struct ContainerNetwork
 {
     std::string Name;
     std::vector<std::string> Aliases;
 };
-
-inline ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
-{
-    ParsedNetworkArgument result;
-
-    auto parseOptions = [&](std::wstring_view options, bool requireName) {
-        bool parsedName = false;
-        for (const auto part : details::SplitPreserveEmpty(options, L','))
-        {
-            const auto separator = part.find(L'=');
-            if (separator == std::wstring_view::npos)
-            {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = details::ToWideString(part);
-                return;
-            }
-
-            const auto key = part.substr(0, separator);
-            const auto optionValue = part.substr(separator + 1);
-            if (key == L"name")
-            {
-                if (parsedName)
-                {
-                    result.Error = NetworkArgumentParseError::DuplicateNetworkName;
-                    result.ErrorValue = details::ToWideString(key);
-                    return;
-                }
-
-                parsedName = true;
-                result.Name = details::ToWideString(optionValue);
-            }
-            else if (key == L"alias")
-            {
-                result.Aliases.emplace_back(details::ToWideString(optionValue));
-            }
-            else
-            {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = details::ToWideString(key);
-                return;
-            }
-        }
-
-        if (requireName && !parsedName)
-        {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
-        }
-    };
-
-    if (value.find(L'=') != std::wstring_view::npos)
-    {
-        parseOptions(value, true);
-    }
-    else
-    {
-        result.Name = details::ToWideString(value);
-    }
-
-    if (result.Error == NetworkArgumentParseError::None)
-    {
-        const auto nameIsEmpty = result.Name.empty() || std::all_of(result.Name.begin(), result.Name.end(), [](wchar_t c) {
-                                     return std::iswspace(static_cast<wint_t>(c));
-                                 });
-        if (nameIsEmpty)
-        {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
-            return result;
-        }
-
-        for (const auto& alias : result.Aliases)
-        {
-            const auto aliasIsEmpty = alias.empty() || std::all_of(alias.begin(), alias.end(), [](wchar_t c) {
-                                          return std::iswspace(static_cast<wint_t>(c));
-                                      });
-            if (aliasIsEmpty)
-            {
-                result.Error = NetworkArgumentParseError::EmptyAlias;
-                return result;
-            }
-        }
-    }
-
-    return result;
-}
 
 struct ContainerOptions
 {
