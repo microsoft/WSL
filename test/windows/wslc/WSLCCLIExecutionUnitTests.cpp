@@ -517,6 +517,52 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::string("b"), options.Networks[0].Aliases[1]);
     }
 
+    TEST_METHOD(CreateCommand_ParseNetworkDuplicateNameOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,name=net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkUnsupportedOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network aliases=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage =
+                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"aliases");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkAliasWithoutName_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network alias=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
     TEST_METHOD(CreateCommand_ParseNetworkAliasEmptyValue_ThrowsArgumentException)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,alias= ubuntu sh");
