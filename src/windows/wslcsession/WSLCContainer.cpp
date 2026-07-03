@@ -169,6 +169,11 @@ bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
     return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
 }
 
+bool NetworkSupportsAliases(std::string_view mode) noexcept
+{
+    return mode != "bridge" && NetworkModeAllocatesVmPorts(mode);
+}
+
 // Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed
 // modes (`service:`, `ns:`, ...) as special, but WSLC only supports `container:`. Surface the
 // rejection here so both Create() and Open() recovery paths share the same gate.
@@ -288,17 +293,15 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         auto [it, inserted] = resolved.try_emplace(name);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
 
+        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), config.Aliases.has_value() && !NetworkSupportsAliases(name));
+
         if (name != "bridge")
         {
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
         }
-
-        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-            config.Aliases.has_value() && name == "bridge");
 
         it->second = std::move(config);
     }
@@ -1663,14 +1666,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
 
     auto primaryConfig =
-        ResolveEndpointConfig(
-            containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+        ResolveEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
 
     // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-        primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+        primaryConfig.Aliases.has_value() && !NetworkSupportsAliases(networkMode));
 
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
