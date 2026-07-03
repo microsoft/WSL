@@ -35,6 +35,42 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+namespace {
+
+    class DECLSPEC_UUID("91EF98A7-99A8-41C2-893C-43CDFB7DB69F") WSLCImageLoadCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IImageLoadCallback, IFastRundown>
+    {
+    public:
+        explicit WSLCImageLoadCallback(Reporter& reporter) : m_reporter(reporter)
+        {
+        }
+
+        HRESULT OnImageLoaded(LPCSTR Reference, EnumReferenceFormat Format) override
+        try
+        {
+            if (Format == EnumReferenceFormatDigest)
+            {
+                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoadedId(Reference));
+            }
+            else if (Format == EnumReferenceFormatTag)
+            {
+                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoaded(Reference));
+            }
+            else
+            {
+                THROW_HR_MSG(E_UNEXPECTED, "Unexpected reference type: %d, '%hs'", Format, Reference);
+            }
+
+            return S_OK;
+        }
+        CATCH_RETURN();
+
+    private:
+        Reporter& m_reporter;
+    };
+
+} // namespace
+
 static bool TryInspectImage(Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
 {
     try
@@ -223,7 +259,8 @@ void LoadImage(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Input))
     {
         auto& input = context.Args.Get<ArgType::Input>();
-        services::ImageService::Load(session, input);
+        auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
+        services::ImageService::Load(session, input, callback.Get());
         return;
     }
 
