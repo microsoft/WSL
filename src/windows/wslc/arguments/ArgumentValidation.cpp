@@ -237,84 +237,6 @@ void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring
     }
 }
 
-ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
-{
-    ParsedNetworkArgument result;
-
-    auto parseOptions = [&](std::wstring_view options, bool requireName) {
-        bool parsedName = false;
-        for (const auto part : SplitPreserveEmpty(options, L','))
-        {
-            const auto separator = part.find(L'=');
-            if (separator == std::wstring_view::npos)
-            {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = std::wstring{part};
-                return;
-            }
-
-            const auto key = part.substr(0, separator);
-            const auto optionValue = part.substr(separator + 1);
-            if (key == L"name")
-            {
-                if (parsedName)
-                {
-                    result.Error = NetworkArgumentParseError::DuplicateNetworkName;
-                    result.ErrorValue = std::wstring{key};
-                    return;
-                }
-
-                parsedName = true;
-                result.Name = std::wstring{optionValue};
-            }
-            else if (key == L"alias")
-            {
-                result.Aliases.emplace_back(optionValue);
-            }
-            else
-            {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = std::wstring{key};
-                return;
-            }
-        }
-
-        if (requireName && !parsedName)
-        {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
-        }
-    };
-
-    if (value.find(L'=') != std::wstring_view::npos)
-    {
-        parseOptions(value, true);
-    }
-    else
-    {
-        result.Name = std::wstring{value};
-    }
-
-    if (result.Error == NetworkArgumentParseError::None)
-    {
-        if (IsEmptyOrWhitespace(result.Name))
-        {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
-            return result;
-        }
-
-        for (const auto& alias : result.Aliases)
-        {
-            if (IsEmptyOrWhitespace(alias))
-            {
-                result.Error = NetworkArgumentParseError::EmptyAlias;
-                return result;
-            }
-        }
-    }
-
-    return result;
-}
-
 // Convert string to WSLCSignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName)
 {
@@ -480,8 +402,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 
@@ -615,6 +537,84 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
     }
 
     return {WideToMultiByte(input.substr(0, equalsPos)), soft, hard};
+}
+
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
+{
+    ParsedNetworkArgument result;
+
+    auto parseOptions = [&](std::wstring_view options, bool requireName) {
+        bool parsedName = false;
+        for (const auto part : SplitPreserveEmpty(options, L','))
+        {
+            const auto separator = part.find(L'=');
+            if (separator == std::wstring_view::npos)
+            {
+                result.Error = NetworkArgumentParseError::UnsupportedOption;
+                result.ErrorValue = std::wstring{part};
+                return;
+            }
+
+            const auto key = part.substr(0, separator);
+            const auto optionValue = part.substr(separator + 1);
+            if (key == L"name")
+            {
+                if (parsedName)
+                {
+                    result.Error = NetworkArgumentParseError::DuplicateNetworkName;
+                    result.ErrorValue = std::wstring{key};
+                    return;
+                }
+
+                parsedName = true;
+                result.Name = std::wstring{optionValue};
+            }
+            else if (key == L"alias")
+            {
+                result.Aliases.emplace_back(optionValue);
+            }
+            else
+            {
+                result.Error = NetworkArgumentParseError::UnsupportedOption;
+                result.ErrorValue = std::wstring{key};
+                return;
+            }
+        }
+
+        if (requireName && !parsedName)
+        {
+            result.Error = NetworkArgumentParseError::EmptyNetworkName;
+        }
+    };
+
+    if (value.find(L'=') != std::wstring_view::npos)
+    {
+        parseOptions(value, true);
+    }
+    else
+    {
+        result.Name = std::wstring{value};
+    }
+
+    if (result.Error == NetworkArgumentParseError::None)
+    {
+        if (IsEmptyOrWhitespace(result.Name))
+        {
+            result.Error = NetworkArgumentParseError::EmptyNetworkName;
+            return result;
+        }
+
+        for (const auto& alias : result.Aliases)
+        {
+            if (IsEmptyOrWhitespace(alias))
+            {
+                result.Error = NetworkArgumentParseError::EmptyAlias;
+                return result;
+            }
+        }
+    }
+
+    return result;
 }
 
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
