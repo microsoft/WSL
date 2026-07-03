@@ -163,7 +163,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
-    X_WIN32(ERROR_ELEVATION_REQUIRED)};
+    X_WIN32(ERROR_ELEVATION_REQUIRED),
+    X_WIN32(WSAEACCES),
+    X_WIN32(WSAEADDRINUSE)};
 
 #undef X
 
@@ -346,15 +348,23 @@ GUID wsl::windows::common::wslutil::CreateV5Uuid(const GUID& namespaceGuid, cons
     return EndianSwap(newGuid);
 }
 
-std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename)
+std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress)
 {
     wsl::windows::common::ConsoleProgressBar progressBar;
     auto progress = [&](auto current, auto total) {
-        progressBar.Print(current, total);
+        if (reportProgress)
+        {
+            progressBar.Print(current, total);
+        }
         return true;
     };
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { progressBar.Clear(); });
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (reportProgress)
+        {
+            progressBar.Clear();
+        }
+    });
 
     return DownloadFileImpl(Url, Filename, progress);
 }
@@ -370,14 +380,45 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    const auto downloadFolder =
-        winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(std::filesystem::temp_directory_path().wstring()).get();
+    // GetFolderFromPathAsync won't work if the folder is hidden or system.
+    auto downloadFolderPath = std::filesystem::temp_directory_path();
+    auto filenameStem = std::filesystem::path(Filename).stem().wstring();
+    auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
+    std::wstring filePath{};
+    winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
+    for (int suffix = 1; outputStream == nullptr; suffix++)
+    {
+        if (suffix == 1)
+        {
+            filePath = (downloadFolderPath / Filename).wstring();
+        }
+        else
+        {
+            filePath = (downloadFolderPath / std::format(L"{} ({}){}", filenameStem, suffix, filenameExtension)).wstring();
+        }
+        try
+        {
+            outputStream = winrt::Windows::Storage::Streams::FileRandomAccessStream::OpenAsync(
+                               filePath,
+                               winrt::Windows::Storage::FileAccessMode::ReadWrite,
+                               winrt::Windows::Storage::StorageOpenOptions::None,
+                               winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
+                               .get();
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            {
+                throw;
+            }
+        }
+    }
 
-    const auto file =
-        downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
-    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { file.DeleteAsync().get(); });
-
-    const auto outputStream = file.OpenAsync(winrt::Windows::Storage::FileAccessMode::ReadWrite).get().GetOutputStreamAt(0);
+    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        outputStream.Close();
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    });
 
     // By default downloaded files are cached in %appdata%/local/packages/{package-family}/AC/InetCache .
     // Disable caching since there's no reason to keep local copies of .msixbundle files.
@@ -411,7 +452,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     download.get();
     deleteFileOnFailure.release();
 
-    return file.Path().c_str();
+    return filePath;
 }
 
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
@@ -1310,17 +1351,17 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
-    EnumReferenceFormat referenceFormat = EnumReferenceFormat::None;
+    EnumReferenceFormat referenceFormat = EnumReferenceFormatNone;
     std::optional<std::string> tagOrDigest;
     if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
     {
         tagOrDigest = digest.str();
-        referenceFormat = EnumReferenceFormat::Digest;
+        referenceFormat = EnumReferenceFormatDigest;
     }
     else if (tag.matched) // <repo>:<tag>
     {
         tagOrDigest = tag.str();
-        referenceFormat = EnumReferenceFormat::Tag;
+        referenceFormat = EnumReferenceFormatTag;
     }
 
     if (Format)

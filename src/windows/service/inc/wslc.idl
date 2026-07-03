@@ -32,6 +32,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
+#define WSLC_EPHEMERAL_PORT 0
 #define WSLC_MAX_SAVE_IMAGES_COUNT 256
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
@@ -43,6 +44,8 @@ cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
+cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MIN") // Pass to Stop() to use the default container stop timeout
+cpp_quote("#define WSLC_STOP_TIMEOUT_NONE -1") // Wait forever for the container to stop.
 
 typedef
 struct _WSLCVersion {
@@ -61,7 +64,7 @@ interface ICrashDumpCallback : IUnknown
     HRESULT OnCrashDump(
         [in, string] LPCWSTR DumpPath,
         [in, unique, string] LPCSTR ProcessName,
-        [in] ULONGLONG Pid,
+        [in] ULONG Pid,
         [in] ULONG Signal,
         [in] ULONGLONG Timestamp);
 };
@@ -84,6 +87,23 @@ interface IProgressCallback : IUnknown
 interface IWarningCallback : IUnknown
 {
     HRESULT OnWarning([in, string] LPCWSTR Message);
+};
+
+typedef enum _EnumReferenceFormat
+{
+    EnumReferenceFormatNone = 0,
+    EnumReferenceFormatTag = 1,
+    EnumReferenceFormatDigest = 2,
+} EnumReferenceFormat;
+
+[
+    uuid(7F3B62FD-E1C1-4F69-A8E2-853CAD9051BD),
+    pointer_default(unique),
+    object
+]
+interface IImageLoadCallback : IUnknown
+{
+    HRESULT OnImageLoaded([in, string] LPCSTR Image, [in] EnumReferenceFormat Format);
 };
 
 [
@@ -262,6 +282,9 @@ typedef struct _WSLCContainerOptions
     LONGLONG NanoCpus;
     [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
     ULONG UlimitsCount;
+
+    // Ignored unless WSLCContainerFlagsStopTimeout is set in Flags.
+    LONG StopTimeout;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -387,6 +410,20 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns an event that is signaled when the VM exits (graceful or forced).
     HRESULT GetTerminationEvent([out, system_handle(sh_event)] HANDLE* Event);
 
+    HRESULT MapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress,
+        [out, retval] USHORT* AllocatedHostPort);
+
+    // Unmaps a port previously mapped via MapVirtioNetPort.
+    HRESULT UnmapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress);
+
     // Returns the cached termination reason and details. These are only available after the
     // termination event has been signaled; before that the call fails.
     HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
@@ -478,6 +515,7 @@ typedef struct _WSLCBuildImageOptions
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
+    WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
@@ -513,6 +551,9 @@ typedef struct _WSLCNetworkOptions
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
     ULONG LabelsCount;
+    BOOL Internal;
+    [unique] LPCSTR Subnet;
+    [unique] LPCSTR Gateway;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
@@ -579,8 +620,8 @@ interface IWSLCSession : IUnknown
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
-    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [in, unique] IImageLoadCallback* LoadCallback);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT SaveImages([in] WSLCHandle OutputHandle, [in] const WSLCStringArray* ImageNames, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
@@ -711,6 +752,7 @@ interface IWSLCSessionManager : IUnknown
     HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }
 
+// Ensure wslcsdk.h and wslcsdk.idl are also updated.
 cpp_quote("#define WSLC_E_BASE (0x0600)")
 cpp_quote("#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2) /* 0x80040602 */")

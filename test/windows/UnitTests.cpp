@@ -2147,7 +2147,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
             L"[wsl2]\n");
         validateWarnings(
             L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
@@ -2166,7 +2166,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
@@ -3563,7 +3563,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 {NetworkingConfiguration::Nat, NetworkingConfiguration::Nat},
                 {NetworkingConfiguration::Bridged, NetworkingConfiguration::Bridged},
                 {NetworkingConfiguration::Mirrored, NetworkingConfiguration::Mirrored},
-                {NetworkingConfiguration::VirtioProxy, NetworkingConfiguration::VirtioProxy},
+                {NetworkingConfiguration::Consomme, NetworkingConfiguration::Consomme},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
@@ -7449,6 +7449,71 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
+    }
+
+    TEST_METHOD(DownloadToHiddenSystemTempFolder)
+    {
+        // Avoid contaminating the real temp folder.
+        const auto testTempFolder = std::filesystem::temp_directory_path() / L"wsl-download-test";
+        std::filesystem::create_directories(testTempFolder);
+        auto cleanupTempFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(testTempFolder, error);
+        });
+
+        const auto originalAttributes = GetFileAttributesW(testTempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(testTempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM));
+
+        ScopedEnvVariable temp(L"TEMP", testTempFolder.wstring());
+        ScopedEnvVariable tmp(L"TMP", testTempFolder.wstring());
+
+        VERIFY_IS_TRUE(std::filesystem::equivalent(std::filesystem::temp_directory_path(), testTempFolder));
+
+        constexpr USHORT port = 6666;
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", port);
+        constexpr auto fileName = L"downloaded-file.bin";
+        constexpr auto fileContent = L"wsl download test content";
+        UniqueWebServer server(endpoint.c_str(), fileContent);
+
+        const auto url = endpoint + fileName;
+        const auto noProgress = [](uint64_t, uint64_t) {};
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket probe{socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+                THROW_LAST_ERROR_IF(!probe);
+
+                sockaddr_in address{};
+                address.sin_family = AF_INET;
+                address.sin_port = htons(port);
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+                THROW_LAST_ERROR_IF(connect(probe.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+            },
+            std::chrono::milliseconds(500),
+            std::chrono::seconds(5));
+
+        const auto firstPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        auto readFile = [](const std::filesystem::path& Path) {
+            std::ifstream file(Path, std::ios::binary);
+            VERIFY_IS_TRUE(file.good());
+            return std::string{std::istreambuf_iterator<char>(file), {}};
+        };
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).filename().wstring(), std::wstring(fileName));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_ARE_EQUAL(readFile(firstPath), wsl::shared::string::WideToMultiByte(fileContent));
+
+        const auto secondPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).filename().wstring(), std::wstring(L"downloaded-file (2).bin"));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_IS_TRUE(std::filesystem::exists(secondPath));
+        VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
     }
 
     void ValidateIsolatedCgroupLayout(bool systemd)

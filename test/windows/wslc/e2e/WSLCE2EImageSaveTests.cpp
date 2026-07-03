@@ -58,7 +58,7 @@ class WSLCE2EImageSaveTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
     {
         const auto result = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), InvalidImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"reference does not exist\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = L"reference does not exist\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_Success)
@@ -151,6 +151,13 @@ class WSLCE2EImageSaveTests
         // Load both images back from the single archive.
         const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
         loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto loadedImages = wsl::shared::string::Split(loadResult.Stdout.value(), L'\n');
+
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", DebianImage.NameAndTag())) != loadedImages.end());
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", AlpineImage.NameAndTag())) != loadedImages.end());
 
         // Run a container from each loaded image to confirm both are restored and runnable.
         const auto runDebian = RunWslc(std::format(L"container run --rm {} echo ok!", DebianImage.NameAndTag()));

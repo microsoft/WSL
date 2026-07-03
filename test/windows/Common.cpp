@@ -17,6 +17,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "LxssDynamicFunction.h"
+#include "WslCoreNetworkEndpointSettings.h"
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
@@ -2990,7 +2991,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
@@ -3044,6 +3045,17 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     {
         sendRequest();
     }
+}
+
+std::optional<std::wstring> GetHostAdapterIpv4()
+{
+    auto endpoint = wsl::core::networking::GetHostEndpointSettings();
+    if (!endpoint || endpoint->PreferredIpAddress.AddressString.empty())
+    {
+        return {};
+    }
+
+    return endpoint->PreferredIpAddress.AddressString;
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)

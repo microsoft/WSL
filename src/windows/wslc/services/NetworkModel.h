@@ -25,6 +25,9 @@ struct CreateNetworkOptions
     std::optional<std::string> Driver;
     std::vector<std::pair<std::string, std::string>> DriverOpts{};
     std::vector<std::pair<std::string, std::string>> Labels{};
+    bool Internal{false};
+    std::optional<std::string> Subnet;
+    std::optional<std::string> Gateway;
 };
 
 struct PruneNetworksResult

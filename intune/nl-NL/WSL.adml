@@ -48,7 +48,7 @@
         <string id="NetworkingModeNone"><!-- _locComment_text="{Locked}" -->None</string>
         <string id="NetworkingModeNAT"><!-- _locComment_text="{Locked}" -->NAT</string>
         <string id="NetworkingModeMirrored"><!-- _locComment_text="{Locked}" -->Mirrored</string>
-        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->VirtioProxy</string>
+        <string id="NetworkingModeVirtioProxy"><!-- _locComment_text="{Locked}" -->Consomme</string>
 
         <string id="WSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-container</string>
 

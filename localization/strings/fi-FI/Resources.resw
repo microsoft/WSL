@@ -1130,9 +1130,9 @@ Yritetään ladata verkkoa...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p on poistettu käytöstä, palataan takaisin 9p:hen vsock-siirron avulla.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy-verkkoa ei tueta, kun wsl2.virtio on poistettu käytöstä; palataan networkingMode-tilaan {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme-verkkoa ei tueta, kun wsl2.virtio on poistettu käytöstä; palataan networkingMode-tilaan {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Käynnissä olevasta ytimestä puuttuu korjaustiedosto, joka parantaa virtio-laitteen suorituskykyä merkittävästi. Ota tämä optimointi käyttöön päivittämällä uudempi WSL-ydin.</value>
@@ -1776,7 +1776,8 @@ WSL:ssä toimivat Linux-binaarit voivat nopeuttaa suorituskykyään automaattise
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Kun olet asentanut VS Coden, voit asentaa WSL-etälaajennuksen Windows-päätteestä:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Avaa WSL-projekti Visual Studio koodissa</value>
@@ -2062,12 +2063,16 @@ Käyttö:
     <value>Virheellinen IP-osoite {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Portin "{}", {} yhdistäminen epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') epäonnistui</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
-    <value>Valitsinta --session ei voi käyttää tämän komennon kanssa.</value>
+    <value>--session -valintaa ei voi käyttää tämän komennon kanssa.</value>
     <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
@@ -2377,6 +2382,10 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Aseman {} luominen epäonnistui: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Liian monta asemaa on otettu käyttöön (rajoitus: {}). Ota lisää asemia käyttöön käynnistämällä istunto uudelleen. Tämä korjataan tulevassa versiossa.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Portti {} on jo käytössä, säilöä {} ei voi käynnistää</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2398,6 +2407,14 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>WSLC-istuntoa ei löytynyt kohteesta {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Kohdetta '{}' ei voi käyttää istunnon tallennustilana, koska hakemisto ei ole tyhjä</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Kohdetta {} ei voi käyttää istunnon tallennustilana, koska se ei ole hakemisto</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">

@@ -39,7 +39,7 @@ set(SOURCES
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
-    VirtioNetworking.cpp
+    ConsommeNetworking.cpp
     WSLCProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
@@ -126,7 +126,7 @@ set(HEADERS
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
-    VirtioNetworking.h
+    ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
     WslCoreConfig.h

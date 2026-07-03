@@ -92,6 +92,7 @@ struct VMPortMapping
     void Attach(WSLCVirtualMachine& Vm);
     void Detach();
     uint16_t HostPort() const;
+    void SetHostPort(uint16_t port);
 
     static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
     static VMPortMapping FromWSLCPortMapping(const ::WSLCPortMapping& Mapping);
@@ -125,7 +126,7 @@ public:
     // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
     // fanning them out to any registered COM callbacks.
     using TOnCrashDump =
-        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONGLONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
 
     WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();
@@ -159,6 +160,8 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    void RemoveDirectory(_In_ const std::string& Path);
+    std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
@@ -183,8 +186,12 @@ public:
 
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
+    WSLCNetworkingMode NetworkingMode() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
+
+    bool UseWslRelayPortForwarding() const;
 
     // Initial setup during Connect()
     void ConfigureNetworking();

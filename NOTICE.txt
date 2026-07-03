@@ -750,3 +750,845 @@ This license governs use of the accompanying software. If you use the software, 
 
 ---------------------------------------------------------
 
+
+NOTICES AND INFORMATION
+Do Not Translate or Localize
+
+This software incorporates material from third parties.
+Microsoft makes certain open source code available at https://3rdpartysource.microsoft.com,
+or you may send a check or money order for US $5.00, including the product name,
+the open source component name, platform, and version number, to:
+
+Source Code Compliance Team
+Microsoft Corporation
+One Microsoft Way
+Redmond, WA 98052
+USA
+
+Notwithstanding any other terms, you may reverse engineer this software to the extent
+required to debug changes to any libraries licensed under the GNU Lesser General Public License.
+
+---------------------------------------------------------
+
+freerdp/freerdp 39f56443f2dc50e0dcfa52d4f8f15008d5b8ed8e - Apache-2.0
+
+
+Copyright 2013
+Copyright 2014
+Copyright 2013 DI
+Copyright 2014 DI
+Copyright 2015 DI
+Copyright (c) 2011
+Copyright 2015 ANSSI
+Copyright 2011 Samsung
+Copyright 2011 Vic Lee
+Copyright 2012 Vic Lee
+Copyright 2014 Vic Lee
+Copyright Jeff Sharkey
+Copyright 2017 Ben Cohen
+Copyright 2013 Felix Long
+Copyright 2011 Jiten Pathy
+Copyright 2013 Blaz Bacnik
+Copyright 2019 Rangee Gmbh
+Copyright 2010-2011 Vic Lee
+Copyright 2010-2012 Vic Lee
+Copyright 2011-2012 Vic Lee
+Copyright 2012 Atrust corp.
+Copyright 2015-2017 Vic Lee
+Copyright 2016 Inuvika Inc.
+Copyright (c) 2018 Simon Ser
+Copyright 2008 Sci-Fi Hi-Fi.
+Copyright 2009-2011 Jay Sorg
+Copyright 2009-2012 Jay Sorg
+Copyright (c) 2010 Apple Inc.
+Copyright (c) 2012 Modelon AB
+Copyright 2012 Gerald Richter
+Copyright 2012 Jason Champion
+Copyright 2012 Thomas Goddard
+Copyright 2017 Artur Zaprzala
+Copyright (c) 2007 Google Inc.
+Copyright (c) 2015 Armin Novak
+Copyright 2008 Matt Gallagher.
+Copyright 2011 Stephen Erisman
+Copyright (c) 2017 Red Hat Inc.
+Copyright 2011-2012 Jiten Pathy
+Copyright (c) 2012 MyCompanyName
+Copyright 2001-2004 Unicode, Inc.
+Copyright 2004-2009 Kitware, Inc.
+Copyright 2006-2009 Kitware, Inc.
+Copyright 2007-2009 Kitware, Inc.
+Copyright 2012 Dmitry Baryshnikov
+Copyright 2014 Thomas Erbesdobler
+Copyright (c) 2012 Collabora, Ltd.
+Copyright (c) 2013 BMW Car IT GmbH
+Copyright (c) 2015 Martin Grasslin
+Copyright (c) 2011-@RC_VERSION_YEAR
+Copyright (c) 2008 Kristian Hogsberg
+Copyright (c) 2011 Charles Scalesse.
+Copyright (c) 2012, Victor Lazzarini
+Copyright (c) 2013 DENSO CORPORATION
+Copyright (c) 2013 Jasper St. Pierre
+Copyright (c) 2013 Rafael Antognolli
+Copyright (c) 2015-2017 Red Hat Inc.
+Copyright (c) 2012-2013 A Tasty Pixel
+Copyright 2013 Christian Hofstaedtler
+Copyright (c) 2005-2014 Lode Vandevenne
+Copyright 2016 Thinast Technologies GmbH
+Copyright 2018 Thicast Technologies GmbH
+Copyright (c) 2008-2013 Kristian Hogsberg
+Copyright (c) 2010-2013 Intel Corporation
+Copyright 2012 Thincast Technologies GmbH
+Copyright 2013 Thincast Technologies GmbH
+Copyright 2014 Thincast Technologies GmbH
+Copyright 2015 Thincast Technologies GmbH
+Copyright 2016 Thincast Technologies GmbH
+Copyright 2017 Thincast Technologies GmbH
+Copyright 2018 Thincast Technologies GmbH
+Copyright 2019 Thincast Technologies GmbH
+copyright was claimed by the wine project
+Copyright 2010 O.S. Systems Software Ltda.
+Copyright 2011 O.S. Systems Software Ltda.
+Copyright 2012 HP Development Company, LLC
+Copyright 2014 Thincast Technologies Gmbh.
+Copyright Iowa State University 2009-2010.
+Copyright (c) 1998-2016 The OpenSSL Project.
+Copyright 2011 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2011 Shea Levy <shea@shealevy.com>
+Copyright 2012 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2015 Vic Lee <llyzs.vic@gmail.com>
+Copyright 2018 Kai Harms <kharms@rangee.com>
+Copyright.txt or https://cmake.org/licensing
+(c) Copyright 2014 Thincast Technologies GmbH
+Copyright (c) 2014 Thincast Technologies GmbH
+Copyright (c) 2015 Thincast Technologies GmbH
+Copyright (c) 2018 Thincast Technologies GmbH
+Copyright 2015 bernhard.miklautz@thincast.com
+(c) Copyright 2012 HP Development Company, LLC
+Copyright 2011-2013 Thincast Technologies GmbH
+Copyright 2012 Alam Arias <Alam.GBC@gmail.com>
+Copyright 2015-2016 Thincast Technologies GmbH
+Copyright 2015-2017 Thincast Technologies GmbH
+Copyright 2016,2018 Thincast Technologies GmbH
+Copyright 2016-2017 Thincast Technologies GmbH
+Copyright 2012 Rolf Eike Beer <eike@sf-mail.de>
+Copyright 2014 Christian Plattner <ccpp@gmx.at>
+Copyright 2016 Christian Plattner <ccpp@gmx.at>
+Copyright 2019 Idan Freiberg <speidy@gmail.com>
+Copyright 2012 Fujitsu Technology Solutions GmbH
+Copyright 2017 Armin Novak <anovak@thincast.com>
+Copyright 2018 Armin Novak <anovak@thincast.com>
+Copyright 2004-2012 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2007-2008 Miguel A. Figueroa-Villanueva
+Copyright 2011 Anthony Tong <atong@trustedcs.com>
+copyright (c) 2011 Petr Vanek <petr@scribus.info>
+Copyright (c) 2006 The Android Open Source Project
+Copyright (c) 2008 The Android Open Source Project
+Copyright (c) 2010 The Android Open Source Project
+Copyright (c) 2011 The Android Open Source Project
+Copyright (c) 2016 The Android Open Source Project
+Copyright 2013 Armin Novak <armin.novak@gmail.com>
+Copyright 2014 Armin Novak <armin.novak@gmail.com>
+Copyright 2015 Jiang Zihao <zihao.jiang@yahoo.com>
+Copyright 2016 Armin Novak <armin.novak@gmail.com>
+Copyright 2016 Jiang Zihao <zihao.jiang@yahoo.com>
+Copyright (c) 1998 Bjorn Reese and Daniel Stenberg.
+Copyright (c) 2000 Bjorn Reese and Daniel Stenberg.
+Copyright (c) 2001 Bjorn Reese and Daniel Stenberg.
+Copyright (c) 2006, Tim Beaulen <tbscope@gmail.com>
+Copyright 2013 Zhang Zhaolong <zhangzl2013@126.com>
+Copyright 2019 Mati Shabtay <matishabtay@gmail.com>
+Copyright (c) 2015 Rozhuk Ivan <rozhuk.im@gmail.com>
+Copyright (c) 2015-2017 Samsung Electronics Co., Ltd
+Copyright 2006 Alexander Neundorf <neundorf@kde.org>
+Copyright 2010 Alexander Neundorf <neundorf@kde.org>
+Copyright 2011 Nils Andresen <nils@nils-andresen.de>
+Copyright 2012 Alexander Neundorf <neundorf@kde.org>
+Copyright 2012 Alfred Liu <alfred.liu@atruscorp.com>
+Copyright 2012 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2013 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2014 Manuel Bachmann <tarnyko@tarnyko.net>
+Copyright 2016 Armin Novak <armin.novak@thincast.om>
+Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
+Copyright (c) Alexi Volkov <alexi@myrealbox.com> 2006
+Copyright 2013 Armin Novak <armin.novak@thincast.com>
+Copyright 2014 Armin Novak <armin.novak@thincast.com>
+Copyright 2015 Armin Novak <armin.novak@thincast.com>
+Copyright 2016 Armin Novak <armin.novak@thincast.com>
+Copyright 2016 David PHAM-VAN <d.phamvan@inuvika.com>
+Copyright 2017 Alexei Lozovsky <a.lozovsky@gmail.com>
+Copyright 2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2019 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 1995-1998 Eric Young (eay@cryptsoft.com)
+Copyright 2015 Denis Vincent <dvincent@devolutions.net>
+Copyright (c) 2006 Andreas Schneider <mail@cynapses.org>
+Copyright 2011 Otavio Salvador <otavio@ossystems.com.br>
+Copyright 2012 Hewlett-Packard Development Company, L.P.
+Copyright 2014 Hewlett-Packard Development Company, L.P.
+Copyright 2015 Copyright 2015 Thincast Technologies GmbH
+Copyright 2015 Hewlett-Packard Development Company, L.P.
+(c) Copyright 2014 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 1998, 2009 Bjorn Reese and Daniel Stenberg.
+Copyright (c) 2008 Kyle Machulis <kyle@nonpolynomial.com>
+Copyright (c) 2015 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2011 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2011 Roman Barabanov <romanbarabanov@gmail.com>
+Copyright 2012-2013 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2013 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2016 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2018 Pascal Bourguignon <pjb@informatimago.com>
+Copyright (c) 2006, Alexander Neundorf, <neundorf@kde.org>
+Copyright (c) 2008, Kevin Kofler, <kevin.kofler@chello.at>
+Copyright 2008-2011 Alexander Neundorf, <neundorf@kde.org>
+Copyright 2015-2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2016,2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2016-2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2011 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2012 Laxmikant Rashinkar <LK.Rashinkar@gmail.com>
+Copyright 2013 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2014 Hardening <contact@hardening-consulting.com>
+Copyright 2014 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2015 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2016 Norbert Federa <norbert.federa@thincast.com>
+(c) Copyright 2012 Hewlett-Packard Development Company, L.P.
+(c) Copyright 2014 Hewlett-Packard Development Company, L.P.
+Copyright (c) 2012 Raphael Kubo da Costa <rakuco@webkit.org>
+Copyright (c) 2015 Hewlett-Packard Development Company, L.P.
+Copyright 2010 Eduardo Fiss Beloni <beloni@ossystems.com.br>
+Copyright 2011 Eduardo Fiss Beloni <beloni@ossystems.com.br>
+Copyright 2014 David FORT <contact@hardening-consulting.com>
+Copyright 2014 David Fort <contact@hardening-consulting.com>
+Copyright 2015 David FORT <contact@hardening-consulting.com>
+Copyright 2015 David Fort <contact@hardening-consulting.com>
+Copyright 2016 David FORT <contact@hardening-consulting.com>
+Copyright 2016 David Fort <contact@hardening-consulting.com>
+Copyright 2017 David Fort <contact@hardening-consulting.com>
+Copyright 2017 Dorian Ducournau <dorian.ducournau@gmail.com>
+Copyright 2018 David Fort <contact@hardening-consulting.com>
+Copyright 2019 David Fort <contact@hardening-consulting.com>
+Copyright (c) 2001 Bjorn Reese <breese@users.sourceforge.net>
+Copyright (c) 2010, Luigi Toscano, <luigi.toscano@tiscali.it>
+Copyright 2009 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012 Dmitrij Jasnov <dmitrij.jasnov@ts.fujitsu.com>
+Copyright 2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2015 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2013 Dell Software <Mike.McDonald@software.dell.com>
+Copyright 2014 Dell Software <Mike.McDonald@software.dell.com>
+Copyright 2014 Mike McDonald <Mike.McDonald@software.dell.com>
+Copyright 2015 Dell Software <Mike.McDonald@software.dell.com>
+Copyright (c) 2014 Hardening <contact@hardening-consulting.com>
+Copyright (c) 2016 Norbert Federa <norbert.federa@thincast.com>
+Copyright (c) 2014 David FORT <contact@hardening-consulting.com>
+Copyright (c) 2015 David FORT <contact@hardening-consulting.com>
+Copyright 2015-2017 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2016-2017 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2012 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2013 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2015 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2018 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2009-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2011 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012-2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2013-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2009-2011 Mathieu Malaterre <mathieu.malaterre@gmail.com>
+Copyright (c) 2015 Bernhard Miklautz <bernhard.miklautz@shacknet.at>
+Copyright (c) 2014-2015 David FORT <contact@hardening-consulting.com>
+Copyright 2006 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+pulseaudio/pulseaudio 0e691b96640919b1c7ed91ae9240761c5775deeb - GPL-2.0-only AND LGPL-2.1-only
+
+
+Copyright (c) DFS
+Copyright (c) 2008
+Copyright (c) 2010
+Copyright (c) 2014
+Copyright (c) 2016
+Copyright (c) 2019
+Copyright (c) 2009.
+Copyright (c) 2009 THE
+Copyright (c) 2011 THE
+Copyright (c) 2008-2019
+Copyright 2009 Finn Thain
+Copyright (c) 2010 Rosetta
+Copyright 2009 Daniel Mack
+Copyright 2015 Georg Chini
+Copyright 2009 Ted Percival
+Copyright 2013 Albert Zeyer
+Copyright Kungliga Tekniska
+Copyright 2006 Diego Petteno
+Copyright 2006 Shams E. King
+Copyright 2008 Colin Guthrie
+Copyright 2009 Canonical Ltd
+Copyright 2009 Colin Guthrie
+Copyright 2009 Tanu Kaskinen
+Copyright 2010 Arun Raghavan
+Copyright 2010 Colin Guthrie
+Copyright 2011 Canonical Ltd
+Copyright 2011 Colin Guthrie
+Copyright 2013 Hajime Fujita
+Copyright (c) 1999 Tom Tromey
+Copyright (c) 2008 PULSEAUDIO
+Copyright 2010 Canonical Ltd.
+Copyright 2013 Collabora Ltd.
+Copyright 2015 Canonical Ltd.
+Copyright (c) 2010 Google Inc.
+Copyright (c) 2008 Timo Jyrinki
+Copyright (c) 2009 Matteo Frigo
+Copyright 2013 Martin Blanchard
+Copyright (c) 2000 Red Hat, Inc.
+Copyright (c) 2001 Chris Bagwell
+Copyright 2004 Joe Marcus Clarke
+Copyright 2008 Nokia Corporation
+Copyright 2009 Intel Corporation
+Copyright 2009 Nokia Corporation
+Copyright 2010 Intel Corporation
+Copyright 2011 Intel Corporation
+Copyright 2013 Alexander Couzens
+Copyright 2013 Intel Corporation
+Copyright 2014 Intel Corporation
+Copyright (c) 2012 Canonical Ltd.
+Copyright 2004 Lennart Poettering
+Copyright 2006 Lennart Poettering
+Copyright 2007 Lennart Poettering
+Copyright 2008 Lennart Poettering
+Copyright 2009 Lennart Poettering
+Copyright 2010 Lennart Poettering
+Copyright 2012 Lennart Poettering
+Copyright 2013 Matthias Wabersich
+Copyright (c) 2008 Alexandre Oliva
+Copyright (c) 2013 The Chromium OS
+copyright (c) 2001 Fabrice Bellard
+Copyright 2011 Collabora Multimedia
+Copyright (c) 2012 Intel Corporation
+Copyright (c) 2014, 2015 Google Inc.
+Copyright 2011-2013 BMW Car IT GmbH.
+Copyright 2013 Joao Paulo Rechi Vita
+Copyright 2014, 2015 Andrey Semashev
+Copyright (c) 2006 Lennart Poettering
+Copyright (c) 2008, 2009 the author(s)
+Copyright 2004-2006 Lennart Poettering
+Copyright 2004-2008 Lennart Poettering
+Copyright 2004-2009 Lennart Poettering
+Copyright 2005-2006 Lennart Poettering
+Copyright 2005-2009 Lennart Poettering
+Copyright 2006-2008 Lennart Poettering
+Copyright 2006-2009 Lennart Poettering
+COPYRIGHT_HOLDER PulseAudio contributors
+Copyright (c) 2006-2010 Nokia Corporation
+Copyright 2008-2013 Joao Paulo Rechi Vita
+Copyright (c) 2006-2008 Lennart Poettering
+Copyright (c) The Internet Society (1998).
+Copyright (c) The Internet Society (2000).
+Copyright (c) The Internet Society (2003).
+Copyright (c) 2008 Free Software Foundation
+Copyright 2011 Wolfson Microelectronics PLC
+copyrighted by the Free Software Foundation
+Copyright 2004-2006, 2009 Lennart Poettering
+Copyright (c) 2008 Stepan Kasal <kasal@ucw.cz>
+Copyright 2009 Jason Newton <nevion@gmail.com>
+Copyright (c) 2007-2008 Free Software Foundation
+Copyright (c) 2009 Jason Newton nevion@gmail.com
+Copyright 2011 David Henningsson, Canonical Ltd.
+Copyright 2014 David Henningsson, Canonical Ltd.
+Copyright 2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 2009 Free Software Foundation, Inc.
+Copyright (c) 2015 Paul Norman <penorman@mac.com>
+Copyright 2009,2010 Daniel Mack <daniel@caiaq.de>
+Copyright 2013 Peter Meerwald <pmeerw@pmeerw.net>
+Copyright 2014 Peter Meerwald <pmeerw@pmeerw.net>
+Copyright (c) 2008 Andreas Schwab <schwab@suse.de>
+Copyright (c) 2012 Zack Weinberg <zackw@panix.com>
+Copyright 2010 Wim Taymans <wim.taymans@gmail.com>
+Copyright (c) 2008 Alan Woodland <ajw05@aber.ac.uk>
+Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+Copyright 2010 David Henningsson <diwic@ubuntu.com>
+Copyright (c) 2008 Benjamin Kosnik <bkoz@redhat.com>
+Copyright (c) 2018 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright 2016 Arun Raghavan <mail@arunraghavan.net>
+Copyright 2014 Wim Taymans <wim.taymans at gmail.com>
+Copyright 2018-2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 2008-2017 Free Software Foundation, Inc.
+Copyright 2015 Ahmed S. Darwish <darwish.07@gmail.com>
+Copyright 2016 Ahmed S. Darwish <darwish.07@gmail.com>
+Copyright (c) 1989, 1991 Free Software Foundation, Inc.
+Copyright (c) 1991, 1999 Free Software Foundation, Inc.
+Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+Copyright (c) 2015 Moritz Klammler <moritz@klammler.eu>
+Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+Copyright (c) 2012, 2016. Free Software Foundation, Inc.
+Copyright 2009 Wim Taymans <wim.taymans@collabora.co.uk>
+Copyright 2010 Wim Taymans <wim.taymans@collabora.co.uk>
+Copyright (c) 2004 Michael Niedermayer <michaelni@gmx.at>
+Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu>
+Copyright 2012 Alexander Kurtz <kurtz.alex@googlemail.com>
+Copyright 2017 Sebastian Droge <sebastian@centricular.com>
+Copyright 2019 Russell Treleaven <rtreleaven@bunnykick.ca>
+Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2009 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2010 Diego Elio Petteno <flameeyes@gmail.com>
+Copyright 2011 Collabora Ltd. 2015 Aldebaran SoftBank Group
+Copyright 2012 Flavio Ceolin <flavio.ceolin@profusion.mobi>
+Copyright (c) 2011 Antonio Ospite <ospite@studenti.unina.it>
+Copyright 2009 Wim Taymans <wim.taymans@collabora.co.uk.com>
+Copyright 2010 Arun Raghavan <arun.raghavan@collabora.co.uk>
+Copyright 2011 Arun Raghavan <arun.raghavan@collabora.co.uk>
+Copyright (c) 1994, 1996, 1997 Free Software Foundation, Inc.
+Copyright (c) 2004-2010 Marcel Holtmann <marcel@holtmann.org>
+Copyright (c) 2017 Peter Meerwald-Stadler <pmeerw@pmeerw.net>
+Copyright 2001-2003, 2006-2012 Free Software Foundation, Inc.
+Copyright 2006 Pierre Ossman <ossman@cendio.se> for Cendio AB
+Copyright 2012 Peter Meerwald <p.meerwald@bct-electronic.com>
+Copyright 2013 Peter Meerwald <p.meerwald@bct-electronic.com>
+Copyright (c) 2014 Collabora Ltd. <http://www.collabora.co.uk/>
+Copyright (c) 2008 Nokia Corporation and/or its subsidiary(-ies).
+Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+Copyright 2012 Feng Wei <wei.feng@freescale.com> , Freescale Ltd.
+Copyright 2006-2007 Pierre Ossman <ossman@cendio.se> for Cendio AB
+Copyright 2012 Niels Ole Salscheider <niels_ole@salscheider-online.de>
+Copyright 2009 Vincent Filali-Ansary <filali.v@azurdigitalnetworks.net>
+Copyright (c) 1994,96,97,98,99,2000,2001,2004 Free Software Foundation, Inc.
+Copyright (c) 2008, 2009, 2012, 2015, 2019 The Free Software Foundation, Inc
+Copyright (c) 2000-2002 Richard W.E. Furse, Paul Barton-Davis, Stefan Westerfeld.
+Copyright 2013 bct electronic GmbH Contributor Stefan Huber <s.huber@bct-electronic.com>
+Copyright 2008-2013 Joao Paulo Rechi Vita Copyrigth 2018-2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 2000-2002 Oliver Kurth <oku@masqmail.cx> 2003 Lennart Poettering <mzkzygbzna@0pointer.de>
+
+All PulseAudio source files, except as noted below, are licensed under the GNU
+Lesser General Public License. (see file LGPL for details)
+
+However, the server side has optional GPL dependencies.  These include the
+libsamplerate and gdbm (core libraries), LIRC (lirc module) and FFTW (equalizer
+module), although others may also be included in the future.  If PulseAudio is
+compiled with these optional components, this effectively downgrades the
+license of the server part to GPL (see the file GPL for details), exercising
+section 3 of the LGPL.  In such circumstances, you should treat the client
+library (libpulse) of PulseAudio as being LGPL licensed and the server part
+(libpulsecore) as being GPL licensed.  Since the PulseAudio daemon, tests,
+various utilities/helpers and the modules link to libpulsecore and/or the afore
+mentioned optional GPL dependencies they are of course also GPL licensed also
+in this scenario.
+
+In addition to this, if D-Bus support is enabled, the PulseAudio client library
+(libpulse) MAY need to be licensed under the GPL, depending on the license
+adopted for libdbus. libdbus is licensed under either of the Academic Free
+License 2.1 or GPL 2.0 or above. Which of these applies is your choice, and the
+result affects the licensing of libpulse and thus, potentially, all programs
+that link to libpulse.
+
+Andre Adrian's echo cancellation implementation is licensed under a less
+restrictive license - see src/modules/echo-cancel/adrian-license.txt for
+details.
+
+Some other files pulled into PA source (i.e. reference implementations that are
+considered too small and stable to be considered as an external library) use the
+more permissive MIT license. These include the device reservation DBus protocol
+and realtime kit implementations.
+
+A more permissive BSD-style license is used for LFE filters, see
+src/pulsecore/filter/LICENSE.WEBKIT for details.
+
+Additionally, a more permissive Sun license is used for code that performs
+u-law, A-law and linear PCM conversions.
+
+While we attempt to provide a summary here, it is the ultimate responsibility of
+the packager to ensure the components they use in their build of PulseAudio
+meets their license requirements.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+wayland-project/weston 04d3ae265d8d8f84352c8dac21ec40b2fe07e7d2 - MIT
+
+
+(c) 2007-2010 Novell, Inc.
+(c) 2013 DENSO CORPORATION
+Copyright (c) 2012 Rob Clark
+Copyright (c) 2012 Jonas Adahl
+Copyright (c) 2013 Jonas Adahl
+Copyright 2018 Collabora, Ltd.
+Copyright 2019 Collabora, Ltd.
+Copyright (c) 2009 Chris Wilson
+Copyright (c) 2012 Scott Moreau
+Copyright (c) 2013 Red Hat, Inc.
+Copyright (c) 2015 Red Hat, Inc.
+Copyright 2012 Intel Corporation
+Copyright (c) 2011 Tim Wiederhake
+Copyright (c) 2012 Martin Minarik
+Copyright (c) 2012 Openismus GmbH
+Copyright (c) 2013 Collabora Ltd.
+Copyright (c) 2013 David Herrmann
+Copyright (c) 2013 Jason Ekstrand
+Copyright (c) 2013 Richard Hughes
+Copyright (c) 2014 Jason Ekstrand
+Copyright (c) 2015 Collabora Ltd.
+Copyright (c) 2015 Giulio Camuffo
+Copyright (c) 2016 Armin Krezovic
+Copyright (c) 2016 Giulio Camuffo
+Copyright (c) 2019 Collabora Ltd.
+Copyright (c) 2011 Collabora, Ltd.
+Copyright (c) 2012 Collabora, Ltd.
+Copyright (c) 2013 BMW Car IT GmbH
+Copyright (c) 2013 Collabora, Ltd.
+Copyright (c) 2013 Philip Withnall
+Copyright (c) 2014 Collabora, Ltd.
+Copyright (c) 2015 Collabora, Ltd.
+Copyright (c) 2016 Benoit Gschwind
+Copyright (c) 2016 Collabora, Ltd.
+Copyright (c) 2017 Collabora, Ltd.
+Copyright (c) 2018 Collabora, Ltd.
+Copyright (c) 2019 Collabora, Ltd.
+copyright u'2019, Weston community
+Copyright (c) 2011 Benjamin Franzke
+Copyright (c) 2012 Benjamin Franzke
+Copyright 2017-2018 Collabora, Ltd.
+Copyright 2018-2019 Collabora, Ltd.
+Copyright (c) 2008 Kristian Hogsberg
+Copyright (c) 2009 Intel Corporation
+Copyright (c) 2010 Intel Corporation
+Copyright (c) 2010 Kristian Hogsberg
+Copyright (c) 2011 Intel Corporation
+Copyright (c) 2011 Kristian Hogsberg
+Copyright (c) 2012 John Kare Alsaker
+Copyright (c) 2012 Kristian Hogsberg
+Copyright (c) 2013 DENSO CORPORATION
+Copyright (c) 2013 Intel Corporation
+Copyright (c) 2014 DENSO CORPORATION
+Copyright (c) 2015 Jasper St. Pierre
+Copyright (c) 2016 DENSO CORPORATION
+Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
+Copyright 2016 The Chromium Authors.
+Copyright 2016, 2017 Collabora, Ltd.
+(c) 2016 Samsung Electronics Co., Ltd
+Copyright (c) 2012 Intel Corporation.
+Copyright (c) 2016 NVIDIA Corporation
+Copyright 2010-2012 Intel Corporation
+Copyright (c) 2014,2018 Collabora Ltd.
+Copyright 2013 Raspberry Pi Foundation
+Copyright (c) 2011-2012 Collabora, Ltd.
+Copyright (c) 2012 Philipp Bruschweiler
+Copyright (c) 2012-2013 Collabora, Ltd.
+Copyright (c) 2012-2018 Collabora, Ltd.
+Copyright (c) 2015,2019 Collabora, Ltd.
+Copyright 2010 Red Hat <mjg@redhat.com>
+Copyright 2018 General Electric Company
+Copyright (c) 2010-2011 Benjamin Franzke
+Copyright (c) 2014, 2015 Collabora, Ltd.
+Copyright (c) 2014, 2016 Collabora, Ltd.
+Copyright (c) 2014, 2019 Collabora, Ltd.
+Copyright (c) 2015, 2019 Collabora, Ltd.
+Copyright (c) 2016, 2019 Collabora, Ltd.
+Copyright (c) 2017, 2018 Collabora, Ltd.
+Copyright (c) 2018 DisplayLink (UK) Ltd.
+Copyright 2011-2012,2020 Collabora, Ltd.
+Copyright (c) 2008-2011 Kristian Hogsberg
+Copyright (c) 2008-2012 Kristian Hogsberg
+Copyright (c) 2010-2011 Intel Corporation
+Copyright (c) 2010-2012 Intel Corporation
+Copyright (c) 2011-2012 Intel Corporation
+Copyright (c) 2014 - 2015 Collabora, Ltd.
+Copyright (c) 2010, 2013 Intel Corporation
+Copyright (c) 2011, 2012 Intel Corporation
+Copyright (c) 2012 Raspberry Pi Foundation
+Copyright (c) 2013 Raspberry Pi Foundation
+Copyright (c) 2018-2019 Intel Corporation.
+Copyright 2014, 2016, 2020 Collabora, Ltd.
+Copyright (c) 2010 Red Hat <mjg@redhat.com>
+Copyright (c) 2017 Pekka Paalanen pq@iki.fi
+Copyright (c) 2015 General Electric Company.
+Copyright (c) 2016 Quentin Sardem FF7 Glidic
+Copyright (c) 2018 Renesas Electronics Corp.
+Copyright 2017-2018 General Electric Company
+Copyright (c) 2012, 2017-2019 Collabora, Ltd.
+Copyright (c) 2014 Pekka Paalanen <pq@iki.fi>
+Copyright (c) 2017 Pekka Paalanen <pq@iki.fi>
+Copyright (c) 2012, 2017, 2018 Collabora, Ltd.
+Copyright (c) 2018 Zodiac Inflight Innovations
+Copyright (c) 2015 Samsung Electronics Co., Ltd
+Copyright (c) 2016 Samsung Electronics Co., Ltd
+Copyright (c) 2017, 2018 General Electric Company
+Copyright (c) 2013 Hardening <rdp.effort@gmail.com>
+Copyright (c) 1988-2004 Keith Packard and Bart Massey.
+Copyright (c) 2013 Sam Spilsbury <smspillaz@gmail.com>
+Copyright (c) 2013 David Herrmann <dh.herrmann@gmail.com>
+Copyright (c) 2013 Vasily Khoruzhick <anarsoul@gmail.com>
+Copyright 2008 Tungsten Graphics, Inc., Cedar Park, Texas.
+Copyright (c) 2004, 2006 The Linux Foundation and its contributors.
+Copyright (c) 2019 Pengutronix, Michael Olbrich <m.olbrich@pengutronix.de>
+
+Copyright © 2008-2012 Kristian Høgsberg
+Copyright © 2010-2012 Intel Corporation
+Copyright © 2010-2011 Benjamin Franzke
+Copyright © 2011-2012 Collabora, Ltd.
+Copyright © 2010 Red Hat <mjg@redhat.com>
+ 
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice (including the next
+paragraph) shall be included in all copies or substantial portions of the
+Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+---
+
+The above is the version of the MIT "Expat" License used by X.org:
+
+    http://cgit.freedesktop.org/xorg/xserver/tree/COPYING
+
+
+---------------------------------------------------------
+
+
+---------------------------------------------------------
+
+mesa/mesa be4f7fb656180ab55a50eff01f36672b0bf5f146 - MIT
+
+
+Copyright (C) 1999-2007 Brian Paul. All Rights Reserved.
+Copyright (c) Mesa contributors
+
+The Mesa distribution consists of several components under different licenses. The core Mesa library and Gallium code are licensed under the MIT license shown below. Component licenses are documented in docs/license.rst within the project source tree.
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------

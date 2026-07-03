@@ -1130,9 +1130,9 @@ Försöker ladda ned...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p är inaktiverat och återgår till 9p med vsock-transport.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy nätverk stöds inte när wsl2.virtio är inaktiverat. återgår till networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme-nätverk stöds inte när wsl2.virtio är inaktiverat. Återgår till networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Den kernel som körs saknar en korrigering som avsevärt förbättrar prestandan för virtio-enheter. Uppdatera till en nyare WSL-kärna för att aktivera den här optimeringen.</value>
@@ -1776,7 +1776,8 @@ Linux-binärfiler som körs i WSL kan automatiskt använda din GPU i Windows fö
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>När du har installerat VS Code kan du installera WSL-fjärrtillägget från Windows-terminal:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+code --install-extension ms-vscode-remote.remote-wsl</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Öppna ett WSL-projekt i Visual Studio Code</value>
@@ -2062,6 +2063,10 @@ Användning:
     <value>Ogiltig IP-adress: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Det gick inte att mappa porten {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') misslyckades</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2335,7 +2340,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>Nätverksdrivrutinsalternativet Gateway kräver att Subnet också anges.</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2377,6 +2382,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Det gick inte att skapa volymen {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>För många volymer har monterats (gräns: {}). Starta om sessionen om du vill montera fler volymer. Detta kommer att åtgärdas i en framtida version.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Porten {} används redan. Det går inte att starta containern {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2398,6 +2407,14 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Ingen WSLC-session hittades i '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Det går inte att använda {} som sessionslagring eftersom katalogen inte är tom</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>Det går inte att använda {} som sessionslagring eftersom det inte är en katalog</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2857,7 +2874,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Ansluta en container till ett nätverk</value>
   </data>
   <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
-    <value>Do not error if the network does not exist</value>
+    <value>Rapportera det inte som ett fel om nätverket inte finns</value>
   </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Ogiltigt {}-värde: nätverksnamnet får inte vara tomt eller innehålla blanksteg</value>
@@ -2926,10 +2943,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Visa tidsstämplar i loggutdata</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>Visa loggar sedan tidsstämpeln (t.ex. Unix-epoksekunder)</value>
+    <value>Visa loggar sedan tidsstämpel (Unix-epoksekunder eller RFC3339, t.ex. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Visa loggar före tidsstämpeln (t.ex. Unix-epoksekunder)</value>
+    <value>Visa loggar före tidsstämpel (Unix-epoksekunder eller RFC3339, t.ex. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildreferens i formatet image-name[:tag]</value>
@@ -2951,7 +2968,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Bindmontera en volym till containern</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>Rapportera det inte som ett fel om volymen inte finns</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbetskatalog i containern</value>

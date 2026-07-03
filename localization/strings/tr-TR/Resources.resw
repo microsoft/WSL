@@ -1130,9 +1130,9 @@ Web'den indirme deneniyor...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p devre dışı bırakıldı, vsock aktarımıyla 9p'ye geri dönülüyor.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy ağı, wsl2.virtio devre dışı bırakıldığında desteklenmez; networkingMode {} moduna geri dönülüyor.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>wsl2.virtio devre dışı bırakıldığında Consomme ağı desteklenmez ve networkingMode {} kullanılır.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Çalışan çekirdekte virtio cihaz performansını önemli ölçüde iyileştiren bir yama eksik. Bu iyileştirmeyi etkinleştirmek için daha yeni bir WSL çekirdeğine güncelleştirin.</value>
@@ -1774,9 +1774,10 @@ WSL'de çalışan Linux ikili dosyaları, performanslarını hızlandırmak içi
     <value>Yükleme</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>VS Code'u yükledikten sonra Remote WSL uzantısını Windows Terminal'dan yükleyebilirsiniz:
+    <value>VS Code'u yükledikten sonra Remote WSL uzantısını Windows Terminal'den yükleyebilirsiniz:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Visual Studio Code'da bir WSL Projesi Açma</value>
@@ -2062,6 +2063,10 @@ Kullanım:
     <value>Geçersiz IP adresi '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>'{}' bağlantı noktası eşlenemedi, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') başarısız oldu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2331,11 +2336,11 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>Desteklenmeyen ağ sürücüsü seçeneği: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>Ağ sürücüsü seçeneği 'Gateway' için 'Subnet' de belirtilmelidir.</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2377,6 +2382,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>'{}': {} disk birimi oluşturulamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Aşırı sayıda birim bağlandı (sınır: {}). Daha fazla birim bağlamak için oturumu yeniden başlatın. Bu sorun gelecekteki bir sürümde düzeltilecektir.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>{} bağlantı noktası zaten kullanımda, {} kapsayıcısı başlatılamıyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2398,6 +2407,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>'{}' içinde WSLC oturumu bulunamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Dizin boş olmadığından '{}' oturum depolama alanı olarak kullanılamıyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>'{}' bir dizin olmadığından oturum depolama alanı olarak kullanılamaz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">

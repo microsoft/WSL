@@ -1,0 +1,20 @@
+# WslcContainerState
+
+```c
+typedef enum WslcContainerState
+{
+    WSLC_CONTAINER_STATE_INVALID = 0,
+    WSLC_CONTAINER_STATE_CREATED = 1,
+    WSLC_CONTAINER_STATE_RUNNING = 2,
+    WSLC_CONTAINER_STATE_EXITED = 3,
+    WSLC_CONTAINER_STATE_DELETED = 4,
+} WslcContainerState;
+```
+
+| Enumerator | Value |
+|---|---|
+| `WSLC_CONTAINER_STATE_INVALID` | `0` |
+| `WSLC_CONTAINER_STATE_CREATED` | `1` |
+| `WSLC_CONTAINER_STATE_RUNNING` | `2` |
+| `WSLC_CONTAINER_STATE_EXITED` | `3` |
+| `WSLC_CONTAINER_STATE_DELETED` | `4` |

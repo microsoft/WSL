@@ -1130,9 +1130,9 @@ Probíhá pokus o stažení webu...</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>Wsl2.virtio9p je zakázáno, probíhá návrat na 9p s přenosem vsock.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>VirtioProxy sítě se nepodporují, pokud je wsl2.virtio zakázané. návrat k networkingMode {}.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>Consomme sítě se nepodporují, pokud je wsl2.virtio zakázané. návrat k networkingMode {}.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>Aktuálně spuštěné jádro postrádá opravu, která výrazně zlepšuje výkon zařízení virtio. Pokud chcete tuto optimalizaci povolit, aktualizujte na novější jádro WSL.</value>
@@ -1776,7 +1776,8 @@ Binární soubory Linuxu spuštěné ve WSL můžou automaticky používat GPU v
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Po instalaci nástroje VS Code můžete nainstalovat rozšíření Remote WSL z terminálu Windows:
 
-code –install-extension ms-vscode-remote.remote-wsl</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Otevření projektu WSL ve Visual Studio Code</value>
@@ -2062,12 +2063,16 @@ Využití:
     <value>Neplatná IP adresa '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>Nepodařilo se namapovat port '{}', {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') selhalo</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
-    <value>The --session option cannot be used with this command.</value>
+    <value>Možnost --session nelze použít s tímto příkazem.</value>
     <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
@@ -2377,6 +2382,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Nepodařilo se vytvořit svazek '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>Bylo připojeno příliš mnoho svazků (limit: {}). Restartujte relaci, aby se připojilo více svazků. Tento problém opravíme v budoucí verzi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>Port {} se už používá, kontejner {} se nedá spustit.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2398,6 +2407,14 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>Nenašla se žádná relace WSLC v '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>Nelze použít '{}' jako úložiště relací, protože adresář není prázdný</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>{} nelze použít jako úložiště relace, protože se nejedná o adresář</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2929,7 +2946,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Zobrazit protokoly od časového razítka (Unixové epochy sekund nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>Zobrazit protokoly před časovým razítkem (např. unix epoch seconds)</value>
+    <value>Zobrazit protokoly před časovým razítkem (sekundy Unix epochy nebo RFC3339, např. 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nový odkaz na obrázek ve formátu image-name[:tag]</value>

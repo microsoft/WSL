@@ -1,4 +1,5 @@
 site_name: WSL
+site_description: Windows Subsystem for Linux developer and architecture documentation
 
 nav:
     - 'Home': 'index.md'
@@ -19,20 +20,65 @@ nav:
        - 'relay': technical-documentation/relay.md
        - 'gns': technical-documentation/gns.md
        - 'localhost': technical-documentation/localhost.md
-       - 'plan9': technical-documentation/plan9.md  
+       - 'plan9': technical-documentation/plan9.md
     - 'Technical documentation':
        - 'Boot process': technical-documentation/boot-process.md
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md
        - 'Systemd': technical-documentation/systemd.md
-      
-      
+    # The API reference tree (docs/api-reference) is appended here; its
+    # navigation is driven by the per-folder .pages files (awesome-pages plugin).
+    - '...'
+
 plugins:
     - search
+    - awesome-pages
     - mermaid2:
         version: 11.4.1
         arguments:
           securityLevel: 'loose'
 
 theme:
-    name: readthedocs
+    name: material
+    features:
+        - navigation.tracking
+        - navigation.sections
+        - navigation.top
+        - navigation.indexes
+        - toc.follow
+        - content.code.copy
+        - search.suggest
+        - search.highlight
+    palette:
+        - media: "(prefers-color-scheme: light)"
+          scheme: default
+          primary: indigo
+          accent: indigo
+          toggle:
+            icon: material/weather-night
+            name: Switch to dark mode
+        - media: "(prefers-color-scheme: dark)"
+          scheme: slate
+          primary: indigo
+          accent: indigo
+          toggle:
+            icon: material/weather-sunny
+            name: Switch to light mode
+
+markdown_extensions:
+    - admonition
+    - attr_list
+    - md_in_html
+    - tables
+    - toc:
+        permalink: true
+    - pymdownx.highlight:
+        anchor_linenums: true
+    - pymdownx.inlinehilite
+    - pymdownx.snippets
+    - pymdownx.details
+    - pymdownx.superfences:
+        custom_fences:
+          - name: mermaid
+            class: mermaid
+            format: !!python/name:mermaid2.fence_mermaid_custom

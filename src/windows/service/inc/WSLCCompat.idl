@@ -47,7 +47,7 @@ interface IWSLCCompatCrashDumpCallback : IUnknown
     HRESULT OnCrashDump(
         [in, string] LPCWSTR DumpPath,
         [in, unique, string] LPCSTR ProcessName,
-        [in] ULONGLONG Pid,
+        [in] ULONG Pid,
         [in] ULONG Signal,
         [in] ULONGLONG Timestamp);
 };
@@ -318,7 +318,7 @@ interface IWSLCCompatSession : IUnknown
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
     HRESULT LoadImage([in] WSLCCompatHandle ImageHandle, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
-    HRESULT ImportImage([in] WSLCCompatHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
+    HRESULT ImportImage([in] WSLCCompatHandle ImageHandle, [in, unique] LPCSTR ImageName, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* ImageId);
     HRESULT ListImages([in, unique] const WSLCCompatListImagesOptions* Options, [out, size_is(, *Count)] WSLCCompatImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCCompatDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCCompatDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCCompatTagImageOptions* Options);

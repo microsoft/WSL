@@ -1130,9 +1130,9 @@ Windows 版本: {}</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>已禁用 wsl2.virtio9p，使用 vsock 传输回退到 9p。</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>当 wsl2.virtio 被禁用时，不支持 VirtioProxy 网络；将回退到 networkingMode {}。</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>当 wsl2.virtio 被禁用时，不支持 Consomme 网络；将回退到 networkingMode {}。</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>正在运行的内核缺少可显著提高设备性能 virtio 补丁。更新到更新的 WSL 内核以启用此优化。</value>
@@ -1776,7 +1776,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>安装 VS Code 后，可以从 Windows 终端安装远程 WSL 扩展:
 
-"code –install-extension ms-vscode-remote.remote-wsl"</value>
+“code --install-extension ms-vscode-remote.remote-wsl”</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>在 Visual Studio Code 中打开 WSL 项目</value>
@@ -2062,12 +2063,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>IP 地址 '{}' 无效</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>未能映射端口 '{}'，{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') 失败</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
-    <value>The --session option cannot be used with this command.</value>
+    <value>此命令不能使用 --session 选项。</value>
     <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
@@ -2331,11 +2336,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
-    <value>Unsupported network driver option: '{}'</value>
+    <value>不支持的网络驱动程序选项: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Network driver option 'Gateway' requires 'Subnet' to also be specified.</value>
+    <value>网络驱动程序选项 'Gateway' 还需要指定 'Subnet'。</value>
     <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2377,6 +2382,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>无法创建卷“{}”: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>装入的卷太多 (限制： {})。重启会话以装载更多卷。此问题将在将来的版本中修复。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
     <value>端口 {} 已在使用中，无法启动容器 {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2398,6 +2407,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>在 '{}' 中找不到 WSLC 会话</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>无法使用 '{}' 作为会话存储，因为目录不为空</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>无法使用 '{}' 作为会话存储，因为它不是目录</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2951,7 +2968,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>将装载卷绑定到容器</value>
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
-    <value>Do not error if the volume does not exist</value>
+    <value>如果卷不存在，则不要报错</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器内的工作目录</value>
@@ -3042,7 +3059,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a Unix epoch timestamp or an RFC3339 date-time (e.g. 2024-01-15T10:30:00Z)</value>
+    <value>无效 {} 参数值: '{}'。预期为 Unix epoch 时间戳或 RFC3339 日期时间(例如 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
