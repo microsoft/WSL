@@ -155,11 +155,6 @@ static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
 };
 
 namespace {
-    std::wstring ToWideString(std::wstring_view value)
-    {
-        return {value.data(), value.size()};
-    }
-
     std::vector<std::wstring_view> SplitPreserveEmpty(std::wstring_view value, wchar_t delimiter)
     {
         std::vector<std::wstring_view> parts;
@@ -254,7 +249,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
             if (separator == std::wstring_view::npos)
             {
                 result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = ToWideString(part);
+                result.ErrorValue = std::wstring{part};
                 return;
             }
 
@@ -265,21 +260,21 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
                 if (parsedName)
                 {
                     result.Error = NetworkArgumentParseError::DuplicateNetworkName;
-                    result.ErrorValue = ToWideString(key);
+                    result.ErrorValue = std::wstring{key};
                     return;
                 }
 
                 parsedName = true;
-                result.Name = ToWideString(optionValue);
+                result.Name = std::wstring{optionValue};
             }
             else if (key == L"alias")
             {
-                result.Aliases.emplace_back(ToWideString(optionValue));
+                result.Aliases.emplace_back(optionValue);
             }
             else
             {
                 result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = ToWideString(key);
+                result.ErrorValue = std::wstring{key};
                 return;
             }
         }
@@ -296,7 +291,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
     }
     else
     {
-        result.Name = ToWideString(value);
+        result.Name = std::wstring{value};
     }
 
     if (result.Error == NetworkArgumentParseError::None)
