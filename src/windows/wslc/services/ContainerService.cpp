@@ -44,6 +44,7 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
 
 static bool SupportsNetworkAliases(std::string_view network)
 {
+    // Aliases are only supported for user-defined networks, not built-in or container-sourced network modes.
     return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
 }
 
@@ -82,8 +83,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
 
         const auto& primary = options.Networks.front().Name;
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
 
         for (const auto& alias : options.NetworkAliases)
         {
@@ -650,13 +650,15 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
     wsl::windows::common::io::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(
+        std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+            stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.
