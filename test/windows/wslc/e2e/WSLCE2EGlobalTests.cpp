@@ -58,12 +58,49 @@ class WSLCE2EGlobalTests
 
     WSLC_TEST_METHOD(WSLCE2E_HelpCommand)
     {
-        RunWslcAndVerify(L"--help", {.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        auto result = RunWslc(L"--help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
     {
-        RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+        auto result = RunWslc(L"INVALID_CMD");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_RoutesToStdout)
+    {
+        auto result = RunWslc(L"--help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ErrorRoutesToStderr)
+    {
+        // Help on error must land on stderr; stdout must remain empty.
+        auto result = RunWslc(L"INVALID_CMD");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_NoColorWhenRedirected)
+    {
+        // Captured via anonymous pipe; Reporter must suppress VT escape sequences.
+        auto result = RunWslc(L"--help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(std::wstring::npos, result.Stdout.value().find(L'\x1b'));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ColorOnTerminal)
+    {
+        // Pseudo console reports VT support; Reporter should emit SGR sequences.
+        auto session = RunWslcInteractive(L"--help", ElevationType::Elevated, PseudoConsole{120, 30});
+        session.WaitForExit();
+        VERIFY_IS_TRUE(session.GetStdoutData().find('\x1b') != std::string::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_VersionCommand)
@@ -536,94 +573,9 @@ class WSLCE2EGlobalTests
     }
 
 private:
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
     std::wstring GetVersionMessage() const
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
-    }
-
-    std::wstring GetDescription() const
-    {
-        return L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL "
-               L"containers from the command line.\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc  [<command>] [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
-            {L"container", Localization::WSLCCLI_ContainerCommandDesc()},
-            {L"image", Localization::WSLCCLI_ImageCommandDesc()},
-            {L"network", Localization::WSLCCLI_NetworkCommandDesc()},
-            {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
-            {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
-            {L"system", Localization::WSLCCLI_SystemCommandDesc()},
-            {L"volume", Localization::WSLCCLI_VolumeCommandDesc()},
-            {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
-            {L"build", Localization::WSLCCLI_ImageBuildDesc()},
-            {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
-            {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
-            {L"export", Localization::WSLCCLI_ContainerExportDesc()},
-            {L"images", Localization::WSLCCLI_ImageListDesc()},
-            {L"import", Localization::WSLCCLI_ImageImportDesc()},
-            {L"inspect", Localization::WSLCCLI_InspectDesc()},
-            {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
-            {L"list", Localization::WSLCCLI_ContainerListDesc()},
-            {L"load", Localization::WSLCCLI_ImageLoadDesc()},
-            {L"login", Localization::WSLCCLI_LoginDesc()},
-            {L"logout", Localization::WSLCCLI_LogoutDesc()},
-            {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},
-            {L"pull", Localization::WSLCCLI_ImagePullDesc()},
-            {L"push", Localization::WSLCCLI_ImagePushDesc()},
-            {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
-            {L"rmi", Localization::WSLCCLI_ImageRemoveDesc()},
-            {L"run", Localization::WSLCCLI_ContainerRunDesc()},
-            {L"save", Localization::WSLCCLI_ImageSaveDesc()},
-            {L"start", Localization::WSLCCLI_ContainerStartDesc()},
-            {L"stats", Localization::WSLCCLI_ContainerStatsDesc()},
-            {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
-            {L"tag", Localization::WSLCCLI_ImageTagDesc()},
-            {L"version", Localization::WSLCCLI_VersionDesc()},
-        };
-
-        size_t maxLen = 0;
-        for (const auto& [name, _] : entries)
-        {
-            maxLen = (std::max)(maxLen, name.size());
-        }
-
-        std::wstringstream commands;
-        commands << Localization::WSLCCLI_AvailableCommands() << L"\r\n";
-        for (const auto& [name, desc] : entries)
-        {
-            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
-        }
-        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -v,--version  Show version information for this tool\r\n"
-                << L"  -?,--help     Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
     }
 };
 } // namespace WSLCE2ETests

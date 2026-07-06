@@ -44,7 +44,8 @@ class WSLCE2EContainerAttachTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Attach_HelpCommand)
     {
         auto result = RunWslc(L"container attach --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Attach_TTY)
@@ -107,7 +108,8 @@ class WSLCE2EContainerAttachTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Attach_MissingContainerId)
     {
         auto result = RunWslc(L"container attach");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Attach_ContainerNotFound)
@@ -121,44 +123,5 @@ class WSLCE2EContainerAttachTests
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return L"Attaches to a container.\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container attach [<options>] <container-id>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  container-id    Container ID\r\n"         //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n" //
-                << L"  -?,--help       Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

@@ -47,6 +47,6 @@ std::wstring NetworkCommand::LongDescription() const
 
 void NetworkCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

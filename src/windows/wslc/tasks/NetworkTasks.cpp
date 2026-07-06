@@ -191,10 +191,10 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<3>({L"NETWORK ID", L"NAME", L"DRIVER"});
+        auto table = wsl::windows::wslc::TableOutput<3>(context.Reporter, {L"NETWORK ID", L"NAME", L"DRIVER"});
         for (const auto& network : networks)
         {
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(TruncateId(network.Id)),
                 MultiByteToWide(network.Name),
                 MultiByteToWide(network.Driver),
