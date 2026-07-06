@@ -1933,7 +1933,8 @@ try
         TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
-        TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
+        TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess")),
+        TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     return result;
 }
