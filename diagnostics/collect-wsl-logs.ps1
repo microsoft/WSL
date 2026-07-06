@@ -350,11 +350,12 @@ mkdir -p $wslgFolder | Out-Null
 $wslgJob = Start-Job -ScriptBlock {
     param($DestFull, $CollectDumps)
 
-    $destWsl = & wsl.exe --system --user root -e wslpath -u "$DestFull" 2>$null
+    $destWsl = "$(& wsl.exe --system --user root -e wslpath -u "$DestFull" 2>$null)".Trim()
     if ([string]::IsNullOrWhiteSpace($destWsl)) { return }
-    $destWsl = $destWsl.Trim()
 
-    # Destination is passed as $1 so paths containing a single quote are handled safely.
+    # Destination is passed as $1 so paths containing a single quote are handled safely. In
+    # `sh -c '<script>' sh <arg>`, the token after the script becomes $0 (here "sh") and the
+    # next becomes $1 (the destination path).
     & wsl.exe --system --user root -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
 
     if ($CollectDumps)
@@ -363,7 +364,7 @@ $wslgJob = Start-Job -ScriptBlock {
     }
 } -ArgumentList (Resolve-Path $wslgFolder).Path, ([bool]$Dump)
 
-if (Wait-Job $wslgJob -Timeout 60)
+if (Wait-Job $wslgJob -Timeout 20)
 {
     Receive-Job $wslgJob | Out-Null
 }
