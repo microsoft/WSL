@@ -63,8 +63,6 @@ struct SessionSettings
     std::wstring StoragePath;
     WSLCSessionSettings Settings{};
 
-    bool WarnCustomStorageLocation = false;
-
     NON_COPYABLE(SessionSettings);
     NON_MOVABLE(SessionSettings);
 
@@ -97,17 +95,12 @@ struct SessionSettings
 
         const auto storageDir = storageBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
 
-        auto result = std::unique_ptr<SessionSettings>(
-            new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), WSLCSessionStorageFlagsNone, userSettings));
+        // wslcsession emits the custom-location warning when it actually creates the VHD, so the notice
+        // fires once at creation without a service-side callback that could stall CreateSession.
+        const auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
 
-        if (customConfigured)
-        {
-            auto runAsUser = wil::impersonate_token(UserToken);
-            std::error_code ec;
-            result->WarnCustomStorageLocation = !std::filesystem::exists(storageDir / wsl::windows::wslc::DefaultStorageVhdName, ec);
-        }
-
-        return result;
+        return std::unique_ptr<SessionSettings>(
+            new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
     }
 
     // Custom session: caller provides name and storage path.
@@ -256,12 +249,6 @@ void WSLCSessionManagerImpl::CreateSession(
     {
         defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
         Settings = &defaultSettings->Settings;
-
-        if (WarningCallback != nullptr && defaultSettings->WarnCustomStorageLocation)
-        {
-            LOG_IF_FAILED(WarningCallback->OnWarning(
-                wsl::shared::Localization::MessageWslcSessionStorageCustomLocation(defaultSettings->StoragePath.c_str()).c_str()));
-        }
     }
 
     std::wstring callerFileName;
