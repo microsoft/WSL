@@ -99,8 +99,7 @@ struct SessionSettings
         // fires once at creation without a service-side callback that could stall CreateSession.
         const auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
 
-        return std::unique_ptr<SessionSettings>(
-            new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
+        return std::unique_ptr<SessionSettings>(new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
     }
 
     // Custom session: caller provides name and storage path.
