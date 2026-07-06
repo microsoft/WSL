@@ -1594,7 +1594,8 @@ class WSLCTests
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
             dockerfile << "FROM debian:latest\n";
-            dockerfile << "HEALTHCHECK --interval=1s --timeout=100ms --start-period=300s --retries=1000 CMD test -f " << c_healthReadyFile << "\n";
+            dockerfile << "HEALTHCHECK --interval=1s --timeout=100ms --start-period=300s --retries=1000 CMD test -f "
+                       << c_healthReadyFile << "\n";
             dockerfile << "CMD [\"sleep\", \"99999\"]\n";
         }
 

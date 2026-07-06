@@ -1337,9 +1337,9 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n"
-                 << L"  image             Image name\r\n"
-                 << L"  command           The command to run\r\n"
-                 << L"  arguments         Arguments to pass to container's init process\r\n\r\n";
+                 << L"  image                  Image name\r\n"
+                 << L"  command                The command to run\r\n"
+                 << L"  arguments              Arguments to pass to container's init process\r\n\r\n";
         return commands.str();
     }
 
