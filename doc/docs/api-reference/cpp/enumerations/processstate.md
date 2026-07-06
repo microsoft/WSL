@@ -3,6 +3,7 @@
 `Process::State()` casts directly from `WslcProcessState`.
 
 Underlying C values:
+
 - `Unknown = 0`
 - `Running = 1`
 - `Exited = 2`

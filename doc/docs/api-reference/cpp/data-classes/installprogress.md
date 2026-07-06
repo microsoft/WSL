@@ -3,6 +3,7 @@
 Progress item reported by `WslcService::InstallWithDependenciesAsync()`.
 
 **Properties**
+
 - `Component()`
 - `Progress()`
 - `Total()`

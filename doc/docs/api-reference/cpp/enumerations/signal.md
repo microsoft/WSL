@@ -3,6 +3,7 @@
 `Container::Stop()` and `Process::Signal()` cast directly to `WslcSignal`.
 
 Underlying values:
+
 - `None = 0`
 - `SIGHUP = 1`
 - `SIGINT = 2`

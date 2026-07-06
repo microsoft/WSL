@@ -13,6 +13,7 @@ public sealed class ProcessSettings
 ```
 
 Notes:
+
 - `CommandLine` must be non-empty before calling `Process.Start()`.
 - The init process is started by `Container.Start()`, not by `Process.Start()`.
 - `OutputMode.Event` enables `OutputReceived` / `ErrorReceived`.

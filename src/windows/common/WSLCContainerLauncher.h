@@ -75,6 +75,7 @@ public:
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
+    void SetStopTimeout(LONG Timeout);
     void SetShmSize(int64_t ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
@@ -103,6 +104,7 @@ private:
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
+    std::optional<LONG> m_stopTimeout;
     int64_t m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;

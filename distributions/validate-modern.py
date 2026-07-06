@@ -452,7 +452,7 @@ def read_tar(node, file, elf_magic: str):
             else:
                 warning(node, 'No shortcut.icon provided')
 
-            if terminal_profile := config.get('windowsterminal.profileTemplate', None):
+            if terminal_profile := config.get('windowsterminal.profiletemplate', None):
                 validate_mode(terminal_profile, [oct(0o660), oct(0o640)], 0, 0, 1024 * 1024)
 
                 if not terminal_profile.startswith(USR_LIB_WSL):

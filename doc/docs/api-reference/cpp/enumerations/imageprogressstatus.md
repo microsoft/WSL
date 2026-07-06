@@ -3,6 +3,7 @@
 `ImageProgress` casts directly from `WslcImageProgressStatus`.
 
 Underlying C values:
+
 - `Unknown = 0`
 - `Pulling = 1`
 - `Waiting = 2`
