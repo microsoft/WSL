@@ -3,6 +3,7 @@
 Progress item reported by image pull/import/load/push operations.
 
 **Properties**
+
 - `Id()`
 - `Status()`
 - `CurrentBytes()`

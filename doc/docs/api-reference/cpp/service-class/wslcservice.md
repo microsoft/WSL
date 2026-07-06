@@ -3,12 +3,14 @@
 Static entry points over the service-level C API.
 
 **Methods**
+
 - `GetMissingComponents()`
 - `GetVersion()`
 - `InstallWithDependencies()`
 - `InstallWithDependenciesAsync()`
 
 **Behavior notes**
+
 - `GetMissingComponents()` returns a `Component` bitmask.
 - `GetVersion()` returns a `ServiceVersion` constructed from `major`, `minor`, and `revision`.
 - `InstallWithDependencies()` installs dependencies synchronously.

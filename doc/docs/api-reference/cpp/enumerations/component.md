@@ -3,6 +3,7 @@
 `WslcService::GetMissingComponents()` returns a `Component` bitmask.
 
 Underlying values:
+
 - `VirtualMachinePlatform = 1`
 - `WslPackage = 2`
 - `SdkNeedsUpdate = 4`

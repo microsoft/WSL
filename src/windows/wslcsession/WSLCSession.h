@@ -110,11 +110,14 @@ public:
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
-    IFACEMETHOD(LoadImage)(_In_ const WSLCHandle ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(LoadImage)(
+        _In_ const WSLCHandle ImageHandle,
+        _In_ ULONGLONG ContentLength,
+        _In_opt_ IWarningCallback* WarningCallback,
+        _In_opt_ IImageLoadCallback* LoadCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
         _In_opt_ LPCSTR ImageName,
-        _In_ IProgressCallback* ProgressCallback,
         _In_ ULONGLONG ContentLength,
         _In_opt_ IWarningCallback* WarningCallback,
         _Out_ LPSTR* ImageId) override;
@@ -289,7 +292,8 @@ private:
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
-    std::optional<std::string> ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
+    std::optional<std::string> ImportImageImpl(
+        DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 

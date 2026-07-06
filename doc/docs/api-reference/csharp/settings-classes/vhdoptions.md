@@ -15,6 +15,7 @@ public sealed class VhdOptions
 ```
 
 Notes:
+
 - Use `SessionSettings.VhdRequirements` for session-level storage requirements.
 - Use `Session.CreateVhdVolume(...)` for named session volumes.
 - `Owner` is intended for named-volume creation and is rejected on `SessionSettings.VhdRequirements`.

@@ -15,6 +15,7 @@ wpr -stop logs.ETL
 ```
 
 The consolidated `wsl.wprp` file includes multiple profiles for different scenarios:
+
 - `WSL` - General WSL tracing (default)
 - `WSL-Storage` - Enhanced storage tracing
 - `WSL-Networking` - Comprehensive networking tracing

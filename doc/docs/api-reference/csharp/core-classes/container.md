@@ -19,6 +19,7 @@ public sealed class Container : IDisposable
 ```
 
 Notes:
+
 - `Start()` has **no flags parameter**.
 - If `InitProcess.OutputMode` is `Event` or `Stream`, `Start()` automatically requests native attach.
 - `InitProcess` is only available when `ContainerSettings.InitProcess` was configured.

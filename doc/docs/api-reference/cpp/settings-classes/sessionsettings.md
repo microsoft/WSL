@@ -1,11 +1,13 @@
 # SessionSettings
 
 **Constructor**
+
 - `SessionSettings(hstring name, hstring storagePath)`
   - `name` must be non-empty.
   - `storagePath` must be non-empty.
 
 **Properties**
+
 - `Name()` / setter
 - `StoragePath()` / setter
 - `CpuCount()` / setter (`0` rejected)

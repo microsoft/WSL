@@ -1,6 +1,7 @@
 # ProcessCrashHandler
 
 Observed use:
+
 - `Session::ProcessCrashed` raises one `ProcessCrashInformation` argument.
 
 ```cpp
