@@ -389,6 +389,25 @@ WSLCContainerState DockerStateToWSLCState(ContainerState state)
     }
 }
 
+// Maps a container state to the lifecycle event action recorded when it transitions into that
+// state. Only states reached via Transition() are expected here; "kill" is a signal, not a state,
+// and is recorded separately in OnEvent().
+std::string WSLCStateToEventAction(WSLCContainerState state)
+{
+    switch (state)
+    {
+    case WslcContainerStateRunning:
+        return "start";
+    case WslcContainerStateExited:
+        return "stop";
+    case WslcContainerStateDeleted:
+        return "destroy";
+    default:
+        WI_ASSERT(false);
+        return "unknown";
+    }
+}
+
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
     // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
@@ -840,7 +859,12 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         CATCH_LOG();
     }
 
-    auto inspectJson = InspectLockHeld();
+    auto dockerInspect = m_dockerClient.InspectContainer(m_id);
+    auto startedAtSeconds = ParseDockerTimestamp(dockerInspect.State.StartedAt);
+
+    auto wslcInspect = BuildInspectContainer(dockerInspect);
+    auto inspectJson = wsl::shared::ToJson(wslcInspect);
+
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
@@ -872,7 +896,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     portCleanup.release();
     volumeCleanup.release();
 
-    Transition(WslcContainerStateRunning);
+    Transition(WslcContainerStateRunning, startedAtSeconds);
     cleanup.release();
 }
 
@@ -882,20 +906,12 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     // Disconnect(), so in-flight COM callers can drain from COMImplClass::m_callers.
     unique_com_disconnect comWrapper;
 
-    // Record lifecycle events here, driven by Docker's own events, so the store gets Docker's
-    // timestamps and the same ordering Docker observed.
-    if (event == ContainerEvent::Start)
-    {
-        m_eventStore.Record("container", "start", m_id, eventTime);
-    }
-    else if (event == ContainerEvent::Kill)
+    if (event == ContainerEvent::Kill)
     {
         m_eventStore.Record("container", "kill", m_id, eventTime);
     }
     else if (event == ContainerEvent::Stop)
     {
-        m_eventStore.Record("container", "stop", m_id, eventTime);
-
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         SetExitCode(exitCode.value());
 
@@ -915,8 +931,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
     else if (event == ContainerEvent::Destroy)
     {
-        m_eventStore.Record("container", "destroy", m_id, eventTime);
-
         WI_ASSERT(!m_destroyEvent.is_signaled());
         m_destroyEvent.SetEvent();
 
@@ -2203,6 +2217,8 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
 
     // m_stateChangedAt is tracked in unix seconds, matching Docker's event timestamps.
     m_stateChangedAt = stateChangedAtSeconds.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
+
+    m_eventStore.Record("container", WSLCStateToEventAction(State), m_id, m_stateChangedAt);
 }
 
 WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :

@@ -41,7 +41,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string Type, std::string Action, const std::string& ActorId, std::optional<uint64_t> TimeSeconds) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::optional<uint64_t> TimeSeconds) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
