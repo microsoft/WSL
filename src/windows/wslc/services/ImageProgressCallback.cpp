@@ -25,7 +25,7 @@ void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
 {
     // Route progress rendering through the Reporter's Info channel (stderr) so it
     // respects the global output state and keeps stdout clean for scripting. Each
-    // call is emitted as a single atomic write, matching the previous WriteConsoleW.
+    // call is emitted as a single atomic write.
     m_reporter.Write(Reporter::Level::Info, L"{}", content);
 }
 
@@ -56,8 +56,8 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         }
 
         // Hide the cursor while rendering so the user doesn't see it bouncing through the
-        // cursor movements, then restore it at the final position. Uses VT sequences to match
-        // BuildImageCallback. scope_exit guarantees the cursor is shown again on every path.
+        // cursor movements, then restore it at the final position. scope_exit guarantees the
+        // cursor is shown again on every exit path.
         WriteTerminal(Cursor::Hide.Get());
         auto showCursor = wil::scope_exit([this]() { WriteTerminal(Cursor::Show.Get()); });
 

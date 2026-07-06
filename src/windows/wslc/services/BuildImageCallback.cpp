@@ -47,7 +47,7 @@ CATCH_LOG()
 void BuildImageCallback::WriteTerminal(std::wstring_view content) const
 {
     // Route the scrolling build display through the Reporter's Info channel (stderr) so it
-    // respects the global output state. Each call is one atomic write, as before.
+    // respects the global output state. Each call is one atomic write.
     m_reporter.Write(Reporter::Level::Info, L"{}", content);
 }
 
