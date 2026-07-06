@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "VersionCommand.h"
+#include "CLIExecutionContext.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
@@ -27,14 +28,13 @@ std::wstring VersionCommand::LongDescription() const
     return Localization::WSLCCLI_VersionLongDesc();
 }
 
-void VersionCommand::PrintVersion()
+void VersionCommand::PrintVersion(Reporter& reporter)
 {
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
+    reporter.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    UNREFERENCED_PARAMETER(context);
-    PrintVersion();
+    PrintVersion(context.Reporter);
 }
 } // namespace wsl::windows::wslc

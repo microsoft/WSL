@@ -12,9 +12,11 @@ Abstract:
 
 --*/
 #pragma once
+#include "Reporter.h"
 #include "SessionService.h"
 #include "VTSupport.h"
 #include <map>
+#include <optional>
 #include <string>
 
 namespace wsl::windows::wslc::services {
@@ -24,17 +26,19 @@ class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallbac
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
+    explicit ImageProgressCallback(Reporter& reporter) : m_reporter(reporter)
+    {
+    }
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
 private:
     auto MoveToLine(int line);
-    static CONSOLE_SCREEN_BUFFER_INFO Info();
     void WriteTerminal(std::wstring_view content) const;
-    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
+    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth);
+    Reporter& m_reporter;
     std::map<std::string, int> m_statuses;
     int m_currentLine = 0;
-    HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
-    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{m_console};
-    wsl::windows::common::vt::ChangeTerminalMode m_terminalMode{m_console, false};
+    // Captured once: the progress display only renders when the Info channel is a VT console.
+    bool m_vtEnabled = m_reporter.IsVTEnabled(Reporter::Level::Info);
 };
 } // namespace wsl::windows::wslc::services

@@ -23,8 +23,10 @@ using namespace wsl::windows::common::vt;
 
 void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
 {
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+    // Route progress rendering through the Reporter's Info channel (stderr) so it
+    // respects the global output state and keeps stdout clean for scripting. Each
+    // call is emitted as a single atomic write, matching the previous WriteConsoleW.
+    m_reporter.Write(Reporter::Level::Info, L"{}", content);
 }
 
 auto ImageProgressCallback::MoveToLine(int line)
@@ -46,10 +48,18 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
-        if (!m_terminalMode.IsConsole())
+        // The in-place progress display relies on cursor movement, so it only renders
+        // when the Info channel is an interactive VT console. When redirected, skip it.
+        if (!m_vtEnabled)
         {
             return S_OK;
         }
+
+        // Hide the cursor while rendering so the user doesn't see it bouncing through the
+        // cursor movements, then restore it at the final position. Uses VT sequences to match
+        // BuildImageCallback. scope_exit guarantees the cursor is shown again on every path.
+        WriteTerminal(Cursor::Hide.Get());
+        auto showCursor = wil::scope_exit([this]() { WriteTerminal(Cursor::Show.Get()); });
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
@@ -58,20 +68,20 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
             return S_OK;
         }
 
-        auto info = Info();
+        const auto visibleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
         }
 
         return S_OK;
@@ -79,14 +89,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
     CATCH_RETURN();
 }
 
-CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
-{
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    return info;
-}
-
-std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth)
 {
     std::wstring line;
     if (total != 0)
@@ -132,24 +135,25 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         line = std::format(L"{}: {}", id, status);
     }
 
-    // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left + 1);
-
-    // Truncate to console width to prevent wrapping that would break cursor repositioning.
-    if (line.size() > static_cast<size_t>(visibleWidth))
+    // Truncate to the console width to prevent wrapping that would break cursor repositioning.
+    // When the width is unknown (redirected) the line is written as-is.
+    if (visibleWidth)
     {
-        line.resize(visibleWidth);
-
-        // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
-        // drop it so we don't emit an invalid UTF-16 sequence.
-        if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+        if (line.size() > static_cast<size_t>(*visibleWidth))
         {
-            line.pop_back();
-        }
-    }
+            line.resize(*visibleWidth);
 
-    // Erase any previously written char on that line.
-    line.resize(visibleWidth, L' ');
+            // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
+            // drop it so we don't emit an invalid UTF-16 sequence.
+            if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
+            {
+                line.pop_back();
+            }
+        }
+
+        // Erase any previously written char on that line.
+        line.resize(*visibleWidth, L' ');
+    }
 
     return line;
 }

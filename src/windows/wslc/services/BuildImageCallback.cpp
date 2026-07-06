@@ -46,8 +46,9 @@ CATCH_LOG()
 
 void BuildImageCallback::WriteTerminal(std::wstring_view content) const
 {
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+    // Route the scrolling build display through the Reporter's Info channel (stderr) so it
+    // respects the global output state. Each call is one atomic write, as before.
+    m_reporter.Write(Reporter::Level::Info, L"{}", content);
 }
 
 bool BuildImageCallback::IsCancelled() const
@@ -103,7 +104,7 @@ try
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            wprintf(L"%hs", status);
+            m_reporter.Write(Reporter::Level::Info, L"{}", MultiByteToWide(status));
         }
         return S_OK;
     }
@@ -184,9 +185,7 @@ CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    const int consoleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left);
+    const auto consoleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info);
 
     const bool showPending = !m_pendingLine.empty();
     const int pullCount = static_cast<int>(m_pullLines.size());
@@ -220,9 +219,9 @@ void BuildImageCallback::Redraw()
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (wline.size() > static_cast<size_t>(consoleWidth))
+        if (consoleWidth.has_value() && wline.size() > static_cast<size_t>(*consoleWidth))
         {
-            wline.resize(static_cast<size_t>(consoleWidth));
+            wline.resize(static_cast<size_t>(*consoleWidth));
         }
         m_frameBuffer += std::move(wline);
         m_frameBuffer += Erase::LineForward;
