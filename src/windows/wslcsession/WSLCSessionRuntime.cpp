@@ -290,11 +290,7 @@ void WSLCSessionRuntime::StartVmLockHeld()
     wil::com_ptr<IWSLCVirtualMachine> vm;
     THROW_IF_FAILED(vmFactory->CreateVirtualMachine(&vm));
 
-    m_virtualMachine.emplace(
-        vm.get(),
-        m_settings,
-        m_sessionTerminatingEvent->get(),
-        WSLCVirtualMachine::TOnCrashDump(m_hooks.OnCrashDump));
+    m_virtualMachine.emplace(vm.get(), m_settings, m_sessionTerminatingEvent->get(), WSLCVirtualMachine::TOnCrashDump(m_hooks.OnCrashDump));
     m_virtualMachine->Initialize();
 
     // Get an event from the service that is signaled when the VM exits.
@@ -307,7 +303,8 @@ void WSLCSessionRuntime::StartVmLockHeld()
     }
 
     // Monitor for unexpected VM exit.
-    m_ioRelay->AddHandle(std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSessionRuntime::OnVmExited, this)));
+    m_ioRelay->AddHandle(
+        std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSessionRuntime::OnVmExited, this)));
 
     if (m_hooks.RecoverState)
     {
@@ -579,7 +576,8 @@ WSLCSessionRuntime::VmLease::~VmLease()
     }
 }
 
-WSLCSessionRuntime::LockedRuntime::LockedRuntime(WSLCSessionRuntime& Runtime) : m_runtime(&Runtime), m_lease(Runtime.AcquireVmLease())
+WSLCSessionRuntime::LockedRuntime::LockedRuntime(WSLCSessionRuntime& Runtime) :
+    m_runtime(&Runtime), m_lease(Runtime.AcquireVmLease())
 {
 }
 
@@ -622,9 +620,7 @@ void WSLCSessionRuntime::OnVmExited()
 }
 
 void WSLCSessionRuntime::Shutdown(
-    wil::rwlock_release_exclusive_scope_exit& sessionLock,
-    WSLCVirtualMachineTerminationReason& terminationReason,
-    std::wstring& terminationDetails)
+    wil::rwlock_release_exclusive_scope_exit& sessionLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails)
 {
     if (!m_initialized)
     {

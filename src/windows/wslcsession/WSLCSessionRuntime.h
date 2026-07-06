@@ -145,9 +145,12 @@ public:
     [[nodiscard]] bool TryClaimExpectedStop() noexcept;
     [[nodiscard]] bool TryClaimSpontaneousExit() noexcept;
 
-    _Requires_exclusive_lock_held_(m_lock) void StartVmLockHeld();
-    _Requires_exclusive_lock_held_(m_lock) void StopVmLockHeld();
-    _Requires_exclusive_lock_held_(m_lock) void TearDownVmLockHeld(bool CaptureTerminationReason = false);
+    _Requires_exclusive_lock_held_(m_lock)
+    void StartVmLockHeld();
+    _Requires_exclusive_lock_held_(m_lock)
+    void StopVmLockHeld();
+    _Requires_exclusive_lock_held_(m_lock)
+    void TearDownVmLockHeld(bool CaptureTerminationReason = false);
     void EnsureVmRunning();
     void OnIdleTimer();
     void OnVmExited();
@@ -155,10 +158,7 @@ public:
     [[nodiscard]] VmLease AcquireVmLease();
     [[nodiscard]] LockedRuntime Acquire();
 
-    void Shutdown(
-        wil::rwlock_release_exclusive_scope_exit& sessionLock,
-        WSLCVirtualMachineTerminationReason& terminationReason,
-        std::wstring& terminationDetails);
+    void Shutdown(wil::rwlock_release_exclusive_scope_exit& sessionLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
 
 private:
     bool IdleTerminationEnabled() const noexcept;

@@ -467,13 +467,7 @@ try
     hooks.OnSpontaneousExit = [this]() { LOG_IF_FAILED(Terminate()); };
 
     hooks.OnCrashDump = std::bind(
-        &WSLCSession::OnCrashDumpWritten,
-        this,
-        std::placeholders::_1,
-        std::placeholders::_2,
-        std::placeholders::_3,
-        std::placeholders::_4,
-        std::placeholders::_5);
+        &WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
 
     WSLCSessionRuntime::SessionContext sessionContext;
     sessionContext.Id = m_id;
@@ -747,7 +741,8 @@ void WSLCSession::StartContainerd()
         args.emplace_back("debug");
     }
 
-    m_runtime.ContainerdProcess() = StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
+    m_runtime.ContainerdProcess() =
+        StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
     WSL_LOG("ContainerdStarted");
 }
 
@@ -1003,8 +998,7 @@ try
     THROW_IF_FAILED(CoCreateGuid(&volumeId));
     auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
     THROW_IF_FAILED(runtime.Vm().MountWindowsFolder(Options->ContextPath, mountPath.c_str(), TRUE));
-    auto unmountFolder =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { runtime.Vm().UnmountWindowsFolder(mountPath.c_str()); });
+    auto unmountFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { runtime.Vm().UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
@@ -2691,7 +2685,8 @@ try
         EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(createResult.Warning));
     }
 
-    auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_runtime.Docker().RemoveNetwork(name); });
+    auto removeNetworkCleanup =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_runtime.Docker().RemoveNetwork(name); });
 
     // Inspect the newly created network to cache full properties (IPAM, Scope, etc.)
     // since CreateNetworkResponse only returns {Id, Warning}.
