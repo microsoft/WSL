@@ -410,6 +410,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCUnixConnect,
     LxMessageWSLCGetGuestCapabilities,
     LxMessageWSLCGetGuestCapabilitiesResult,
+    LxMessageWSLCListDir,
+    LxMessageWSLCListDirResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -522,6 +524,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCUnixConnect)
         X(LxMessageWSLCGetGuestCapabilities)
         X(LxMessageWSLCGetGuestCapabilitiesResult)
+        X(LxMessageWSLCListDir)
+        X(LxMessageWSLCListDirResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1583,6 +1587,33 @@ struct WSLC_GET_DISK
     unsigned int ScsiLun{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+};
+
+struct WSLC_LISTDIR_RESULT
+{
+    static inline auto Type = LxMessageWSLCListDirResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_LISTDIR_RESULT);
+
+    MESSAGE_HEADER Header;
+    int Result{};
+    unsigned int EntriesIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_ARRAY_FIELD(EntriesIndex));
+};
+
+struct WSLC_LISTDIR
+{
+    static inline auto Type = LxMessageWSLCListDir;
+    using TResponse = WSLC_LISTDIR_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_LISTDIR);
+
+    MESSAGE_HEADER Header;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
 };
 
 struct WSLC_MOUNT_RESULT

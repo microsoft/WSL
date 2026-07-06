@@ -332,6 +332,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IImageLoadCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{7F3B62FD-E1C1-4F69-A8E2-853CAD9051BD}">
+                    <RegistryValue Value="IImageLoadCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLCSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{EF0661E4-6364-40EA-B433-E2FDF11F3519}">
                     <RegistryValue Value="IWSLCSession" Type="string" />
