@@ -575,7 +575,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     // container does not pin the VM: its metadata survives teardown and the VM restarts on next use.
     if (m_state == WslcContainerStateRunning)
     {
-        m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
+        m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());
     }
 }
 
@@ -2213,7 +2213,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld(
     const bool active = (m_state == WslcContainerStateRunning);
     if (active && !m_activityHold)
     {
-        m_activityHold = ActivityRef(m_wslcSession.IdleStateShared());
+        m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());
     }
     else if (!active && m_activityHold)
     {
@@ -2239,7 +2239,7 @@ try
     *Stdout = {};
     *Stderr = {};
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
 CATCH_RETURN();
@@ -2310,7 +2310,7 @@ try
 
     *Process = nullptr;
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Exec, Options, StartOptions, Process);
 }
 CATCH_RETURN();
@@ -2323,7 +2323,7 @@ try
     // Hold a VM lease for the whole operation: --rm containers self-delete during Stop, which
     // disconnects the wrapper and drops activity. Without the lease, the idle worker can fire
     // during the post-stop destroy wait (up to 60s) and tear the VM down mid-call.
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
 }
 CATCH_RETURN();
@@ -2334,7 +2334,7 @@ try
     WSLCExecutionContext context(&m_session);
 
     // Hold a VM lease for the same reason as Stop(): --rm can self-delete and drop activity.
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 CATCH_RETURN();
@@ -2346,7 +2346,7 @@ try
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
 }
 CATCH_RETURN();
@@ -2360,7 +2360,7 @@ try
 
     *Output = nullptr;
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Inspect, Output);
 }
 CATCH_RETURN();
@@ -2374,7 +2374,7 @@ try
 
     *Output = nullptr;
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stats, Output);
 }
 CATCH_RETURN();
@@ -2391,7 +2391,7 @@ try
     // can trigger an idle teardown. Without the lease the idle worker could take the session
     // lock exclusively and clear m_containers (destroying this container) concurrently, racing
     // the delete and inverting the container->session lock order.
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     auto [lock, impl] = LockImpl();
 
     impl->Delete(Flags);
@@ -2421,7 +2421,7 @@ try
 {
     WSLCExecutionContext context(&m_session);
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
 CATCH_RETURN();
@@ -2437,7 +2437,7 @@ try
     *Stdout = {};
     *Stderr = {};
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
 CATCH_RETURN();
@@ -2616,7 +2616,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::ConnectToNetwork, Options);
 }
 CATCH_RETURN();
@@ -2626,7 +2626,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    auto vmLease = m_session.AcquireVmLease();
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
 }
 CATCH_RETURN();
