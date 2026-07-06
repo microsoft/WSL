@@ -106,7 +106,6 @@ stages:
         steps:
           - ${{ if eq(parameters.pool, '') }}:
             - template: templates/python_auth.yml
-              displayName: "Setup pip feed"
               parameters:
                 pipAuthentication: true 
 
