@@ -104,11 +104,6 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
-          - ${{ if eq(parameters.pool, '') }}:
-            - template: templates/python_auth.yml
-              parameters:
-                pipAuthentication: true 
-
           - script: pip install --user -r tools/devops/requirements.txt --break-system-packages
             displayName: Install dependencies
 
