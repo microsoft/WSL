@@ -1102,60 +1102,34 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
     std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        // If the export failed, accumulate the error message.
+        errorJson.append(buffer.data(), buffer.size());
+    };
 
     if (SocketCodePair.first != 200)
     {
-        // Read the error body synchronously with a timeout. The async ReadHandle + io.Run()
-        // path causes a ~5 second stall because overlapped ReadFile on hvsockets has delayed
-        // EOF detection compared to synchronous Winsock recv, even though Connection: close is set.
-        lock.reset();
-
-        DWORD timeout = 2000;
-        LOG_LAST_ERROR_IF(
-            setsockopt(SocketCodePair.second.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
-
-        std::array<char, 4096> buf{};
-        for (;;)
-        {
-            auto bytesRead = recv(SocketCodePair.second.get(), buf.data(), static_cast<int>(buf.size()), 0);
-            if (bytesRead <= 0)
-            {
-                break;
-            }
-            errorJson.append(buf.data(), bytesRead);
-        }
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
-            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
-
-        // Release the lock so the container can still be interacted with while the export is in progress.
-        // Past this point, no member variables can be accessed.
-        lock.reset();
-
-        io.Run({});
+        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
+            HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
+
+    // Release the lock so the container can still be interacted with while the export is in progress.
+    // Past this point, no member variables can be accessed.
+    lock.reset();
+
+    io.Run({});
 
     if (SocketCodePair.first != 200)
     {
         // Export failed, parse the error message.
-        try
-        {
-            auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+        auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
 
-            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-        }
-        catch (const wil::ResultException&)
-        {
-            throw;
-        }
-        catch (...)
-        {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
-        }
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 }
 
@@ -1245,26 +1219,9 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
 
     if (statusCode != 200)
     {
-        // Read the error body synchronously. Docker error responses are small JSON and already
-        // buffered in the socket. We cannot use the async io.Run() path with a raw ReadHandle
-        // because overlapped ReadFile on hvsockets has delayed EOF detection (~5s stall) compared
-        // to synchronous Winsock recv, even though Connection: close is set.
-        // Use a short receive timeout as a safety net.
-        lock.reset();
-
-        DWORD timeout = 2000; // 2 seconds — more than enough for a buffered error body
-        LOG_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
-
-        std::array<char, 4096> buf{};
-        for (;;)
-        {
-            auto bytesRead = recv(socket.get(), buf.data(), static_cast<int>(buf.size()), 0);
-            if (bytesRead <= 0)
-            {
-                break;
-            }
-            errorJson.append(buf.data(), bytesRead);
-        }
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(socket)}, [&](const gsl::span<char>& buffer) {
+            errorJson.append(buffer.data(), buffer.size());
+        }));
     }
     else
     {
@@ -1280,11 +1237,11 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
                 std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
                 wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
         }
-
-        lock.reset();
-
-        io.Run({});
     }
+
+    lock.reset();
+
+    io.Run({});
 
     if (statusCode != 200)
     {
