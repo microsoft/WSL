@@ -79,6 +79,7 @@ private:
             {L"list", Localization::WSLCCLI_ContainerListDesc()},
             {L"prune", Localization::WSLCCLI_ContainerPruneDesc()},
             {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
+            {L"restart", Localization::WSLCCLI_ContainerRestartDesc()},
             {L"run", Localization::WSLCCLI_ContainerRunDesc()},
             {L"start", Localization::WSLCCLI_ContainerStartDesc()},
             {L"stats", Localization::WSLCCLI_ContainerStatsDesc()},

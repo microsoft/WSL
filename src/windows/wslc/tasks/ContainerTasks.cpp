@@ -767,6 +767,29 @@ void StopContainers(CLIExecutionContext& context)
     }
 }
 
+void RestartContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containersToRestart = context.Args.GetAll<ArgType::ContainerId>();
+    StopContainerOptions options;
+    if (context.Args.Contains(ArgType::Signal))
+    {
+        options.Signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
+    }
+
+    if (context.Args.Contains(ArgType::Time))
+    {
+        options.Timeout = validation::GetIntegerFromString<LONG>(context.Args.Get<ArgType::Time>());
+    }
+
+    for (const auto& id : containersToRestart)
+    {
+        ContainerService::Restart(session, WideToMultiByte(id), options);
+        PrintMessage(id);
+    }
+}
+
 void ViewContainerLogs(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
