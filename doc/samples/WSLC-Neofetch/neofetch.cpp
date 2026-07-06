@@ -22,38 +22,37 @@
 using namespace winrt;
 using namespace winrt::Microsoft::WSL::Containers;
 
-namespace
+namespace {
+constexpr std::wstring_view c_imageName = L"anrginit/ubuntu-neofetch:1.0";
+
+// Forward a chunk of container stdout/stderr straight to the Windows console.
+void WriteToConsole(FILE* stream, array_view<uint8_t const> data)
 {
-    constexpr std::wstring_view c_imageName = L"anrginit/ubuntu-neofetch:1.0";
-
-    // Forward a chunk of container stdout/stderr straight to the Windows console.
-    void WriteToConsole(FILE* stream, array_view<uint8_t const> data)
-    {
-        fprintf(stream, "%.*s", static_cast<int>(data.size()), reinterpret_cast<const char*>(data.data()));
-        fflush(stream);
-    }
-
-    // Build a storage path in a "WslcStorage" folder next to the executable, so
-    // the sample doesn't depend on any hard-coded absolute path.
-    std::wstring GetStoragePath()
-    {
-        wchar_t exePath[MAX_PATH];
-        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-        wchar_t* lastSlash = wcsrchr(exePath, L'\\');
-        if (lastSlash != nullptr)
-        {
-            *(lastSlash + 1) = L'\0';
-        }
-        return std::wstring{ exePath } + L"WslcStorage";
-    }
+    fprintf(stream, "%.*s", static_cast<int>(data.size()), reinterpret_cast<const char*>(data.data()));
+    fflush(stream);
 }
+
+// Build a storage path in a "WslcStorage" folder next to the executable, so
+// the sample doesn't depend on any hard-coded absolute path.
+std::wstring GetStoragePath()
+{
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+    wchar_t* lastSlash = wcsrchr(exePath, L'\\');
+    if (lastSlash != nullptr)
+    {
+        *(lastSlash + 1) = L'\0';
+    }
+    return std::wstring{exePath} + L"WslcStorage";
+}
+} // namespace
 
 int wmain(int argc, wchar_t* argv[])
 {
     init_apartment();
 
     // argv[0] (our exe) is replaced with "neofetch"; the rest pass through.
-    std::vector<hstring> commandLine{ L"neofetch" };
+    std::vector<hstring> commandLine{L"neofetch"};
     for (int i = 1; i < argc; ++i)
     {
         commandLine.emplace_back(argv[i]);
@@ -63,24 +62,24 @@ int wmain(int argc, wchar_t* argv[])
     {
         // ---- Session ----
         fwprintf(stderr, L"[wslc] Creating session...\n");
-        SessionSettings sessionSettings{ L"WSLCNeofetch", GetStoragePath() };
+        SessionSettings sessionSettings{L"WSLCNeofetch", GetStoragePath()};
         sessionSettings.CpuCount(4);
         sessionSettings.MemorySizeInMB(2048);
 
-        Session session{ sessionSettings };
+        Session session{sessionSettings};
         session.Start();
 
         // ---- Pull image ----
         fwprintf(stderr, L"[wslc] Pulling image '%ls'...\n", c_imageName.data());
-        session.PullImage(PullImageOptions{ hstring{ c_imageName } });
+        session.PullImage(PullImageOptions{hstring{c_imageName}});
 
         // ---- Create & start container ----
         // The init process keeps the container alive while we exec neofetch.
         fwprintf(stderr, L"[wslc] Starting container...\n");
         ProcessSettings initProcess;
-        initProcess.CommandLine(single_threaded_vector<hstring>({ L"/bin/sleep", L"60" }));
+        initProcess.CommandLine(single_threaded_vector<hstring>({L"/bin/sleep", L"60"}));
 
-        ContainerSettings containerSettings{ hstring{ c_imageName } };
+        ContainerSettings containerSettings{hstring{c_imageName}};
         containerSettings.Name(L"wslc-neofetch");
         containerSettings.InitProcess(initProcess);
         containerSettings.EnableAutoRemove(true);
@@ -96,7 +95,7 @@ int wmain(int argc, wchar_t* argv[])
 
         Process process = container.CreateProcess(processSettings);
 
-        handle exitEvent{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+        handle exitEvent{CreateEvent(nullptr, TRUE, FALSE, nullptr)};
         if (!exitEvent)
         {
             throw_last_error();
@@ -126,7 +125,7 @@ int wmain(int argc, wchar_t* argv[])
 
         // ---- Cleanup ----
         fwprintf(stderr, L"[wslc] Shutting down...\n");
-        container.Stop(Signal::SIGTERM, std::chrono::seconds{ 5 });
+        container.Stop(Signal::SIGTERM, std::chrono::seconds{5});
         session.Terminate();
 
         fwprintf(stderr, L"[wslc] Done.\n");

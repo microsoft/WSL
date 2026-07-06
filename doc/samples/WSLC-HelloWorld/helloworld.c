@@ -85,30 +85,50 @@ int wmain(void)
     wchar_t storagePath[MAX_PATH];
     DWORD waitResult;
 
-    PCSTR initArgv[2] = { "/bin/sleep", "60" };
-    PCSTR echoArgv[2] = { "/bin/echo", "Hello, World from a WSL container!" };
+    PCSTR initArgv[2] = {"/bin/sleep", "60"};
+    PCSTR echoArgv[2] = {"/bin/echo", "Hello, World from a WSL container!"};
 
     hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr)) { PrintError(L"Initialize COM", hr, NULL); return 1; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Initialize COM", hr, NULL);
+        return 1;
+    }
 
     g_exitEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
-    if (g_exitEvent == NULL) { PrintError(L"Create exit event", HRESULT_FROM_WIN32(GetLastError()), NULL); goto cleanup; }
+    if (g_exitEvent == NULL)
+    {
+        PrintError(L"Create exit event", HRESULT_FROM_WIN32(GetLastError()), NULL);
+        goto cleanup;
+    }
 
     // ---- Session ----
     fwprintf(stderr, L"[wslc] Creating session...\n");
     GetStoragePath(storagePath, ARRAYSIZE(storagePath));
     hr = WslcInitSessionSettings(L"WSLCHelloWorld", storagePath, &sessionSettings);
-    if (FAILED(hr)) { PrintError(L"Init session settings", hr, NULL); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Init session settings", hr, NULL);
+        goto cleanup;
+    }
 
     hr = WslcCreateSession(&sessionSettings, &session, &error);
-    if (FAILED(hr)) { PrintError(L"Create session", hr, error); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Create session", hr, error);
+        goto cleanup;
+    }
 
     // ---- Pull image ----
     fwprintf(stderr, L"[wslc] Pulling image '%hs'...\n", IMAGE_NAME);
     ZeroMemory(&pullOptions, sizeof(pullOptions));
     pullOptions.uri = IMAGE_NAME;
     hr = WslcPullSessionImage(session, &pullOptions, &error);
-    if (FAILED(hr)) { PrintError(L"Pull image", hr, error); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Pull image", hr, error);
+        goto cleanup;
+    }
 
     // ---- Create & start container ----
     fwprintf(stderr, L"[wslc] Starting container...\n");
@@ -121,10 +141,18 @@ int wmain(void)
     WslcSetContainerSettingsFlags(&containerSettings, WSLC_CONTAINER_FLAG_AUTO_REMOVE);
 
     hr = WslcCreateContainer(session, &containerSettings, &container, &error);
-    if (FAILED(hr)) { PrintError(L"Create container", hr, error); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Create container", hr, error);
+        goto cleanup;
+    }
 
     hr = WslcStartContainer(container, WSLC_CONTAINER_START_FLAG_NONE, &error);
-    if (FAILED(hr)) { PrintError(L"Start container", hr, error); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Start container", hr, error);
+        goto cleanup;
+    }
 
     // ---- Run echo ----
     fwprintf(stderr, L"[wslc] Running echo...\n");
@@ -138,7 +166,11 @@ int wmain(void)
     WslcSetProcessSettingsCallbacks(&execProcess, &callbacks, NULL);
 
     hr = WslcCreateContainerProcess(container, &execProcess, &process, &error);
-    if (FAILED(hr)) { PrintError(L"Run echo", hr, error); goto cleanup; }
+    if (FAILED(hr))
+    {
+        PrintError(L"Run echo", hr, error);
+        goto cleanup;
+    }
 
     waitResult = WaitForSingleObject(g_exitEvent, 30000);
     if (waitResult == WAIT_OBJECT_0)
@@ -157,8 +189,14 @@ int wmain(void)
 cleanup:
     fwprintf(stderr, L"[wslc] Shutting down...\n");
 
-    if (process != NULL) { WslcReleaseProcess(process); }
-    if (g_exitEvent != NULL) { CloseHandle(g_exitEvent); }
+    if (process != NULL)
+    {
+        WslcReleaseProcess(process);
+    }
+    if (g_exitEvent != NULL)
+    {
+        CloseHandle(g_exitEvent);
+    }
     if (container != NULL)
     {
         WslcStopContainer(container, WSLC_SIGNAL_SIGTERM, 5, NULL);
