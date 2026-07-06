@@ -2347,8 +2347,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Для параметра сетевого драйвера "Gateway" также требуется указать "Subnet".</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Для опции '--gateway' также требуется указать '--subnet'.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Сеть "{}" содержит активные конечные точки.</value>
@@ -2360,6 +2360,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Неподдерживаемый сетевой режим: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Недопустимое значение времени остановки: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2927,6 +2931,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Сигнал для остановки контейнера</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Время ожидания (в секундах) на остановку контейнера перед его принудительным завершением (-1 — без ограничения времени ожидания)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Размер /dev/shm (например, 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3095,6 +3102,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Запрошена загрузка, но входные данные не предоставлены.</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Загруженное изображение: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>ИД загруженного изображения: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Управление сетями.</value>
   </data>
@@ -3114,6 +3129,17 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Параметр сетевых метаданных</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Ограничение внешнего доступа к сети</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Подсеть в формате CIDR, представляющая сегмент сети</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Шлюз IPv4 или IPv6 для подсети</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Удалите одну или несколько сетей.</value>
@@ -3358,6 +3384,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Не удалось отключить том "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>Том {} содержит непустой каталог lost+found. Он остался на месте, и содержимое тома может быть не заполнено изображениями</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Не удалось остановить контейнер '{}' после отклонения подключаемого модуля</value>

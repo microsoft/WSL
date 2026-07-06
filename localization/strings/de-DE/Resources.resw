@@ -379,8 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux
-aus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
 
 Verbrauch:
     /l, /list [Option]
@@ -1585,8 +1584,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, 
-auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
@@ -2348,8 +2346,8 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Die Netzwerktreiberoption 'Gateway' erfordert, dass auch 'Subnet' angegeben wird.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Die Option '--gateway' erfordert, dass auch '--subnet' angegeben wird.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Das Netzwerk „{}“ hat aktive Endpunkte.</value>
@@ -2361,6 +2359,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nicht unterstützter Netzwerkmodus: „{}“</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Ungültiger Wert für das Stopp-Timeout: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2928,6 +2930,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal zum Beenden des Containers</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Timeout (in Sekunden) zum Beenden des Containers vor dem Beenden (-1 ohne Timeout)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Größe von /dev/shm (z. B. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3096,6 +3101,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Laden angefordert, aber keine Eingabe bereitgestellt.</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Geladenes Bild: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>Geladene Bild-ID: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Netzwerke verwalten.</value>
   </data>
@@ -3115,6 +3128,17 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Einstellung für Netzwerkmetadaten</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Externen Zugriff auf das Netzwerk einschränken</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Subnetz im CIDR-Format, das ein Netzwerksegment darstellt</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>IPv4- oder IPv6-Gateway für das Subnetz</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Ein oder mehrere Netzwerke entfernen.</value>
@@ -3359,6 +3383,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Fehler beim Aufheben der Einbindung des Volumes „{}“: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>Das Volume „{}“ hat ein nicht leeres „lost+found“-Verzeichnis. Es wurde an Ort und Stelle belassen, und das Volume kann möglicherweise nicht mit Bildinhalten initialisiert werden.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Fehler beim Beenden des Containers „{}“ nach der Ablehnung des Plug-Ins</value>
