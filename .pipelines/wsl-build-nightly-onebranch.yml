@@ -28,7 +28,7 @@ extends:
       EnableCDPxPAT: false
       WindowsHostVersion: 1ESWindows2022
       networkisolation:
-        policy: Preferred
+        policy: Permissive
     globalSdl:
       credscan:
         enabled: true
