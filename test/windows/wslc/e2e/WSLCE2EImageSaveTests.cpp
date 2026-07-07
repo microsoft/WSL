@@ -152,6 +152,13 @@ class WSLCE2EImageSaveTests
         const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
         loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 
+        auto loadedImages = wsl::shared::string::Split(loadResult.Stdout.value(), L'\n');
+
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", DebianImage.NameAndTag())) != loadedImages.end());
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", AlpineImage.NameAndTag())) != loadedImages.end());
+
         // Run a container from each loaded image to confirm both are restored and runnable.
         const auto runDebian = RunWslc(std::format(L"container run --rm {} echo ok!", DebianImage.NameAndTag()));
         runDebian.Verify({.Stdout = std::format(L"ok!\n"), .Stderr = L"", .ExitCode = 0});
