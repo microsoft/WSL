@@ -47,7 +47,7 @@ def main(path: str, fix: bool):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Validate that source files use CRLF line endings.')
-    parser.add_argument('path', help='Path to the repository root.')
+    parser.add_argument('path', help='Path to validate (must be inside the repo).')
     parser.add_argument('--fix', action='store_true', help='Convert mismatching files to CRLF line endings.')
     args = parser.parse_args()
 
