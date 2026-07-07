@@ -1198,8 +1198,6 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Timeout)
     {
-        // A health check that hangs past its timeout should be treated as a failure and drive the
-        // container to the "unhealthy" state. Docker reports a timed-out probe with exit code -1.
         auto result = RunWslc(std::format(
             LR"(container run -d --health-cmd "sleep 30" --health-interval 1s --health-timeout 1s --health-retries 1 --name {} {} sleep infinity)",
             WslcContainerName,
