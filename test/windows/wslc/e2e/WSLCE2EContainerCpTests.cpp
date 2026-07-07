@@ -350,15 +350,15 @@ class WSLCE2EContainerCpTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal)
     {
-        // Create and start a container with a known file.
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo container-content > /tmp/fromcontainer.txt && sleep infinity\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        // Create and start a container.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Wait briefly for the file to be created inside the container.
-        Sleep(1000);
+        // Create a file inside the container using exec.
+        auto execResult =
+            RunWslc(std::format(L"container exec {} sh -c \"echo container-content > /tmp/fromcontainer.txt\"", WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
 
         // Create a temp directory to download into.
         wchar_t tempDir[MAX_PATH]{};
@@ -380,13 +380,14 @@ class WSLCE2EContainerCpTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_TrailingBackslash)
     {
         // Regression test: trailing backslash on local path should not break tar extraction.
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo backslash-test > /tmp/bstest.txt && sleep infinity\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        Sleep(1000);
+        // Create the file inside the container using exec.
+        auto execResult =
+            RunWslc(std::format(L"container exec {} sh -c \"echo backslash-test > /tmp/bstest.txt\"", WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
 
         wchar_t tempDir[MAX_PATH]{};
         THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
@@ -407,13 +408,14 @@ class WSLCE2EContainerCpTests
     {
         // When the local target doesn't end with a separator and isn't an existing directory,
         // it should be treated as a file destination (matching docker cp semantics).
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo file-dest-test > /tmp/srcfile.txt && sleep infinity\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        Sleep(1000);
+        // Create the file inside the container using exec.
+        auto execResult =
+            RunWslc(std::format(L"container exec {} sh -c \"echo file-dest-test > /tmp/srcfile.txt\"", WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
 
         wchar_t tempDir[MAX_PATH]{};
         THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
