@@ -669,6 +669,33 @@ void HandleMessageImpl(
     Transaction.Send(Response);
 }
 
+void LoadVirtualizationModules()
+{
+    std::string cpuinfo;
+    try
+    {
+        cpuinfo = UtilReadFileContent("/proc/cpuinfo");
+    }
+    CATCH_LOG();
+
+    const char* module = nullptr;
+    if (cpuinfo.find(" vmx") != std::string::npos)
+    {
+        module = "kvm_intel";
+    }
+    else if (cpuinfo.find(" svm") != std::string::npos)
+    {
+        module = "kvm_amd";
+    }
+
+    if (module != nullptr)
+    {
+        const char* Argv[] = {"/sbin/modprobe", module, nullptr};
+        int Status = -1;
+        UtilCreateProcessAndWait("/sbin/modprobe", Argv, &Status);
+    }
+}
+
 template <typename TMessage>
 void HandleMountMessage(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const TMessage& Message, const gsl::span<gsl::byte>& Buffer)
@@ -728,6 +755,14 @@ void HandleMountMessage(
         else
         {
             THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        }
+
+        if constexpr (std::is_same_v<TMessage, WSLC_MOUNT>)
+        {
+            if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
+            {
+                LoadVirtualizationModules();
+            }
         }
 
         // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
