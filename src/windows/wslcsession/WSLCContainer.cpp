@@ -1187,21 +1187,10 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
 
     if (pendingErrorJson.has_value())
     {
-        try
-        {
-            auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+        auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
 
-            THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
-            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-        }
-        catch (const wil::ResultException&)
-        {
-            throw;
-        }
-        catch (...)
-        {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, *pendingErrorJson);
-        }
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 }
 
@@ -1245,21 +1234,10 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
 
     if (statusCode != 200)
     {
-        try
-        {
-            auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+        auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
 
-            THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
-            THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-        }
-        catch (const wil::ResultException&)
-        {
-            throw;
-        }
-        catch (...)
-        {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, errorJson);
-        }
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 }
 
