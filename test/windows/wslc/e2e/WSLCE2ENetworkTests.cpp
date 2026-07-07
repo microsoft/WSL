@@ -72,6 +72,8 @@ private:
             {L"inspect", Localization::WSLCCLI_NetworkInspectDesc()},
             {L"list", Localization::WSLCCLI_NetworkListDesc()},
             {L"prune", Localization::WSLCCLI_NetworkPruneDesc()},
+            {L"connect", Localization::WSLCCLI_NetworkConnectDesc()},
+            {L"disconnect", Localization::WSLCCLI_NetworkDisconnectDesc()},
         };
 
         size_t maxLen = 0;
