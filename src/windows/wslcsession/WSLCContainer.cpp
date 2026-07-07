@@ -619,7 +619,7 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
 void WSLCContainerImpl::Initialize()
 {
-    // N.B. this must be done here because weak_from_this() is only valid after the constructor returns. 
+    // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
     m_comWrapper->Initialize(weak_from_this());
 }
 

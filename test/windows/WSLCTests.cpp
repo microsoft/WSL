@@ -6781,7 +6781,6 @@ class WSLCTests
 
         unsigned int failures = 0;
 
-
         // One thread repeatedly creates a container and then deletes it.
         std::thread thread([&]() {
             for (unsigned int i = 0; i < c_iterations; ++i)

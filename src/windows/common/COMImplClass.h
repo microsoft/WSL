@@ -104,7 +104,6 @@ protected:
     }
 
 private:
-
     std::mutex m_lock;
     std::condition_variable m_cv;
     _Guarded_by_(m_lock) std::unordered_set<std::thread::id> m_callers;
