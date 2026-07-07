@@ -451,12 +451,10 @@
 
        選項:
             --enable-wsl1
-                啟用 WSL1 支援。
- 
+                啟用 WSL1 支援。 
 
             --fixed-vhd
-                建立大小固定的磁碟，以儲存發佈。
- 
+                建立大小固定的磁碟，以儲存發佈。 
 
             --from-file &lt;Path&gt;
                 從本機檔案安裝發佈。
@@ -484,10 +482,8 @@
 
             --web-download
                 從網際網路下載發佈，而非從 Microsoft Store 下載。
-
- 
-    --manage &lt;Distro&gt; &lt;Options...&gt;
- 
+ 
+    --manage &lt;Distro&gt; &lt;Options...&gt; 
         變更 distro 指定選項。
 
         選項:
@@ -495,8 +491,7 @@
                 將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
- 
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
 
             --set-default-user &lt;Username&gt;
                 設定發佈的預設使用者。
@@ -536,8 +531,7 @@
         選項:
             --force
                 結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
-
- 
+ 
     --status
         顯示 Linux 版 Windows 子系統的狀態。
 
@@ -564,8 +558,7 @@
         將發行版本匯出至 tar 檔案。
         stdout 的檔案名稱可以是 -。
 
-        選項:
- 
+        選項: 
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
@@ -2353,8 +2346,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>網路驅動程式選項 'Gateway' 也必須指定 'Subnet'。</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>選項 '--gateway' 也必須同時指定 '--subnet'。</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>網路 '{}' 有作用中的端點。</value>
@@ -2366,6 +2359,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>不支援的網路模式: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>停止逾時值無效: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2933,6 +2930,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>停止容器的訊號</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>在終止容器之前，用來停止容器的逾時時間 (以秒為單位)(-1 表示不逾時)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>/dev/shm 的大小 (例如 64M、1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3101,6 +3101,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>已要求載入，但未提供輸入。</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>已載入的影像: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>已載入的影像識別碼: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>管理網路。</value>
   </data>
@@ -3120,6 +3128,17 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>網路中繼資料設定</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>限制對網路的外部存取</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>代表網路區段 CIDR 格式的子網路</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>子網路的 IPv4 或 IPv6 閘道</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>移除一或多個網路。</value>
@@ -3364,6 +3383,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>無法卸載磁碟區 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>磁碟區 '{}' 有非空白的 'lost+found' 目錄。它留在該位置，而磁碟區可能無法以影像內容來執行。</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>無法在外掛程式拒絕後停止容器 '{}'</value>
