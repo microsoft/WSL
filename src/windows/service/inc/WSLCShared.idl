@@ -156,9 +156,10 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsVirtioFs = 8,
     WslcFeatureFlagsDebug = 16,
     WslcFeatureFlagsPortRelayWslRelay = 32, // Use the wslrelay-based localhost port relay in Consomme networking mode.
+    WslcFeatureFlagsNestedVirtualization = 64, // Expose virtualization extensions so containers can use /dev/kvm.
 } WSLCFeatureFlags;
 
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay)")
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay | WslcFeatureFlagsNestedVirtualization)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 

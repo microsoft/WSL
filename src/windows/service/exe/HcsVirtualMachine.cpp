@@ -146,12 +146,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = SanitizeHostingProcessNameSuffix(Settings->DisplayName);
     }
 
+    const bool nestedVirt = FeatureEnabled(WslcFeatureFlagsNestedVirtualization);
+    if (nestedVirt)
+    {
+        vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = true;
+    }
+
 #ifdef _AMD64_
 
-    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
-    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
-    vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
-    vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
+    if (!(nestedVirt && !helpers::IsWindows11OrAbove()))
+    {
+        HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
+        __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
+        vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
+        vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
+    }
 
 #endif
 

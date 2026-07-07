@@ -1611,6 +1611,16 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.DeviceRequests = std::vector<common::docker_schema::DeviceRequest>{{"cdi", {LX_WSLC_GPU_CDI_DEVICE}}};
     }
 
+    if (virtualMachine.FeatureEnabled(WslcFeatureFlagsNestedVirtualization))
+    {
+        if (!request.HostConfig.Devices.has_value())
+        {
+            request.HostConfig.Devices.emplace();
+        }
+
+        request.HostConfig.Devices->push_back({"/dev/kvm", "/dev/kvm", "rwm"});
+    }
+
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
     for (ULONG i = 0; i < containerOptions.PortsCount; i++)
