@@ -1191,7 +1191,7 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
         {
             auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
 
-            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, httpStatusCode == 404);
+            THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
             THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
         }
         catch (const wil::ResultException&)
@@ -1249,7 +1249,7 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
         {
             auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
 
-            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, statusCode == 404);
+            THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
             THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
         }
         catch (const wil::ResultException&)
