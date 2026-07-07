@@ -767,6 +767,9 @@ CATCH_LOG()
 void wsl::windows::common::helpers::AppendCommonKernelCommandLine(
     _Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes, _In_ ULONG cpuCount)
 {
+    // Set number of processors.
+    kernelCmdLine += std::format(L" nr_cpus={}", cpuCount);
+
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
