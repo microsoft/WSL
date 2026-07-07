@@ -102,7 +102,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"Invalid copy direction") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidTargetFormat_EmptyContainer)
@@ -112,7 +112,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"Invalid copy direction") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidTargetFormat_EmptyPath)
@@ -122,7 +122,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"Invalid destination format") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerNotFound)
@@ -134,7 +134,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+        VERIFY_IS_TRUE(result.Stderr->find(L"not found") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_Success)
@@ -483,7 +483,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(cpResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, cpResult.ExitCode.value());
         VERIFY_IS_TRUE(cpResult.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(0u, cpResult.Stderr.value().size());
+        VERIFY_IS_TRUE(cpResult.Stderr->find(L"not found") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)
