@@ -7565,10 +7565,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // the two terminated distros must have been removed.
         //
         // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
-        // wsl --terminate returns (it sync()s, then recursively rmdir's the distro cgroup subtree).
-
-        // On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
-
+        // wsl --terminate returns (it sync()s, drains the cgroup via cgroup.kill, then rmdir's the
+        // subtree). On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
         // can still be in flight when this check runs, so retry until cleanup completes.
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
             [&]() {
