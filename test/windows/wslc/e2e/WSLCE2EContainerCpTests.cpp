@@ -28,7 +28,7 @@ class WSLCE2EContainerCpTests
     TEST_METHOD_SETUP(MethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        TarPath = wsl::windows::common::filesystem::GetTempFilename();
+        TarPath = std::filesystem::current_path() / L"wslc-cp-test.tar";
         DeleteFileW(TarPath.c_str());
         return true;
     }
@@ -313,7 +313,7 @@ class WSLCE2EContainerCpTests
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create a local file to copy.
-        auto localFile = wsl::windows::common::filesystem::GetTempFilename();
+        auto localFile = std::filesystem::current_path() / L"wslc-cp-local-test.txt";
         auto cleanupLocal = wil::scope_exit([&] { DeleteFileW(localFile.c_str()); });
 
         {
@@ -329,9 +329,8 @@ class WSLCE2EContainerCpTests
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Verify the file was copied.
-        auto fileName = localFile.filename().string();
         const auto execResult =
-            RunWslc(std::format(L"container exec {} cat /tmp/{}", WslcContainerName, wsl::shared::string::MultiByteToWide(fileName)));
+            RunWslc(std::format(L"container exec {} cat /tmp/wslc-cp-local-test.txt", WslcContainerName));
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
@@ -360,10 +359,8 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container exec {} sh -c \"echo container-content > /tmp/fromcontainer.txt\"", WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
-        // Create a temp directory to download into.
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-download-test";
+        // Create a directory to download into.
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-download-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -389,9 +386,7 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container exec {} sh -c \"echo backslash-test > /tmp/bstest.txt\"", WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-backslash-test";
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-backslash-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -417,9 +412,7 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container exec {} sh -c \"echo file-dest-test > /tmp/srcfile.txt\"", WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto targetFile = std::filesystem::path(tempDir) / L"wslc-cp-file-dest-test" / L"renamed.txt";
+        auto targetFile = std::filesystem::current_path() / L"wslc-cp-file-dest-test" / L"renamed.txt";
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(targetFile.parent_path()); });
 
         // Copy from container to a specific file path (not a directory).
@@ -439,9 +432,7 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-notfound-test";
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-notfound-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -459,9 +450,7 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-notfound-dir-test";
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-notfound-dir-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -475,9 +464,7 @@ class WSLCE2EContainerCpTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_Download_NonexistentContainer)
     {
         // Regression test: DownloadArchive error path when the container itself doesn't exist.
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-no-container-test";
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-no-container-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -496,9 +483,7 @@ class WSLCE2EContainerCpTests
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Container has exited (ran a one-shot command). Copy from the stopped container.
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto downloadDir = std::filesystem::path(tempDir) / L"wslc-cp-stopped-test";
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-stopped-test";
         std::filesystem::create_directories(downloadDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
 
@@ -529,10 +514,8 @@ private:
     // Creates a tar file containing a single text file using tar.exe.
     void CreateTestTarFile()
     {
-        // Create a temp directory with a test file to archive.
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        auto tarSrcDir = std::filesystem::path(tempDir) / L"wslc-cp-tar-src";
+        // Create a directory with a test file to archive.
+        auto tarSrcDir = std::filesystem::current_path() / L"wslc-cp-tar-src";
         std::filesystem::create_directories(tarSrcDir);
         auto cleanupSrcDir = wil::scope_exit([&] { std::filesystem::remove_all(tarSrcDir); });
 
