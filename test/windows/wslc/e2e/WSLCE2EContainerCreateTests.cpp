@@ -852,7 +852,7 @@ class WSLCE2EContainerCreateTests
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
-        // Only --health-cmd: the command is forwarded, other fields fall back to the daemon default.
+        // Only --health-cmd: the command is forwarded, other fields fall back to the default.
         {
             auto result = RunWslc(
                 std::format(LR"(container create --health-cmd "exit 1" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
@@ -894,6 +894,20 @@ class WSLCE2EContainerCreateTests
             auto result =
                 RunWslc(std::format(L"container create --health-retries abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid health-retries argument value: abc\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result = RunWslc(std::format(
+                LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"The '--no-healthcheck' option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result = RunWslc(std::format(
+                L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"The '--no-healthcheck' option cannot be combined with other health check options.\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }

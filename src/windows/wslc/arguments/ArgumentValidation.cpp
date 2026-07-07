@@ -75,6 +75,14 @@ void Argument::Validate(const ArgMap& execArgs) const
             execArgs.GetAll<ArgType::HealthRetries>(), m_name, [](int value) { return value >= 0; });
         break;
 
+    case ArgType::NoHealthcheck:
+        if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
+            execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+        }
+        break;
+
     case ArgType::Memory:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::Memory>(), m_name);
         break;
@@ -436,10 +444,8 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
     return static_cast<int64_t>(parsed.value());
 }
 
-// Parses a Go-style duration string (as used by Docker) into nanoseconds. The input is a possibly
-// signed sequence of decimal numbers, each with an optional fraction and a required unit suffix.
-// Valid units are "ns", "us"/"µs", "ms", "s", "m", "h". Returns std::nullopt on any parse error.
-static std::optional<int64_t> TryParseGoDuration(const std::string& input)
+// Parses duration string into nanoseconds.
+static std::optional<int64_t> TryParseDuration(const std::string& input)
 {
     if (input.empty())
     {
@@ -495,23 +501,23 @@ static std::optional<int64_t> TryParseGoDuration(const std::string& input)
         }
         else if (unit == "us" || unit == "\xC2\xB5s" /* µs (U+00B5) */ || unit == "\xCE\xBCs" /* μs (U+03BC) */)
         {
-            multiplier = 1e3L;
+            multiplier = 1000L;
         }
         else if (unit == "ms")
         {
-            multiplier = 1e6L;
+            multiplier = 1000000L;
         }
         else if (unit == "s")
         {
-            multiplier = 1e9L;
+            multiplier = 1000000000L;
         }
         else if (unit == "m")
         {
-            multiplier = 60e9L;
+            multiplier = 60000000000L;
         }
         else if (unit == "h")
         {
-            multiplier = 3600e9L;
+            multiplier = 3600000000000L;
         }
         else
         {
@@ -567,7 +573,7 @@ void ValidateDuration(const std::vector<std::wstring>& values, const std::wstrin
 int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring& argName)
 {
     const std::string narrow = WideToMultiByte(input);
-    const auto parsed = TryParseGoDuration(narrow);
+    const auto parsed = TryParseDuration(narrow);
 
     if (!parsed.has_value() || parsed.value() < 0)
     {

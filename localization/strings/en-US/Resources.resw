@@ -3102,6 +3102,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid {} argument value: '{}'. Expected a duration (e.g. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>The '--no-healthcheck' option cannot be combined with other health check options.</value>
+    <comment>{Locked="--no-healthcheck'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID file '{}' already exists</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

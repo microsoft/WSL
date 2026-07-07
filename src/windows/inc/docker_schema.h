@@ -286,7 +286,6 @@ struct NetworkSettings
 
 struct HealthConfig
 {
-    // ["NONE"] disables it, and ["CMD-SHELL", <cmd>] runs <cmd> through the shell.
     std::optional<std::vector<std::string>> Test;
     std::optional<std::int64_t> Interval;
     std::optional<std::int64_t> Timeout;

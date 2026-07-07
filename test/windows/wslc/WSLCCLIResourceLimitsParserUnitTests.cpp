@@ -127,9 +127,9 @@ class WSLCCLIResourceLimitsParserUnitTests
 
     TEST_METHOD(Duration_Valid)
     {
-        // (input, expected nanoseconds)
         std::vector<std::pair<std::wstring, int64_t>> valid = {
             {L"0", 0LL},
+            {L"0s", 0LL},
             {L"1ns", 1LL},
             {L"500ms", 500'000'000LL},
             {L"30s", 30'000'000'000LL},
@@ -150,18 +150,8 @@ class WSLCCLIResourceLimitsParserUnitTests
 
     TEST_METHOD(Duration_Invalid)
     {
-        // Each value should be rejected as an invalid duration.
         const std::vector<std::wstring> invalid = {
-            L"",
-            L"abc",
-            L"30",    // missing unit
-            L"30sec", // unknown unit
-            L"30x",   // unknown unit
-            L"-30s",  // negative durations are rejected
-            L"30 s",  // embedded whitespace
-            L"s",     // missing number
-            L"1.2.3s" // multiple dots
-        };
+            L"", L"-1", L"s", L"abc", L"30", L"30sec", L"30x", L"-30s", L"30 s", L"s", L"1.2.3s", L"9223372036854775808s"};
 
         for (const auto& input : invalid)
         {

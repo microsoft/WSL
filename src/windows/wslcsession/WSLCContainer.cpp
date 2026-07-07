@@ -1297,7 +1297,6 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.State.StartedAt = dockerInspect.State.StartedAt;
     wslcInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
 
-    // Map the runtime health status, which Docker only reports when a health check is configured.
     if (dockerInspect.State.Health.has_value())
     {
         const auto& dockerHealth = dockerInspect.State.Health.value();
