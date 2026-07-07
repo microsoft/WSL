@@ -25,7 +25,7 @@ Notes:
 - `Timeout` must be positive and must fit in a `uint32` millisecond count.
 - `VhdRequirements` is optional.
 
-Sessions names serve both as display names, and as machine-wide keys to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.
+Session names serve both as display names and as machine-wide keys used to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.
 
 Also note that the following information about a session is visible to all users on the machine:
 

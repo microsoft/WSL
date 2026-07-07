@@ -6,7 +6,7 @@
   - `name` must be non-empty. The name of the session to be created.
   - `storagePath` must be non-empty. Path to where the session storage should be written. If the path doesn't exist, it will be created.
 
-Sessions names serve both as display names, and as machine-wide keys to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.
+Session names serve both as display names and as machine-wide keys used to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.
 
 Also note that the following information about a session is visible to all users on the machine:
 
