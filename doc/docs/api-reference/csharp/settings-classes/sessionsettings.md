@@ -19,9 +19,21 @@ public sealed class SessionSettings
 
 Notes:
 
+- `Name` is the name of the session to be created.
+- `StoragePath` is the path to where the session storage should be written. If the path doesn't exist, it will be created.
 - `CpuCount`, `MemorySizeInMB`, and `Timeout` are optional nullable values.
 - `Timeout` must be positive and must fit in a `uint32` millisecond count.
 - `VhdRequirements` is optional.
+
+Sessions names serve both as display names, and as machine-wide keys to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.
+
+Also note that the following information about a session is visible to all users on the machine:
+
+- The session's name
+- The SID of the user that created the session
+- The PID of the process that created the session
+
+Do not put credentials or other sensitive information in the session's name.
 
 Example:
 
