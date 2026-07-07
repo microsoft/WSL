@@ -422,11 +422,14 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         }
 
         // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-        try
+        if (m_storageMounted)
         {
-            m_virtualMachine->Unmount(c_containerdStorage);
+            try
+            {
+                m_virtualMachine->Unmount(c_containerdStorage);
+            }
+            CATCH_LOG();
         }
-        CATCH_LOG();
     }
 
     m_dockerdProcess.reset();
