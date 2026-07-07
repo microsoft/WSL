@@ -35,7 +35,7 @@ def main(path: str, fix: bool):
                 fd.write(to_crlf(content))
 
     if not mismatches:
-        print('All files use CRLF line endings')
+        print(f'All {len(source_files)} files use CRLF line endings')
         return
 
     listed = '\n'.join(mismatches)
@@ -50,8 +50,5 @@ if __name__ == '__main__':
     parser.add_argument('path', help='Path to the repository root.')
     parser.add_argument('--fix', action='store_true', help='Convert mismatching files to CRLF line endings.')
     args = parser.parse_args()
-
-    if not os.path.exists(args.path):
-        parser.error(f"Path '{args.path}' does not exist.")
 
     main(args.path, args.fix)
