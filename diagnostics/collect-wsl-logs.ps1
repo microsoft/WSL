@@ -343,7 +343,7 @@ if ($LogProfile -eq "networking")
 
 # Collect WSLg logs (https://github.com/microsoft/wslg)
 $wslgFolder = "$folder/wslg"
-mkdir -p $wslgFolder | Out-Null
+New-Item -ItemType Directory -Force -Path $wslgFolder | Out-Null
 
 # Run in a job with a timeout so a wedged WSL service can't hang collection. --system --user root
 # reaches /mnt/wslg even when the default distro is WSL1 or isn't running, and can read root-only logs.
