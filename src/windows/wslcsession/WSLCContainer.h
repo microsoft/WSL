@@ -94,8 +94,6 @@ public:
 
     ~WSLCContainerImpl();
 
-    // Completes two-phase construction by wiring the COM wrapper to a std::weak_ptr of this impl.
-    // Must be called after the impl is owned by a std::shared_ptr (see Create()/Open()).
     void Initialize();
 
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);

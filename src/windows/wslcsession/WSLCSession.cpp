@@ -3405,10 +3405,8 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock(m_containersLock);
 
-    // The container may already have been removed from the map by a concurrent purge (erase_if of
-    // WslcContainerStateDeleted entries in OpenContainer/ListContainers, or PruneContainers) while
-    // this Delete() was in flight, so an erase count of 0 is expected. The impl itself remains alive
-    // for the duration of the call via the shared_ptr held by WSLCContainer::Delete's LockImpl().
+    // N.B. once a container transitions to a 'Deleted' state, a call to ListContainers() can remove it from m_containers.
+    // Therefore it's possible that the container is already removed when the callback from Delete() is invoked.
     m_containers.erase(Container->ID());
 }
 

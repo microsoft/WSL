@@ -22,9 +22,6 @@ template <typename TImpl, typename TPointer = TImpl*>
 class COMImplClass
 {
 public:
-    // Stores the pointer to the underlying impl. Kept separate from the constructor so that the
-    // std::weak_ptr specialization can be initialized after the impl is owned by a std::shared_ptr
-    // (e.g. via std::enable_shared_from_this::weak_from_this()).
     void Initialize(TPointer impl)
     {
         m_impl = std::move(impl);
@@ -42,7 +39,7 @@ public:
             return m_callers.empty() || m_callers.size() == 1 && *m_callers.begin() == std::this_thread::get_id();
         });
 
-        ResetImpl();
+        m_impl = {};
     }
 
 protected:
@@ -68,9 +65,6 @@ protected:
     }
     CATCH_RETURN();
 
-    // Returns a usable pointer to the impl for the current call: the raw pointer for the TImpl*
-    // specialization, or a strong std::shared_ptr locked from the weak_ptr otherwise.
-    // Must be called with m_lock held.
     auto GetPointer()
     {
         if constexpr (std::is_same_v<TPointer, TImpl*>)
@@ -85,10 +79,6 @@ protected:
 
     [[nodiscard]] auto LockImpl()
     {
-        // Obtain a usable reference to the impl and add ourselves to the list of callers.
-        // For the std::weak_ptr specialization, GetPointer() returns a strong std::shared_ptr that
-        // keeps the impl alive for the full duration of the call, even if the owning container map
-        // entry is erased concurrently on another thread.
         auto impl = [this] {
             std::unique_lock lock{m_lock};
 
@@ -114,19 +104,6 @@ protected:
     }
 
 private:
-    // Clears the impl pointer so subsequent LockImpl() calls fail with RPC_E_DISCONNECTED.
-    // Must be called with m_lock held.
-    void ResetImpl() noexcept
-    {
-        if constexpr (std::is_same_v<TPointer, TImpl*>)
-        {
-            m_impl = nullptr;
-        }
-        else
-        {
-            m_impl.reset();
-        }
-    }
 
     std::mutex m_lock;
     std::condition_variable m_cv;

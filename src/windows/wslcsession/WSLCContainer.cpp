@@ -619,8 +619,7 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
 void WSLCContainerImpl::Initialize()
 {
-    // Store a weak_ptr to this impl in the COM wrapper so that in-flight COM calls (via LockImpl)
-    // keep the impl alive for their full duration, independent of the owning container map entry.
+    // N.B. this must be done here because weak_from_this() is only valid after the constructor returns. 
     m_comWrapper->Initialize(weak_from_this());
 }
 
