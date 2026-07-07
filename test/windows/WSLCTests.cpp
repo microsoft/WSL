@@ -1671,6 +1671,35 @@ class WSLCTests
             // Validate that the container transitions to "unhealthy" after the health command fails.
             waitForHealthStatus(container, "unhealthy", 60s);
         }
+
+        // Validate that WSLCContainerFlagsNoHealthCheck disables the image's default health check.
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-disabled");
+            launcher.SetNoHealthcheck();
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"NONE"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // A disabled health check is not monitored, so the container never reports a runtime health status.
+            VERIFY_IS_FALSE(inspect.State.Health.has_value());
+        }
+
+        // Validate that combining WSLCContainerFlagsNoHealthCheck with an explicit health check command is rejected.
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-conflict");
+            launcher.SetNoHealthcheck();
+            launcher.SetHealthCmd("exit 0");
+
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+            VERIFY_IS_FALSE(container.has_value());
+        }
     }
 
     WSLC_TEST_METHOD(BuildImageWithContext)

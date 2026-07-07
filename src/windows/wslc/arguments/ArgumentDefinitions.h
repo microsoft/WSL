@@ -88,6 +88,7 @@ _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  L
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoColor,        "no-color",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoColorArgDescription()) \
+_(NoHealthcheck,  "no-healthcheck",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoHealthcheckArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ObjectIdArgDescription()) \

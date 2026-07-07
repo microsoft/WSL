@@ -164,6 +164,11 @@ void WSLCContainerLauncher::SetHealthRetries(LONG Retries)
     m_healthRetries = Retries;
 }
 
+void WSLCContainerLauncher::SetNoHealthcheck()
+{
+    WI_SetFlag(m_containerFlags, WSLCContainerFlagsNoHealthCheck);
+}
+
 void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 {
     m_entrypoint = std::move(entrypoint);

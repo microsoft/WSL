@@ -82,6 +82,7 @@ public:
     void SetHealthTimeout(int64_t Nanoseconds);
     void SetHealthStartPeriod(int64_t Nanoseconds);
     void SetHealthRetries(LONG Retries);
+    void SetNoHealthcheck();
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);

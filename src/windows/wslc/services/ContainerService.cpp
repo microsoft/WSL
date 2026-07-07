@@ -171,6 +171,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetHealthRetries(options.HealthRetries.value());
     }
 
+    if (options.NoHealthcheck)
+    {
+        containerLauncher.SetNoHealthcheck();
+    }
+
     if (options.MemoryBytes.has_value())
     {
         containerLauncher.SetMemoryLimit(options.MemoryBytes.value());

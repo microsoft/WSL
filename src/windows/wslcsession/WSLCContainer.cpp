@@ -1547,19 +1547,25 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     request.HostConfig.ShmSize = containerOptions.ShmSize;
 
-    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsHealthCheck))
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsNoHealthCheck))
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsHealthCheck),
+            "WSLCContainerFlagsHealthCheck and WSLCContainerFlagsNoHealthCheck cannot be combined");
+
+        request.Healthcheck.emplace().Test = std::vector<std::string>{"NONE"};
+    }
+    else if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsHealthCheck))
     {
         common::docker_schema::HealthConfig health{};
 
-        // A custom command maps to Docker's ["CMD-SHELL", <cmd>]. When no command is provided the
-        // Test field is left unset so the image's health check command (if any) is preserved.
         if (containerOptions.HealthCmd != nullptr)
         {
             health.Test = std::vector<std::string>{"CMD-SHELL", containerOptions.HealthCmd};
         }
 
-        // Durations are already in nanoseconds; 0 means "use the daemon default", so only forward
-        // explicit non-zero values.
+        // N.B. '0' will use the default value from the image.
         if (containerOptions.HealthIntervalNs != 0)
         {
             health.Interval = containerOptions.HealthIntervalNs;

@@ -45,6 +45,7 @@ struct ContainerOptions
     std::optional<int64_t> HealthTimeout{};     // nanoseconds
     std::optional<int64_t> HealthStartPeriod{}; // nanoseconds
     std::optional<int> HealthRetries{};
+    bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;

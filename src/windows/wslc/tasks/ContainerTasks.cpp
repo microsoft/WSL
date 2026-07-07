@@ -478,6 +478,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.HealthRetries = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::HealthRetries>());
     }
 
+    if (context.Args.Contains(ArgType::NoHealthcheck))
+    {
+        options.NoHealthcheck = true;
+    }
+
     if (context.Args.Contains(ArgType::Memory))
     {
         options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
