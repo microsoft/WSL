@@ -6779,7 +6779,7 @@ class WSLCTests
 
         const std::string containerName = "wslc-list-delete-stress";
 
-        unsigned int failures = 0;
+        std::atomic<unsigned int> failures = 0;
 
         // One thread repeatedly creates a container and then deletes it.
         std::thread thread([&]() {
@@ -6846,7 +6846,7 @@ class WSLCTests
 
         thread.join();
 
-        VERIFY_ARE_EQUAL(failures, 0u);
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
     }
 
     WSLC_TEST_METHOD(ContainerNetwork)

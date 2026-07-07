@@ -24,6 +24,7 @@ class COMImplClass
 public:
     void Initialize(TPointer impl)
     {
+        std::unique_lock lock(m_lock);
         m_impl = std::move(impl);
     }
 
