@@ -18,12 +18,16 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-template <typename TImpl>
+template <typename TImpl, typename TPointer = TImpl*>
 class COMImplClass
 {
 public:
-    COMImplClass(TImpl* impl) : m_impl(impl)
+    // Stores the pointer to the underlying impl. Kept separate from the constructor so that the
+    // std::weak_ptr specialization can be initialized after the impl is owned by a std::shared_ptr
+    // (e.g. via std::enable_shared_from_this::weak_from_this()).
+    void Initialize(TPointer impl)
     {
+        m_impl = std::move(impl);
     }
 
     void Disconnect() noexcept
@@ -38,8 +42,7 @@ public:
             return m_callers.empty() || m_callers.size() == 1 && *m_callers.begin() == std::this_thread::get_id();
         });
 
-        WI_ASSERT(m_impl != nullptr);
-        m_impl = nullptr;
+        ResetImpl();
     }
 
 protected:
@@ -48,7 +51,7 @@ protected:
     try
     {
         auto [lock, impl] = LockImpl();
-        (impl->*routine)(std::forward<Args>(args)...);
+        ((*impl).*routine)(std::forward<Args>(args)...);
 
         return S_OK;
     }
@@ -59,22 +62,44 @@ protected:
     try
     {
         auto [lock, impl] = LockImpl();
-        (impl->*routine)(std::forward<Args>(args)...);
+        ((*impl).*routine)(std::forward<Args>(args)...);
 
         return S_OK;
     }
     CATCH_RETURN();
 
+    // Returns a usable pointer to the impl for the current call: the raw pointer for the TImpl*
+    // specialization, or a strong std::shared_ptr locked from the weak_ptr otherwise.
+    // Must be called with m_lock held.
+    auto GetPointer()
+    {
+        if constexpr (std::is_same_v<TPointer, TImpl*>)
+        {
+            return m_impl;
+        }
+        else
+        {
+            return m_impl.lock();
+        }
+    }
+
     [[nodiscard]] auto LockImpl()
     {
-        // Check if m_impl is available and add ourselves to the list of callers if that's the case.
-        {
+        // Obtain a usable reference to the impl and add ourselves to the list of callers.
+        // For the std::weak_ptr specialization, GetPointer() returns a strong std::shared_ptr that
+        // keeps the impl alive for the full duration of the call, even if the owning container map
+        // entry is erased concurrently on another thread.
+        auto impl = [this] {
             std::unique_lock lock{m_lock};
-            THROW_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+
+            auto pointer = GetPointer();
+            THROW_HR_IF(RPC_E_DISCONNECTED, !pointer);
 
             auto [_, inserted] = m_callers.insert(std::this_thread::get_id());
             WI_ASSERT(inserted);
-        }
+
+            return pointer;
+        }();
 
         auto release = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() {
             std::unique_lock lock{m_lock};
@@ -85,14 +110,28 @@ protected:
             m_cv.notify_one();
         });
 
-        return std::make_pair(std::move(release), m_impl);
+        return std::make_pair(std::move(release), std::move(impl));
     }
 
 private:
+    // Clears the impl pointer so subsequent LockImpl() calls fail with RPC_E_DISCONNECTED.
+    // Must be called with m_lock held.
+    void ResetImpl() noexcept
+    {
+        if constexpr (std::is_same_v<TPointer, TImpl*>)
+        {
+            m_impl = nullptr;
+        }
+        else
+        {
+            m_impl.reset();
+        }
+    }
+
     std::mutex m_lock;
     std::condition_variable m_cv;
     _Guarded_by_(m_lock) std::unordered_set<std::thread::id> m_callers;
-    TImpl* m_impl = nullptr;
+    TPointer m_impl{};
 };
 
 } // namespace wsl::windows::service::wslc
