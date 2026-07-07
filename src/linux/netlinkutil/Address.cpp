@@ -148,8 +148,13 @@ bool Address::IsLinkLocal() const
         return (ntohl(AsBytes<in_addr>().s_addr) & 0xFFFF0000) == 0xA9FE0000;
     }
 
-    const auto bytes = AsBytes<in6_addr>();
-    return bytes.s6_addr[0] == 0xFE && (bytes.s6_addr[1] & 0xC0) == 0x80;
+    if (m_family == AF_INET6)
+    {
+        const auto bytes = AsBytes<in6_addr>();
+        return bytes.s6_addr[0] == 0xFE && (bytes.s6_addr[1] & 0xC0) == 0x80;
+    }
+
+    return false;
 }
 
 bool Address::IsPrefixRouteAutogenerationDisabled() const noexcept
