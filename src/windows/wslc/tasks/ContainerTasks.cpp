@@ -358,50 +358,32 @@ void ContainerCp(CLIExecutionContext& context)
             auto parentDir = absPath.parent_path().wstring();
             auto fileName = absPath.filename().wstring();
 
-            // Create a temp tar file
-            wchar_t tempDir[MAX_PATH]{};
-            THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-            wchar_t tempFile[MAX_PATH]{};
-            THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
-            auto tempPath = std::wstring(tempFile);
-            auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
-
-            // Create tar archive — strip trailing separator to avoid the CRT parsing '\"' as an escaped quote
-            auto parentDirStr = parentDir;
-            while (parentDirStr.size() > 1 && (parentDirStr.back() == L'\\' || parentDirStr.back() == L'/'))
+            // Strip trailing separator to avoid the CRT parsing '\"' as an escaped quote
+            while (parentDir.size() > 1 && (parentDir.back() == L'\\' || parentDir.back() == L'/'))
             {
-                parentDirStr.pop_back();
+                parentDir.pop_back();
             }
 
-            auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" \"{}\"", tempPath, parentDirStr, fileName);
-            STARTUPINFOW si{sizeof(si)};
-            PROCESS_INFORMATION pi{};
-            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
-            {
-                auto lastError = GetLastError();
-                THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-                    Localization::WSLCCLI_CpTarNotFoundError(),
-                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
-                THROW_WIN32(lastError);
-            }
-            wil::unique_handle tarProcess(pi.hProcess);
-            wil::unique_handle tarThread(pi.hThread);
+            // Create a temp file with DELETE_ON_CLOSE and InheritHandle so tar can write to it via stdout
+            filesystem::TempFile tarFile(
+                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, filesystem::TempFileFlags::DeleteOnClose | filesystem::TempFileFlags::InheritHandle);
 
-            WaitForSingleObject(tarProcess.get(), INFINITE);
-            DWORD exitCode = 0;
-            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            // Run tar.exe writing to stdout, redirected to our temp file handle
+            auto tarCmd = std::format(L"tar.exe -cf - -C \"{}\" \"{}\"", parentDir, fileName);
+            SubProcess process(nullptr, tarCmd.c_str());
+            process.SetStdHandles(nullptr, tarFile.Handle.get(), nullptr);
+            auto exitCode = process.Run();
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
 
-            // Open the tar file and upload
-            wil::unique_hfile tarFileHandle(
-                CreateFileW(tempPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-            THROW_LAST_ERROR_IF(!tarFileHandle);
+            // Rewind and get size for upload
+            LARGE_INTEGER zero{};
+            THROW_LAST_ERROR_IF(!SetFilePointerEx(tarFile.Handle.get(), zero, nullptr, FILE_BEGIN));
 
             LARGE_INTEGER fileSize{};
-            THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFileHandle.get(), &fileSize));
+            THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFile.Handle.get(), &fileSize));
 
-            ContainerService::CopyToContainer(session, containerId, destPath, tarFileHandle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+            ContainerService::CopyToContainer(
+                session, containerId, destPath, tarFile.Handle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
         }
     }
     else if (sourceIsContainer && !targetIsContainer)
@@ -417,20 +399,13 @@ void ContainerCp(CLIExecutionContext& context)
         bool targetIsDir = (!target.empty() && (target.back() == L'\\' || target.back() == L'/')) || std::filesystem::is_directory(absTarget);
 
         // Download archive from container to a temp file
-        wchar_t tempDir[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempPathW(MAX_PATH, tempDir) == 0);
-        wchar_t tempFile[MAX_PATH]{};
-        THROW_LAST_ERROR_IF(GetTempFileNameW(tempDir, L"wslcp", 0, tempFile) == 0);
-        auto tempPath = std::wstring(tempFile);
-        auto cleanupTemp = wil::scope_exit([&] { DeleteFileW(tempPath.c_str()); });
+        filesystem::TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
 
-        {
-            wil::unique_hfile tarFileHandle(
-                CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-            THROW_LAST_ERROR_IF(!tarFileHandle);
+        ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
 
-            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFileHandle.get());
-        }
+        // Rewind for tar extraction
+        LARGE_INTEGER zero{};
+        THROW_LAST_ERROR_IF(!SetFilePointerEx(tarFile.Handle.get(), zero, nullptr, FILE_BEGIN));
 
         if (targetIsDir)
         {
@@ -446,30 +421,15 @@ void ContainerCp(CLIExecutionContext& context)
                 targetDir.pop_back();
             }
 
-            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, targetDir);
-            STARTUPINFOW si{sizeof(si)};
-            PROCESS_INFORMATION pi{};
-            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
-            {
-                auto lastError = GetLastError();
-                THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-                    Localization::WSLCCLI_CpTarNotFoundError(),
-                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
-                THROW_WIN32(lastError);
-            }
-            wil::unique_handle tarProcess(pi.hProcess);
-            wil::unique_handle tarThread(pi.hThread);
-
-            WaitForSingleObject(tarProcess.get(), INFINITE);
-            DWORD exitCode = 0;
-            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tarFile.Path.wstring(), targetDir);
+            SubProcess process(nullptr, tarCmd.c_str());
+            auto exitCode = process.Run();
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
         }
         else
         {
             // Target is a file path. Extract to a temp directory, then move to the target.
-            auto extractDir = std::filesystem::path(tempDir) / L"wslc-cp-extract";
+            auto extractDir = tarFile.Path.parent_path() / L"wslc-cp-extract";
             std::filesystem::create_directories(extractDir);
             auto cleanupExtract = wil::scope_exit([&] { std::filesystem::remove_all(extractDir); });
 
@@ -479,24 +439,9 @@ void ContainerCp(CLIExecutionContext& context)
                 extractDirStr.pop_back();
             }
 
-            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tempPath, extractDirStr);
-            STARTUPINFOW si{sizeof(si)};
-            PROCESS_INFORMATION pi{};
-            if (!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
-            {
-                auto lastError = GetLastError();
-                THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-                    Localization::WSLCCLI_CpTarNotFoundError(),
-                    lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND);
-                THROW_WIN32(lastError);
-            }
-            wil::unique_handle tarProcess(pi.hProcess);
-            wil::unique_handle tarThread(pi.hThread);
-
-            WaitForSingleObject(tarProcess.get(), INFINITE);
-            DWORD exitCode = 0;
-            GetExitCodeProcess(tarProcess.get(), &exitCode);
+            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tarFile.Path.wstring(), extractDirStr);
+            SubProcess process(nullptr, tarCmd.c_str());
+            auto exitCode = process.Run();
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
 
             // Find the extracted file and move it to the target path.
