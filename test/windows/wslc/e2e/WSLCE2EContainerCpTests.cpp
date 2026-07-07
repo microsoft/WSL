@@ -156,7 +156,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ToStoppedContainer)
@@ -193,7 +193,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagLongForm)
@@ -214,7 +214,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsTrue)
@@ -233,7 +233,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsFalse)
@@ -252,7 +252,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsTrue)
@@ -271,7 +271,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsFalse)
@@ -290,7 +290,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"wslc-cp-test-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagInvalidValue)
@@ -335,7 +335,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_IS_TRUE(execResult.Stdout->find(L"local-file-content") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"local-file-content\r\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalFileNotFound)
