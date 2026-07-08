@@ -81,7 +81,7 @@
                     "name": "nlohmann::json",
                     "version": "3.12.0",
                     "downloadUrl": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
-                    "hash": "sha256:42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+                    "hash": "sha1:48c2c76de06fde8cf36faf039509b38b3ae90b5b"
                 }
             }
         }
