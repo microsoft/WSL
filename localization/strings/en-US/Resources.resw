@@ -2526,6 +2526,10 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>No file extracted from container archive</value>
     <comment>Shown when the container archive download produced no extractable files.</comment>
   </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Cannot copy a directory to a file path. Use a directory target (with trailing separator) instead.</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination. {Locked="wslc container cp"}</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspect a container.</value>
   </data>

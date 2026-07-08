@@ -25,6 +25,7 @@ Abstract:
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 #include <filesystem>
+#include <sstream>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -398,78 +399,93 @@ void ContainerCp(CLIExecutionContext& context)
         // Treat as directory if: ends with separator, or already exists as a directory.
         bool targetIsDir = (!target.empty() && (target.back() == L'\\' || target.back() == L'/')) || std::filesystem::is_directory(absTarget);
 
-        // Download archive from container to a temp file
-        filesystem::TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
-
-        ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
-
-        // Rewind for tar extraction
-        LARGE_INTEGER zero{};
-        THROW_LAST_ERROR_IF(!SetFilePointerEx(tarFile.Handle.get(), zero, nullptr, FILE_BEGIN));
-
         if (targetIsDir)
         {
-            // Extract directly into the target directory.
+            // Extract directly into the target directory by piping the download to tar stdin.
             std::error_code dirError;
             std::filesystem::create_directories(absTarget, dirError);
             THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
 
-            // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote
+            // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
             auto targetDir = absTarget.wstring();
             while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
             {
                 targetDir.pop_back();
             }
 
-            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tarFile.Path.wstring(), targetDir);
+            auto [pipeRead, pipeWrite] = OpenAnonymousPipe(0, false, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+            auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
             SubProcess process(nullptr, tarCmd.c_str());
-            auto exitCode = process.Run();
+            process.SetStdHandles(pipeRead.get(), nullptr, nullptr);
+            auto processHandle = process.Start();
+            pipeRead.reset();
+
+            ContainerService::CopyFromContainer(session, containerId, srcPath, pipeWrite.get());
+            pipeWrite.reset();
+
+            auto exitCode = SubProcess::GetExitCode(processHandle.get());
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
         }
         else
         {
-            // Target is a file path. Extract to a temp directory, then move to the target.
-            auto extractDir = tarFile.Path.parent_path() / L"wslc-cp-extract";
-            std::filesystem::create_directories(extractDir);
-            auto cleanupExtract = wil::scope_exit([&] { std::filesystem::remove_all(extractDir); });
+            // Target is a file path. Download archive once to a temp file (exclusive write handle),
+            // validate it contains a single file with tar -t, then extract via tar -x -O.
 
-            auto extractDirStr = extractDir.wstring();
-            while (extractDirStr.size() > 1 && (extractDirStr.back() == L'\\' || extractDirStr.back() == L'/'))
+            // Download archive to temp file. FILE_SHARE_READ allows tar to read it while we hold
+            // the exclusive write handle, preventing other processes from tampering.
+            filesystem::TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
+
+            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
+
+            // Step 1: List archive contents to validate it's a single file.
+            auto listCmd = std::format(L"tar.exe -tf \"{}\"", tarFile.Path.wstring());
+            SubProcess listProcess(nullptr, listCmd.c_str());
+            auto listOutput = listProcess.RunAndCaptureOutput();
+            THROW_HR_IF_MSG(E_FAIL, listOutput.ExitCode != 0, "tar.exe -t exited with code %u", listOutput.ExitCode);
+
+            // Validate the archive contains exactly one entry (a single file, not a directory).
+            size_t entryCount = 0;
+            bool hasDirectory = false;
+            std::wistringstream listStream(listOutput.Stdout);
+            std::wstring line;
+            while (std::getline(listStream, line))
             {
-                extractDirStr.pop_back();
+                if (line.empty())
+                {
+                    continue;
+                }
+
+                entryCount++;
+                if (line.back() == L'/')
+                {
+                    hasDirectory = true;
+                }
             }
 
-            auto tarCmd = std::format(L"tar.exe -xf \"{}\" -C \"{}\"", tarFile.Path.wstring(), extractDirStr);
-            SubProcess process(nullptr, tarCmd.c_str());
-            auto exitCode = process.Run();
-            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpSourceIsDirectoryError(), hasDirectory || entryCount > 1);
 
-            // Find the extracted file and move it to the target path.
-            // Docker's archive API returns a tar with the file at its basename.
-            std::filesystem::path extractedFile;
-            for (const auto& entry : std::filesystem::directory_iterator(extractDir))
-            {
-                extractedFile = entry.path();
-                break;
-            }
+            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpNoFileExtractedError(), entryCount == 0);
 
-            THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpNoFileExtractedError(), extractedFile.empty());
-
-            // Ensure parent directory of target exists.
+            // Step 2: Extract the single file content directly to the target.
             std::error_code dirError;
             std::filesystem::create_directories(absTarget.parent_path(), dirError);
             THROW_HR_IF_MSG(
                 HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.parent_path().c_str());
 
-            std::error_code moveError;
-            std::filesystem::rename(extractedFile, absTarget, moveError);
-            if (moveError)
-            {
-                // rename can fail across volumes; fall back to copy+delete.
-                std::filesystem::copy_file(extractedFile, absTarget, std::filesystem::copy_options::overwrite_existing, moveError);
-                THROW_HR_IF_MSG(
-                    HRESULT_FROM_WIN32(moveError.value()), !!moveError, "Failed to copy file to target: %ls", absTarget.c_str());
-            }
+            wil::unique_hfile targetFile(CreateFileW(absTarget.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!targetFile);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(targetFile.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+            auto extractCmd = std::format(L"tar.exe -xf \"{}\" -O", tarFile.Path.wstring());
+            SubProcess extractProcess(nullptr, extractCmd.c_str());
+            extractProcess.SetStdHandles(nullptr, targetFile.get(), nullptr);
+            auto extractHandle = extractProcess.Start();
+            targetFile.reset();
+
+            auto extractExitCode = SubProcess::GetExitCode(extractHandle.get());
+            THROW_HR_IF_MSG(E_FAIL, extractExitCode != 0, "tar.exe -x -O exited with code %u", extractExitCode);
         }
     }
     else
