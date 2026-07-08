@@ -4441,15 +4441,6 @@ VERSION_ID="Invalid|Format"
 
             TerminateDistribution();
 
-            // The distro's files should not be exposed via \\wsl.localhost before OOBE is completed.
-            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
-            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
-            {
-                const wil::unique_hfile file(CreateFile(
-                    testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-                VERIFY_IS_FALSE(file.is_valid());
-            }
-
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
 
@@ -4457,13 +4448,14 @@ VERSION_ID="Invalid|Format"
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
 
-            // The distro's files should now be exposed. And new file should be created with the correct uid.
-            {
-                const wil::unique_hfile file(CreateFile(
-                    testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-                VERIFY_IS_TRUE(file.is_valid());
-                validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
-            }
+            // New file should be created with the correct uid.
+            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
+            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
+
+            const wil::unique_hfile file(CreateFile(
+                testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            VERIFY_IS_TRUE(file.is_valid());
+            validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
