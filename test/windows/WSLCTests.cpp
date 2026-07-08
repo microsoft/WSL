@@ -1700,11 +1700,11 @@ class WSLCTests
     {
         auto contextDir = std::filesystem::current_path() / "build-context-healthcheck";
         std::filesystem::create_directories(contextDir);
-auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-    LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-healthcheck:latest", WSLCDeleteImageFlagsForce).first);
-    std::error_code ec;
-    std::filesystem::remove_all(contextDir, ec);
-});
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-healthcheck:latest", WSLCDeleteImageFlagsForce).first);
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
 
         // Create an image with a healthcheck that only passes once a specific file exists.
         constexpr auto c_healthReadyFile = "/tmp/wslc-health-ready";

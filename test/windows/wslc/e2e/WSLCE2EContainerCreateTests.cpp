@@ -900,14 +900,14 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(std::format(
                 LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The '--no-healthcheck' option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The '--no-healthcheck' option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }
