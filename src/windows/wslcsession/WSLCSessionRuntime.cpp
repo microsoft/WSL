@@ -639,6 +639,9 @@ void WSLCSessionRuntime::Shutdown(
 
     m_vmState.store(VmState::None);
 
+    terminationReason = m_lastTerminationReason;
+    terminationDetails = m_lastTerminationDetails;
+
     // Signal completion last so any observer of the terminated event sees a fully torn-down
     // session and a populated termination reason.
     m_sessionTerminatedEvent->SetEvent();
@@ -652,9 +655,6 @@ void WSLCSessionRuntime::Shutdown(
     // Permanently disable idle teardown and drain any in-flight timer callback so it cannot
     // reference this session after it is destroyed.
     m_idleState->Disarm();
-
-    terminationReason = m_lastTerminationReason;
-    terminationDetails = m_lastTerminationDetails;
 }
 
 } // namespace wsl::windows::service::wslc
