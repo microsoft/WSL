@@ -249,7 +249,7 @@ void ConnectionTargetManager::RemoveAll()
     m_targets.clear();
 }
 
-// Checks whether the list of logon IDs contains the specified ID.
+// Checks whether the list of targets contains the specified ID.
 bool ConnectionTargetManager::Contains(LUID luid) const
 {
     const auto it =
