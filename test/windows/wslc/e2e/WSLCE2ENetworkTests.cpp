@@ -34,6 +34,7 @@ class WSLCE2ENetworkTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureNetworkDoesNotExist(TestNetworkName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
