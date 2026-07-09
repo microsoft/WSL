@@ -205,7 +205,7 @@ bool TryAttachConsole();
 
 void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
 
-void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes);
+void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes, _In_ ULONG cpuCount);
 
 UINT64 ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes);
 

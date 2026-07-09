@@ -49,13 +49,6 @@ inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
 
-enum class EnumReferenceFormat
-{
-    None,
-    Tag,
-    Digest
-};
-
 struct GitHubReleaseAsset
 {
     std::wstring url;

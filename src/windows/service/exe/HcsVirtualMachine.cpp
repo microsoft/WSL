@@ -60,7 +60,7 @@ SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
 // vmmem-XXX process name visible in Task Manager and parsed by various tooling).
 std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
 {
-    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::wstring sanitized{name};
     for (auto& c : sanitized)
     {
@@ -166,8 +166,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
-    kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes, Settings->CpuCount);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.

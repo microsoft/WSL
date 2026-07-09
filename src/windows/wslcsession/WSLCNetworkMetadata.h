@@ -45,6 +45,7 @@ struct NetworkEntry
     std::string Scope;
     bool Internal{false};
     std::map<std::string, std::string> Labels;
+    std::map<std::string, std::string> Options;
     NetworkIPAM IPAM;
 };
 
