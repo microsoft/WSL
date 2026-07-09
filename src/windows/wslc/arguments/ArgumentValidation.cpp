@@ -527,9 +527,8 @@ static std::optional<int64_t> TryParseDuration(const std::string& input)
         long double value{};
         try
         {
-            size_t consumed = 0;
-            value = std::stold(numberStr, &consumed);
-            if (consumed != numberStr.size())
+            auto [ptr, ec] = std::from_chars(numberStr.data(), numberStr.data() + numberStr.size(), value, std::chars_format::fixed);
+            if (ptr != numberStr.data() + numberStr.size() || ec != std::errc())
             {
                 return std::nullopt;
             }
