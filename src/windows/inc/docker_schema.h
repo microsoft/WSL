@@ -20,6 +20,8 @@ Abstract:
 
 namespace wsl::windows::common::docker_schema {
 
+using wsl::shared::EmptyObject;
+
 struct CreatedContainer
 {
     std::string Id;
@@ -144,9 +146,10 @@ struct CreateNetwork
     std::string Driver;
     bool Internal{};
     std::optional<IPAM> IPAM;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Options, Labels);
 };
 
 struct Network
@@ -157,27 +160,19 @@ struct Network
     std::string Scope;
     bool Internal{};
     IPAM IPAM;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
 };
 
-struct EmptyObject
+struct ContainerNetworkRequest
 {
+    using TResponse = void;
+    std::string Container;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
 };
-
-inline void to_json(nlohmann::json& j, const EmptyObject& memory)
-{
-    UNREFERENCED_PARAMETER(memory);
-    j = nlohmann::json::object();
-}
-
-inline void from_json(const nlohmann::json& j, EmptyObject& obj)
-{
-    // EmptyObject has no fields, so nothing to deserialize
-    UNREFERENCED_PARAMETER(j);
-    UNREFERENCED_PARAMETER(obj);
-}
 
 struct Mount
 {
@@ -256,13 +251,28 @@ struct EndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::optional<std::vector<std::string>> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
+
+struct EndpointConfig
+{
+    std::optional<std::vector<std::string>> Aliases;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointConfig& v)
+{
+    j = nlohmann::json::object();
+    if (v.Aliases.has_value() && !v.Aliases->empty())
+    {
+        j["Aliases"] = *v.Aliases;
+    }
+}
 
 struct NetworkingConfig
 {
-    std::map<std::string, EmptyObject> EndpointsConfig;
+    std::map<std::string, EndpointConfig> EndpointsConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(NetworkingConfig, EndpointsConfig);
 };
@@ -289,6 +299,7 @@ struct CreateContainer
     std::string Hostname;
     std::string Domainname;
     std::optional<std::string> StopSignal;
+    std::optional<long> StopTimeout;
     std::optional<std::string> WorkingDir;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
@@ -299,7 +310,7 @@ struct CreateContainer
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
 };
 
 struct ContainerInspectState
@@ -321,8 +332,10 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Env;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
+    std::optional<std::string> StopSignal;
+    std::optional<int> StopTimeout;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout);
 };
 
 struct InspectMount
@@ -402,6 +415,13 @@ struct PruneVolumeResult
     uint64_t SpaceReclaimed{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
+};
+
+struct PruneNetworkResult
+{
+    std::optional<std::vector<std::string>> NetworksDeleted;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneNetworkResult, NetworksDeleted);
 };
 
 struct ImportStatus

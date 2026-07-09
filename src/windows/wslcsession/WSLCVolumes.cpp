@@ -44,8 +44,7 @@ WSLCVolumes::WSLCVolumes(
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover volume: %hs", volume.Name.c_str());
-            EMIT_USER_WARNING(
-                wsl::shared::Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(volume.Name)));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcFailedToRecoverVolume(volume.Name));
         }
     }
 }
@@ -122,9 +121,6 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
 
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
-
-    // Record that we initiated this create so OnVolumeEvent ignores the matching docker event.
-    m_expectedEvents.emplace_back(name, VolumeEvent::Create);
 
     return info;
 }
@@ -206,10 +202,14 @@ std::string WSLCVolumes::InspectVolume(const std::string& Name) const
     return it->second->Inspect();
 }
 
-bool WSLCVolumes::ContainsVolume(const std::string& Name) const
+std::pair<HRESULT, std::string> WSLCVolumes::GetVolumeStatus(const std::string& Name) const
 {
     auto lock = m_lock.lock_shared();
-    return m_volumes.contains(Name);
+
+    auto it = m_volumes.find(Name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
+
+    return it->second->Status();
 }
 
 WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::string, std::vector<std::string>>& Filters)
@@ -248,7 +248,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::st
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to release host resources for pruned volume: %hs", name.c_str());
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeReleaseFailed(wsl::shared::string::MultiByteToWide(name)));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeReleaseFailed(name));
         }
 
         m_volumes.erase(it);
@@ -269,6 +269,16 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     try
     {
         OpenVolumeExclusiveLockHeld(m_dockerClient.InspectVolume(volumeName));
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // A 404 here is expected when a late `create` event arrives after the volume has already
+        // been deleted (e.g. user calls CreateVolume then DeleteVolume; the create event from
+        // docker can race in after the delete has been processed).
+        if (e.StatusCode() != 404)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to open volume: %hs", volumeName.c_str());
+        }
     }
     CATCH_LOG_MSG("Failed to open volume: %hs", volumeName.c_str());
 }

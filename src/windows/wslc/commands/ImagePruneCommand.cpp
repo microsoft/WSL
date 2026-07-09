@@ -30,7 +30,6 @@ std::vector<Argument> ImagePruneCommand::GetArguments() const
     return {
         Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_ImagePruneAllArgDescription()),
         Argument::Create(ArgType::Filter, false, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -46,8 +45,8 @@ std::wstring ImagePruneCommand::LongDescription() const
 
 void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneImages;
 }
 } // namespace wsl::windows::wslc

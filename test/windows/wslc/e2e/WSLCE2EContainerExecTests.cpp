@@ -154,6 +154,79 @@ class WSLCE2EContainerExecTests
         session.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand)
+    {
+        // Regression test for a stdin deadlock. When stdin is a synchronous (non-overlapped) anonymous pipe, the client
+        // relays it on a worker thread parked in a blocking ReadFile() that the exit event cannot interrupt. With
+        // `echo hello` (which exits without reading stdin), teardown's join() on that worker blocks until stdin closes,
+        // so wslc hangs. The test exercises this by running `exec -i echo hello` and requiring it to exit while the
+        // client keeps stdin open.
+        //
+        // If this regresses, look at the client-side stdin relay teardown: InterruptAndJoinInputThread
+        // (the CancelSynchronousIo retry loop that unblocks the worker) and relay.cpp's InterruptableRead (which maps
+        // the resulting ERROR_OPERATION_ABORTED to EOF).
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // RunWslcInteractive wires wslc's stdin to the read end of a synchronous (non-overlapped) anonymous pipe, which
+        // is what triggers the blocking-ReadFile relay path under test.
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} echo hello", containerId));
+
+        // The command's output must arrive without the client closing stdin first.
+        session.ExpectStdout("hello\n");
+
+        // Long timeout: this only bounds the failure (hang) path, so it is generous to avoid false positives under CI load.
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        // Closing stdin after the process has already exited must remain a clean no-op with no errors emitted.
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveTTY_SelfExitingCommand)
+    {
+        // TTY counterpart to WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand (see that test for the full
+        // explanation of the deadlock). The -t flag routes wslc through ConsoleService::RelayInteractiveTty, whose
+        // stdin worker teardown is a separate scope-exit from the non-TTY path, so a regression could be introduced
+        // in one path and not the other. This test guards the TTY call site.
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // -t sets the TTY flag; the harness still wires stdin as a synchronous pipe, so wslc takes the vulnerable
+        // RelayInteractiveTty else-branch (its input handle is a pipe, not a console).
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} echo hello", containerId));
+
+        // The TTY translates the trailing LF to CRLF, so the exact output is "hello\r\n".
+        session.ExpectStdout("hello\r\n");
+
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_PseudoConsole_TerminalSize)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        constexpr SHORT columns = 42;
+        constexpr SHORT rows = 43;
+        const auto commandLine =
+            std::format(L"container exec -it {} /bin/sh -c -- \"while true; do stty size; sleep 1; done\"", WslcContainerName);
+
+        auto session = RunWslcInteractive(commandLine, ElevationType::Elevated, PseudoConsole{columns, rows});
+        VerifyPseudoConsoleTtySize(session, columns, rows);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvOption)
     {
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
@@ -395,6 +468,24 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_Detach)
+    {
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        constexpr auto markerPath = L"/tmp/wslc-exec-detach-marker";
+        result = RunWslc(std::format(L"container exec -d {} sh -c \"sleep 1 && echo wslc-detach-ok > {}\"", WslcContainerName, markerPath));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
+                readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(10)));
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -450,7 +541,6 @@ private:
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"

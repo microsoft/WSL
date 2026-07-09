@@ -30,7 +30,6 @@ std::vector<Argument> NetworkListCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_NetworkListQuietArgDesc()),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -58,8 +57,8 @@ void NetworkListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
-            << GetNetworks   //
+    context << ResolveSession //
+            << GetNetworks    //
             << ListNetworks;
 }
 } // namespace wsl::windows::wslc

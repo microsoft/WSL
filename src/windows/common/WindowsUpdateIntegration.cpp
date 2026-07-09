@@ -166,7 +166,12 @@ void WindowsUpdateContext::EnsureProductRegistryEntry() const
 size_t WindowsUpdateContext::SearchForUpdates()
 {
     TraceLoggingWriteTagged(
-        *m_activity, "SearchForUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+        *m_activity,
+        "SearchForUpdates",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingWideString(m_product.c_str(), "product"));
+
     THROW_IF_FAILED(m_session->CreateUpdateSearcher(&m_searcher));
 
     std::wstring queryString = std::format(L"Product='{}'", m_product);
@@ -217,7 +222,17 @@ size_t WindowsUpdateContext::SearchForUpdates()
     }
 
     THROW_IF_FAILED(searchResult->get_Updates(&m_updates));
-    return GetUpdateCount();
+    size_t result = GetUpdateCount();
+
+    TraceLoggingWriteTagged(
+        *m_activity,
+        "SearchForUpdatesResult",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingInt32(resultCode, "OperationResultCode"),
+        TraceLoggingLong(static_cast<LONG>(result), "updateCount"));
+
+    return result;
 }
 
 size_t WindowsUpdateContext::GetUpdateCount() const
@@ -232,8 +247,6 @@ size_t WindowsUpdateContext::GetUpdateCount() const
 
 void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& progress) const
 {
-    TraceLoggingWriteTagged(
-        *m_activity, "DownloadUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     // Collect all of the updates that are not currently downloaded
     wil::com_ptr<IUpdateCollection> toDownload = m_factory->CreateUpdateCollection();
 
@@ -252,6 +265,14 @@ void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& 
     // All updates are already downloaded — nothing to do.
     LONG toDownloadCount{};
     THROW_IF_FAILED(toDownload->get_Count(&toDownloadCount));
+
+    TraceLoggingWriteTagged(
+        *m_activity,
+        "DownloadUpdates",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingLong(toDownloadCount, "downloadCount"));
+
     if (toDownloadCount == 0)
     {
         if (progress)
@@ -318,7 +339,11 @@ void WindowsUpdateContext::InstallUpdates(const std::function<void(uint32_t)>& p
 void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<void(uint32_t)>& progress)
 {
     TraceLoggingWriteTagged(
-        *m_activity, "RunUpdateFlow", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+        *m_activity,
+        "RunUpdateFlow",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingBool(forceInstall, "forceInstall"));
 
     static_assert(
         DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");

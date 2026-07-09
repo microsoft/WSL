@@ -294,6 +294,8 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: default\n"
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
+            "experimental:\n"
+            "  portRelay: default\n"
             "credentialStore: default\n");
 
         UserSettingsTest s{dir};
@@ -303,9 +305,10 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
-        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -369,7 +372,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(
             Loc::WSLCUserSettings_Warning_InvalidValue(L"credentialStore", s.SettingsFilePath().wstring(), 3), s.GetWarnings()[1].Message);
         // Values still fall back to built-in defaults.
-        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -521,11 +524,176 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: nat\n"
             "  hostFileShareMode: virtiofs\n"
             "  dnsTunneling: true\n"
+            "  storagePath: C:\\wslc-data\n"
+            "experimental:\n"
+            "  portRelay: wslrelay\n"
             "credentialStore: wincred\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+    }
+
+    TEST_METHOD(Validation_PortRelay_ExplicitValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "experimental:\n"
+            "  portRelay: wslrelay\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::WslRelay), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+    }
+
+    // -----------------------------------------------------------------------
+    // session.defaultBindingAddress
+    // -----------------------------------------------------------------------
+
+    // When unset, the default binding address falls back to the empty built-in default.
+    TEST_METHOD(Validation_DefaultBindingAddress_Absent_UsesEmptyDefault)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 4\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // A valid IPv4 binding address loads without warnings.
+    TEST_METHOD(Validation_DefaultBindingAddress_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: 0.0.0.0\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("0.0.0.0"), s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // "default" magic string uses the built-in (empty) default with no warning.
+    TEST_METHOD(Validation_DefaultBindingAddress_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // An invalid address is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_DefaultBindingAddress_InvalidValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: not-an-ip\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.defaultBindingAddress"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An IPv6 literal is rejected (the default binding address is IPv4 only) and warns.
+    TEST_METHOD(Validation_DefaultBindingAddress_IPv6Rejected_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: \"::1\"\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+    }
+
+    // -----------------------------------------------------------------------
+    // session.storagePath
+    // -----------------------------------------------------------------------
+
+    // When unset, the storage path falls back to the empty built-in default (caller uses %LOCALAPPDATA%).
+    TEST_METHOD(Validation_StoragePath_Absent_UsesEmptyDefault)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 4\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A valid absolute path loads without warnings.
+    TEST_METHOD(Validation_StoragePath_AbsoluteValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: D:\\wslc\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("D:\\wslc"), s.Get<Setting::SessionStoragePath>());
+    }
+
+    // "default" magic string uses the built-in (empty) default with no warning.
+    TEST_METHOD(Validation_StoragePath_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A relative path is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_StoragePath_RelativeValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: wslc\\data\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.storagePath", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.storagePath"), s.GetWarnings().front().SettingPath);
     }
 };
 

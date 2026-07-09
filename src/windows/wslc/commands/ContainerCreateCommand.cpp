@@ -32,6 +32,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
         Argument::Create(ArgType::CIDFile),
+        Argument::Create(ArgType::Cpus),
         Argument::Create(ArgType::DNS, false, NO_LIMIT),
         // Argument::Create(ArgType::DNSDomain),
         Argument::Create(ArgType::DNSOption, false, NO_LIMIT),
@@ -45,18 +46,22 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Label, false, NO_LIMIT),
+        Argument::Create(ArgType::Memory),
         Argument::Create(ArgType::Name),
+        Argument::Create(ArgType::Network, false, NO_LIMIT),
+        Argument::Create(ArgType::NetworkAlias, false, NO_LIMIT),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Remove),
         // Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
+        Argument::Create(ArgType::StopTimeout),
         Argument::Create(ArgType::TMPFS, false, NO_LIMIT),
         Argument::Create(ArgType::TTY),
+        Argument::Create(ArgType::Ulimit, false, NO_LIMIT),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
@@ -79,7 +84,7 @@ std::wstring ContainerCreateCommand::LongDescription() const
 void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << CreateContainer;
 }

@@ -302,7 +302,7 @@ void DockerHTTPClient::StartContainer(const std::string& Id, const std::optional
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds)
+void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds)
 {
     auto url = URL::Create("/containers/{}/stop", Id);
     if (Signal.has_value())
@@ -449,6 +449,16 @@ void DockerHTTPClient::RemoveNetwork(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/networks/{}", Name));
 }
 
+void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/connect", NetworkName), Request);
+}
+
+void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
+}
+
 std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
 {
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
@@ -457,6 +467,18 @@ std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
 docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
 {
     return Transaction<docker_schema::EmptyRequest, docker_schema::Network>(verb::get, URL::Create("/networks/{}", Name));
+}
+
+docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/networks/prune");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -641,16 +663,9 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
     {
         // Otherwise keep parsing the HTTP response header.
         size_t i{};
-        for (i = 0; i < Content.size() && LineFeeds < 2; i++)
+        for (i = 0; i < Content.size() && !HeaderEnd.IsDone(); i++)
         {
-            if (Content[i] == '\n')
-            {
-                LineFeeds++;
-            }
-            else if (Content[i] != '\r')
-            {
-                LineFeeds = 0;
-            }
+            HeaderEnd.Consume(Content[i]);
         }
 
         // Feed the parser up to the end of the header.
@@ -775,16 +790,21 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
     // Parse the response header
     constexpr auto bufferSize = 16 * 1024;
+    // Docker response header max size.
+    constexpr size_t maxHeaderSize = _1MB;
     size_t Offset = 0;
     std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
     parser.eager(false);
     parser.skip(false);
 
-    size_t lineFeeds = 0;
+    HttpHeaderEndDetector headerEnd;
     // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_BUFFER_OVERFLOW), Offset >= maxHeaderSize, "HTTP response header exceeded %zu bytes", maxHeaderSize);
+
         buffer.resize(Offset + bufferSize);
 
         // Peek for the end of the HTTP header '\r\n'
@@ -793,28 +813,27 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
-        size_t i{};
-        for (i = 0; i < bytesRead + Offset && lineFeeds < 2; i++)
+        // Scan only the newly peeked bytes [Offset, Offset + bytesRead)
+        size_t i = 0;
+        for (i = Offset; i < bytesRead + Offset && !headerEnd.IsDone(); i++)
         {
-            if (buffer[i] == '\n')
-            {
-                lineFeeds++;
-            }
-            else if (buffer[i] != '\r')
-            {
-                lineFeeds = 0;
-            }
+            headerEnd.Consume(buffer[i]);
         }
 
-        // Consume the buffer from the socket.
+        WI_ASSERT(i >= Offset);
+        const size_t toConsume = i - Offset;
+
+        // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), i - Offset), m_exitingEvent);
-        WI_ASSERT(bytesRead == i - Offset);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0);
+        THROW_HR_IF(E_ABORT, bytesRead == 0); // E_ABORT case after peek but before consume
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);
 
         Offset += bytesRead;
         buffer.resize(Offset);
 
-        if (lineFeeds == 2) // Header is complete, feed it to the parser.
+        if (headerEnd.IsDone()) // Header is complete, feed it to the parser.
         {
 
 #ifdef WSLC_HTTP_DEBUG

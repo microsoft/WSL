@@ -2147,7 +2147,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
             L"[wsl2]\n");
         validateWarnings(
             L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
@@ -2166,7 +2166,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
@@ -2289,6 +2289,67 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
         VERIFY_ARE_EQUAL(L"1\n", output);
         VERIFY_ARE_EQUAL(L"", warnings);
+    }
+
+    WSL2_TEST_METHOD(DmesgCollection)
+    {
+        const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
+        WslConfigChange config(LxssGenerateTestConfig({}));
+
+        auto readDmesgLog = [&](uint64_t offset) -> std::string {
+            wil::unique_hfile file(CreateFileW(
+                dmesgLogFile.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            if (!file)
+            {
+                return {};
+            }
+
+            LARGE_INTEGER fileOffset{};
+            fileOffset.QuadPart = static_cast<LONGLONG>(offset);
+            THROW_LAST_ERROR_IF(!SetFilePointerEx(file.get(), fileOffset, nullptr, FILE_BEGIN));
+
+            return ReadToString(file.get());
+        };
+
+        auto fileSize = [&]() -> uint64_t {
+            WIN32_FILE_ATTRIBUTE_DATA attributes{};
+            if (!GetFileAttributesExW(dmesgLogFile.c_str(), GetFileExInfoStandard, &attributes))
+            {
+                return 0;
+            }
+
+            return (static_cast<uint64_t>(attributes.nFileSizeHigh) << 32) | attributes.nFileSizeLow;
+        };
+
+        auto expectInDmesg = [&](bool earlyBootLogging, const std::string_view& expectedLine) -> std::string {
+            config.Update(LxssGenerateTestConfig({.earlyBootLogging = earlyBootLogging, .debugConsoleLogFile = dmesgLogFile}));
+
+            const auto offset = fileSize();
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/bin/true"), 0L);
+
+            return wsl::shared::retry::RetryWithTimeout<std::string>(
+                [&]() {
+                    auto content = readDmesgLog(offset);
+                    THROW_HR_IF(E_FAIL, content.find(expectedLine) == std::string::npos);
+
+                    return content;
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(120));
+        };
+
+        // 'Linux version' is printed during early boot. 'brd: module loaded' is printed after transitioning to the virtio console.
+        {
+            auto dmesg = expectInDmesg(true, "brd: module loaded");
+            VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
+        }
+
+        {
+            auto dmesg = expectInDmesg(false, "brd: module loaded");
+            VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
+        }
     }
 
     WSL2_TEST_METHOD(GuiApplications)
@@ -3048,6 +3109,79 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
+    WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
+    {
+        // Regression test for #40716: if the VHD's owner is BUILTIN\Administrators
+        // (as happens after a cross-volume MoveFileEx from an elevated context),
+        // the move must still succeed because setVhdOwner runs as SYSTEM.
+        constexpr auto name = L"move-admin-owner-test-distro";
+        constexpr auto firstFolder = L"move-admin-owner-first";
+        constexpr auto secondFolder = L"move-admin-owner-second";
+
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(firstFolder);
+            std::filesystem::remove_all(secondFolder);
+        });
+
+        // Move to first folder so we know where the VHD is.
+        WslShutdown();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, firstFolder)), 0L);
+
+        auto vhdPath = std::format(L"{}\\ext4.vhdx", firstFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        // Simulate cross-volume MoveFileEx side-effect: change VHD owner to BUILTIN\Administrators.
+        {
+            BYTE adminsSidBuffer[SECURITY_MAX_SID_SIZE];
+            DWORD sidSize = sizeof(adminsSidBuffer);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidBuffer, &sidSize));
+
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(vhdPath.c_str()), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, adminsSidBuffer, nullptr, nullptr, nullptr));
+
+            // Verify it took effect.
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                vhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidBuffer));
+        }
+
+        // Now move again as non-elevated. Before the fix, this would fail with E_ACCESSDENIED
+        // because CreateFileW(WRITE_OWNER) was called under user impersonation.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        WslShutdown();
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, secondFolder), nullptr, nullptr, nullptr, nonElevatedToken.get()), 0L);
+
+        auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
+
+        // Verify the VHD owner was preserved. The code reads the owner before
+        // MoveFileEx and restores it afterward. Since we set the owner to
+        // Administrators before this move, it should still be Administrators.
+        {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                newVhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            BYTE adminsSidCheck[SECURITY_MAX_SID_SIZE] = {};
+            DWORD sidSize = sizeof(adminsSidCheck);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidCheck, &sidSize));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidCheck));
+        }
+
+        // Validate distro still works.
+        WslShutdown();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+    }
+
     WSL2_TEST_METHOD(Resize)
     {
         constexpr auto name = L"resize-test-distro";
@@ -3429,7 +3563,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 {NetworkingConfiguration::Nat, NetworkingConfiguration::Nat},
                 {NetworkingConfiguration::Bridged, NetworkingConfiguration::Bridged},
                 {NetworkingConfiguration::Mirrored, NetworkingConfiguration::Mirrored},
-                {NetworkingConfiguration::VirtioProxy, NetworkingConfiguration::VirtioProxy},
+                {NetworkingConfiguration::Consomme, NetworkingConfiguration::Consomme},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
@@ -7312,6 +7446,71 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
+    }
+
+    TEST_METHOD(DownloadToHiddenSystemTempFolder)
+    {
+        // Avoid contaminating the real temp folder.
+        const auto testTempFolder = std::filesystem::temp_directory_path() / L"wsl-download-test";
+        std::filesystem::create_directories(testTempFolder);
+        auto cleanupTempFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(testTempFolder, error);
+        });
+
+        const auto originalAttributes = GetFileAttributesW(testTempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(testTempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM));
+
+        ScopedEnvVariable temp(L"TEMP", testTempFolder.wstring());
+        ScopedEnvVariable tmp(L"TMP", testTempFolder.wstring());
+
+        VERIFY_IS_TRUE(std::filesystem::equivalent(std::filesystem::temp_directory_path(), testTempFolder));
+
+        constexpr USHORT port = 6666;
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", port);
+        constexpr auto fileName = L"downloaded-file.bin";
+        constexpr auto fileContent = L"wsl download test content";
+        UniqueWebServer server(endpoint.c_str(), fileContent);
+
+        const auto url = endpoint + fileName;
+        const auto noProgress = [](uint64_t, uint64_t) {};
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket probe{socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+                THROW_LAST_ERROR_IF(!probe);
+
+                sockaddr_in address{};
+                address.sin_family = AF_INET;
+                address.sin_port = htons(port);
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+                THROW_LAST_ERROR_IF(connect(probe.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+            },
+            std::chrono::milliseconds(500),
+            std::chrono::seconds(5));
+
+        const auto firstPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        auto readFile = [](const std::filesystem::path& Path) {
+            std::ifstream file(Path, std::ios::binary);
+            VERIFY_IS_TRUE(file.good());
+            return std::string{std::istreambuf_iterator<char>(file), {}};
+        };
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).filename().wstring(), std::wstring(fileName));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_ARE_EQUAL(readFile(firstPath), wsl::shared::string::WideToMultiByte(fileContent));
+
+        const auto secondPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).filename().wstring(), std::wstring(L"downloaded-file (2).bin"));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_IS_TRUE(std::filesystem::exists(secondPath));
+        VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
     }
 
 }; // namespace UnitTests

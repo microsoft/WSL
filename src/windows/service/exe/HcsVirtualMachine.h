@@ -24,6 +24,8 @@ Abstract:
 #include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
+#include <optional>
+#include <string>
 
 #define MAX_VHD_COUNT 254
 
@@ -46,6 +48,11 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(MapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) override;
+    IFACEMETHOD(UnmapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:
     struct DiskInfo
@@ -84,12 +91,11 @@ private:
     std::wstring m_swiotlbOption;
 
     wil::unique_socket m_listenSocket;
+    wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     std::optional<wsl::core::Config> m_natConfig;
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
-
-    wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;
@@ -102,7 +108,51 @@ private:
     std::atomic<bool> m_vmSavedStateCaptured = false;
     std::atomic<bool> m_crashLogCaptured = false;
 
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
+    // Termination reason and details, cached in OnExit before m_vmExitEvent is signaled and never
+    // modified afterward. Publication relies on the event: readers (GetTerminationReason) only access
+    // these after observing m_vmExitEvent signaled, so no lock is needed. Keeping them lock-free also
+    // avoids contending for m_lock from the HCS exit callback, which the destructor holds while the
+    // callback is drained.
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
+};
+
+//
+// WSLCVirtualMachineFactory - Implements IWSLCVirtualMachineFactory.
+//
+// Owns a deep copy of the WSLCSessionSettings needed to construct a VM and creates a
+// fresh HcsVirtualMachine on demand. This lets the per-user session recreate a VM that
+// was idle-terminated, without the SYSTEM service holding a VM up front.
+//
+class WSLCVirtualMachineFactory
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
+{
+public:
+    explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);
+
+    IFACEMETHOD(CreateVirtualMachine)(_Out_ IWSLCVirtualMachine** Vm) override;
+
+private:
+    // Rebuilds a WSLCSessionSettings that points at this factory's owned storage.
+    // The returned struct is only valid while this factory is alive.
+    WSLCSessionSettings BuildSettings();
+
+    std::wstring m_displayName;
+    std::wstring m_storagePath;
+    std::optional<std::wstring> m_rootVhdOverride;
+    std::optional<std::string> m_rootVhdTypeOverride;
+
+    // Duplicated dmesg sink (best-effort): only the first VM is guaranteed a live sink;
+    // subsequent VMs reuse this duplicate, whose writes simply fail if the sink is gone.
+    wil::unique_handle m_dmesgOutput;
+
+    ULONGLONG m_maximumStorageSizeMb{};
+    ULONG m_cpuCount{};
+    ULONG m_memoryMb{};
+    ULONG m_bootTimeoutMs{};
+    WSLCNetworkingMode m_networkingMode{};
+    WSLCFeatureFlags m_featureFlags{};
+    WSLCSessionStorageFlags m_storageFlags{};
 };
 
 } // namespace wsl::windows::service::wslc

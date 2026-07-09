@@ -63,6 +63,7 @@ public:
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddPrimaryNetworkAlias(const std::string& Alias);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
     RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -74,6 +75,7 @@ public:
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
+    void SetStopTimeout(LONG Timeout);
     void SetShmSize(int64_t ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
@@ -86,6 +88,7 @@ public:
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
+    using WSLCProcessLauncher::SetTtySize;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 
@@ -101,6 +104,7 @@ private:
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
+    std::optional<LONG> m_stopTimeout;
     int64_t m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;
@@ -109,6 +113,7 @@ private:
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
     std::vector<std::string> m_additionalNetworks;
+    std::vector<std::string> m_primaryNetworkAliases;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;

@@ -952,13 +952,17 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
 
     // Restore the original VHD owner on the moved file.
+    // Run as self (SYSTEM) for both the file open and the SetSecurityInfo call,
+    // because after a cross-volume MoveFileEx the new file's owner may be
+    // BUILTIN\Administrators and the impersonated user token may lack WRITE_OWNER.
     auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
+        auto runAsSelf = wil::run_as_self();
+        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
+
         wil::unique_hfile vhdHandle(CreateFileW(
             vhdPath.c_str(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
         THROW_LAST_ERROR_IF(!vhdHandle);
 
-        auto runAsSelf = wil::run_as_self();
-        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
         THROW_IF_WIN32_ERROR(
             ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
     };
@@ -1039,7 +1043,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
         static_assert((RTL_NUMBER_OF(current->DistroName) - 1) == LX_INIT_DISTRO_NAME_MAX);
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
-        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName) - 1, configuration.Name.c_str());
+        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
     }
 
     *DistributionCount = numberOfDistributions;
@@ -3206,10 +3210,20 @@ try
 
     // Attach the disk to the VM, reusing the same LUN if possible.
     //
-    // N.B. The user token is not provided because the key that holds the disk
-    // state can only be written by elevated users.
+    // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
+    // registry key, so the disk being restored here was mounted earlier in this same boot
+    // by this same user. For a VHD we therefore pass the user token so the access grant and
+    // the path resolution run under the mounting user's identity: a privileged operation can
+    // only ever touch a file that user can already reach, which closes the restore-time
+    // junction/symlink swap (TOCTOU) without re-resolving the path as SYSTEM.
+    //
+    // A pass-through (raw block device) attach is elevation-gated and the reconnecting user
+    // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
+    // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
+    // against.
     auto lun = std::stoul(LunStr);
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, nullptr);
+    const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
+    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))
@@ -4088,6 +4102,14 @@ try
         // We only add uppercase as there is no standard environment variable for PAC proxies.
         // This at least makes the PAC url available to the user in case they wish to use it.
         environment.emplace_back(std::format("{}={}", c_pacProxy, proxySettings.PacUrl));
+
+        // When PAC is used, the reply only populates the proxy field.
+        // Set both envs to this value as best effort since PAC is not functional in headless Linux.
+        if (proxySettings.SecureProxy.empty() && !proxySettings.Proxy.empty())
+        {
+            environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.Proxy));
+            environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.Proxy));
+        }
     }
 }
 CATCH_LOG()

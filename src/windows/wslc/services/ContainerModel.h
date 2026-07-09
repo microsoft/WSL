@@ -38,6 +38,7 @@ struct ContainerOptions
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
+    std::optional<int> StopTimeout{};
     std::optional<int64_t> ShmSize{};
     bool Gpu = false;
     std::vector<std::string> Ports;
@@ -50,9 +51,14 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
+    std::vector<std::string> Networks;
+    std::vector<std::string> NetworkAliases;
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
     std::optional<std::wstring> CidFile{};
+    std::optional<int64_t> MemoryBytes{};
+    std::optional<int64_t> NanoCpus{};
+    std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
 };
 
 struct CreateContainerResult
@@ -62,10 +68,8 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONG DefaultTimeout = -1;
-
     WSLCSignal Signal = WSLCSignalNone;
-    LONG Timeout = DefaultTimeout;
+    LONG Timeout = WSLC_STOP_TIMEOUT_DEFAULT;
 };
 
 struct PruneContainersResult

@@ -28,7 +28,6 @@ std::vector<Argument> ContainerKillCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Signal),
     };
 }
@@ -47,7 +46,7 @@ std::wstring ContainerKillCommand::LongDescription() const
 void ContainerKillCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << KillContainers;
 }
 // clang-format on

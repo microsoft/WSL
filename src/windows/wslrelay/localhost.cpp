@@ -291,15 +291,11 @@ try
 {
     // Begin accepting connections until the relay is stopped.
 
-    const int AddressFamily = WindowsAddressFamily(Arguments->Family);
-
     for (;;)
     {
-        wil::unique_socket InetSocket(WSASocket(AddressFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        THROW_LAST_ERROR_IF(!InetSocket);
-
-        if (!wsl::windows::common::socket::CancellableAccept(
-                Arguments->ListenSocket.get(), InetSocket.get(), INFINITE, Arguments->ExitEvent.get()))
+        auto InetSocket =
+            wsl::windows::common::socket::CancellableAccept(Arguments->ListenSocket.get(), INFINITE, Arguments->ExitEvent.get());
+        if (!InetSocket)
         {
             break; // Exit event was signaled, exit.
         }
@@ -308,7 +304,7 @@ try
 
         WSL_LOG("PortRelayUsage", TraceLoggingValue(Arguments->Family, "family"), TraceLoggingValue(Arguments->Port, "port"), TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-        auto RelayThread = std::thread([Arguments, InetSocket = std::move(InetSocket)]() {
+        auto RelayThread = std::thread([Arguments, InetSocket = std::move(*InetSocket)]() {
             try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"Port relay");
@@ -597,7 +593,7 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
         {
             if (it != ports.end())
             {
-                result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
                 continue;
             }
             else
@@ -619,6 +615,12 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                 catch (...)
                 {
                     result = wil::ResultFromCaughtException();
+                    if (result == HRESULT_FROM_WIN32(WSAEACCES))
+                    {
+                        // Translate WSAEACCES to WSAEADDRINUSE to match the virtionet behavior.
+                        result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
+                    }
+
                     continue;
                 }
             }

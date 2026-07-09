@@ -131,6 +131,61 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_NotFound)
+    {
+        auto result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_Valid)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_MixedFoundNotFound)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {} {}", TestVolumeName, TestVolumeName2));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_VolumeInUse_Fail)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        // Create a container that uses the volume to ensure it's in use
+        result = RunWslc(std::format(
+            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
+            L"infinity\"",
+            WslcContainerName,
+            TestVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // --force does not bypass in-use checks, volume should still fail to be removed
+        result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName),
+             .ExitCode = 1});
+
+        VerifyVolumeIsListed(TestVolumeName);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -176,9 +231,9 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"            //
-                << L"  -?,--help      Shows help about the selected command\r\n" //
+        options << L"The following options are available:\r\n"                       //
+                << L"  -f,--force     Do not error if the volume does not exist\r\n" //
+                << L"  -?,--help      Shows help about the selected command\r\n"     //
                 << L"\r\n";
         return options.str();
     }
