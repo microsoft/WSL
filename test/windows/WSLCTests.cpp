@@ -3693,7 +3693,6 @@ class WSLCTests
         static constexpr auto mountPoint = "/virtiofs-ownership-test";
 
         VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), mountPoint, false));
-        auto unmount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session->UnmountWindowsFolder(mountPoint); });
 
         // Create a file and chown to uid 1000:100, then verify ownership is preserved.
         // Without the 'metadata' option on the virtiofs share, chown appears to succeed but
@@ -3719,6 +3718,8 @@ class WSLCTests
             0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
+
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint));
     }
 
     // Validates that VirtioFs shares are reused across mount/unmount cycles for the same Windows folder.
