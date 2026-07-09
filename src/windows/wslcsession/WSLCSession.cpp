@@ -44,7 +44,7 @@ constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
-// session's settings.yaml does not override it). This avoids thrashing the VM (repeated
+// session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
 // teardown/recreate) when containers are created and destroyed, or operations issued, in quick
 // succession. The clock restarts whenever the VM is observed to be non-idle, so a full grace period
 // of continuous idleness is required before teardown.
