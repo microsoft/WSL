@@ -3411,7 +3411,9 @@ class WSLCTests
         // Install socat in the VM.
         {
             constexpr auto c_mountPoint = "/testdata";
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(g_testDataPath.c_str(), c_mountPoint, true));
+            auto mountSource = std::filesystem::absolute(g_testDataPath);
+
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true));
             auto unmount =
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
 

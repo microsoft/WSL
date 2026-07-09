@@ -26,7 +26,7 @@ function Get-LatestRpmUrl {
     $letter = $Package.Substring(0, 1).ToLowerInvariant()
     $listingUrl = "$RepoUrl/$Arch/Packages/$letter/"
 
-    $listing = curl.exe -sSL $listingUrl
+    $listing = curl.exe --fail -sSL $listingUrl
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to list packages at $listingUrl"
     }
