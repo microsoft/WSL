@@ -553,14 +553,10 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Networks.reserve(options.Networks.size() + networks.size());
         for (const auto& value : networks)
         {
-            const auto parsed = validation::ParseNetworkArgument(value);
+            auto parsed = validation::ParseNetworkArgument(value);
             auto& network = options.Networks.emplace_back();
-            network.Name = WideToMultiByte(parsed.Name);
-            network.Aliases.reserve(parsed.Aliases.size());
-            for (const auto& alias : parsed.Aliases)
-            {
-                network.Aliases.emplace_back(WideToMultiByte(alias));
-            }
+            network.Name = parsed.Name;
+            network.Aliases = std::move(parsed.Aliases);
         }
     }
 

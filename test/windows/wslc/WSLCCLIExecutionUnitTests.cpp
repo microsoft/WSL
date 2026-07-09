@@ -534,7 +534,25 @@ class WSLCCLIExecutionUnitTests
 
     TEST_METHOD(CreateCommand_ParseNetworkUnsupportedOption_ThrowsArgumentException)
     {
-        auto invocation = CreateInvocationFromCommandLine(L"wslc --network aliases=a ubuntu sh");
+        auto invocation = CreateInvocationFromCommandLine(
+            L"wslc --network name=net1,driver-opt=com.docker.network.endpoint.sysctls="
+            L"net.ipv4.conf.IFNAME.log_martians=1 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage =
+                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"driver-opt");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkUnknownOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,aliases=a ubuntu sh");
 
         ContainerCreateCommand command{L""};
         CLIExecutionContext context;
@@ -544,6 +562,22 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
                 const auto expectedMessage =
                     wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"aliases");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkBackendAliasesOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,Aliases=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage =
+                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"Aliases");
                 return exception.Message() == expectedMessage;
             });
     }
@@ -572,7 +606,10 @@ class WSLCCLIExecutionUnitTests
         command.ParseArguments(invocation, context.Args);
 
         VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkAliasEmptyError(L"network");
+                return exception.Message() == expectedMessage;
+            });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkEmptyValue_ThrowsArgumentException)

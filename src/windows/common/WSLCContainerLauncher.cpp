@@ -407,15 +407,15 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
     // Aliases for the primary endpoint.
-    std::vector<KeyValuePair> aliasKvps;
-    aliasKvps.reserve(m_primaryNetworkAliases.size());
+    std::vector<KeyValuePair> primarySettings;
+    primarySettings.reserve(m_primaryNetworkAliases.size());
     for (const auto& alias : m_primaryNetworkAliases)
     {
-        aliasKvps.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
     }
 
-    options.ContainerNetwork.Settings = aliasKvps.empty() ? nullptr : aliasKvps.data();
-    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(aliasKvps.size());
+    options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(primarySettings.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

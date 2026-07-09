@@ -89,23 +89,12 @@ std::pair<std::string, std::string> ParseLabel(const std::wstring& value);
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value);
 std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
-enum class NetworkArgumentParseError
-{
-    None,
-    EmptyNetworkName,
-    EmptyAlias,
-    DuplicateNetworkName,
-    UnsupportedOption,
-};
-
 struct ParsedNetworkArgument
 {
-    std::wstring Name;
-    std::vector<std::wstring> Aliases;
-    NetworkArgumentParseError Error = NetworkArgumentParseError::None;
-    std::wstring ErrorValue;
+    std::string Name;
+    std::vector<std::string> Aliases;
 };
 
-ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value);
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName = {});
 
 } // namespace wsl::windows::wslc::validation

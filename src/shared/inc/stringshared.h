@@ -13,14 +13,19 @@ Abstract:
 --*/
 
 #pragma once
+#include <algorithm>
+#include <cctype>
+#include <cwctype>
 #include <set>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <fstream>
 #include <gsl/gsl>
 #include <format>
 #include <source_location>
+#include <type_traits>
 
 #ifndef WIN32
 #include <string.h>
@@ -93,6 +98,27 @@ inline std::vector<std::basic_string<T>> Split(const std::basic_string<T>& Strin
         {
             Output.emplace_back(std::move(Entry));
         }
+    }
+
+    return Output;
+}
+
+template <class T>
+inline std::vector<std::basic_string_view<T>> SplitPreserveEmpty(const std::basic_string_view<T> String, T Separator)
+{
+    std::vector<std::basic_string_view<T>> Output;
+    size_t Start = 0;
+    while (Start <= String.size())
+    {
+        const auto End = String.find(Separator, Start);
+        if (End == std::basic_string_view<T>::npos)
+        {
+            Output.emplace_back(String.substr(Start));
+            break;
+        }
+
+        Output.emplace_back(String.substr(Start, End - Start));
+        Start = End + 1;
     }
 
     return Output;
@@ -309,6 +335,21 @@ inline bool IsEqual(const std::wstring_view String1, const std::wstring_view Str
     }
 
     return (Compare(String1, String2, CaseInsensitive) == String1.size());
+}
+
+template <class T>
+inline bool IsEmptyOrWhitespace(const std::basic_string_view<T> String)
+{
+    return String.empty() || std::all_of(String.begin(), String.end(), [](T Ch) {
+               if constexpr (std::is_same_v<T, wchar_t>)
+               {
+                   return std::iswspace(static_cast<wint_t>(Ch));
+               }
+               else
+               {
+                   return std::isspace(static_cast<unsigned char>(Ch));
+               }
+           });
 }
 
 template <typename T>

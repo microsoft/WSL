@@ -263,8 +263,9 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
             THROW_HR_WITH_USER_ERROR_IF(
                 E_INVALIDARG,
                 Localization::MessageWslcAliasEmpty(),
-                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
+                wsl::shared::string::IsEmptyOrWhitespace(std::string_view{alias}));
         }
+
         config.Aliases = std::move(it->second);
     }
 

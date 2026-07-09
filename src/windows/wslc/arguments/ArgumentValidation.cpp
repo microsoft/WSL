@@ -154,34 +154,6 @@ static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
     {L"SIGPOLL", WSLCSignalSIGPOLL}, {L"SIGPWR", WSLCSignalSIGPWR},     {L"SIGSYS", WSLCSignalSIGSYS},
 };
 
-namespace {
-    std::vector<std::wstring_view> SplitPreserveEmpty(std::wstring_view value, wchar_t delimiter)
-    {
-        std::vector<std::wstring_view> parts;
-        size_t start = 0;
-        while (start <= value.size())
-        {
-            const auto end = value.find(delimiter, start);
-            if (end == std::wstring_view::npos)
-            {
-                parts.emplace_back(value.substr(start));
-                break;
-            }
-
-            parts.emplace_back(value.substr(start, end - start));
-            start = end + 1;
-        }
-
-        return parts;
-    }
-
-    bool IsEmptyOrWhitespace(std::wstring_view value)
-    {
-        return value.empty() ||
-               std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); });
-    }
-} // namespace
-
 void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
 {
     for (const auto& value : values)
@@ -212,25 +184,8 @@ void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring
 {
     for (const auto& value : values)
     {
-        const auto parsed = ParseNetworkArgument(value);
-        if (parsed.Error == NetworkArgumentParseError::EmptyNetworkName)
-        {
-            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
-        }
-        else if (parsed.Error == NetworkArgumentParseError::EmptyAlias)
-        {
-            throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
-        }
-        else if (parsed.Error == NetworkArgumentParseError::DuplicateNetworkName)
-        {
-            throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
-        }
-        else if (parsed.Error == NetworkArgumentParseError::UnsupportedOption)
-        {
-            throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, parsed.ErrorValue));
-        }
-
-        if (IsEqual(parsed.Name, L"host", true))
+        const auto parsed = ParseNetworkArgument(value, argName);
+        if (IsEqual(parsed.Name, "host", true))
         {
             throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
         }
@@ -539,7 +494,7 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
     return {WideToMultiByte(input.substr(0, equalsPos)), soft, hard};
 }
 
-ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
 {
     ParsedNetworkArgument result;
 
@@ -548,11 +503,9 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
         for (const auto part : SplitPreserveEmpty(options, L','))
         {
             const auto separator = part.find(L'=');
-            if (separator == std::wstring_view::npos)
+            if (separator == std::wstring_view::npos || separator == 0)
             {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = std::wstring{part};
-                return;
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{part}));
             }
 
             const auto key = part.substr(0, separator);
@@ -561,29 +514,30 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
             {
                 if (parsedName)
                 {
-                    result.Error = NetworkArgumentParseError::DuplicateNetworkName;
-                    result.ErrorValue = std::wstring{key};
-                    return;
+                    throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
                 }
 
                 parsedName = true;
-                result.Name = std::wstring{optionValue};
+                result.Name = WideToMultiByte(optionValue);
             }
             else if (key == L"alias")
             {
-                result.Aliases.emplace_back(optionValue);
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
+                }
+
+                result.Aliases.emplace_back(WideToMultiByte(optionValue));
             }
             else
             {
-                result.Error = NetworkArgumentParseError::UnsupportedOption;
-                result.ErrorValue = std::wstring{key};
-                return;
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{key}));
             }
         }
 
         if (requireName && !parsedName)
         {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
         }
     };
 
@@ -593,25 +547,12 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value)
     }
     else
     {
-        result.Name = std::wstring{value};
+        result.Name = WideToMultiByte(value);
     }
 
-    if (result.Error == NetworkArgumentParseError::None)
+    if (IsEmptyOrWhitespace(std::string_view{result.Name}))
     {
-        if (IsEmptyOrWhitespace(result.Name))
-        {
-            result.Error = NetworkArgumentParseError::EmptyNetworkName;
-            return result;
-        }
-
-        for (const auto& alias : result.Aliases)
-        {
-            if (IsEmptyOrWhitespace(alias))
-            {
-                result.Error = NetworkArgumentParseError::EmptyAlias;
-                return result;
-            }
-        }
+        throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
     }
 
     return result;
