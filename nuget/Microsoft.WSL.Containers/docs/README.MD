@@ -78,7 +78,12 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
              Dockerfile="container/Dockerfile"
              Context="container/"
              Sources="container/src/**"
-             TarLocation="$(OutDir)my-server.tar" />
+             TarLocation="$(OutDir)my-server.tar"
+             BuildArgs="VERSION=1.2.3;COMMIT=abcdef"
+             Labels="org.opencontainers.image.source=https://example.com/repo"
+             Pull="true"
+             NoCache="false"
+             Verbose="false" />
 </ItemGroup>
 ```
 
@@ -89,6 +94,11 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
 | `Context` | Yes | Build context directory |
 | `Sources` | No | Glob patterns for incremental rebuild tracking (defaults to all files in `Context`) |
 | `TarLocation` | No | Output path for the saved `.tar` (defaults to `$(OutDir)<name>.tar`) |
+| `BuildArgs` | No | Semicolon-separated `KEY=VALUE` build-time variables (each forwarded as `--build-arg`) |
+| `Labels` | No | Semicolon-separated `KEY=VALUE` image labels (each forwarded as `--label`) |
+| `Pull` | No | `true` to always attempt to pull a newer base image (`--pull`) |
+| `NoCache` | No | `true` to build without the layer cache (`--no-cache`) |
+| `Verbose` | No | `true` to emit verbose build output (`--verbose`) |
 
 **Optional MSBuild properties:**
 
@@ -97,7 +107,6 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
 | `WslcCliPath` | `wslc` | Path to the `wslc` CLI executable |
 | `WslcPruneAfterBuild` | `false` | Run `wslc image prune` after each successful build |
 | `WslcTreatPruneFailureAsError` | `false` | Fail the build if the post-build prune fails |
-| `WslcPlatform` | `$(Platform)` | Override the detected platform (x64 or arm64) |
 
 ### CMake
 
@@ -110,12 +119,35 @@ wslc_add_image(my-server
     CONTEXT      container/
     SOURCES      container/src/*.cpp container/src/*.h
     TAR_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/my-server.tar
+    BUILD_ARGS   VERSION=1.2.3 COMMIT=abcdef
+    LABELS       org.opencontainers.image.source=https://example.com/repo
+    PULL
 )
 
 add_dependencies(my_app my-server)
 ```
 
-Set `WSLC_CLI_PATH` to override the `wslc` executable location. Pass `PRUNE_AFTER_BUILD` to prune dangling images after each build.
+| Argument | Required | Description |
+|---|---|---|
+| `<target>` | Yes | Name of the CMake target to create (first positional argument) |
+| `IMAGE` | Yes | Container image reference (`:latest` appended if no tag) |
+| `DOCKERFILE` | Yes | Path to the Dockerfile |
+| `CONTEXT` | Yes | Build context directory |
+| `SOURCES` | No | Files or glob patterns for incremental rebuild tracking (defaults to all files in `CONTEXT`) |
+| `TAR_LOCATION` | No | Output path for the saved `.tar` (defaults to `${CMAKE_CURRENT_BINARY_DIR}/<target>.tar`) |
+| `BUILD_ARGS` | No | `KEY=VALUE` build-time variables (each forwarded as `--build-arg`) |
+| `LABELS` | No | `KEY=VALUE` image labels (each forwarded as `--label`) |
+| `PULL` | No | Always attempt to pull a newer base image (`--pull`) |
+| `NO_CACHE` | No | Build without the layer cache (`--no-cache`) |
+| `VERBOSE` | No | Emit verbose build output (`--verbose`) |
+
+**Project-wide CMake variables:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `WSLC_CLI_PATH` | Found on `PATH` | Path to the `wslc` CLI executable |
+| `WSLC_PRUNE_AFTER_BUILD` | `OFF` | Run `wslc image prune` after each successful build |
+| `WSLC_TREAT_PRUNE_FAILURE_AS_ERROR` | `OFF` | Fail the build if the post-build prune fails |
 
 ---
 

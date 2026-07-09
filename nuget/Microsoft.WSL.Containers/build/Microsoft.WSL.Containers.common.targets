@@ -15,12 +15,19 @@
         <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
     </PropertyGroup>
 
-    <!-- Default metadata for WslcImage items. Image is the full ref;
-         ':latest' is appended automatically when no tag is given. -->
+    <!-- Default values for optional WslcImage metadata. Pull/NoCache/Verbose
+         default to false (flag off); Image/TarLocation/BuildArgs/Labels default
+         to empty. Required metadata (Dockerfile, Context) is intentionally not
+         defaulted here so _WslcValidateItems reports it as missing. -->
     <ItemDefinitionGroup>
         <WslcImage>
             <Image></Image>
             <TarLocation></TarLocation>
+            <BuildArgs></BuildArgs>
+            <Labels></Labels>
+            <Pull>false</Pull>
+            <NoCache>false</NoCache>
+            <Verbose>false</Verbose>
         </WslcImage>
     </ItemDefinitionGroup>
 
@@ -75,7 +82,7 @@
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildAndSaveSingleImage"
                  StopOnFirstFailure="true"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcBuildArgs=$([MSBuild]::Escape('%(WslcImage.BuildArgs)'));_WslcLabels=$([MSBuild]::Escape('%(WslcImage.Labels)'));_WslcPull=%(WslcImage.Pull);_WslcNoCache=%(WslcImage.NoCache);_WslcVerbose=%(WslcImage.Verbose)" />
     </Target>
 
     <!--
@@ -129,10 +136,26 @@
         <MakeDir Directories="$(_WslcIntDir)" />
         <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
 
+        <ItemGroup>
+            <_WslcBuildArgItems Include="$([MSBuild]::Unescape('$(_WslcBuildArgs)').Split(';'))" Condition="'$(_WslcBuildArgs)' != ''" />
+            <_WslcLabelItems Include="$([MSBuild]::Unescape('$(_WslcLabels)').Split(';'))" Condition="'$(_WslcLabels)' != ''" />
+        </ItemGroup>
+
+        <PropertyGroup>
+            <_WslcBuildOptions></_WslcBuildOptions>
+            <_WslcBuildOptions>$(_WslcBuildOptions) -t &quot;$(_WslcFullRef)&quot;</_WslcBuildOptions>
+            <_WslcBuildOptions Condition="'$(_WslcNoCache)' == 'true'">$(_WslcBuildOptions) --no-cache</_WslcBuildOptions>
+            <_WslcBuildOptions Condition="'$(_WslcPull)' == 'true'">$(_WslcBuildOptions) --pull</_WslcBuildOptions>
+            <_WslcBuildOptions Condition="'$(_WslcVerbose)' == 'true'">$(_WslcBuildOptions) --verbose</_WslcBuildOptions>
+            <_WslcBuildOptions Condition="'@(_WslcBuildArgItems)' != ''">$(_WslcBuildOptions) @(_WslcBuildArgItems->'--build-arg &quot;%(Identity)&quot;', ' ')</_WslcBuildOptions>
+            <_WslcBuildOptions Condition="'@(_WslcLabelItems)' != ''">$(_WslcBuildOptions) @(_WslcLabelItems->'--label &quot;%(Identity)&quot;', ' ')</_WslcBuildOptions>
+            <_WslcBuildOptions>$(_WslcBuildOptions) -f &quot;$(_WslcDockerfile)&quot;</_WslcBuildOptions>
+        </PropertyGroup>
+
         <Message Importance="high"
                  Text="WSLC: Building image '$(_WslcFullRef)'..." />
 
-        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcFullRef)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build$(_WslcBuildOptions) &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
         <Message Importance="high"
