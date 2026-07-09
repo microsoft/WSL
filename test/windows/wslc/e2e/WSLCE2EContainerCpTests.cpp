@@ -156,7 +156,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ToStoppedContainer)
@@ -193,7 +193,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagLongForm)
@@ -214,7 +214,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsTrue)
@@ -233,7 +233,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagEqualsFalse)
@@ -252,7 +252,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsTrue)
@@ -271,7 +271,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveLongFormEqualsFalse)
@@ -290,7 +290,7 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ArchiveFlagInvalidValue)
@@ -329,12 +329,11 @@ class WSLCE2EContainerCpTests
         cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Verify the file was copied.
-        const auto execResult =
-            RunWslc(std::format(L"container exec {} cat /tmp/wslc-cp-local-test.txt", WslcContainerName));
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/wslc-cp-local-test.txt", WslcContainerName));
         VERIFY_IS_TRUE(execResult.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
         VERIFY_IS_TRUE(execResult.Stdout.has_value());
-        VERIFY_ARE_EQUAL(L"local-file-content\r\n", execResult.Stdout.value());
+        VERIFY_ARE_EQUAL(L"local-file-content\n", execResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalFileNotFound)
@@ -382,8 +381,7 @@ class WSLCE2EContainerCpTests
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create the file inside the container using exec.
-        auto execResult =
-            RunWslc(std::format(L"container exec {} sh -c \"echo backslash-test > /tmp/bstest.txt\"", WslcContainerName));
+        auto execResult = RunWslc(std::format(L"container exec {} sh -c \"echo backslash-test > /tmp/bstest.txt\"", WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto downloadDir = std::filesystem::current_path() / L"wslc-cp-backslash-test";
@@ -408,8 +406,7 @@ class WSLCE2EContainerCpTests
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create the file inside the container using exec.
-        auto execResult =
-            RunWslc(std::format(L"container exec {} sh -c \"echo file-dest-test > /tmp/srcfile.txt\"", WslcContainerName));
+        auto execResult = RunWslc(std::format(L"container exec {} sh -c \"echo file-dest-test > /tmp/srcfile.txt\"", WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto targetFile = std::filesystem::current_path() / L"wslc-cp-file-dest-test" / L"renamed.txt";
