@@ -651,8 +651,6 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
-std::filesystem::path GetTestDataPath();
-
 void LoadTestImage(IWSLCSession& session, std::string_view imageName);
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
