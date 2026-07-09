@@ -66,7 +66,7 @@ struct ContainerPortMapping
     uint16_t ContainerPort{};
 };
 
-class WSLCContainerImpl
+class WSLCContainerImpl : public std::enable_shared_from_this<WSLCContainerImpl>
 {
 public:
     NON_COPYABLE(WSLCContainerImpl);
@@ -91,6 +91,8 @@ public:
         WSLCContainerFlags ContainerFlags);
 
     ~WSLCContainerImpl();
+
+    void Initialize();
 
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
@@ -127,7 +129,7 @@ public:
         return m_containerFlags;
     }
 
-    static std::unique_ptr<WSLCContainerImpl> Create(
+    static std::shared_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
         const std::string& Name,
         WSLCSession& wslcSession,
@@ -136,7 +138,7 @@ public:
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
-    static std::unique_ptr<WSLCContainerImpl> Open(
+    static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
@@ -223,11 +225,11 @@ private:
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
-      public COMImplClass<WSLCContainerImpl>
+      public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
 public:
-    WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+    WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;

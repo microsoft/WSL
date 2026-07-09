@@ -1,6 +1,6 @@
-import click
+import argparse
 import os.path
-from git import Repo
+import subprocess
 
 EXTENSIONS = ['.c', '.cpp', '.h', '.hpp', '.idl', '.resw']
 
@@ -16,14 +16,10 @@ def to_crlf(content: bytes) -> bytes:
     # Normalize every line ending (CRLF, lone CR, lone LF) to a single CRLF.
     return content.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n')
 
-@click.command()
-@click.argument('path', required=True, type=click.Path(exists=True))
-@click.option('--fix', is_flag=True, help='Convert mismatching files to CRLF line endings.')
 def main(path: str, fix: bool):
-    repo = Repo(path, search_parent_directories=True)
-
-    tracked = repo.git.ls_files('-z').split('\0')
-    source_files = [os.path.join(repo.working_tree_dir, e) for e in tracked if e and is_source_file(e)]
+    tracked = subprocess.run(
+        ['git', '-C', path, 'ls-files', '-z'], check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').split('\0')
+    source_files = [os.path.join(path, e) for e in tracked if e and is_source_file(e)]
 
     mismatches = []
     for e in source_files:
@@ -39,15 +35,20 @@ def main(path: str, fix: bool):
                 fd.write(to_crlf(content))
 
     if not mismatches:
-        click.secho('All files use CRLF line endings', fg='green')
+        print(f'All {len(source_files)} files use CRLF line endings')
         return
 
     listed = '\n'.join(mismatches)
     if fix:
-        click.secho(f'Converted {len(mismatches)} files to CRLF:\n{listed}', fg='yellow')
+        print(f'Converted {len(mismatches)} files to CRLF:\n{listed}')
     else:
-        click.secho(f'{len(mismatches)} files have non-CRLF line endings:\n{listed}', fg='red')
+        print(f'{len(mismatches)} files have non-CRLF line endings:\n{listed}')
         raise SystemExit(1)
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Validate that source files use CRLF line endings.')
+    parser.add_argument('path', help='Path to validate (must be inside the repo).')
+    parser.add_argument('--fix', action='store_true', help='Convert mismatching files to CRLF line endings.')
+    args = parser.parse_args()
+
+    main(args.path, args.fix)

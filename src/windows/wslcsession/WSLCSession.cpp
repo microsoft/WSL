@@ -3485,7 +3485,9 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
     // shared acquire behind a pending writer).
     std::lock_guard containersLock(m_containersLock);
 
-    WI_VERIFY(m_containers.erase(Container->ID()) == 1);
+    // N.B. once a container transitions to a 'Deleted' state, a call to ListContainers() can remove it from m_containers.
+    // Therefore it's possible that the container is already removed when the callback from Delete() is invoked.
+    m_containers.erase(Container->ID());
 }
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
