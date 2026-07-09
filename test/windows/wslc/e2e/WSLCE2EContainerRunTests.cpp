@@ -1136,6 +1136,102 @@ class WSLCE2EContainerRunTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthCheck)
+    {
+        // All health-check options are forwarded to the container configuration.
+        {
+            auto result = RunWslc(std::format(
+                LR"(container run -d --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {} sleep infinity)",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 0"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // Durations are reported in nanoseconds.
+            VERIFY_ARE_EQUAL(5'000'000'000LL, health.Interval.value_or(0));
+            VERIFY_ARE_EQUAL(3'000'000'000LL, health.Timeout.value_or(0));
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value_or(0));
+            VERIFY_ARE_EQUAL(2, health.Retries.value_or(0));
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When no health option is specified, no health check is forwarded.
+        {
+            auto result =
+                RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.Healthcheck.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthCheck_Invalid)
+    {
+        auto result = RunWslc(
+            std::format(L"container run --rm --health-timeout invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Invalid health-timeout argument value: 'invalid'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Healthy)
+    {
+        // A health check that always succeeds should drive the container to the "healthy" state.
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "exit 0" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "healthy");
+        VERIFY_ARE_EQUAL(0, health.FailingStreak);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(0, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Unhealthy)
+    {
+        // A health check that always fails should drive the container to the "unhealthy" state.
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "exit 1" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "unhealthy");
+        VERIFY_IS_TRUE(health.FailingStreak >= 1);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(1, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Timeout)
+    {
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "sleep 30" --health-interval 1s --health-timeout 1s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "unhealthy");
+        VERIFY_IS_TRUE(health.FailingStreak >= 1);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(-1, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus)
     {
         auto result = RunWslc(std::format(L"container run --name {} --cpus 1.5 {} true", WslcContainerName, DebianImage.NameAndTag()));

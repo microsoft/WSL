@@ -882,6 +882,97 @@ class WSLCE2EContainerCreateTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_HealthCheck)
+    {
+        // All health-check options are forwarded to the container configuration.
+        {
+            auto result = RunWslc(std::format(
+                LR"(container create --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {})",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 0"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // Durations are reported in nanoseconds.
+            VERIFY_IS_TRUE(health.Interval.has_value());
+            VERIFY_ARE_EQUAL(5'000'000'000LL, health.Interval.value());
+            VERIFY_IS_TRUE(health.Timeout.has_value());
+            VERIFY_ARE_EQUAL(3'000'000'000LL, health.Timeout.value());
+            VERIFY_IS_TRUE(health.StartPeriod.has_value());
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value());
+            VERIFY_IS_TRUE(health.Retries.has_value());
+            VERIFY_ARE_EQUAL(2, health.Retries.value());
+
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // Only --health-cmd: the command is forwarded, other fields fall back to the default.
+        {
+            auto result = RunWslc(
+                std::format(LR"(container create --health-cmd "exit 1" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 1"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When no health option is specified, no health check is forwarded.
+        {
+            auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.Healthcheck.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_HealthCheck_Invalid)
+    {
+        {
+            auto result = RunWslc(std::format(
+                L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = L"Invalid health-interval argument value: 'notaduration'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container create --health-retries abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid health-retries argument value: abc\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result = RunWslc(std::format(
+                LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        {
+            auto result = RunWslc(std::format(
+                L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_StopSignal_Invalid)
     {
         {
