@@ -25,7 +25,6 @@ Abstract:
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 #include <filesystem>
-#include <sstream>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -439,30 +438,70 @@ void ContainerCp(CLIExecutionContext& context)
 
             ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
 
-            // Step 1: List archive contents to validate it's a single file.
+            // Step 1: Pipe tar -t output and read just enough lines to classify the archive.
+            auto [listStdoutRead, listStdoutWrite] = OpenAnonymousPipe(0, true, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(listStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
             auto listCmd = std::format(L"tar.exe -tf \"{}\"", tarFile.Path.wstring());
             SubProcess listProcess(nullptr, listCmd.c_str());
-            auto listOutput = listProcess.RunAndCaptureOutput();
-            THROW_HR_IF_MSG(E_FAIL, listOutput.ExitCode != 0, "tar.exe -t exited with code %u", listOutput.ExitCode);
+            listProcess.SetStdHandles(nullptr, listStdoutWrite.get(), nullptr);
+            auto listHandle = listProcess.Start();
+            listStdoutWrite.reset();
 
-            // Validate the archive contains exactly one entry (a single file, not a directory).
+            // Read lines from tar -t output. We only need to detect:
+            // - zero entries (empty archive)
+            // - exactly one non-directory entry (single file)
+            // - anything else (directory or multi-file)
             size_t entryCount = 0;
             bool hasDirectory = false;
-            std::wistringstream listStream(listOutput.Stdout);
-            std::wstring line;
-            while (std::getline(listStream, line))
+            std::string lineBuffer;
+            char readBuf[4096];
+            DWORD bytesRead = 0;
+            bool done = false;
+            while (!done && ReadFile(listStdoutRead.get(), readBuf, sizeof(readBuf), &bytesRead, nullptr) && bytesRead > 0)
             {
-                if (line.empty())
+                for (DWORD i = 0; i < bytesRead && !done; i++)
                 {
-                    continue;
-                }
+                    if (readBuf[i] == '\n')
+                    {
+                        if (!lineBuffer.empty())
+                        {
+                            entryCount++;
+                            if (lineBuffer.back() == '/')
+                            {
+                                hasDirectory = true;
+                            }
 
+                            // We can stop early: directory entry or second entry means not a single file.
+                            if (hasDirectory || entryCount > 1)
+                            {
+                                done = true;
+                            }
+
+                            lineBuffer.clear();
+                        }
+                    }
+                    else if (readBuf[i] != '\r')
+                    {
+                        lineBuffer.append(1, readBuf[i]);
+                    }
+                }
+            }
+
+            // Count trailing line without newline.
+            if (!done && !lineBuffer.empty())
+            {
                 entryCount++;
-                if (line.back() == L'/')
+                if (lineBuffer.back() == '/')
                 {
                     hasDirectory = true;
                 }
             }
+
+            listStdoutRead.reset();
+
+            // Wait for tar -t to finish (it may still be writing lines we stopped reading).
+            SubProcess::GetExitCode(listHandle.get());
 
             THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpSourceIsDirectoryError(), hasDirectory || entryCount > 1);
 
