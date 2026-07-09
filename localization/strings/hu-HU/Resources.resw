@@ -1215,7 +1215,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>A Linuxos Windows-alrendszer Gépházban a fejlesztők grafikus felhasználói felületre épülő alkalmazással kezelhetik a .wslconfig fájlt.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Automatikus memória-visszanyerés</value>
@@ -1295,13 +1295,15 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Egyéni rendszer disztribúciója</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Böngészés a disztribúciók között</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak. [További információ a rendszer disztribúcióiról itt].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1309,10 +1311,11 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Egyéni rendszer disztribúciója</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Hibakeresési konzol engedélyezése</value>
@@ -1347,6 +1350,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Fejlesztő</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Dokumentáció</value>
@@ -1846,6 +1850,7 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Fejlesztő</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Disztribúciókezelés</value>
@@ -2340,8 +2345,8 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>A „Gateway” hálózati illesztőprogram-opcióhoz a „Subnet” megadása is szükséges.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>A '--gateway' opció használatához a '--subnet' opciót is meg kell adni.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>A(z) {} hálózat aktív végpontokkal rendelkezik.</value>
@@ -2353,6 +2358,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nem támogatott hálózati mód: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Érvénytelen leállítási időkorlát érték: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2416,6 +2425,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
     <value>A(z) {} nem használható munkamenet-tárolóként, mert nem könyvtár</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Érvénytelen képcímke-formátum: „{}”. A várt formátum a következő: „name:tag”</value>
@@ -2920,6 +2933,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Jelzés a tároló leállításához</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>A tároló leállításához megadott időtúllépés másodpercben, a leállítás előtt (-1 esetén nincs időtúllépés)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>A(z) /dev/shm mérete (pl. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3088,6 +3104,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Betöltés kérelmezve, de nincs megadva bevitel.</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Betöltött kép: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>Betöltött kép azonosítója: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Hálózatok kezelése.</value>
   </data>
@@ -3107,6 +3131,17 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Hálózati metaadatok beállítása</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Korlátozza a hálózathoz való külső hozzáférést</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>CIDR formátumú alhálózat, amely egy hálózati szegmenst jelöl</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Az alhálózathoz tartozó IPv4- vagy IPv6-átjáró</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Távolítson el egy vagy több hálózatot.</value>
@@ -3351,6 +3386,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Nem sikerült leválasztani a(z) {} kötetet: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>A(z) {} kötet nem üres Talált ('lost+found') elemek könyvtárat tartalmaz. A helyén maradt, és előfordulhat, hogy a kötetet nem lehet a kép tartalmával kiosztani.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Nem sikerült leállítani a(z) {} tárolót a beépülő modul elutasítása után</value>

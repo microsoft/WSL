@@ -1215,7 +1215,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>Linux için Windows Alt Sistemi Ayarları, geliştiricilerin gui tabanlı .wslconfig kullanarak bu dosyayı yönetmesini sağlar.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Otomatik bellek geri kazanma</value>
@@ -1295,13 +1295,15 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Özel sistem dağıtımı</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Dağıtımlara gözat</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Öncelikle WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı olarak yüklenecek bir VHD'ye giden yolu belirtin. [Buradan sistem dağıtımları hakkında daha fazla bilgi edinin].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1309,10 +1311,11 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Özel sistem dağıtımı</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Öncelikli olarak WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı şeklinde yüklenecek VHD'ye giden yolu belirtin.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Hata ayıklama konsolunu etkinleştir</value>
@@ -1347,6 +1350,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Geliştirici</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Belgeler</value>
@@ -1846,6 +1850,7 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Geliştirici</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Dağıtım Yönetimi</value>
@@ -2340,8 +2345,8 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Ağ sürücüsü seçeneği 'Gateway' için 'Subnet' de belirtilmelidir.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>'--gateway' seçeneği için '--subnet' seçeneğinin de belirtilmesi gerekir.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>'{}' ağının etkin uç noktaları var.</value>
@@ -2353,6 +2358,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Geçersiz durdurma zaman aşımı değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2416,6 +2425,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
     <value>'{}' bir dizin olmadığından oturum depolama alanı olarak kullanılamaz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Geçersiz resim etiketi biçimi: '{}'. Beklenen biçim: 'ad:etiket'</value>
@@ -2920,6 +2933,9 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Kapsayıcıyı durdurma sinyali</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Kapsayıcıyı sonlandırmadan önce durdurmak için saniye cinsinden zaman aşımı (zaman aşımı olmaması için -1)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>/dev/shm klasörünün boyutu (örneğin 64 MB, 1 GB)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3088,6 +3104,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Yükleme istendi ancak giriş sağlanmadı.</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Yüklenen görüntü: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>Yüklenen görüntü kimliği: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Ağları yönet.</value>
   </data>
@@ -3107,6 +3131,17 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Ağ meta verisi ayarı</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Ağa dış erişimi kısıtlayın</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Bir ağ segmentini temsil eden CIDR biçimindeki alt ağ</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Alt ağ için IPv4 veya IPv6 ağ geçidi</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Bir veya birden fazla ağı kaldırın.</value>
@@ -3351,6 +3386,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>'{}' birimi çıkarılamadı: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>'{}' birimi boş olmayan bir 'lost+found' dizinine sahip. Olduğu gibi bırakıldı ve birim, görüntü içeriğiyle doldurulmamış olabilir.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Eklenti reddedildikten sonra '{}' kapsayıcısı durdurulamadı</value>

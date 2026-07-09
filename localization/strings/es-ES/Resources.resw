@@ -1221,7 +1221,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>El ajuste Subsistema de Windows para Linux permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación basada en GUI.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Recuperación automática de memoria</value>
@@ -1301,13 +1301,15 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Distribución del sistema personalizada</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Examinar distribuciones</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1315,10 +1317,11 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Distribución del sistema personalizada</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Habilitar consola de depuración</value>
@@ -1353,6 +1356,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Desarrollador</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentación</value>
@@ -1852,6 +1856,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Desarrollador</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Administración de distribuciones</value>
@@ -2346,8 +2351,8 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>La opción de controlador de red 'Gateway' requiere que también se especifique la 'Subnet'.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>La opción '--gateway' requiere que también se especifique '--subnet'.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>La red “{}” tiene puntos de conexión activos.</value>
@@ -2359,6 +2364,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Modo de red no admitido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Valor de tiempo de espera de detención no válido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2422,6 +2431,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
     <value>No se puede usar '{}' como almacenamiento de sesión porque no es un directorio</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Formato de etiqueta de imagen no válido: "{}". El formato esperado es 'name:tag'</value>
@@ -2926,6 +2939,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Señal para detener el contenedor</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Tiempo de espera (en segundos) para detener el contenedor antes de terminarlo (-1 para que no se agote el tiempo de espera)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Tamaño de /dev/shm (por ejemplo, 64 M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
@@ -3094,6 +3110,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Carga solicitada, pero no se proporcionó ninguna entrada.</value>
   </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Imagen cargada: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>Id. de imagen cargada: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Administrar redes.</value>
   </data>
@@ -3113,6 +3137,17 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Configuración de metadatos de red</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Restricción del acceso externo a la red</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Subred en formato CIDR que representa un segmento de red</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Puerta de enlace IPv4 o IPv6 para la subred</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Quita una o varias redes.</value>
@@ -3357,6 +3392,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>No se pudo desmontar el volumen '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>El volumen '{}' tiene un directorio de 'lost+found' no vacío. Se dejó en su lugar y es posible que el volumen no se inicialice con el contenido de la imagen.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>No se pudo detener el contenedor '{}' tras el rechazo del complemento</value>
