@@ -492,6 +492,14 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
+void ContainerService::Restart(Session& session, const std::string& id, StopContainerOptions options)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
+    THROW_IF_FAILED(container->Restart(options.Signal, options.Timeout, warningCallback.Get()));
+}
+
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
     wil::com_ptr<IWSLCContainer> container;

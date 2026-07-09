@@ -2130,6 +2130,10 @@ Usage:
     <value>Container '{}' is not running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerRestartAutoRemove" xml:space="preserve">
+    <value>Container '{}' was created with --rm and cannot be restarted.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--rm "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Container '{}' is running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2523,6 +2527,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
     <value>Removes containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRestartDesc" xml:space="preserve">
+    <value>Restart containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRestartLongDesc" xml:space="preserve">
+    <value>Restarts one or more containers. Running containers are stopped and started again; stopped containers are started.</value>
   </data>
   <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
     <value>Run a container.</value>

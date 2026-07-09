@@ -492,6 +492,7 @@ interface IWSLCContainer : IUnknown
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
 
 typedef struct _WSLCDeletedImageInformation

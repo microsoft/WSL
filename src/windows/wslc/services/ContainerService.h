@@ -28,6 +28,7 @@ struct ContainerService
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options);
     static int Start(models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
+    static void Restart(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force);
     static std::vector<models::ContainerInformation> List(

@@ -2534,6 +2534,40 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
         TraceLoggingValue(NetworkName, "NetworkName"));
 }
 
+void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
+{
+    // N.B. Snapshot under a brief shared lock and release before composing Stop/Start.
+    // m_lock is a non-recursive srwlock; Stop and Start each take it exclusively.
+    WSLCContainerState snapshotState{};
+    WSLCContainerFlags snapshotFlags{};
+    {
+        auto lock = m_lock.lock_shared();
+        snapshotState = m_state;
+        snapshotFlags = m_containerFlags;
+    }
+
+    // Refuse --rm before stopping: Stop -> OnStopped would delete the container.
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        Localization::MessageWslcContainerRestartAutoRemove(m_id),
+        WI_IsFlagSet(snapshotFlags, WSLCContainerFlagsRm));
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        snapshotState != WslcContainerStateRunning && snapshotState != WslcContainerStateExited && snapshotState != WslcContainerStateCreated,
+        "Cannot restart container '%hs', state %i",
+        m_id.c_str(),
+        snapshotState);
+
+    if (snapshotState == WslcContainerStateRunning)
+    {
+        // N.B. If the container exits on its own before Stop acquires m_lock, Stop no-ops on Exited.
+        Stop(Signal, TimeoutSeconds, /*Kill*/ false);
+    }
+
+    Start(WSLCContainerStartFlagsNone, nullptr);
+}
+
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
@@ -2560,6 +2594,15 @@ try
 {
     COMServiceExecutionContext context;
     return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback)
+try
+{
+    // N.B. WarningCallback is ambient here so EMIT_USER_WARNING reaches the client from both the Stop and Start phases.
+    WSLCExecutionContext context(&m_session, WarningCallback);
+    return CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds);
 }
 CATCH_RETURN();
 
