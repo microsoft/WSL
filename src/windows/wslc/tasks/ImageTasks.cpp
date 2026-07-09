@@ -184,7 +184,6 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         // Create table — only IMAGE ID uses fixed width; other columns auto-size.

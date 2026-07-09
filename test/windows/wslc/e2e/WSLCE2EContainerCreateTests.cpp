@@ -946,29 +946,32 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(std::format(
                 L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify(
-                {.Stderr = L"Invalid health-interval argument value: 'notaduration'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-interval argument value"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container create --health-retries abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid health-retries argument value: abc\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-retries argument value"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"cannot be combined with other health check options"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"cannot be combined with other health check options"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }

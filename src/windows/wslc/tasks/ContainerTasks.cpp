@@ -312,7 +312,6 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         // Create table with or without column limits based on --no-trunc flag
@@ -717,7 +716,6 @@ void ShowContainerStats(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         auto table = trunc ? wsl::windows::wslc::TableOutput<8>(

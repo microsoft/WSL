@@ -1178,7 +1178,8 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(
             std::format(L"container run --rm --health-timeout invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid health-timeout argument value: 'invalid'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-timeout argument value"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 

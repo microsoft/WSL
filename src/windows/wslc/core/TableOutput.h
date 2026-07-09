@@ -64,13 +64,7 @@ struct FormattedCell
     }
 
     // Single-sequence cell: wraps text with the sequence and a trailing reset.
-    FormattedCell(std::wstring_view text, const Sequence& seq) : sequences({&seq, &Format::Default})
-    {
-        fmt.reserve(4 + text.size());
-        fmt += L"{}";
-        fmt += text;
-        fmt += L"{}";
-    }
+    FormattedCell(std::wstring_view text, const Sequence& seq);
 
     // Block temporaries: the cell only stores a pointer to seq, so binding a Sequence rvalue (including
     // derived types such as the ConstructedSequence returned by Sgr()) would dangle once the full
@@ -78,114 +72,17 @@ struct FormattedCell
     FormattedCell(std::wstring_view text, const Sequence&& seq) = delete;
 
     // Visible width: count characters that are not part of {} placeholders.
-    size_t VisibleWidth() const
-    {
-        if (sequences.empty())
-        {
-            return fmt.size();
-        }
-
-        size_t width = 0;
-        for (size_t i = 0; i < fmt.size(); ++i)
-        {
-            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
-            {
-                ++i; // skip the pair
-            }
-            else
-            {
-                ++width;
-            }
-        }
-        return width;
-    }
+    size_t VisibleWidth() const;
 
     // Renders the cell with or without sequences.
     // When vtEnabled is false, all {} placeholders are skipped (no VT output).
     // When vtEnabled is true but colorEnabled is false, only non-color sequences are emitted.
     // When both are true, all sequences are emitted.
-    std::wstring Render(bool vtEnabled, bool colorEnabled) const
-    {
-        if (sequences.empty())
-        {
-            return fmt; // plain text, no placeholders
-        }
-
-        std::wstring result;
-        result.reserve(fmt.size() + (vtEnabled ? sequences.size() * 8 : 0));
-        size_t seqIdx = 0;
-
-        for (size_t i = 0; i < fmt.size(); ++i)
-        {
-            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
-            {
-                if (vtEnabled && seqIdx < sequences.size() && (colorEnabled || !sequences[seqIdx]->IsColor()))
-                {
-                    result.append(sequences[seqIdx]->Get());
-                }
-                ++seqIdx;
-                ++i; // skip the pair
-            }
-            else
-            {
-                result += fmt[i];
-            }
-        }
-
-        return result;
-    }
+    std::wstring Render(bool vtEnabled, bool colorEnabled) const;
 
     // Renders with visible text truncated to maxWidth characters, appending ellipsis.
     // Sequences after the truncation point are still emitted (for resets).
-    std::wstring RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEnabled) const
-    {
-        if (sequences.empty())
-        {
-            // Plain text: simple truncation.
-            if (fmt.size() <= maxWidth)
-            {
-                return fmt;
-            }
-            return fmt.substr(0, maxWidth > 0 ? maxWidth - 1 : 0) + L"\u2026";
-        }
-
-        std::wstring result;
-        result.reserve(fmt.size());
-        size_t seqIdx = 0;
-        size_t visibleChars = 0;
-        bool truncated = (maxWidth == 0);
-        const size_t truncateAt = maxWidth > 1 ? maxWidth - 1 : 0;
-
-        for (size_t i = 0; i < fmt.size(); ++i)
-        {
-            if (i + 1 < fmt.size() && fmt[i] == L'{' && fmt[i + 1] == L'}')
-            {
-                // Always emit sequences (they're invisible); they handle resets after truncation.
-                if (vtEnabled && seqIdx < sequences.size() && (colorEnabled || !sequences[seqIdx]->IsColor()))
-                {
-                    result.append(sequences[seqIdx]->Get());
-                }
-                ++seqIdx;
-                ++i;
-            }
-            else if (!truncated)
-            {
-                if (visibleChars < truncateAt)
-                {
-                    result += fmt[i];
-                    ++visibleChars;
-                }
-                else
-                {
-                    result += L'\u2026';
-                    truncated = true;
-                }
-            }
-            // After truncation, skip remaining visible chars but continue to emit sequences.
-        }
-
-        return result;
-    }
+    std::wstring RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEnabled) const;
 };
 
 // Controls how a column handles content that exceeds its available width.
@@ -218,6 +115,13 @@ struct ColumnDefinition
     std::wstring Name;
     ColumnWidthConfig Config;
 };
+
+namespace details {
+
+    // Splits visible text into word-boundary chunks of at most maxWidth chars.
+    std::vector<std::wstring> WrapText(const std::wstring& text, size_t maxWidth);
+
+} // namespace details
 
 template <size_t FieldCount>
 struct TableOutput
@@ -333,8 +237,11 @@ struct TableOutput
     {
         m_empty = false;
 
-        // Buffer rows to ensure accurate column sizing before flush.
-        if (m_dataRowCount < m_sizingBuffer)
+        // Buffer rows to size columns before flush. When every column is unbounded (no MaxWidth cap
+        // and no Wrap/Shrink overflow), buffer all rows so column widths grow to fit the widest value
+        // regardless of row order. With an overflow policy in play, cap the buffer at m_sizingBuffer
+        // and stream the remainder to bound memory for large result sets.
+        if (m_dataRowCount < m_sizingBuffer || AllColumnsUnbounded())
         {
             m_buffer.emplace_back(std::move(line));
             ++m_dataRowCount;
@@ -411,6 +318,20 @@ private:
     bool m_dropEmptyColumns = false;
     size_t m_consoleWidthOverride = 0;
 
+    // True when no column constrains its width (no MaxWidth cap and no Wrap/Shrink overflow).
+    // Such tables buffer every row so a late, wide value is never truncated or misaligned.
+    bool AllColumnsUnbounded() const
+    {
+        for (size_t i = 0; i < FieldCount; ++i)
+        {
+            if (m_columns[i].ConfiguredMaxLength != 0 || m_columns[i].Overflow != ColumnOverflow::Truncate)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // Syncs Column state from m_columnConfigs[i]; call whenever a config entry changes.
     void SyncColumnFromConfig(size_t i)
     {
@@ -458,42 +379,6 @@ private:
         return std::nullopt;
     }
 
-    // Splits visible text into word-boundary chunks of at most maxWidth chars.
-    static std::vector<std::wstring> WrapText(const std::wstring& text, size_t maxWidth)
-    {
-        if (maxWidth == 0 || text.length() <= maxWidth)
-        {
-            return {text};
-        }
-
-        std::vector<std::wstring> lines;
-        size_t pos = 0;
-
-        while (pos < text.length())
-        {
-            size_t chunkEnd = std::min(pos + maxWidth, text.length());
-
-            if (chunkEnd < text.length())
-            {
-                size_t breakAt = text.rfind(L' ', chunkEnd);
-                if (breakAt != std::wstring::npos && breakAt > pos)
-                {
-                    chunkEnd = breakAt;
-                }
-            }
-
-            lines.emplace_back(text.substr(pos, chunkEnd - pos));
-
-            pos = chunkEnd;
-            while (pos < text.length() && text[pos] == L' ')
-            {
-                ++pos;
-            }
-        }
-
-        return lines;
-    }
-
     // Wraps a cell's visible text into chunks, preserving formatting on each chunk.
     std::vector<FormattedCell> BuildWrappedCells(const FormattedCell& cell, const Column& col) const
     {
@@ -512,7 +397,7 @@ private:
         // For plain cells, wrap the text directly.
         if (cell.sequences.empty())
         {
-            auto chunks = WrapText(cell.fmt, col.MaxLength);
+            auto chunks = details::WrapText(cell.fmt, col.MaxLength);
             std::vector<FormattedCell> result;
             result.reserve(chunks.size());
             for (auto& chunk : chunks)
@@ -543,7 +428,7 @@ private:
             }
         }
 
-        auto chunks = WrapText(visibleText, col.MaxLength);
+        auto chunks = details::WrapText(visibleText, col.MaxLength);
         std::vector<FormattedCell> result;
         result.reserve(chunks.size());
         for (auto& chunk : chunks)
