@@ -159,6 +159,41 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_StdinFromPipe)
+    {
+        // Validate that cp works when stdin is a pipe (no content-length available),
+        // as opposed to a file where GetFileSize can determine the length upfront.
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        CreateTestTarFile();
+
+        // Open the tar file and relay its content into a pipe on a background thread.
+        wil::unique_hfile tarFile(
+            CreateFileW(TarPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!tarFile);
+
+        auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
+
+        std::thread relayThread([&tarFile, &pipeWrite] {
+            wsl::windows::common::relay::InterruptableRelay(tarFile.get(), pipeWrite.get());
+            pipeWrite.reset();
+        });
+
+        // Pass the pipe read end as stdin — wslc cannot determine content-length from a pipe.
+        const auto cpResult = RunWslc(std::format(L"container cp - {}:/tmp", WslcContainerName), ElevationType::Elevated, pipeRead.get());
+        relayThread.join();
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Verify the file was copied.
+        const auto execResult = RunWslc(std::format(L"container exec {} cat /tmp/testfile.txt", WslcContainerName));
+        VERIFY_IS_TRUE(execResult.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, execResult.ExitCode.value());
+        VERIFY_IS_TRUE(execResult.Stdout.has_value());
+        VERIFY_ARE_EQUAL(L"wslc-cp-test-content\n", execResult.Stdout.value());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ToStoppedContainer)
     {
         // Create a stopped container (not started).
@@ -475,8 +510,9 @@ class WSLCE2EContainerCpTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)
     {
         // Create a container, put a file in it, stop it, then copy out.
-        auto runResult = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto runResult = RunWslc(
+            std::format(
+                L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Container has exited (ran a one-shot command). Copy from the stopped container.
