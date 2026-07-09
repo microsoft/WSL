@@ -254,10 +254,9 @@ void WSLCSessionRuntime::EnsureVmRunning()
 
 void WSLCSessionRuntime::NotifyVmStarted()
 {
-    m_vmStartNotified.store(true);
-
     if (m_hooks.OnVmStarted)
     {
+        m_vmStartNotified.store(true);
         m_hooks.OnVmStarted();
     }
 }
