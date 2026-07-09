@@ -33,6 +33,7 @@ namespace wsl::windows::service::wslc {
 
 class WSLCContainer;
 class WSLCSession;
+class WSLCSessionRuntime;
 class WSLCVolumes;
 
 class unique_com_disconnect
@@ -73,7 +74,7 @@ public:
 
     WSLCContainerImpl(
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         std::string&& Id,
         std::string&& Name,
@@ -81,13 +82,9 @@ public:
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<std::string>&& namedVolumes,
-        WSLCVolumes& Volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
@@ -134,25 +131,17 @@ public:
         const WSLCContainerOptions& Options,
         const std::string& Name,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     static std::unique_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
 private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);

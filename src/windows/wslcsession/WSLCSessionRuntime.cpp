@@ -503,6 +503,56 @@ try
 }
 CATCH_LOG();
 
+bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
+{
+    // Mirror OnIdleTimer's MTA context on a dedicated thread: the incoming RPC thread is an STA, so
+    // both re-initializing MTA on it and running teardown inline would fail (RPC_E_CHANGED_MODE /
+    // RPC_E_WRONG_THREAD when releasing the VM's cross-process COM proxies).
+    bool wasAlreadyIdle = false;
+    std::exception_ptr error;
+
+    std::thread worker([&]() {
+        try
+        {
+            const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
+            auto lock = m_lock.lock_exclusive();
+
+            if (m_terminating->load() || m_vmState.load() != VmState::Running)
+            {
+                wasAlreadyIdle = true;
+                return;
+            }
+
+            if (!TryClaimExpectedStop())
+            {
+                wasAlreadyIdle = true;
+                return;
+            }
+
+            auto dispositionCleanup = wil::scope_exit([this]() {
+                auto stopRequested = VmExitDisposition::StopRequested;
+                m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+            });
+
+            StopVmLockHeld();
+        }
+        catch (...)
+        {
+            error = std::current_exception();
+        }
+    });
+
+    worker.join();
+
+    if (error)
+    {
+        std::rethrow_exception(error);
+    }
+
+    return wasAlreadyIdle;
+}
+
 WSLCSessionRuntime::VmLease WSLCSessionRuntime::AcquireVmLease()
 {
     return VmLease(*this);

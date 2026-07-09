@@ -2083,14 +2083,10 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             *containerOptions,
             containerName,
             *this,
-            m_runtime.Vm(),
+            m_runtime,
             m_pluginNotifier.get(),
             m_networks,
-            m_runtime.Volumes(),
-            std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
-            m_runtime.Events(),
-            m_runtime.Docker(),
-            *m_runtime.Relay());
+            std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1));
 
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
@@ -3183,6 +3179,19 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::TriggerIdleTermination(BOOL* WasAlreadyIdle)
+try
+{
+    WSLCExecutionContext context(this);
+
+    THROW_HR_IF_NULL(E_POINTER, WasAlreadyIdle);
+
+    *WasAlreadyIdle = m_runtime.TriggerIdleTerminationForTest() ? TRUE : FALSE;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
     return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) ? S_OK : S_FALSE;
@@ -3535,13 +3544,9 @@ void WSLCSession::RecoverExistingContainers()
             auto container = WSLCContainerImpl::Open(
                 dockerContainer,
                 *this,
-                m_runtime.Vm(),
+                m_runtime,
                 m_pluginNotifier.get(),
-                m_runtime.Volumes(),
-                std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
-                m_runtime.Events(),
-                m_runtime.Docker(),
-                *m_runtime.Relay());
+                std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1));
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);

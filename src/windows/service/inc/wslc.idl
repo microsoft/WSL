@@ -692,6 +692,11 @@ interface IWSLCSession : IUnknown
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
+
+    // Used only for testing. Synchronously runs the idle-termination teardown path, ignoring the
+    // activity-count and idle-timeout-enabled guards so a test can force the VM down even while a
+    // container holds an activity reference. WasAlreadyIdle is TRUE when the VM was not running.
+    HRESULT TriggerIdleTermination([out] BOOL* WasAlreadyIdle);
 }
 
 //

@@ -215,6 +215,7 @@ public:
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
+    IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,

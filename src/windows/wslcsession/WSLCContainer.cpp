@@ -528,7 +528,7 @@ WSLCPortMapping ContainerPortMapping::Serialize() const
 
 WSLCContainerImpl::WSLCContainerImpl(
     WSLCSession& wslcSession,
-    WSLCVirtualMachine& virtualMachine,
+    WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
     std::string&& Id,
     std::string&& Name,
@@ -536,34 +536,30 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::string NetworkMode,
     std::vector<WSLCVolumeMount>&& volumes,
     std::vector<std::string>&& namedVolumes,
-    WSLCVolumes& Volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
-    DockerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient,
-    IORelay& Relay,
     WSLCContainerState InitialState,
     std::uint64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags) :
     m_wslcSession(wslcSession),
     m_pluginNotifier(pluginNotifier),
-    m_virtualMachine(virtualMachine),
+    m_virtualMachine(runtime.Vm()),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
     m_networkMode(std::move(NetworkMode)),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_namedVolumes(std::move(namedVolumes)),
-    m_volumes(Volumes),
+    m_volumes(runtime.Volumes()),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
-    m_dockerClient(DockerClient),
-    m_eventTracker(EventTracker),
-    m_ioRelay(Relay),
-    m_containerEvents(EventTracker.RegisterContainerStateUpdates(
+    m_dockerClient(runtime.Docker()),
+    m_eventTracker(runtime.Events()),
+    m_ioRelay(*runtime.Relay()),
+    m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
         m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -1401,15 +1397,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     const std::string& containerName,
     WSLCSession& wslcSession,
-    WSLCVirtualMachine& virtualMachine,
+    WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
-    WSLCVolumes& volumesManager,
-    std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-    DockerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient,
-    IORelay& IoRelay)
+    std::function<void(const WSLCContainerImpl*)>&& OnDeleted)
 {
+    auto& virtualMachine = runtime.Vm();
+    auto& DockerClient = runtime.Docker();
+    auto& EventTracker = runtime.Events();
+
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
 
@@ -1792,7 +1788,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
-        virtualMachine,
+        runtime,
         pluginNotifier,
         std::move(result.Id),
         CleanContainerName(inspectData.Name),
@@ -1800,13 +1796,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(networkMode),
         std::move(volumes),
         std::move(namedVolumes),
-        volumesManager,
         std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
-        EventTracker,
-        DockerClient,
-        IoRelay,
         WslcContainerStateCreated,
         ParseDockerTimestamp(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
@@ -1819,14 +1811,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
-    WSLCVirtualMachine& virtualMachine,
+    WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
-    WSLCVolumes& volumes,
-    std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-    DockerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient,
-    IORelay& ioRelay)
+    std::function<void(const WSLCContainerImpl*)>&& OnDeleted)
 {
+    auto& virtualMachine = runtime.Vm();
+    auto& DockerClient = runtime.Docker();
+
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
@@ -1884,7 +1875,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
-        virtualMachine,
+        runtime,
         pluginNotifier,
         std::string(dockerContainer.Id),
         std::move(name),
@@ -1892,13 +1883,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(networkMode),
         std::move(metadata.Volumes),
         std::move(namedVolumes),
-        volumes,
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
-        EventTracker,
-        DockerClient,
-        ioRelay,
         DockerStateToWSLCState(dockerContainer.State),
         static_cast<std::uint64_t>(dockerContainer.Created),
         metadata.InitProcessFlags,

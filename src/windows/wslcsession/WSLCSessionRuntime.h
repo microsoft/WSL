@@ -158,6 +158,8 @@ public:
     [[nodiscard]] VmLease AcquireVmLease();
     [[nodiscard]] LockedRuntime Acquire();
 
+    [[nodiscard]] bool TriggerIdleTerminationForTest();
+
     void Shutdown(wil::rwlock_release_exclusive_scope_exit& sessionLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
 
 private:

@@ -11424,6 +11424,114 @@ class WSLCTests
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
 
+    // TriggerIdleTermination runs the idle-teardown path synchronously and reports whether the VM
+    // was already idle. Validates the idle -> running -> forced-idle -> running lifecycle.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRestartsVm)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-trigger-test";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName));
+
+        // The VM starts lazily, so a freshly created session is already idle.
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // Starting a process brings the VM up.
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        // Forcing idle termination tears the running VM down.
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // A second trigger is now a no-op.
+        wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+
+        // The session survives and lazily restarts the VM on the next operation.
+        WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
+        auto process2 = launcher2.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+    }
+
+    // A running container pins the VM via its activity hold; TriggerIdleTermination ignores that
+    // hold and forces teardown. The container's state must survive on persistent storage and be
+    // recovered against a fresh docker context when the VM lazily restarts.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRecoversRunningContainer)
+    {
+        SKIP_TEST_SERVER();
+
+        const std::string containerName = "wslc-idle-recovery";
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        container.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        // Force idle teardown even though the container holds a running-activity reference.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Re-opening lazily restarts the VM and recovers the container. It must be found (no longer
+        // running, since its init process died with the VM) and operable against the new context.
+        auto recovered = OpenContainer(m_defaultSession.get(), containerName);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+        VERIFY_ARE_NOT_EQUAL(recovered.State(), WslcContainerStateRunning);
+    }
+
+    // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or
+    // stale-state races. Operations may fail while the VM is being torn down; that is tolerated, but
+    // the workers must never hang and the session must remain usable afterwards.
+    WSLC_TEST_METHOD(TriggerIdleTerminationConcurrentWithOperations)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-hammer-test";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName));
+
+        std::atomic<bool> stop = false;
+        std::atomic<unsigned int> opFailures = 0;
+
+        std::thread worker([&]() {
+            while (!stop.load())
+            {
+                try
+                {
+                    WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+                    auto process = launcher.Launch(*session);
+                    process.GetExitEvent().wait(5000);
+                }
+                catch (...)
+                {
+                    opFailures.fetch_add(1);
+                }
+            }
+        });
+
+        for (int i = 0; i < 25; ++i)
+        {
+            BOOL wasAlreadyIdle = FALSE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        }
+
+        stop.store(true);
+        worker.join();
+
+        LogInfo("TriggerIdleTerminationConcurrentWithOperations tolerated %u operation failures", opFailures.load());
+
+        // The session must still be usable after the hammering.
+        WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
+    }
+
     // Helper: COM callback that captures all warnings received.
     class CapturingWarningCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
