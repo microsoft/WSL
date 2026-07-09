@@ -72,6 +72,11 @@ struct FormattedCell
         fmt += L"{}";
     }
 
+    // Block temporaries: the cell only stores a pointer to seq, so binding a Sequence rvalue (including
+    // derived types such as the ConstructedSequence returned by Sgr()) would dangle once the full
+    // expression ends. Only long-lived Sequence instances may be used here.
+    FormattedCell(std::wstring_view text, const Sequence&& seq) = delete;
+
     // Visible width: count characters that are not part of {} placeholders.
     size_t VisibleWidth() const
     {
