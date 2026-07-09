@@ -780,6 +780,50 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
+    // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
+    // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
+    WSL2_TEST_METHOD(WslcVmRestart)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmRestart);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-restart");
+
+            // First operation brings the VM up -> OnWslcVmStarted (which reentrantly runs a process).
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Force idle teardown of the running VM -> OnWslcVmStopping.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // Next operation lazily restarts the VM -> OnWslcVmStarted fires again.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Session teardown tears the second VM down -> OnWslcVmStopping, then OnWslcSessionStopping.
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=22
+            WSLC Session created, name=plugin-wslc-vm-restart, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM stopping, session=*
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM stopping, session=*
+            WSLC Session stopping, name=plugin-wslc-vm-restart, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {

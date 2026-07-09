@@ -52,6 +52,8 @@ public:
     void OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const;
     void OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;
     void OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const;
+    void OnWslcVmStarted(const WSLCSessionInformation* Session) const;
+    void OnWslcVmStopping(const WSLCSessionInformation* Session) const;
 
     void ThrowIfFatalPluginError() const;
 

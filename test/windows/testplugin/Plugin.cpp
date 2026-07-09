@@ -539,6 +539,44 @@ HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId
     return S_OK;
 }
 
+HRESULT OnWslcVmStarted(const WSLCSessionInformation* Session)
+try
+{
+    // Only log/exercise for the dedicated VM-restart test so other WSLC plugin tests (which start
+    // and stop VMs incidentally) are not affected by extra log lines.
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+
+    // Prove the VM is usable from within the started hook, and that calling back into the session
+    // (WSLCCreateProcess acquires a VM lease + the runtime lock) does not deadlock.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM started reentrant WSLCCreateProcess: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(hr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
+{
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+    return S_OK;
+}
+
 EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPluginAPIV1* Api, WSLPluginHooksV1* Hooks)
 {
     try
@@ -550,7 +588,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcImagePull));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmRestart));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
@@ -566,6 +604,8 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         Hooks->ContainerStopping = &OnWslcContainerStopping;
         Hooks->ImageCreated = &OnWslcImageCreated;
         Hooks->ImageDeleted = &OnWslcImageDeleted;
+        Hooks->WslcVmStarted = &OnWslcVmStarted;
+        Hooks->WslcVmStopping = &OnWslcVmStopping;
 
         if (g_testType == PluginTestType::FailToLoad)
         {

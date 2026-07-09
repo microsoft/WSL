@@ -125,6 +125,13 @@ interface IWSLCPluginNotifier : IUnknown
 
     // Called when an image is deleted. 'ImageId' is the image identifier. Errors are logged but ignored.
     HRESULT OnImageDeleted([in] LPCSTR ImageId);
+
+    // Called when the VM backing the session has started (first start or recreation after idle
+    // teardown). Errors are logged but ignored.
+    HRESULT OnVmStarted();
+
+    // Called when the VM backing the session is about to stop. Errors are logged but ignored.
+    HRESULT OnVmStopping();
 };
 
 typedef struct _WSLCImageInformation

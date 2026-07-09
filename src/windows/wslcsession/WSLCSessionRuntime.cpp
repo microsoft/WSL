@@ -225,19 +225,41 @@ void WSLCSessionRuntime::EnsureVmRunning()
         return;
     }
 
-    auto lock = m_lock.lock_exclusive();
-
-    // Do not (re)start the VM once the session is terminating or has terminated. This also
-    // bounds VmLease's retry loop: a lease that races with Terminate() fails here instead of
-    // restarting a VM that is being permanently torn down.
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent->is_signaled());
-
-    if (m_vmState.load() == VmState::Running)
+    bool started = false;
     {
-        return;
+        auto lock = m_lock.lock_exclusive();
+
+        // Do not (re)start the VM once the session is terminating or has terminated. This also
+        // bounds VmLease's retry loop: a lease that races with Terminate() fails here instead of
+        // restarting a VM that is being permanently torn down.
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent->is_signaled());
+
+        if (m_vmState.load() != VmState::Running)
+        {
+            StartVmLockHeld();
+            started = true;
+        }
     }
 
-    StartVmLockHeld();
+    // Notify plugins that a VM has started, outside the exclusive lock: the handler forwards to the
+    // plugin, which may call back into the session (e.g. WSLCCreateProcess acquires a VM lease and
+    // the exclusive lock), so firing under the lock would deadlock. EnsureVmRunning's only caller
+    // (VmLease) holds an activity reference across this call, so idle teardown cannot race the VM
+    // down in the gap between releasing the lock and notifying.
+    if (started)
+    {
+        NotifyVmStarted();
+    }
+}
+
+void WSLCSessionRuntime::NotifyVmStarted()
+{
+    m_vmStartNotified.store(true);
+
+    if (m_hooks.OnVmStarted)
+    {
+        m_hooks.OnVmStarted();
+    }
 }
 
 bool WSLCSessionRuntime::TryClaimExpectedStop() noexcept
@@ -354,6 +376,14 @@ void WSLCSessionRuntime::StopVmLockHeld()
 
 void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
 {
+    // Notify plugins that the VM is about to stop, paired with a prior OnVmStarted. Skipped for a
+    // VM that never finished starting (m_vmStartNotified false, e.g. bring-up failure). Fired under
+    // the lock, so the handler must not call back into the session.
+    if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
+    {
+        m_hooks.OnVmStopping();
+    }
+
     if (m_hooks.TearDownSessionState)
     {
         m_hooks.TearDownSessionState();
