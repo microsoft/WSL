@@ -453,6 +453,36 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
     }
 
+    if (context.Args.Contains(ArgType::HealthCmd))
+    {
+        options.HealthCmd = WideToMultiByte(context.Args.Get<ArgType::HealthCmd>());
+    }
+
+    if (context.Args.Contains(ArgType::HealthInterval))
+    {
+        options.HealthInterval = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthInterval>());
+    }
+
+    if (context.Args.Contains(ArgType::HealthTimeout))
+    {
+        options.HealthTimeout = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthTimeout>());
+    }
+
+    if (context.Args.Contains(ArgType::HealthStartPeriod))
+    {
+        options.HealthStartPeriod = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthStartPeriod>());
+    }
+
+    if (context.Args.Contains(ArgType::HealthRetries))
+    {
+        options.HealthRetries = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::HealthRetries>());
+    }
+
+    if (context.Args.Contains(ArgType::NoHealthcheck))
+    {
+        options.NoHealthcheck = true;
+    }
+
     if (context.Args.Contains(ArgType::Memory))
     {
         options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
