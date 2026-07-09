@@ -624,6 +624,23 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    TEST_METHOD(CreateCommand_SetContainerOptionsInvalidNetwork_ThrowsArgumentExceptionWithArgumentName)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,name=net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            wsl::windows::wslc::task::SetContainerOptionsFromArgs(context),
+            wsl::windows::wslc::ArgumentException,
+            [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
     // code as the CLI up to the point of command execution, including parsing and argument validtion.

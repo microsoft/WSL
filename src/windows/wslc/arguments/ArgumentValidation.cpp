@@ -518,7 +518,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
                 }
 
                 parsedName = true;
-                result.Name = WideToMultiByte(optionValue);
+                result.Name = WideToMultiByte(std::wstring{optionValue});
             }
             else if (key == L"alias")
             {
@@ -527,7 +527,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
                     throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
                 }
 
-                result.Aliases.emplace_back(WideToMultiByte(optionValue));
+                result.Aliases.emplace_back(WideToMultiByte(std::wstring{optionValue}));
             }
             else
             {
@@ -547,7 +547,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
     }
     else
     {
-        result.Name = WideToMultiByte(value);
+        result.Name = WideToMultiByte(std::wstring{value});
     }
 
     if (IsEmptyOrWhitespace(std::string_view{result.Name}))

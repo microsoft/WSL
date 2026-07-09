@@ -549,11 +549,12 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Network))
     {
+        const auto networkArgName = Argument::Create(ArgType::Network).Name();
         auto networks = context.Args.GetAll<ArgType::Network>();
         options.Networks.reserve(options.Networks.size() + networks.size());
         for (const auto& value : networks)
         {
-            auto parsed = validation::ParseNetworkArgument(value);
+            auto parsed = validation::ParseNetworkArgument(value, networkArgName);
             auto& network = options.Networks.emplace_back();
             network.Name = parsed.Name;
             network.Aliases = std::move(parsed.Aliases);
