@@ -512,6 +512,11 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
             const auto optionValue = part.substr(separator + 1);
             if (key == L"name")
             {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+                }
+
                 if (parsedName)
                 {
                     throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
@@ -547,10 +552,15 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
     }
     else
     {
+        if (IsEmptyOrWhitespace(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+
         result.Name = WideToMultiByte(std::wstring{value});
     }
 
-    if (IsEmptyOrWhitespace(std::string_view{result.Name}))
+    if (result.Name.empty())
     {
         throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
     }

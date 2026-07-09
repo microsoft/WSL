@@ -21,6 +21,7 @@ Abstract:
 #include "AsyncExecution.h"
 #include "Command.h"
 #include "RootCommand.h"
+#include "ArgumentValidation.h"
 #include "ContainerCommand.h"
 #include "ContainerTasks.h"
 
@@ -588,6 +589,29 @@ class WSLCCLIExecutionUnitTests
             const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
             return exception.Message() == expectedMessage;
         });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkNameWhitespaceValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"name=   \" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(ParseNetworkArgument_NameUnicodeWhitespaceValue_ThrowsArgumentException)
+    {
+        VERIFY_THROWS_SPECIFIC(
+            validation::ParseNetworkArgument(L"name=\u3000", L"network"), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+                return exception.Message() == expectedMessage;
+            });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkAliasEmptyValue_ThrowsArgumentException)
