@@ -61,6 +61,15 @@ public:
         std::function<void()> TearDownSessionState;
         std::function<void()> OnSpontaneousExit;
         WSLCVirtualMachine::TOnCrashDump OnCrashDump;
+
+        // Fired when a VM has started (best-effort). Invoked without the runtime lock held so the
+        // handler may call back into the session (e.g. to run setup in the VM). Fired every time a
+        // VM is (re)created for the session.
+        std::function<void()> OnVmStarted;
+
+        // Fired when a VM is about to be torn down (best-effort). Invoked under the runtime lock, so
+        // the handler must not call back into the session. Paired with a prior OnVmStarted.
+        std::function<void()> OnVmStopping;
     };
 
     struct SessionContext
@@ -166,6 +175,11 @@ private:
     bool IdleTerminationEnabled() const noexcept;
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
 
+    // Fires the OnVmStarted hook. Must be called without the runtime lock held (the handler may
+    // call back into the session), with an activity reference held so idle teardown cannot race the
+    // VM down before the notification is delivered.
+    void NotifyVmStarted();
+
     WSLCSession* m_session{};
     RuntimeHooks m_hooks;
 
@@ -198,6 +212,10 @@ private:
     wil::srwlock m_lock;
     std::atomic<VmState> m_vmState{VmState::None};
     std::atomic<VmExitDisposition> m_vmExitDisposition{VmExitDisposition::Active};
+
+    // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
+    // never finished starting (or had no started notification) does not emit a spurious stopping.
+    std::atomic<bool> m_vmStartNotified{false};
     std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
 
     WSLCVirtualMachineTerminationReason m_lastTerminationReason{WSLCVirtualMachineTerminationReasonUnknown};

@@ -691,3 +691,41 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
         }
     }
 }
+
+void PluginManager::OnWslcVmStarted(const WSLCSessionInformation* Session) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.WslcVmStarted != nullptr)
+        {
+            const auto result = e.hooks.WslcVmStarted(Session);
+            WSL_LOG(
+                "PluginOnWslcVmStartedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcVmStopping(const WSLCSessionInformation* Session) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.WslcVmStopping != nullptr)
+        {
+            const auto result = e.hooks.WslcVmStopping(Session);
+            WSL_LOG(
+                "PluginOnWslcVmStoppingCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}

@@ -466,6 +466,22 @@ try
 
     hooks.OnSpontaneousExit = [this]() { LOG_IF_FAILED(Terminate()); };
 
+    // Forward VM start/stop to plugins. Both are best-effort: errors are logged and ignored so a
+    // misbehaving plugin cannot abort VM startup or the operation that triggered it.
+    hooks.OnVmStarted = [this]() {
+        if (m_pluginNotifier)
+        {
+            LOG_IF_FAILED(m_pluginNotifier->OnVmStarted());
+        }
+    };
+
+    hooks.OnVmStopping = [this]() {
+        if (m_pluginNotifier)
+        {
+            LOG_IF_FAILED(m_pluginNotifier->OnVmStopping());
+        }
+    };
+
     hooks.OnCrashDump = std::bind(
         &WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
 
