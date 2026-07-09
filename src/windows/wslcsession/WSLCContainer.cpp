@@ -559,7 +559,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_volumes(Volumes),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
-    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, wslcSession, std::move(onDeleted))),
+    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
@@ -615,6 +615,12 @@ WSLCContainerImpl::~WSLCContainerImpl()
         auto lock = m_lock.lock_exclusive();
         wrapper = ReleaseResources();
     }
+}
+
+void WSLCContainerImpl::Initialize()
+{
+    // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
+    m_comWrapper->Initialize(weak_from_this());
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1415,7 +1421,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     return wslcInspect;
 }
 
-std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
+std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     const std::string& containerName,
     WSLCSession& wslcSession,
@@ -1850,7 +1856,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
     }
 
-    auto container = std::make_unique<WSLCContainerImpl>(
+    auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
         pluginNotifier,
@@ -1872,11 +1878,13 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
+    container->Initialize();
+
     deleteOnFailure.release();
     return container;
 }
 
-std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
+std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
@@ -1942,7 +1950,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
     }
 
-    auto container = std::make_unique<WSLCContainerImpl>(
+    auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
         pluginNotifier,
@@ -1963,6 +1971,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         static_cast<std::uint64_t>(dockerContainer.Created),
         metadata.InitProcessFlags,
         metadata.Flags);
+
+    container->Initialize();
 
     // Restore the state change timestamp from Docker inspect data.
     try
@@ -2252,8 +2262,8 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 }
 
-WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
-    COMImplClass<WSLCContainerImpl>(impl), m_session(session), m_onDeleted(std::move(OnDeleted))
+WSLCContainer::WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
+    m_session(session), m_onDeleted(std::move(OnDeleted))
 {
 }
 
@@ -2398,7 +2408,7 @@ try
     auto [lock, impl] = LockImpl();
 
     impl->Delete(Flags);
-    m_onDeleted(impl);
+    m_onDeleted(impl.get());
 
     return S_OK;
 }

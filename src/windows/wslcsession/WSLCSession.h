@@ -315,7 +315,7 @@ private:
     // This allows independent operations to proceed while container bookkeeping remains synchronized.
     // WSLCVolumes has its own internal srwlock and does not require m_lock.
     std::mutex m_containersLock;
-    std::unordered_map<std::string, std::unique_ptr<WSLCContainerImpl>> m_containers;
+    std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
     std::optional<WSLCVolumes> m_volumes;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
