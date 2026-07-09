@@ -46,6 +46,7 @@ set(HEADERS
     WSLCProcessIO.h
     WSLCSession.h
     WSLCSessionRuntime.h
+    WSLCIdleState.h
     WSLCSessionFactory.h
     WSLCSessionReference.h
     WSLCVirtualMachine.h
