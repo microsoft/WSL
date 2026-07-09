@@ -185,14 +185,19 @@ void ListImages(CLIExecutionContext& context)
     case FormatType::Table:
     {
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        using enum ColumnOverflow;
 
-        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
         auto table =
             trunc
                 ? wsl::windows::wslc::TableOutput<5>(
                       context.Reporter,
-                      {{{L"REPOSITORY", {}}, {L"TAG", {}}, {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12}}, {L"CREATED", {}}, {L"SIZE", {}}}})
+                      {{{L"REPOSITORY", {.Overflow = Shrink}},
+                        {L"TAG", {.Overflow = Shrink}},
+                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
+                        {L"CREATED", {.Overflow = Shrink}},
+                        {L"SIZE", {.Overflow = Shrink}}}})
                 : wsl::windows::wslc::TableOutput<5>(context.Reporter, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
