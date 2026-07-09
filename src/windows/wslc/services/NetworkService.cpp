@@ -115,4 +115,21 @@ models::PruneNetworksResult NetworkService::Prune(models::Session& session, cons
 
     return result;
 }
+
+void NetworkService::Connect(models::Session& session, const std::string& networkName, const std::string& containerId)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+
+    WSLCNetworkConnectionOptions options{};
+    options.NetworkName = networkName.c_str();
+    THROW_IF_FAILED(container->ConnectToNetwork(&options));
+}
+
+void NetworkService::Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+    THROW_IF_FAILED(container->DisconnectFromNetwork(networkName.c_str()));
+}
 } // namespace wsl::windows::wslc::services
