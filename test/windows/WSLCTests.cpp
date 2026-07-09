@@ -7292,12 +7292,10 @@ class WSLCTests
             const std::string additionalNetworkName = "alias-net-additional";
             createNetwork(primaryNetworkName, "172.64.0.0/16");
             createNetwork(additionalNetworkName, "172.65.0.0/16");
-            auto primaryNetCleanup = wil::scope_exit([&]() {
-                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetworkName.c_str()));
-            });
-            auto additionalNetCleanup = wil::scope_exit([&]() {
-                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(additionalNetworkName.c_str()));
-            });
+            auto primaryNetCleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetworkName.c_str())); });
+            auto additionalNetCleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(additionalNetworkName.c_str())); });
 
             WSLCContainerLauncher launcher("debian:latest", "alias-ctr-additional", {"sleep", "99999"}, {}, primaryNetworkName);
             launcher.AddPrimaryNetworkAlias("db");

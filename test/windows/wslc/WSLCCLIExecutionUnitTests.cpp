@@ -525,11 +525,10 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkUnsupportedOption_ThrowsArgumentException)
@@ -542,12 +541,11 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage =
-                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"driver-opt");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage =
+                wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"driver-opt");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkUnknownOption_ThrowsArgumentException)
@@ -558,12 +556,10 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage =
-                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"aliases");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"aliases");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkBackendAliasesOption_ThrowsArgumentException)
@@ -574,12 +570,10 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage =
-                    wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"Aliases");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"Aliases");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkAliasWithoutName_ThrowsArgumentException)
@@ -590,11 +584,10 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkAliasEmptyValue_ThrowsArgumentException)
@@ -605,11 +598,10 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         command.ParseArguments(invocation, context.Args);
 
-        VERIFY_THROWS_SPECIFIC(
-            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
-                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkAliasEmptyError(L"network");
-                return exception.Message() == expectedMessage;
-            });
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkAliasEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
@@ -633,9 +625,7 @@ class WSLCCLIExecutionUnitTests
         command.ParseArguments(invocation, context.Args);
 
         VERIFY_THROWS_SPECIFIC(
-            wsl::windows::wslc::task::SetContainerOptionsFromArgs(context),
-            wsl::windows::wslc::ArgumentException,
-            [](const auto& exception) {
+            wsl::windows::wslc::task::SetContainerOptionsFromArgs(context), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
                 const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
                 return exception.Message() == expectedMessage;
             });

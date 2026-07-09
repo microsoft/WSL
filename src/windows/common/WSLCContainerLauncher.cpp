@@ -255,8 +255,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std
     AddAdditionalNetwork(Name, {});
 }
 
-void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(
-    const std::string& Name, const std::vector<std::string>& Aliases)
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases)
 {
     m_additionalNetworks.push_back({.Name = Name, .Aliases = Aliases});
 }
