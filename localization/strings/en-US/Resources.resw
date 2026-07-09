@@ -1215,7 +1215,7 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>Windows Subsystem for Linux Settings lets developers manage the .wslconfig file using a GUI-based application.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Auto memory reclaim</value>
@@ -1295,13 +1295,15 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Custom system distro</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Browse distros</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Specify a path to a VHD which will load as a custom system distro, primarily used to power GUI apps in WSL. [Learn more about system distros here].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1309,10 +1311,11 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Custom system distro</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Specify a path to a VHD which will load as a custom system distro, primarily used to power GUI apps in WSL.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Enable debug console</value>
@@ -1347,6 +1350,7 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Developer</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentation</value>
@@ -1846,6 +1850,7 @@ You can also access more VS Code Remote options through the command palette with
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Developer</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Distro Management</value>
@@ -2435,6 +2440,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
     <value>Cannot use '{}' as session storage because it is not a directory</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Invalid image tag format: '{}'. Expected format is 'name:tag'</value>
@@ -3182,6 +3191,18 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Deleted: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Connect a container to a network.</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Connects a container to an existing network.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Disconnect a container from a network.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Disconnects a container from an existing network.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Manage volumes.</value>

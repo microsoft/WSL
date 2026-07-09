@@ -36,6 +36,7 @@ class WSLCE2EInspectTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
         EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureNetworkDoesNotExist(DebianImage.Name);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -45,6 +46,7 @@ class WSLCE2EInspectTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
         EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureNetworkDoesNotExist(DebianImage.Name);
         return true;
     }
 

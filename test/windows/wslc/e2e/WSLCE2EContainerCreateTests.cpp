@@ -837,7 +837,8 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container create --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-timeout argument value: abc\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-timeout argument value: abc"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 

@@ -1575,11 +1575,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSL_ROOT_INIT_ENV) L"=1 panic=-1";
 
-    // Set number of processors.
-    kernelCmdLine += std::format(L" nr_cpus={}", m_vmConfig.ProcessorCount);
-
     // Append common kernel parameters shared between WSL2 and WSLC.
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder, m_vmConfig.SwiotlbSizeBytes);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder, m_vmConfig.SwiotlbSizeBytes, m_vmConfig.ProcessorCount);
 
     if (m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported())
     {
