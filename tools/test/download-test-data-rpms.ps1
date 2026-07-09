@@ -2,8 +2,7 @@
 [CmdletBinding(PositionalBinding = $False)]
 param (
     [Parameter(Mandatory = $true)][string]$Target,
-    [string]$BaseUrl = "https://packages.microsoft.com/azurelinux/3.0/prod/base",
-    [switch]$Force
+    [string]$BaseUrl = "https://packages.microsoft.com/azurelinux/3.0/prod/base"
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +31,7 @@ function Get-LatestRpmUrl {
         throw "Failed to list packages at $listingUrl"
     }
 
-    $pattern = 'href="(?<file>' + [regex]::Escape($Package) + '-(?<ver>[0-9][0-9.]*)-(?<rel>[0-9]+)\.azl3\.' + $Arch + '\.rpm)"'
+    $pattern = 'href="(?<file>' + [regex]::Escape($Package) + '-(?<ver>[0-9][0-9.]*)-(?<rel>[0-9]+)\.azl[0-9]+\.' + $Arch + '\.rpm)"'
     $matches = [regex]::Matches($listing, $pattern)
     if ($matches.Count -eq 0) {
         throw "No '$Package' rpm found for '$Arch' at $listingUrl"

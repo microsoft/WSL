@@ -3412,7 +3412,8 @@ class WSLCTests
         {
             constexpr auto c_mountPoint = "/testdata";
             VERIFY_SUCCEEDED(session->MountWindowsFolder(g_testDataPath.c_str(), c_mountPoint, true));
-            auto unmount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session->UnmountWindowsFolder(c_mountPoint); });
+            auto unmount =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
 
             const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
             auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
