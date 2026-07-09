@@ -122,6 +122,8 @@ wslc_add_image(my-server
     BUILD_ARGS   VERSION=1.2.3 COMMIT=abcdef
     LABELS       org.opencontainers.image.source=https://example.com/repo
     PULL
+    NO_CACHE
+    VERBOSE
 )
 
 add_dependencies(my_app my-server)
