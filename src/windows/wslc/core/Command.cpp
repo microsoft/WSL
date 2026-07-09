@@ -121,6 +121,12 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
     // Build usage line with Write calls for each segment.
     {
         std::wstring usageText = Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
+
+        while (!usageText.empty() && usageText.back() == L' ')
+        {
+            usageText.pop_back();
+        }
+
         reporter.Write(helpLevel, L"{}{}{}", HelpHeadingEmphasis, usageText, Format::Default);
 
         if (!commands.empty())
@@ -133,6 +139,7 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
             {
                 reporter.Write(helpLevel, L" ");
             }
+
             reporter.Write(
                 helpLevel,
                 L"{}<{}{}{}{}{}>{}",
@@ -170,12 +177,14 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
             {
                 reporter.Write(helpLevel, L"{}[{}", HelpMetaEmphasis, Format::Default);
             }
+
             reporter.Write(
                 helpLevel, L"{}<{}{}{}{}{}>{}", HelpMetaEmphasis, Format::Default, HelpPlaceholderEmphasis, arg.Name(), Format::Default, HelpMetaEmphasis, Format::Default);
             if (arg.Limit() > 1)
             {
                 reporter.Write(helpLevel, L"{}...{}", HelpMetaEmphasis, Format::Default);
             }
+
             if (!arg.Required())
             {
                 reporter.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
@@ -212,6 +221,7 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
             }
             aliasLine += commandAliases[i];
         }
+
         reporter.Write(helpLevel, L"{}{}\n\n", std::wstring(c_helpRowIndent, L' '), aliasLine);
     }
 

@@ -24,6 +24,7 @@ Abstract:
 #include <utility>
 #include <variant>
 #include <vector>
+#include <wil/result_macros.h>
 #include "Reporter.h"
 #include "VTSupport.h"
 
@@ -74,6 +75,11 @@ struct FormattedCell
     // Visible width: count characters that are not part of {} placeholders.
     size_t VisibleWidth() const
     {
+        if (sequences.empty())
+        {
+            return fmt.size();
+        }
+
         size_t width = 0;
         for (size_t i = 0; i < fmt.size(); ++i)
         {
