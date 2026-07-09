@@ -323,7 +323,7 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
     THROW_WIN32_IF_MSG(
         ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(m_settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
-    auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
+    [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
