@@ -107,4 +107,34 @@ struct NetworkPruneCommand final : public Command
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
+
+// Connect Command
+struct NetworkConnectCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"connect";
+    NetworkConnectCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Disconnect Command
+struct NetworkDisconnectCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"disconnect";
+    NetworkDisconnectCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
 } // namespace wsl::windows::wslc
