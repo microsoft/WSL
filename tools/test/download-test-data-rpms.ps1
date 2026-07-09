@@ -65,7 +65,7 @@ foreach ($archEntry in $archMap.GetEnumerator()) {
         $destination = Join-Path $packagesDir $fileName
 
         Write-Output "[$nugetArch] Downloading $url"
-        curl.exe -sSL -o $destination $url
+        curl.exe --fail -sSL -o $destination $url
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to download $url"
         }
