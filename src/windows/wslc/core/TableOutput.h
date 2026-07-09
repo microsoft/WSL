@@ -220,18 +220,6 @@ struct TableOutput
     {
         m_consoleWidthOverride = width;
     }
-    // Promotes all Truncate columns to Shrink globally; no effect on Wrap columns.
-    void SetColumnWidthLimiting(bool enable)
-    {
-        for (size_t i = 0; i < FieldCount; ++i)
-        {
-            if (enable && m_columnConfigs[i].Overflow == ColumnOverflow::Truncate)
-            {
-                m_columnConfigs[i].Overflow = ColumnOverflow::Shrink;
-                SyncColumnFromConfig(i);
-            }
-        }
-    }
 
     void WriteRow(line_t&& line)
     {
