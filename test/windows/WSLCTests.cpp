@@ -11468,6 +11468,14 @@ class WSLCTests
 
         const std::string containerName = "wslc-idle-recovery";
 
+        auto cleanup = wil::scope_exit([&]() {
+            wil::com_ptr<IWSLCContainer> staleContainer;
+            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &staleContainer)))
+            {
+                LOG_IF_FAILED(staleContainer->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            }
+        });
+
         WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
         auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
         container.SetDeleteOnClose(false);
