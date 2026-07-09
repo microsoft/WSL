@@ -457,7 +457,7 @@ class WSLCTests
         // Reject invalid storage flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
-            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x2);
+            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x4);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
@@ -6771,6 +6771,82 @@ class WSLCTests
             // session list so the actual count should also be at most one.
             VERIFY_IS_TRUE(containers.size() <= 1u);
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerListDeleteStressTest)
+    {
+        constexpr auto c_iterations = 50;
+
+        const std::string containerName = "wslc-list-delete-stress";
+
+        std::atomic<unsigned int> failures = 0;
+
+        // One thread repeatedly creates a container and then deletes it.
+        std::thread thread([&]() {
+            for (unsigned int i = 0; i < c_iterations; ++i)
+            {
+                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"});
+
+                auto [hrCreate, container] = launcher.CreateNoThrow(*m_defaultSession);
+                if (FAILED(hrCreate))
+                {
+                    LogError("CreateContainer(%hs) unexpected HR: 0x%08x", containerName.c_str(), hrCreate);
+                    ++failures;
+                    continue;
+                }
+
+                if (i % 2 == 0)
+                {
+                    auto result = container->Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+                    if (FAILED(result))
+                    {
+                        LogError("Start(%hs) failed: 0x%08x", containerName.c_str(), result);
+                        ++failures;
+                    }
+
+                    if (i % 4 == 0)
+                    {
+                        result = container->Get().Stop(WSLCSignalSIGKILL, 0);
+                        if (FAILED(result))
+                        {
+                            LogError("Stop(%hs) failed: 0x%08x", containerName.c_str(), result);
+                            ++failures;
+                        }
+                    }
+                }
+
+                HRESULT result = container->Get().Delete(WSLCDeleteFlagsForce);
+                if (FAILED(result))
+                {
+                    LogError("Delete(%hs) failed: 0x%08x", containerName.c_str(), result);
+                    ++failures;
+                }
+                else
+                {
+                    container->SetDeleteOnClose(false);
+                }
+            }
+        });
+
+        while (WaitForSingleObject(thread.native_handle(), 0) == WAIT_TIMEOUT)
+        {
+            WSLCListContainersOptions options{};
+            options.Flags = WSLCListContainersFlagsAll;
+
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            HRESULT hrList = m_defaultSession->ListContainers(
+                &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>());
+            if (FAILED(hrList))
+            {
+                LogError("ListContainers unexpected HR: 0x%08x", hrList);
+                ++failures;
+            }
+        }
+
+        thread.join();
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
     }
 
     WSLC_TEST_METHOD(ContainerNetwork)
