@@ -5,8 +5,7 @@ trigger:
     - release/*
 
 variables:
-  WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
-  WindowsHostVersion: '1ESWindows2022'
+  WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2025/vse2026:latest"
 
 resources:
   repositories:
@@ -22,7 +21,8 @@ extends:
       name: "windows_undocked"
     featureFlags:
       EnableCDPxPAT: false
-      WindowsHostVersion: 1ESWindows2022
+      WindowsHostVersion:
+        Version: 2025
     globalSdl:
       suppression:
         suppressionFile: $(Build.SourcesDirectory)\.gdnsuppress
