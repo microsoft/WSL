@@ -1139,6 +1139,114 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
 }
 
+void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const
+{
+    auto lock = m_lock.lock_shared();
+
+    std::optional<uint64_t> contentLength;
+    if (ContentSize > 0)
+    {
+        contentLength = ContentSize;
+    }
+
+    auto requestContext = m_dockerClient.PutArchive(m_id, DestPath, contentLength);
+
+    auto userHandle = m_wslcSession.OpenUserHandle(TarHandle);
+
+    auto io = m_wslcSession.CreateIOContext();
+
+    std::optional<std::string> pendingErrorJson;
+    unsigned int httpStatusCode = 0;
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("ContainerUploadArchiveHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        httpStatusCode = response.result_int();
+        if (httpStatusCode != 200)
+        {
+            pendingErrorJson.emplace();
+        }
+    };
+
+    auto onProgress = [&](const gsl::span<char>& buffer) {
+        if (pendingErrorJson.has_value())
+        {
+            pendingErrorJson->append(buffer.data(), buffer.size());
+        }
+    };
+
+    // Shutdown the Docker stream's write side when the input is fully read.
+    auto onInputComplete = [socket = requestContext->stream.native_handle()]() {
+        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
+    };
+
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(
+        HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, HandleWrapper{requestContext->stream.native_handle()}));
+
+    io.AddHandle(
+        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(*requestContext, std::move(onHttpResponse), std::move(onProgress)),
+        wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+
+    // Release the lock so the container can still be interacted with while the upload is in progress.
+    lock.reset();
+
+    io.Run({});
+
+    if (pendingErrorJson.has_value())
+    {
+        auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+    }
+}
+
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+{
+    auto lock = m_lock.lock_shared();
+
+    auto [statusCode, socket, isChunked] = m_dockerClient.GetArchive(m_id, SrcPath);
+
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
+
+    wsl::windows::common::io::MultiHandleWait io = m_wslcSession.CreateIOContext();
+
+    std::string errorJson;
+
+    if (statusCode != 200)
+    {
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(socket)}, [&](const gsl::span<char>& buffer) {
+            errorJson.append(buffer.data(), buffer.size());
+        }));
+    }
+    else
+    {
+        if (isChunked)
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+        else
+        {
+            io.AddHandle(
+                std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(socket)}, userHandle.Get()),
+                wsl::windows::common::io::MultiHandleWait::CancelOnCompleted);
+        }
+    }
+
+    lock.reset();
+
+    io.Run({});
+
+    if (statusCode != 200)
+    {
+        auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+    }
+}
+
 void WSLCContainerImpl::GetState(WSLCContainerState* Result)
 {
     auto lock = m_lock.lock_shared();
@@ -2434,6 +2542,24 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
     WSLCExecutionContext context(&m_session);
 
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
+}
+
+HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, DestPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, DestPath[0] == '\0');
+    return CallImpl(&WSLCContainerImpl::UploadArchive, TarHandle, DestPath, ContentSize);
+}
+
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
 }
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

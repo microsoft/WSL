@@ -70,6 +70,7 @@ private:
     {
         std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
+            {L"cp", Localization::WSLCCLI_ContainerCpDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
             {L"export", Localization::WSLCCLI_ContainerExportDesc()},
