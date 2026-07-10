@@ -8,7 +8,7 @@ All prerequisites can be installed automatically by running:
 tools\setup-dev-env.ps1
 ```
 
-This uses [WinGet Configuration](https://learn.microsoft.com/windows/package-manager/configuration/) to install Developer Mode, CMake, Visual Studio 2022, and the required workloads from [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig). If VS 2022 is already installed, the script detects your edition (Community, Professional, or Enterprise) and uses the matching configuration. If no VS 2022 is found, it defaults to Community.
+This uses [WinGet Configuration](https://learn.microsoft.com/windows/package-manager/configuration/) to install Developer Mode, CMake, Visual Studio 2026, and the required workloads from [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig). If VS 2026 is already installed, the script detects your edition (Community, Professional, or Enterprise) and uses the matching configuration. If no VS 2026 is found, it defaults to Community.
 
 You can also run a WinGet configuration directly for your edition:
 
@@ -28,9 +28,9 @@ If you prefer to install prerequisites manually:
 
 - CMake >= 3.25
     - Can be installed with `winget install Kitware.CMake`
-- Visual Studio 2022 with the required components:
+- Visual Studio 2026 with the required components:
     - Use VS Installer → More → Import configuration and select [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig)
-    - Or: `winget install Microsoft.VisualStudio.2022.Community --override "--wait --quiet --config .vsconfig"`
+    - Or: `winget install Microsoft.VisualStudio.Community --override "--wait --quiet --config .vsconfig"`
 - Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) in Windows Settings, or run builds with Administrator privileges (required for symbolic link support)
 
 </details>
