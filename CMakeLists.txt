@@ -367,8 +367,7 @@ else()
 endif()
 
 # Determine the Visual Studio installation directory which contains LLVM tools.
-# Supported versions: VS2026 and VS2022.
-# Prefer VS2026 to keep local clang-format output aligned with pipeline expectations.
+# Supported version: VS2026.
 function(find_vs_install_dir VERSION_RANGE OUTPUT_VAR)
     execute_process(
         COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "${VERSION_RANGE}" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease -latest
@@ -383,18 +382,8 @@ endfunction()
 find_vs_install_dir("[18.0,19.0)" VS_INSTALL_DIR)
 
 if (NOT VS_INSTALL_DIR)
-    find_vs_install_dir("[17.0,18.0)" VS_INSTALL_DIR)
-    if (VS_INSTALL_DIR)
-        message(WARNING "Visual Studio 2026 was not found; using Visual Studio 2022 instead. clang-format output may differ from pipeline expectations.")
-    endif()
-endif()
-
-if (NOT VS_INSTALL_DIR)
     message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
 endif()
-
-# Pick the first line returned from vswhere, in case multiple versions are returned.
-string(REGEX MATCH "([^\n\r]+)" VS_INSTALL_DIR "${VS_INSTALL_DIR}")
 
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     set(LLVM_INSTALL_DIR "${VS_INSTALL_DIR}/VC/Tools/Llvm/x64/bin")
