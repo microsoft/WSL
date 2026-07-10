@@ -30,7 +30,7 @@ Abstract:
 
 namespace wsl::windows::wslc {
 
-using namespace wsl::windows::common::vt;
+using wsl::windows::common::vt::Sequence;
 
 // A table cell: either plain text or a format string with Sequence placeholders.
 // Every {} in the format string corresponds to a Sequence (zero display width).

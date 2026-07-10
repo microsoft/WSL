@@ -22,6 +22,7 @@ namespace wsl::windows::wslc {
 
 FormattedCell::FormattedCell(std::wstring_view text, const Sequence& seq) : sequences({&seq, &Format::Default})
 {
+    WI_ASSERT(text.find(L"{}") == std::wstring_view::npos);
     fmt.reserve(4 + text.size());
     fmt += L"{}";
     fmt += text;
