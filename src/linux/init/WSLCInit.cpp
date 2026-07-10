@@ -1148,6 +1148,14 @@ int WSLCEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
+    //
+    // Increase the network device backlog queue to prevent packet drops when
+    // the kernel bridge forwards large GRO frames (segmented into many
+    // MTU-sized packets) to container network interfaces.
+    //
+
+    WriteToFile("/proc/sys/net/core/netdev_max_backlog", "10000");
+
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
     sigset_t mask{};
