@@ -500,7 +500,8 @@ void ContainerCp(CLIExecutionContext& context)
 
             listStdoutRead.reset();
 
-            // Wait for tar -t to finish (it may still be writing lines we stopped reading).
+            // Kill the tar -t process (it may still be writing lines we stopped reading) and wait for it to exit.
+            TerminateProcess(listHandle.get(), 0);
             SubProcess::GetExitCode(listHandle.get());
 
             THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::WSLCCLI_CpSourceIsDirectoryError(), hasDirectory || entryCount > 1);
