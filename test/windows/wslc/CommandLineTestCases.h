@@ -149,6 +149,27 @@ COMMAND_LINE_TEST_CASE(L"create --gpus all ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --gpus all ubuntu sh", L"create", true)
 COMMAND_LINE_TEST_CASE(L"create --gpus none ubuntu", L"create", false) // Only 'all' is supported
 COMMAND_LINE_TEST_CASE(L"create --gpus", L"create", false)             // Missing value for --gpus
+// Health check tests for container run
+COMMAND_LINE_TEST_CASE(L"run --health-cmd \"exit 0\" ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(
+    L"run --health-interval 30s --health-timeout 5s --health-retries 3 --health-start-period 10s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval 1m30s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval notaduration ubuntu", L"run", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"run --health-timeout -5s ubuntu", L"run", false)           // Negative duration
+COMMAND_LINE_TEST_CASE(L"run --health-retries abc ubuntu", L"run", false)           // Non-numeric retries
+COMMAND_LINE_TEST_CASE(L"run --health-retries -1 ubuntu", L"run", false)            // Negative retries
+COMMAND_LINE_TEST_CASE(L"run --health-interval ubuntu", L"run", false)              // Missing value for --health-interval
+COMMAND_LINE_TEST_CASE(L"run --health-cmd", L"run", false)                          // Missing value for --health-cmd
+// Health check tests for container create
+COMMAND_LINE_TEST_CASE(L"create --health-cmd \"exit 0\" ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(
+    L"container create --health-cmd \"curl -f http://localhost/\" --health-interval 30s --health-timeout 5s --health-retries 3 "
+    L"--health-start-period 10s ubuntu",
+    L"create",
+    true)
+COMMAND_LINE_TEST_CASE(L"create --health-start-period 500ms ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --health-timeout invalid ubuntu", L"create", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"create --health-retries 2.5 ubuntu", L"create", false)     // Non-integer retries
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
