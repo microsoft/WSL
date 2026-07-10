@@ -131,6 +131,12 @@ try
     {
         int bytesSent = Syscall(
             sendto, m_udpSocket.get(), dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent, 0, reinterpret_cast<sockaddr*>(&remoteAddr), sizeof(remoteAddr));
+        // Guard against infinite loop: if sendto returns 0 or a negative value, break out
+        if (bytesSent <= 0)
+        {
+            GNS_LOG_ERROR("UDP DNS sendto failed or returned 0, aborting send loop. bytesSent: {}", bytesSent);
+            break;
+        }
         totalBytesSent += bytesSent;
     }
 }
@@ -166,6 +172,12 @@ try
     while (totalBytesSent < bufferSize)
     {
         int bytesSent = Syscall(write, tcpConnection, dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent);
+        // Guard against infinite loop: if write returns 0 or a negative value, break out
+        if (bytesSent <= 0)
+        {
+            GNS_LOG_ERROR("TCP DNS write failed or returned 0, aborting send loop. bytesSent: {}", bytesSent);
+            break;
+        }
         totalBytesSent += bytesSent;
     }
 }

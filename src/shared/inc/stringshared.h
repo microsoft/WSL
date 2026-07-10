@@ -639,7 +639,9 @@ inline std::wstring MultiByteToWide(const char* string)
     }
 
     std::mbstate_t state{};
-    size_t size = std::mbsrtowcs(nullptr, &string, 0, &state);
+    // Use a temporary pointer for the length calculation since mbsrtowcs advances the source pointer
+    const char* src = string;
+    size_t size = std::mbsrtowcs(nullptr, &src, 0, &state);
     THROW_LAST_ERROR_IF(size == -1);
 
     if (size == 0)
@@ -648,7 +650,9 @@ inline std::wstring MultiByteToWide(const char* string)
     }
 
     std::wstring buffer(size, L'\0');
-    std::mbsrtowcs(buffer.data(), &string, size, &state);
+    // Reset the source pointer for the actual conversion
+    src = string;
+    std::mbsrtowcs(buffer.data(), &src, size, &state);
     return buffer;
 
 #endif // WIN32
@@ -675,7 +679,9 @@ inline std::string WideToMultiByte(const wchar_t* string)
     }
 
     std::mbstate_t state{};
-    size_t size = std::wcsrtombs(nullptr, &string, 0, &state);
+    // Use a temporary pointer for the length calculation since wcsrtombs advances the source pointer
+    const wchar_t* src = string;
+    size_t size = std::wcsrtombs(nullptr, &src, 0, &state);
     THROW_LAST_ERROR_IF(size == -1);
 
     if (size == 0)
@@ -684,7 +690,9 @@ inline std::string WideToMultiByte(const wchar_t* string)
     }
 
     std::string buffer(size, '\0');
-    std::wcsrtombs(buffer.data(), &string, size, &state);
+    // Reset the source pointer for the actual conversion
+    src = string;
+    std::wcsrtombs(buffer.data(), &src, size, &state);
     return buffer;
 
 #endif // WIN32

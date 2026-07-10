@@ -113,11 +113,11 @@ private:
 
     // Unique id that is incremented for each TCP connection. In case the value reaches MAX_UINT and is reset to 0,
     // it's assumed previous connections with id's 0, 1, ... were closed in the meantime and the id can be reused.
-    // _Guarded_by_(m_udpLock)
+    // _Guarded_by_(m_tcpLock)
     uint32_t m_currentTcpConnectionId = 0;
 
     // Mapping TCP connection unique id to connection context
-    // _Guarded_by_(m_udpLock)
+    // _Guarded_by_(m_tcpLock)
     std::map<uint32_t, std::unique_ptr<TcpConnectionContext>> m_tcpConnectionContexts;
 
     // Pipe used to stop m_serverThread.

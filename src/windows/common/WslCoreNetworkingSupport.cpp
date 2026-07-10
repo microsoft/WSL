@@ -41,7 +41,9 @@ static bool FindInterfacesForNetworkAdapter(
     // Find the IP interface(s) in the adapter's interface stack.
     std::vector<IF_INDEX> ipInterfaces{};
     std::queue<IF_INDEX> interfaceStack{};
+    std::unordered_set<IF_INDEX> visitedInterfaces{};
     interfaceStack.push(interfaceIndex);
+    visitedInterfaces.insert(interfaceIndex);
     while (!interfaceStack.empty())
     {
         IF_INDEX currInterfaceIndex = interfaceStack.front();
@@ -51,7 +53,12 @@ static bool FindInterfacesForNetworkAdapter(
         {
             if (interfaceStackTable.get()->Table[i].LowerLayerInterfaceIndex == currInterfaceIndex)
             {
-                interfaceStack.push(interfaceStackTable.get()->Table[i].HigherLayerInterfaceIndex);
+                IF_INDEX higherLayer = interfaceStackTable.get()->Table[i].HigherLayerInterfaceIndex;
+                // Guard against circular references in the interface stack table
+                if (visitedInterfaces.insert(higherLayer).second)
+                {
+                    interfaceStack.push(higherLayer);
+                }
             }
         }
 
