@@ -3532,11 +3532,19 @@ class WSLCTests
         auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        // Install socat in the container.
-        //
-        // TODO: revisit this in the future to avoid pulling packages from the network.
-        auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
-        ValidateProcessOutput(installSocat, {}, 0, 300 * 1000);
+        // Install socat in the VM.
+        {
+            constexpr auto c_mountPoint = "/testdata";
+            auto mountSource = std::filesystem::absolute(g_testDataPath);
+
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true));
+            auto unmount =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
+
+            const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
+            auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
+            ValidateProcessOutput(installSocat, {}, 0, 120 * 1000);
+        }
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
