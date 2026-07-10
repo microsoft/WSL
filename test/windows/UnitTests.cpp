@@ -516,6 +516,46 @@ class UnitTests
         }
     }
 
+    WSL2_TEST_METHOD(ConfigUpdateLanguage)
+    {
+        // Validates that init populates $LANG from the distro locale configuration file.
+        // ConfigUpdateLanguage reads /etc/default/locale first, then /etc/locale.conf, and uses
+        // the first file that exists. See ConfigUpdateLanguage in src/linux/init/config.cpp.
+
+        DistroFileChange defaultLocale(L"/etc/default/locale", LxsstuLaunchWsl(L"test -f /etc/default/locale") == 0);
+        DistroFileChange localeConf(L"/etc/locale.conf", LxsstuLaunchWsl(L"test -f /etc/locale.conf") == 0);
+
+        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"echo $LANG").first; };
+
+        // Only /etc/default/locale is present (Debian/Ubuntu).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=de_DE.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"de_DE.UTF-8\n");
+        }
+
+        // Only /etc/locale.conf is present (Fedora, Arch, openSUSE, ...).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            localeConf.SetContent(L"LANG=fr_FR.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"fr_FR.UTF-8\n");
+        }
+
+        // Both files are present: /etc/default/locale takes precedence because it is read first.
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=ja_JP.UTF-8\n");
+            localeConf.SetContent(L"LANG=en_US.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"ja_JP.UTF-8\n");
+        }
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
