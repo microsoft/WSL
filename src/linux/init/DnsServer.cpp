@@ -131,11 +131,11 @@ try
     {
         int bytesSent = Syscall(
             sendto, m_udpSocket.get(), dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent, 0, reinterpret_cast<sockaddr*>(&remoteAddr), sizeof(remoteAddr));
-        // Guard against infinite loop: if sendto returns 0 or a negative value, break out
-        if (bytesSent <= 0)
+        // Syscall() throws on negative return; guard against the unexpected "no progress" case to avoid an infinite loop.
+        if (bytesSent == 0)
         {
-            GNS_LOG_ERROR("UDP DNS sendto failed or returned 0, aborting send loop. bytesSent: {}", bytesSent);
-            break;
+            GNS_LOG_ERROR("UDP DNS sendto returned 0 bytes; aborting send loop. UDP request id: {}", dnsClientIdentifier.DnsClientId);
+            return;
         }
         totalBytesSent += bytesSent;
     }
@@ -172,11 +172,13 @@ try
     while (totalBytesSent < bufferSize)
     {
         int bytesSent = Syscall(write, tcpConnection, dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent);
-        // Guard against infinite loop: if write returns 0 or a negative value, break out
-        if (bytesSent <= 0)
+        // Syscall() throws on negative return; if write returns 0, treat the connection as broken
+        // and remove it from tracking to avoid repeated writes to a dead fd.
+        if (bytesSent == 0)
         {
-            GNS_LOG_ERROR("TCP DNS write failed or returned 0, aborting send loop. bytesSent: {}", bytesSent);
-            break;
+            GNS_LOG_ERROR("TCP DNS write returned 0 bytes; closing connection. TCP connection id: {}", dnsClientIdentifier.DnsClientId);
+            m_tcpConnectionContexts.erase(it);
+            return;
         }
         totalBytesSent += bytesSent;
     }

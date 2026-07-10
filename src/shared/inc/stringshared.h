@@ -650,9 +650,13 @@ inline std::wstring MultiByteToWide(const char* string)
     }
 
     std::wstring buffer(size, L'\0');
-    // Reset the source pointer for the actual conversion
+    // Reset the source pointer and conversion state for the actual conversion pass.
+    // The mbstate_t must be reset because stateful encodings may have left residual shift state
+    // from the length-calculation pass.
     src = string;
-    std::mbsrtowcs(buffer.data(), &src, size, &state);
+    state = std::mbstate_t{};
+    size_t result = std::mbsrtowcs(buffer.data(), &src, size, &state);
+    THROW_LAST_ERROR_IF(result == static_cast<size_t>(-1));
     return buffer;
 
 #endif // WIN32
@@ -690,9 +694,13 @@ inline std::string WideToMultiByte(const wchar_t* string)
     }
 
     std::string buffer(size, '\0');
-    // Reset the source pointer for the actual conversion
+    // Reset the source pointer and conversion state for the actual conversion pass.
+    // The mbstate_t must be reset because stateful encodings may have left residual shift state
+    // from the length-calculation pass.
     src = string;
-    std::wcsrtombs(buffer.data(), &src, size, &state);
+    state = std::mbstate_t{};
+    size_t result = std::wcsrtombs(buffer.data(), &src, size, &state);
+    THROW_LAST_ERROR_IF(result == static_cast<size_t>(-1));
     return buffer;
 
 #endif // WIN32
