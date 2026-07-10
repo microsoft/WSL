@@ -642,7 +642,7 @@ inline std::wstring MultiByteToWide(const char* string)
     // Use a temporary pointer for the length calculation since mbsrtowcs advances the source pointer
     const char* src = string;
     size_t size = std::mbsrtowcs(nullptr, &src, 0, &state);
-    THROW_LAST_ERROR_IF(size == -1);
+    THROW_LAST_ERROR_IF(size == static_cast<size_t>(-1));
 
     if (size == 0)
     {
@@ -686,7 +686,7 @@ inline std::string WideToMultiByte(const wchar_t* string)
     // Use a temporary pointer for the length calculation since wcsrtombs advances the source pointer
     const wchar_t* src = string;
     size_t size = std::wcsrtombs(nullptr, &src, 0, &state);
-    THROW_LAST_ERROR_IF(size == -1);
+    THROW_LAST_ERROR_IF(size == static_cast<size_t>(-1));
 
     if (size == 0)
     {
