@@ -73,8 +73,8 @@ wil::unique_handle wsl::windows::common::security::CreateRestrictedToken(_In_ HA
 
     // Get the thread token with appropriate access rights.
     wil::unique_handle newToken{};
-    THROW_IF_WIN32_BOOL_FALSE(::OpenThreadToken(
-        ::GetCurrentThread(), (TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT | TOKEN_ASSIGN_PRIMARY), TRUE, &newToken));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::OpenThreadToken(::GetCurrentThread(), (TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT | TOKEN_ASSIGN_PRIMARY), TRUE, &newToken));
 
     // Create a restricted token with only the SeChangeNotifyPrivilege privilege.
     wil::unique_handle restrictedToken{};
@@ -161,13 +161,14 @@ wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE 
     }
 
     wil::unique_handle newToken;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(
-        contextToken.get(),
-        TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_DEFAULT,
-        nullptr,
-        SecurityImpersonation,
-        tokenType,
-        &newToken));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::DuplicateTokenEx(
+            contextToken.get(),
+            TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_DEFAULT,
+            nullptr,
+            SecurityImpersonation,
+            tokenType,
+            &newToken));
 
     // If the token integrity level is system, reduce it to high integrity level. The VM worker process runs at
     // high integrity level and objects created with a higher integrity level token may be inaccessible.

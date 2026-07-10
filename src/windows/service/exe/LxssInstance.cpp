@@ -821,8 +821,12 @@ void LxssInstance::_InitializeNetworking()
     m_ipTables.EnableIpTablesSupport(m_instanceHandle);
 
     // Register for network connectivity change notifications to update network information.
-    LOG_IF_WIN32_ERROR(::NotifyNetworkConnectivityHintChange(
-        [](PVOID context, NL_NETWORK_CONNECTIVITY_HINT) { static_cast<LxssInstance*>(context)->_UpdateNetworkInformation(); }, this, TRUE, &m_networkNotificationHandle));
+    LOG_IF_WIN32_ERROR(
+        ::NotifyNetworkConnectivityHintChange(
+            [](PVOID context, NL_NETWORK_CONNECTIVITY_HINT) { static_cast<LxssInstance*>(context)->_UpdateNetworkInformation(); },
+            this,
+            TRUE,
+            &m_networkNotificationHandle));
 }
 
 void LxssInstance::_InitiateConnectionToInitProcess()

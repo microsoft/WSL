@@ -29,8 +29,9 @@ namespace {
 HRESULT CreateToastNotifier(IToastNotifier** notifier)
 {
     ComPtr<IToastNotificationManagerStatics> toastStatics;
-    RETURN_IF_FAILED(Windows::Foundation::GetActivationFactory(
-        HStringReference(RuntimeClass_Windows_UI_Notifications_ToastNotificationManager).Get(), &toastStatics));
+    RETURN_IF_FAILED(
+        Windows::Foundation::GetActivationFactory(
+            HStringReference(RuntimeClass_Windows_UI_Notifications_ToastNotificationManager).Get(), &toastStatics));
 
     return toastStatics->CreateToastNotifierWithId(HStringReference(L"Microsoft.WSL").Get(), notifier);
 }
@@ -51,8 +52,8 @@ HRESULT CreateXmlDocumentFromString(const wchar_t* xmlString, IXmlDocument** doc
 HRESULT CreateToastNotification(IXmlDocument* content, IToastNotification** notification)
 {
     ComPtr<IToastNotificationFactory> factory;
-    RETURN_IF_FAILED(Windows::Foundation::GetActivationFactory(
-        HStringReference(RuntimeClass_Windows_UI_Notifications_ToastNotification).Get(), &factory));
+    RETURN_IF_FAILED(
+        Windows::Foundation::GetActivationFactory(HStringReference(RuntimeClass_Windows_UI_Notifications_ToastNotification).Get(), &factory));
 
     return factory->CreateToastNotification(content, notification);
 }

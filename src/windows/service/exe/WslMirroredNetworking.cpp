@@ -1556,8 +1556,9 @@ try
 
             // Set the due time just past the debounce timer duration, relative to the last update time.
             m_IsDebounceUpdateAllEndpointsDefaultTimerSet = true;
-            FILETIME dueTime = wil::filetime::from_int64(static_cast<ULONGLONG>(
-                -1 * (wil::filetime_duration::one_millisecond * (20 + m_debounceUpdateAllEndpointsTimerMs - timeFromLastUpdate))));
+            FILETIME dueTime = wil::filetime::from_int64(
+                static_cast<ULONGLONG>(
+                    -1 * (wil::filetime_duration::one_millisecond * (20 + m_debounceUpdateAllEndpointsTimerMs - timeFromLastUpdate))));
             SetThreadpoolTimer(m_debounceUpdateAllEndpointsDefaultTimer.get(), &dueTime, 0, 0);
             return;
         }

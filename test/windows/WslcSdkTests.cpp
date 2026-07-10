@@ -92,11 +92,13 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
     ProcessOutput output;
     wsl::windows::common::io::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
-        std::move(ownedStdout), [&](const auto& buffer) { output.stdoutOutput.append(buffer.data(), buffer.size()); }));
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(std::move(ownedStdout), [&](const auto& buffer) {
+        output.stdoutOutput.append(buffer.data(), buffer.size());
+    }));
 
-    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
-        std::move(ownedStderr), [&](const auto& buffer) { output.stderrOutput.append(buffer.data(), buffer.size()); }));
+    io.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(std::move(ownedStderr), [&](const auto& buffer) {
+        output.stderrOutput.append(buffer.data(), buffer.size());
+    }));
 
     auto timeoutTime = std::chrono::steady_clock::now() + timeout;
     io.Run(timeout);
@@ -332,12 +334,13 @@ class WslcSdkTests
 
         auto callback = [](const WslcSessionCrashDumpInfo* info, PVOID context) {
             auto* p = static_cast<std::promise<Invocation>*>(context);
-            p->set_value(Invocation{
-                info->dumpPath ? std::wstring{info->dumpPath} : std::wstring{},
-                info->processName ? std::string{info->processName} : std::string{},
-                info->pid,
-                info->signal,
-                info->timestamp});
+            p->set_value(
+                Invocation{
+                    info->dumpPath ? std::wstring{info->dumpPath} : std::wstring{},
+                    info->processName ? std::string{info->processName} : std::string{},
+                    info->pid,
+                    info->signal,
+                    info->timestamp});
         };
 
         std::filesystem::path extraStorage = m_storagePath / "wslc-crash-callback-storage";
@@ -2652,14 +2655,15 @@ class WslcSdkTests
         auto output = WaitForProcessOutput(process.get());
         VERIFY_ARE_EQUAL(output.stdoutOutput, "wslc-auto-remove\n");
 
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                WslcContainerState state{};
-                THROW_IF_FAILED(WslcGetContainerState(container.get(), &state));
-                THROW_WIN32_IF(ERROR_RETRY, state != WSLC_CONTAINER_STATE_DELETED);
-            },
-            std::chrono::milliseconds{100},
-            std::chrono::seconds{30}));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    WslcContainerState state{};
+                    THROW_IF_FAILED(WslcGetContainerState(container.get(), &state));
+                    THROW_WIN32_IF(ERROR_RETRY, state != WSLC_CONTAINER_STATE_DELETED);
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{30}));
     }
 
     WSLC_TEST_METHOD(DeleteRunningContainerWithForce)

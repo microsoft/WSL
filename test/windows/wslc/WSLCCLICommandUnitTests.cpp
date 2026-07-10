@@ -286,8 +286,9 @@ class WSLCCLICommandUnitTests
                 // Check for duplicate ArgType registration.
                 if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)
                 {
-                    VERIFY_FAIL(std::format(L"Command '{}' registers ArgType '{}' more than once", commandFullName, ArgTypeName(arg.Type()))
-                                    .c_str());
+                    VERIFY_FAIL(
+                        std::format(L"Command '{}' registers ArgType '{}' more than once", commandFullName, ArgTypeName(arg.Type()))
+                            .c_str());
                 }
 
                 // Check name collision between distinct ArgTypes.
@@ -295,13 +296,14 @@ class WSLCCLICommandUnitTests
                 auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
                 if (!nameInserted)
                 {
-                    VERIFY_FAIL(std::format(
-                                    L"Command '{}' has duplicate name '--{}' (ArgType '{}' conflicts with ArgType '{}')",
-                                    commandFullName,
-                                    name,
-                                    ArgTypeName(arg.Type()),
-                                    ArgTypeName(nameIt->second))
-                                    .c_str());
+                    VERIFY_FAIL(
+                        std::format(
+                            L"Command '{}' has duplicate name '--{}' (ArgType '{}' conflicts with ArgType '{}')",
+                            commandFullName,
+                            name,
+                            ArgTypeName(arg.Type()),
+                            ArgTypeName(nameIt->second))
+                            .c_str());
                 }
 
                 // Check alias collision between distinct ArgTypes; skip empty aliases (NO_ALIAS).
@@ -311,13 +313,14 @@ class WSLCCLICommandUnitTests
                     auto [aliasIt, aliasInserted] = seenAliases.emplace(alias, arg.Type());
                     if (!aliasInserted)
                     {
-                        VERIFY_FAIL(std::format(
-                                        L"Command '{}' has duplicate alias '-{}' (ArgType '{}' conflicts with ArgType '{}')",
-                                        commandFullName,
-                                        alias,
-                                        ArgTypeName(arg.Type()),
-                                        ArgTypeName(aliasIt->second))
-                                        .c_str());
+                        VERIFY_FAIL(
+                            std::format(
+                                L"Command '{}' has duplicate alias '-{}' (ArgType '{}' conflicts with ArgType '{}')",
+                                commandFullName,
+                                alias,
+                                ArgTypeName(arg.Type()),
+                                ArgTypeName(aliasIt->second))
+                                .c_str());
                     }
                 }
             }

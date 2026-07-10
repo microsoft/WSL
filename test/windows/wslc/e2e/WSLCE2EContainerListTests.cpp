@@ -303,8 +303,11 @@ class WSLCE2EContainerListTests
         VerifyContainerIsNotListed(WslcContainerName2);
 
         // First container has both labels; second has only one of them.
-        auto result = RunWslc(std::format(
-            L"container create --name {} --label filter.test=yes --label filter.role=primary {}", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --label filter.test=yes --label filter.role=primary {}",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container create --name {} --label filter.test=yes {}", WslcContainerName2, DebianImage.NameAndTag()));

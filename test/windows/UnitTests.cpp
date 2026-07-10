@@ -338,8 +338,9 @@ class UnitTests
         auto cleanup = EnableSystemd("initTimeout=0");
 
         // Wait for systemd to be started
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Validate that the X11 socket has not been deleted
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
@@ -391,7 +392,8 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
 
             // Runtime registration via /register still works (we only block /status).
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
             // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
             // cascade into later tests. Always remove it on scope exit.
@@ -434,15 +436,17 @@ class UnitTests
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto revert = EnableSystemd("initTimeout=0");
         // Wait for systemd to start
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Kill the WSL init process
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
 
         // Wait for the distro to exit.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
 
         // Verify that a new WSL command succeeds (the distro restarts cleanly).
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
@@ -4231,8 +4235,9 @@ localhostForwarding=true
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
+                LxsstuLaunchWsl(
+                    std::format(
+                        L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
                 0L);
         }
 
@@ -6850,8 +6855,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
-            dmesg.find(
-                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            dmesg.find(L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
             std::wstring::npos);
     }
 
@@ -7035,14 +7039,15 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::vector<gsl::byte> message;
 
             wsl::windows::common::io::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                wsl::windows::common::io::HandleWrapper{std::move(server)},
-                buffer,
-                pendingBytes,
-                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
-                    callbackInvoked = true;
-                    message.assign(received.begin(), received.end());
-                }));
+            io.AddHandle(
+                std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)},
+                    buffer,
+                    pendingBytes,
+                    [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                        callbackInvoked = true;
+                        message.assign(received.begin(), received.end());
+                    }));
 
             const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
             VERIFY_ARE_EQUAL(hr, expectedHr);
@@ -7254,11 +7259,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             bool callbackInvoked = false;
             const auto hr = wil::ResultFromException([&]() {
                 wsl::windows::common::io::MultiHandleWait io;
-                io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                    wsl::windows::common::io::HandleWrapper{std::move(server)},
-                    buffer,
-                    pendingBytes,
-                    [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                        wsl::windows::common::io::HandleWrapper{std::move(server)},
+                        buffer,
+                        pendingBytes,
+                        [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
                 io.Run(std::chrono::seconds(60));
             });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
@@ -7288,13 +7294,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             wsl::windows::common::io::MultiHandleWait io;
             for (size_t i = 0; i < handleCount; ++i)
             {
-                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
-                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
-                        std::lock_guard lock{firedLock};
-                        VERIFY_IS_FALSE(fired[i]);
-                        fired[i] = true;
-                        firedCount.fetch_add(1);
-                    }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::EventHandle>(
+                        wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                            std::lock_guard lock{firedLock};
+                            VERIFY_IS_FALSE(fired[i]);
+                            fired[i] = true;
+                            firedCount.fetch_add(1);
+                        }));
             }
 
             for (auto& e : events)
@@ -7326,13 +7333,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             wsl::windows::common::io::MultiHandleWait io;
             for (size_t i = 0; i < handleCount; ++i)
             {
-                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
-                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
-                        std::lock_guard lock{firedLock};
-                        VERIFY_IS_FALSE(fired[i]);
-                        fired[i] = true;
-                        firedCount.fetch_add(1);
-                    }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::EventHandle>(
+                        wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                            std::lock_guard lock{firedLock};
+                            VERIFY_IS_FALSE(fired[i]);
+                            fired[i] = true;
+                            firedCount.fetch_add(1);
+                        }));
             }
 
             std::thread signaller([&events]() {

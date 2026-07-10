@@ -510,8 +510,9 @@ class WSLCE2EContainerCpTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)
     {
         // Create a container, put a file in it, stop it, then copy out.
-        auto runResult = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto runResult = RunWslc(
+            std::format(
+                L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Container has exited (ran a one-shot command). Copy from the stopped container.

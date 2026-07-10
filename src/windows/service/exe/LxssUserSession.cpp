@@ -2474,8 +2474,9 @@ std::vector<wsl::windows::common::filesystem::unique_lxss_addmount> LxssUserSess
     auto runAsUser = wil::CoImpersonateClient();
     const auto rootFsPath = Configuration.BasePath / LXSS_ROOTFS_DIRECTORY;
     std::vector<wsl::windows::common::filesystem::unique_lxss_addmount> mounts;
-    mounts.emplace_back(wsl::windows::common::filesystem::CreateMount(
-        rootFsPath.c_str(), LXSS_ROOTFS_DIRECTORY, LXSS_ROOTFS_MOUNT, LXSS_DISTRO_USES_WSL_FS(Configuration.Version) ? LXSS_FS_TYPE_WSLFS : LXSS_FS_TYPE_LXFS, 0755));
+    mounts.emplace_back(
+        wsl::windows::common::filesystem::CreateMount(
+            rootFsPath.c_str(), LXSS_ROOTFS_DIRECTORY, LXSS_ROOTFS_MOUNT, LXSS_DISTRO_USES_WSL_FS(Configuration.Version) ? LXSS_FS_TYPE_WSLFS : LXSS_FS_TYPE_LXFS, 0755));
 
     // Add a read only sharefs mount to the inbox tools directory which contains the bsdtar binary.
     std::wstring systemDirectory;
@@ -2483,8 +2484,8 @@ std::vector<wsl::windows::common::filesystem::unique_lxss_addmount> LxssUserSess
 
     // Add a read only sharefs mount to the packaged tools directory which contains the init binary.
     const auto initPath = wsl::windows::common::wslutil::GetBasePath() / L"tools";
-    mounts.emplace_back(wsl::windows::common::filesystem::CreateMount(
-        initPath.c_str(), initPath.c_str(), LXSS_TOOLS_MOUNT, LXSS_FS_TYPE_SHAREFS, 0755, false));
+    mounts.emplace_back(
+        wsl::windows::common::filesystem::CreateMount(initPath.c_str(), initPath.c_str(), LXSS_TOOLS_MOUNT, LXSS_FS_TYPE_SHAREFS, 0755, false));
 
     return mounts;
 }
@@ -2764,8 +2765,9 @@ try
     auto distributionProfileId =
         wsl::shared::string::GuidToString<wchar_t>(CreateV5Uuid(WslTerminalNamespace, std::as_bytes(std::span{distributionIdString})));
 
-    auto hideGeneratedProfileGuid = WideToMultiByte(wsl::shared::string::GuidToString<wchar_t>(
-        CreateV5Uuid(GeneratedProfilesTerminalNamespace, std::as_bytes(std::span{Configuration.Name}))));
+    auto hideGeneratedProfileGuid = WideToMultiByte(
+        wsl::shared::string::GuidToString<wchar_t>(
+            CreateV5Uuid(GeneratedProfilesTerminalNamespace, std::as_bytes(std::span{Configuration.Name}))));
 
     bool foundHideProfile = false;
 
@@ -4020,8 +4022,8 @@ try
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     // This is needed to launch the OOBE process as the user.
     wil::unique_handle userTokenCreateProcess;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(
-        userToken.get(), MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &userTokenCreateProcess));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::DuplicateTokenEx(userToken.get(), MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &userTokenCreateProcess));
     wsl::windows::common::helpers::LaunchWslSettingsOOBE(userTokenCreateProcess.get());
     wsl::windows::common::registry::WriteDword(lxssKey.get(), nullptr, LXSS_OOBE_COMPLETE_NAME, true);
 }

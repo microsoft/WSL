@@ -80,8 +80,9 @@ try
     // Register the class factory (single-use: one factory per process)
     auto factory = winrt::make<WSLCSessionFactoryClassFactory>();
     wil::unique_com_class_object_cookie cookie;
-    THROW_IF_FAILED(::CoRegisterClassObject(
-        __uuidof(wsl::windows::service::wslc::WSLCSessionFactory), factory.get(), CLSCTX_LOCAL_SERVER, REGCLS_SINGLEUSE, &cookie));
+    THROW_IF_FAILED(
+        ::CoRegisterClassObject(
+            __uuidof(wsl::windows::service::wslc::WSLCSessionFactory), factory.get(), CLSCTX_LOCAL_SERVER, REGCLS_SINGLEUSE, &cookie));
 
     WSL_LOG("Per-user session server registered, waiting for activations", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 

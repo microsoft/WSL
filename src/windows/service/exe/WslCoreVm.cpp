@@ -519,8 +519,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 }
                 else if (FAILED(result))
                 {
-                    EMIT_USER_WARNING(wsl::shared::Localization::MessagedFailedToCreateSwapVhd(
-                        m_vmConfig.SwapFilePath.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(result).c_str()));
+                    EMIT_USER_WARNING(
+                        wsl::shared::Localization::MessagedFailedToCreateSwapVhd(
+                            m_vmConfig.SwapFilePath.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(result).c_str()));
 
                     THROW_HR(result);
                 }
@@ -584,8 +585,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             if (!natNetwork)
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
-                    ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::Consomme)));
+                EMIT_USER_WARNING(
+                    wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
+                        ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::Consomme)));
 
                 m_vmConfig.NetworkingMode = NetworkingMode::Consomme;
             }
@@ -686,8 +688,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
 
             // Fall back to no networking.
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
-                ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::None)));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
+                    ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::None)));
 
             m_vmConfig.NetworkingMode = NetworkingMode::None;
             m_networkingEngine.reset();
@@ -2933,8 +2936,8 @@ void WslCoreVm::ValidateNetworkingMode()
         if (disabledComponents == c_ipv6Disabled)
         {
             m_vmConfig.NetworkingMode = NetworkingMode::Nat;
-            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingNotSupportedReason(
-                Localization::MessageMirroredNetworkingNotSupportedIpv6Disabled()));
+            EMIT_USER_WARNING(
+                Localization::MessageMirroredNetworkingNotSupportedReason(Localization::MessageMirroredNetworkingNotSupportedIpv6Disabled()));
         }
     }
 
@@ -2944,14 +2947,16 @@ void WslCoreVm::ValidateNetworkingMode()
         if ((m_kernelVersion < std::make_tuple(5u, 10u, 0u)) || !m_seccompAvailable)
         {
             m_vmConfig.NetworkingMode = NetworkingMode::Nat;
-            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingNotSupportedReason(
-                Localization::MessageMirroredNetworkingNotSupportedKernel()));
+            EMIT_USER_WARNING(
+                Localization::MessageMirroredNetworkingNotSupportedReason(Localization::MessageMirroredNetworkingNotSupportedKernel()));
         }
         else if (!wsl::core::networking::IsFlowSteeringSupportedByHns() || !m_vmConfig.FirewallConfig.Enabled())
         {
             m_vmConfig.NetworkingMode = NetworkingMode::Nat;
-            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingNotSupportedReason(Localization::MessageMirroredNetworkingNotSupportedWindowsVersion(
-                m_windowsVersion.BuildNumber, m_windowsVersion.UpdateBuildRevision)));
+            EMIT_USER_WARNING(
+                Localization::MessageMirroredNetworkingNotSupportedReason(
+                    Localization::MessageMirroredNetworkingNotSupportedWindowsVersion(
+                        m_windowsVersion.BuildNumber, m_windowsVersion.UpdateBuildRevision)));
         }
     }
 

@@ -105,8 +105,9 @@ class WSLCE2ENetworkPruneTests
         VerifyNetworkIsListed(TestNetworkName);
 
         // Start a container attached to the network so it is considered in use.
-        RunWslc(std::format(
-                    L"container run -d --name {} --network {} {} sleep infinity", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()))
+        RunWslc(
+            std::format(
+                L"container run -d --name {} --network {} {} sleep infinity", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()))
             .Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() {
