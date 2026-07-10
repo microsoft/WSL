@@ -412,8 +412,9 @@ void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
     {
         while (m_stdoutReader->ReadBytes(m_ignoreSequence->size()) == *m_ignoreSequence)
         {
-            Log::Comment(std::format(L"Consuming ignored sequence: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(*m_ignoreSequence)))
-                             .c_str());
+            Log::Comment(
+                std::format(L"Consuming ignored sequence: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(*m_ignoreSequence)))
+                    .c_str());
             m_stdoutReader->ConsumeBytes(m_ignoreSequence->size());
         }
     }
@@ -564,8 +565,9 @@ void WSLCInteractiveSession::VerifyNoErrors()
     const auto& stderrContent = m_stderrReader->GetData();
     if (!stderrContent.empty())
     {
-        VERIFY_FAIL(std::format(L"Expected no errors but stderr contained: {}", wsl::shared::string::MultiByteToWide(EscapeString(stderrContent)))
-                        .c_str());
+        VERIFY_FAIL(
+            std::format(L"Expected no errors but stderr contained: {}", wsl::shared::string::MultiByteToWide(EscapeString(stderrContent)))
+                .c_str());
     }
 }
 

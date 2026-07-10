@@ -120,8 +120,12 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str()));
         auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
 
-        auto result = RunWslc(std::format(
-            L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --cidfile \"{}\" --name {} {}",
+                EscapePath(cidFilePath.wstring()),
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto containerId = result.GetStdoutOneLine();
@@ -134,8 +138,12 @@ class WSLCE2EContainerCreateTests
         const auto cidFilePath = wsl::windows::common::filesystem::GetTempFilename();
         auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
 
-        auto result = RunWslc(std::format(
-            L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --cidfile \"{}\" --name {} {}",
+                EscapePath(cidFilePath.wstring()),
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify(
             {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_FILE_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
              .ExitCode = 1});
@@ -170,12 +178,13 @@ class WSLCE2EContainerCreateTests
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
 
-        auto result = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data:ro\" {} cat /data/{}",
-            WslcContainerName,
-            hostDirectory.wstring(),
-            AlpineImage.NameAndTag(),
-            fileName));
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data:ro\" {} cat /data/{}",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
         result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -183,12 +192,13 @@ class WSLCE2EContainerCreateTests
     {
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-            WslcContainerName,
-            hostDirectory.wstring(),
-            AlpineImage.NameAndTag(),
-            fileName));
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
@@ -200,12 +210,13 @@ class WSLCE2EContainerCreateTests
     {
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-            WslcContainerName,
-            hostDirectory.wstring(),
-            AlpineImage.NameAndTag(),
-            fileName));
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
@@ -219,12 +230,13 @@ class WSLCE2EContainerCreateTests
     {
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data:ro\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-            WslcContainerName,
-            hostDirectory.wstring(),
-            AlpineImage.NameAndTag(),
-            fileName));
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data:ro\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
         auto errorMessage = std::format(L"sh: can't create /data/{}: Read-only file system\n", fileName);
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
@@ -236,16 +248,17 @@ class WSLCE2EContainerCreateTests
         auto fileName1 = VolumeTestFile1.filename().wstring();
         auto hostDirectory2 = VolumeTestFile2.parent_path();
         auto fileName2 = VolumeTestFile2.filename().wstring();
-        auto result = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > "
-            L"/data1/{} && "
-            L"echo -n 'Test2' > /data2/{}\"",
-            WslcContainerName,
-            hostDirectory1.wstring(),
-            hostDirectory2.wstring(),
-            AlpineImage.NameAndTag(),
-            fileName1,
-            fileName2));
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > "
+                L"/data1/{} && "
+                L"echo -n 'Test2' > /data2/{}\"",
+                WslcContainerName,
+                hostDirectory1.wstring(),
+                hostDirectory2.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName1,
+                fileName2));
 
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
@@ -285,22 +298,24 @@ class WSLCE2EContainerCreateTests
             VERIFY_IS_TRUE(out.good(), L"Failed to write to test file (host -> container test)");
         }
 
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --volume \"{}:/data:ro\" {} cat /data/reltest.txt",
-            WslcContainerName,
-            relativeDir,
-            AlpineImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container run --rm --name {} --volume \"{}:/data:ro\" {} cat /data/reltest.txt",
+                WslcContainerName,
+                relativeDir,
+                AlpineImage.NameAndTag()));
         result.Verify({.Stdout = L"WSLC Relative Path Test", .Stderr = L"", .ExitCode = 0});
 
         EnsureContainerDoesNotExist(WslcContainerName);
 
         // Write a file from the container and verify the host can read it back via the relative path mount.
-        result = RunWslc(std::format(
-            L"container run --rm --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Relative Path Write Test' > "
-            L"/data/reltest.txt\"",
-            WslcContainerName,
-            relativeDir,
-            AlpineImage.NameAndTag()));
+        result = RunWslc(
+            std::format(
+                L"container run --rm --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Relative Path Write Test' > "
+                L"/data/reltest.txt\"",
+                WslcContainerName,
+                relativeDir,
+                AlpineImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         std::ifstream in(testFile);
@@ -368,22 +383,26 @@ class WSLCE2EContainerCreateTests
         }
 
         {
-            auto result = RunWslc(std::format(
-                L"container run --name {} --volume C:\\hostPath:/containerPath:invalid_mode {}", WslcContainerName, AlpineImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(
+                    L"container run --name {} --volume C:\\hostPath:/containerPath:invalid_mode {}",
+                    WslcContainerName,
+                    AlpineImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:invalid_mode'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
-            auto result = RunWslc(std::format(
-                L"container run --name {} --volume C:\\hostPath:/containerPath:ro:extra {}", WslcContainerName, AlpineImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(
+                    L"container run --name {} --volume C:\\hostPath:/containerPath:ro:extra {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:ro:extra'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
-            auto result = RunWslc(std::format(
-                L"container run --name {} --volume C:\\hostPath:/containerPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(L"container run --name {} --volume C:\\hostPath:/containerPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
@@ -469,8 +488,8 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         const auto& prompt = ">";
-        auto result = RunWslc(std::format(
-            L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
@@ -530,8 +549,8 @@ class WSLCE2EContainerCreateTests
 
         constexpr auto ExpectedExitCode = 37;
 
-        auto result = RunWslc(std::format(
-            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
+        auto result = RunWslc(
+            std::format(L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
 
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -551,8 +570,9 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -572,11 +592,12 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
-            L"/wslc-tmpfs/data\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
+                L"/wslc-tmpfs/data\"",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -585,11 +606,13 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_With_Options)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' "
-            L"&& echo mounted\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs "
+                L"' "
+                L"&& echo mounted\"",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -598,11 +621,13 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_Multiple_With_Options)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q "
-            L"' on /wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | "
+                L"grep -q "
+                L"' on /wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -646,8 +671,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Hostname)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --hostname my-test-host {} hostname", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --name {} --hostname my-test-host {} hostname", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -656,8 +681,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Domainname)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --domainname my-test-domain {} dnsdomainname", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --name {} --domainname my-test-domain {} dnsdomainname", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -666,8 +691,9 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -678,10 +704,11 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSSearch)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -691,10 +718,11 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSOption)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -705,11 +733,12 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_StopSignal)
     {
         constexpr int ExpectedExitCode = 42;
-        auto result = RunWslc(std::format(
-            LR"(container create --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")",
-            WslcContainerName,
-            DebianImage.NameAndTag(),
-            ExpectedExitCode));
+        auto result = RunWslc(
+            std::format(
+                LR"(container create --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")",
+                WslcContainerName,
+                DebianImage.NameAndTag(),
+                ExpectedExitCode));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VerifyContainerIsListed(containerId, L"created");
@@ -731,8 +760,9 @@ class WSLCE2EContainerCreateTests
         // A positive value is forwarded to the container configuration.
         {
             constexpr int ExpectedStopTimeout = 30;
-            auto result = RunWslc(std::format(
-                L"container create --stop-timeout {} --name {} {}", ExpectedStopTimeout, WslcContainerName, DebianImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(
+                    L"container create --stop-timeout {} --name {} {}", ExpectedStopTimeout, WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             const auto inspect = InspectContainer(WslcContainerName);
@@ -825,10 +855,11 @@ class WSLCE2EContainerCreateTests
     {
         // All health-check options are forwarded to the container configuration.
         {
-            auto result = RunWslc(std::format(
-                LR"(container create --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {})",
-                WslcContainerName,
-                DebianImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(
+                    LR"(container create --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {})",
+                    WslcContainerName,
+                    DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             const auto inspect = InspectContainer(WslcContainerName);
@@ -883,8 +914,8 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_HealthCheck_Invalid)
     {
         {
-            auto result = RunWslc(std::format(
-                L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify(
                 {.Stderr = L"Invalid health-interval argument value: 'notaduration'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
@@ -898,15 +929,16 @@ class WSLCE2EContainerCreateTests
         }
 
         {
-            auto result = RunWslc(std::format(
-                LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(
+                    LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
-            auto result = RunWslc(std::format(
-                L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            auto result = RunWslc(
+                std::format(L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
@@ -955,8 +987,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_HostMode_WithMultipleNetworks_Rejected)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --network bridge --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --name {} --network bridge --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -967,8 +999,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
 
-        result = RunWslc(std::format(
-            L"container create --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(L"container create --name {} --network {} {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -996,8 +1028,12 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
 
-        result = RunWslc(std::format(
-            L"container create --name {} --network {} --network-alias db {} true", WslcContainerName, TestNetworkName, DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(
+                L"container create --name {} --network {} --network-alias db {} true",
+                WslcContainerName,
+                TestNetworkName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -1020,8 +1056,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_NetworkAlias_NoneMode_Rejected)
     {
-        auto result = RunWslc(std::format(
-            L"container create --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
             {.Stderr =
                  L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
@@ -1031,10 +1067,11 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_NetworkAlias_MultipleNetworks_Rejected)
     {
-        auto result = RunWslc(std::format(
-            L"container create --network bridge --network bridge --network-alias db --name {} {} true",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --network bridge --network bridge --network-alias db --name {} {} true",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -1084,8 +1121,9 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --ulimit nofile=1024:2048 --ulimit nproc=512 {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -1129,8 +1167,12 @@ class WSLCE2EContainerCreateTests
         WriteTestFile(
             EnvTestFile1, {"WSLC_TEST_CREATE_ENV_FILE_A=create-env-file-a", "WSLC_TEST_CREATE_ENV_FILE_B=create-env-file-b"});
 
-        auto result = RunWslc(std::format(
-            L"container create --name {} --env-file {} {} env", WslcContainerName, EscapePath(EnvTestFile1.wstring()), DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --env-file {} {} env",
+                WslcContainerName,
+                EscapePath(EnvTestFile1.wstring()),
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
@@ -1142,8 +1184,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_EnvFile_MissingFile)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
             {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
@@ -1153,8 +1195,12 @@ class WSLCE2EContainerCreateTests
     {
         WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
 
-        auto result = RunWslc(std::format(
-            L"container create --name {} --env-file {} {} env", WslcContainerName, EscapePath(EnvTestFile1.wstring()), DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} --env-file {} {} env",
+                WslcContainerName,
+                EscapePath(EnvTestFile1.wstring()),
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
@@ -1162,8 +1208,13 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_TCP)
     {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
-        auto result = RunWslc(std::format(
-            L"container create --name {} -p {}:{} {} sleep 5", WslcContainerName, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} -p {}:{} {} sleep 5",
+                WslcContainerName,
+                HostTestPort1,
+                ContainerTestPort,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
@@ -1183,14 +1234,15 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_MultipleMappings)
     {
         // Map two host ports to the same container port.
-        auto result = RunWslc(std::format(
-            L"container create --name {} -p {}:{} -p {}:{} {} sleep 5",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            HostTestPort2,
-            ContainerTestPort,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} -p {}:{} -p {}:{} {} sleep 5",
+                WslcContainerName,
+                HostTestPort1,
+                ContainerTestPort,
+                HostTestPort2,
+                ContainerTestPort,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
@@ -1225,8 +1277,8 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_Ephemeral)
     {
         // -p <containerPort> (no host port) means the host picks a random port.
-        auto result = RunWslc(std::format(
-            L"container create --name {} -p {} {} sleep 5", WslcContainerName, ContainerTestPort, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --name {} -p {} {} sleep 5", WslcContainerName, ContainerTestPort, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
@@ -1246,12 +1298,13 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_UDP)
     {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
-        auto result = RunWslc(std::format(
-            L"container create --name {} -p {}:{}/udp {} sleep 5",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} -p {}:{}/udp {} sleep 5",
+                WslcContainerName,
+                HostTestPort1,
+                ContainerTestPort,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
@@ -1272,12 +1325,13 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Publish_HostIP)
     {
         // Port bindings only show up in inspect after start, so create then start before inspecting.
-        auto result = RunWslc(std::format(
-            L"container create --name {} -p 127.0.0.1:{}:{} {} sleep 5",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create --name {} -p 127.0.0.1:{}:{} {} sleep 5",
+                WslcContainerName,
+                HostTestPort1,
+                ContainerTestPort,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start {}", WslcContainerName));

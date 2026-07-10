@@ -50,8 +50,14 @@ public:
         std::string&& Url,
         std::string&& RequestContent,
         std::string&& ResponseContent) :
-        std::runtime_error(std::format(
-            "HTTP request failed: {} {} -> {} (Request: {}, Response: {})", boost::beast::http::to_string(Method), Url, Response.result_int(), RequestContent, ResponseContent)),
+        std::runtime_error(
+            std::format(
+                "HTTP request failed: {} {} -> {} (Request: {}, Response: {})",
+                boost::beast::http::to_string(Method),
+                Url,
+                Response.result_int(),
+                RequestContent,
+                ResponseContent)),
         m_response(std::move(Response)),
         m_url(std::move(Url)),
         m_request(std::move(RequestContent)),

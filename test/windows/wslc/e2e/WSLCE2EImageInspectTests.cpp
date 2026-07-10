@@ -100,8 +100,8 @@ class WSLCE2EImageInspectTests
                 "STOPSIGNAL SIGTERM\n",
                 wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag())));
 
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltExposeImage.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltExposeImage.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltExposeImage.NameAndTag());

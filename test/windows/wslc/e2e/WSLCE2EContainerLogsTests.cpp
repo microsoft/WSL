@@ -44,8 +44,8 @@ class WSLCE2EContainerLogsTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Tail)
     {
         // Run a container that outputs two lines
-        auto result = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo line1 && echo line2\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container run --name {} {} sh -c \"echo line1 && echo line2\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"line1\nline2\n", .Stderr = L"", .ExitCode = 0});
 
         // Verify --tail 1 only shows the last line
@@ -180,8 +180,8 @@ class WSLCE2EContainerLogsTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_AllOptionsCombined)
     {
         // Run a container that outputs multiple lines
-        auto result = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo a && echo b && echo c\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container run --name {} {} sh -c \"echo a && echo b && echo c\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Combine --timestamps --since 0 --tail 2
@@ -210,11 +210,12 @@ class WSLCE2EContainerLogsTests
     {
         // Sleep between the two lines so the second is not produced until after line 1 is read.
         constexpr int InterLineSleepSeconds = 2;
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo follow-line-1; sleep {}; echo follow-line-2\"",
-            WslcContainerName,
-            DebianImage.NameAndTag(),
-            InterLineSleepSeconds));
+        auto result = RunWslc(
+            std::format(
+                L"container run -d --name {} {} sh -c \"echo follow-line-1; sleep {}; echo follow-line-2\"",
+                WslcContainerName,
+                DebianImage.NameAndTag(),
+                InterLineSleepSeconds));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto logsSession = RunWslcInteractive(std::format(L"container logs -f {}", WslcContainerName));
