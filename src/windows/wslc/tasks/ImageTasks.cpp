@@ -197,7 +197,8 @@ void ListImages(CLIExecutionContext& context)
                         {L"TAG", {.Overflow = Shrink}},
                         {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
                         {L"CREATED", {.Overflow = Shrink}},
-                        {L"SIZE", {.Overflow = Shrink}}}})
+                        {L"SIZE", {.Overflow = Shrink}}}},
+                      images.size())
                 : wsl::windows::wslc::TableOutput<5>(context.Reporter, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)

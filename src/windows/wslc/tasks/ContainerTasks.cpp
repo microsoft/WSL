@@ -580,7 +580,8 @@ void ListContainers(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}})
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
+                                 containers.size())
                            : wsl::windows::wslc::TableOutput<6>(
                                  context.Reporter,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
@@ -986,7 +987,8 @@ void ShowContainerStats(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderMemPercent(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderNetIo(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}})
+                                   {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
+                                 statsJson.size())
                            : wsl::windows::wslc::TableOutput<8>(
                                  context.Reporter,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
