@@ -166,8 +166,8 @@ class WSLCE2EImageSaveTests
         auto restoreDebian = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(DebianImage); });
 
         // Save both images into a single archive.
-        const auto saveResult = RunWslc(std::format(
-            L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), AlpineImage.NameAndTag()));
+        const auto saveResult = RunWslc(
+            std::format(L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), AlpineImage.NameAndTag()));
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete both source images.
@@ -195,8 +195,8 @@ class WSLCE2EImageSaveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MultipleImages_InvalidImage)
     {
-        const auto result = RunWslc(std::format(
-            L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), InvalidImage.NameAndTag()));
+        const auto result = RunWslc(
+            std::format(L"image save --output \"{}\" {} {}", SavedArchivePath.wstring(), DebianImage.NameAndTag(), InvalidImage.NameAndTag()));
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
