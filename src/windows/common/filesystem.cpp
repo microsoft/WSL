@@ -161,8 +161,8 @@ void SetNtfsDirCaseSensitivityFlags(_In_ ULONG Flags)
 CaseSensitivity GetCaseSensitivity()
 {
     ULONG caseSensitiveRaw;
-    THROW_IF_NTSTATUS_FAILED(::NtQueryInformationThread(
-        GetCurrentThread(), ThreadExplicitCaseSensitivity, &caseSensitiveRaw, sizeof(caseSensitiveRaw), nullptr));
+    THROW_IF_NTSTATUS_FAILED(
+        ::NtQueryInformationThread(GetCurrentThread(), ThreadExplicitCaseSensitivity, &caseSensitiveRaw, sizeof(caseSensitiveRaw), nullptr));
 
     return (caseSensitiveRaw == 0) ? Disabled : Enabled;
 }
@@ -362,14 +362,15 @@ void SetDirectoryCaseSensitive(_In_ PCWSTR Path)
 
 void SetExtendedAttributesLxFs(_In_ PCWSTR Path, _In_ ULONG Mode, _In_ ULONG Uid, _In_ ULONG Gid)
 {
-    const wil::unique_hfile FileHandle(::CreateFileW(
-        Path,
-        FILE_GENERIC_READ | FILE_GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS,
-        nullptr));
+    const wil::unique_hfile FileHandle(
+        ::CreateFileW(
+            Path,
+            FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS,
+            nullptr));
 
     THROW_LAST_ERROR_IF(!FileHandle);
 

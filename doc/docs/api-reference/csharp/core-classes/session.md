@@ -208,7 +208,7 @@ Authenticates to a registry and returns registry authentication data suitable fo
 AuthenticateResult authentication = session.Authenticate(
     new Uri("https://registry.example.com"),
     "user1",
-    "password");
+    "<password>");
 
 session.PullImage(new PullImageOptions("registry.example.com/demo:latest")
 {
