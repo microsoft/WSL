@@ -2224,8 +2224,7 @@ class NetworkTests
             THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
         };
 
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
     }
 
     static void VerifyPortZeroRebindSucceeds()
