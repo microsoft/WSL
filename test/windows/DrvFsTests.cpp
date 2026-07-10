@@ -43,8 +43,6 @@ Abstract:
 
 #define LXSST_DRVFS_METADATA_TEST_MODE (5)
 
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
-
 #define LXSST_METADATA_EA_NAME_LENGTH (RTL_NUMBER_OF(LX_FILE_METADATA_UID_EA_NAME) - 1)
 
 #define LX_DRVFS_DISABLE_NONE (0)

@@ -14,6 +14,11 @@
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
 
+// TODO: Remove this once Microsoft.WSL.LinuxSdk provides PIDFD_THREAD.
+#ifndef PIDFD_THREAD
+#define PIDFD_THREAD O_EXCL
+#endif
+
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
 constexpr auto c_sock_diag_poll_timeout = std::chrono::milliseconds(10);
@@ -528,7 +533,14 @@ wil::unique_fd GnsPortTracker::DuplicateSocketFd(pid_t Pid, int SocketFd)
     // Duplicate the socket fd from the target process into our address space.
     // We cannot use open("/proc/pid/fd/N") for sockets because the symlink target
     // (socket:[inode]) is not a valid filesystem path. Use pidfd_getfd() instead.
-    wil::unique_fd pidFd(static_cast<int>(syscall(SYS_pidfd_open, Pid, 0u)));
+    // PIDFD_THREAD requires kernel >= 6.9. Fallback to process only if not supported.
+    int pidFdResult = static_cast<int>(syscall(SYS_pidfd_open, Pid, PIDFD_THREAD));
+    if (pidFdResult < 0 && errno == EINVAL)
+    {
+        pidFdResult = static_cast<int>(syscall(SYS_pidfd_open, Pid, 0u));
+    }
+
+    wil::unique_fd pidFd(pidFdResult);
     if (!pidFd)
     {
         GNS_LOG_INFO("Port-0 bind: pidfd_open failed for pid {} (errno {})", Pid, errno);

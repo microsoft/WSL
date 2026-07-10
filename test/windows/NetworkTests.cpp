@@ -2168,6 +2168,66 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyPortZeroBindFromThreadIsTracked()
+    {
+        auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
+        // LXT uses one bit per variation; the threaded port-zero server is the sixth server variation.
+        constexpr unsigned long long c_portZeroThreadVariationMask = 1ull << 5;
+        const auto commandLine = std::format(L"/data/test/wsl_unit_tests socket -s -v {}", c_portZeroThreadVariationMask);
+        auto cmd = LxssGenerateWslCommandLine(commandLine.data());
+        unique_kill_process serverProcess(LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get()));
+        stdOutWrite.reset();
+
+        constexpr std::string_view portMarker = "PORT_ZERO_THREAD_LISTENER_PORT=";
+        std::string output(512, '\0');
+        DWORD writeOffset = 0;
+        uint16_t assignedPort = 0;
+        while (assignedPort == 0)
+        {
+            if (writeOffset == output.size())
+            {
+                output.resize(output.size() * 2);
+            }
+
+            DWORD bytesRead = 0;
+            VERIFY_IS_TRUE(ReadFile(
+                stdOutRead.get(), output.data() + writeOffset, static_cast<DWORD>(output.size() - writeOffset), &bytesRead, nullptr));
+            VERIFY_ARE_NOT_EQUAL(bytesRead, 0u);
+            writeOffset += bytesRead;
+
+            const std::string_view outputView(output.data(), writeOffset);
+            const auto markerPosition = outputView.find(portMarker);
+            if (markerPosition == std::string_view::npos)
+            {
+                continue;
+            }
+
+            const auto portBegin = markerPosition + portMarker.size();
+            const auto portEnd = outputView.find_first_not_of("0123456789", portBegin);
+            if (portEnd == std::string_view::npos)
+            {
+                continue;
+            }
+
+            assignedPort = static_cast<uint16_t>(std::stoi(std::string(outputView.substr(portBegin, portEnd - portBegin))));
+        }
+
+        LogInfo("Threaded guest listener assigned port %u", assignedPort);
+        const auto connectToGuest = [&]() {
+            wil::unique_socket clientSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_LAST_ERROR_IF(!clientSocket);
+
+            SOCKADDR_IN address{};
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            address.sin_port = htons(assignedPort);
+            THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+        };
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+    }
+
     static void VerifyPortZeroRebindSucceeds()
     {
         // Verify that bind(0) -> close -> immediate rebind on the same port succeeds.
@@ -3754,6 +3814,9 @@ class MirroredTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        // Build the Linux unit tests used by the port tracking tests.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
+
         if (LxsstuVmMode())
         {
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -4169,6 +4232,8 @@ class MirroredTests
         // this range, so even after the guest releases the port the host still cannot bind
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
+
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
     }
 
     WSL2_TEST_METHOD(AcceptedConnectionPortTracking)
@@ -4963,6 +5028,9 @@ class ConsommeTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        // Build the Linux unit tests used by the port tracking tests.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
+
         if (LxsstuVmMode())
         {
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -5126,6 +5194,8 @@ class ConsommeTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
     }
 
     WSL2_TEST_METHOD(PortZeroRebindSucceeds)
