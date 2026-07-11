@@ -184,7 +184,6 @@ void GnsEngine::ProcessNotification(const nlohmann::json& payload, Interface& in
     default:
         throw RuntimeErrorWithSourceLocation(
             std::format("Unexpected LxGnsMessageNotification for interfaceName {}: {}", interface.Name(), payload["ResourceType"].get<std::string>()));
-        break;
     }
 }
 
@@ -704,7 +703,6 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
         default:
             throw RuntimeErrorWithSourceLocation(
                 std::format("Unexpected Wslcore::Networking::OperationType : {}", static_cast<int>(interfaceNetFilterRequest.operation)));
-            break;
         }
         break;
     }
