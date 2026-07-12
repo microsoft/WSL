@@ -53,6 +53,7 @@ Abstract:
 #define HOSTS_FILE_PATH ETC_FOLDER "hosts"
 #define LANG_ENV "LANG"
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
+#define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
@@ -334,7 +335,7 @@ try
 CATCH_LOG()
 
 void ConfigHandleInteropMessage(
-    wsl::shared::SocketChannel& ResponseChannel,
+    wsl::shared::Transaction& Transaction,
     wsl::shared::SocketChannel& InteropChannel,
     bool Elevated,
     gsl::span<gsl::byte> Message,
@@ -350,7 +351,7 @@ Routine Description:
 
 Arguments:
 
-    ResponseChannel - Supplies channel used to send responses.
+    Transaction - Supplies transaction used to send responses.
 
     InteropChannel - Supplies a channel to the host to be used for create
         process requests.
@@ -381,7 +382,7 @@ try
 
     case LxInitMessageQueryDrvfsElevated:
     {
-        ResponseChannel.SendResultMessage<bool>(Elevated);
+        Transaction.SendResultMessage<bool>(Elevated);
         break;
     }
 
@@ -394,10 +395,10 @@ try
             return;
         }
 
-        auto Value = UtilGetEnvironmentVariable(Query->Buffer);
+        auto Value = UtilGetEnvironmentVariable(wsl::shared::string::FromMessageBuffer<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message));
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Response(LxInitMessageQueryEnvironmentVariable);
         Response.WriteString(Value);
-        ResponseChannel.SendMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
+        Transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
     }
 
     break;
@@ -405,7 +406,7 @@ try
     case LxInitMessageQueryFeatureFlags:
     {
         assert(Config.FeatureFlags.has_value());
-        ResponseChannel.SendResultMessage<int32_t>(Config.FeatureFlags.value());
+        Transaction.SendResultMessage<int32_t>(Config.FeatureFlags.value());
         break;
     }
 
@@ -419,7 +420,7 @@ try
         }
 
         bool success = false;
-        auto sendResponse = wil::scope_exit([&]() { ResponseChannel.SendResultMessage<bool>(success); });
+        auto sendResponse = wil::scope_exit([&]() { Transaction.SendResultMessage<bool>(success); });
 
         if (!Config.BootInit || Config.InitPid.value_or(0) != getpid())
         {
@@ -427,7 +428,8 @@ try
         }
         else
         {
-            success = CreateLoginSession(Config, CreateSession->Buffer, CreateSession->Uid);
+            success = CreateLoginSession(
+                Config, wsl::shared::string::FromMessageBuffer<LX_INIT_CREATE_LOGIN_SESSION>(Message), CreateSession->Uid);
         }
 
         break;
@@ -435,7 +437,7 @@ try
 
     case LxInitMessageQueryNetworkingMode:
         assert(Config.NetworkingMode.has_value());
-        ResponseChannel.SendResultMessage<uint8_t>(static_cast<uint8_t>(Config.NetworkingMode.value()));
+        Transaction.SendResultMessage<uint8_t>(static_cast<uint8_t>(Config.NetworkingMode.value()));
         break;
 
     case LxInitMessageQueryVmId:
@@ -446,7 +448,7 @@ try
             Response.WriteString(Config.VmId.value());
         }
 
-        ResponseChannel.SendMessage<LX_INIT_QUERY_VM_ID>(Response.Span());
+        Transaction.Send<LX_INIT_QUERY_VM_ID>(Response.Span());
         break;
     }
 
@@ -618,7 +620,7 @@ try
 }
 CATCH_LOG()
 
-int ConfigInitializeInstance(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
+int ConfigInitializeInstance(const std::function<void(const gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -632,7 +634,7 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file descriptor to send the response message.
+    SendResponse - Supplies a function to send the response message.
 
     Buffer - Supplies the message buffer.
 
@@ -923,7 +925,7 @@ try
         Response.WriteString(Response->VersionIndex, Version->c_str());
     }
 
-    Channel.SendMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(Response.Span());
+    SendResponse(Response.Span());
 
     //
     // Accept the interop connection.
@@ -973,13 +975,14 @@ try
                     continue;
                 }
 
-                auto [Message, Span] = ClientChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+                auto transaction = ClientChannel.ReceiveTransaction();
+                auto [Message, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
                 if (Message == nullptr)
                 {
                     continue;
                 }
 
-                ConfigHandleInteropMessage(ClientChannel, InteropChannel, Elevated, Span, Message, Config);
+                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config);
             }
         });
 
@@ -2137,7 +2140,7 @@ Return Value:
     //
 
     const char* const Argv[] = {MOUNT_COMMAND, MOUNT_FSTAB_ARG, nullptr};
-    if (UtilCreateProcessAndWait(Argv[0], Argv, nullptr, {{WSL_DRVFS_ELEVATED_ENV, Elevated ? "1" : "0"}}) < 0)
+    if (UtilCreateProcessAndWait(Argv[0], Argv, nullptr, {{WSL_DRVFS_ELEVATED_ENV, Elevated ? "1" : "0"}}, true) < 0)
     {
         auto message = wsl::shared::Localization::MessageFstabMountFailed();
         LOG_ERROR("{}", message.c_str());
@@ -2186,7 +2189,7 @@ Return Value:
     return Result;
 }
 
-int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, const wsl::linux::WslDistributionConfig& Config)
+int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::Transaction& Transaction, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -2207,7 +2210,7 @@ Return Value:
 
 --*/
 {
-    Channel.SendResultMessage<int32_t>(ConfigRemountDrvFsImpl(Buffer, Config));
+    Transaction.SendResultMessage<int32_t>(ConfigRemountDrvFsImpl(Buffer, Config));
 
     return 0;
 }
@@ -2246,7 +2249,7 @@ try
     const auto* Message = gslhelpers::try_get_struct<LX_INIT_MOUNT_DRVFS>(Buffer);
     if (!Message)
     {
-        LOG_ERROR("Unexpected sizeof for LX_INIT_MOUNT_DRVFS: {}u", Buffer.size());
+        LOG_ERROR("Unexpected sizeof for LX_INIT_MOUNT_DRVFS: {}", Buffer.size());
         return -1;
     }
 
@@ -2512,8 +2515,13 @@ void ConfigUpdateLanguage(EnvironmentBlock& Environment)
 
 Routine Description:
 
-    This routine queries the contents of the /etc/default/locale text file and
+    This routine queries the contents of the locale configuration file and
     if present updates the $LANG environment variable in the environment block.
+
+    Different distributions store this file in different locations:
+        - /etc/default/locale
+        - /etc/locale.conf
+    Both share the same "LANG=" line format, so the first file that exists is used.
 
 Arguments:
 
@@ -2528,22 +2536,33 @@ Return Value:
 try
 {
     //
-    // Attempt to open the /etc/default/locale file. If the file does not exist
-    // then the $LANG environment variable will not be updated.
+    // Attempt to open the locale configuration file, trying each known path in turn.
+    // If none of the files exist then the $LANG environment variable will not be updated.
     //
-    // N.B. This file is being opened by root. The only user-visible content
+    // N.B. These files are being opened by root. The only user-visible content
     //      will be the contents of the last line of the file that contains
     //      "LANG=".
     //
 
-    wil::unique_file LocaleFile{fopen(LOCALE_FILE_PATH, "r")};
-    if (!LocaleFile)
+    constexpr const char* LocaleFilePaths[] = {LOCALE_FILE_PATH, LOCALE_CONF_FILE_PATH};
+
+    wil::unique_file LocaleFile;
+    for (const auto* Path : LocaleFilePaths)
     {
-        if (errno != ENOENT)
+        LocaleFile.reset(fopen(Path, "r"));
+        if (LocaleFile)
         {
-            LOG_ERROR("fopen({}) failed {}", LOCALE_FILE_PATH, errno);
+            break;
         }
 
+        if (errno != ENOENT)
+        {
+            LOG_ERROR("fopen({}) failed {}", Path, errno);
+        }
+    }
+
+    if (!LocaleFile)
+    {
         return;
     }
 

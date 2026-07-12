@@ -9,6 +9,44 @@ Param (
 
 Set-StrictMode -Version Latest
 
+function Test-WslApplication {
+    param (
+        $Name
+    )
+
+    # Log warning when tool is not present in WSL
+
+    # Capture any output/error from wsl.exe so we can distinguish
+    # between "command not found" and "WSL invocation failed".
+    $wslOutput = & wsl.exe -e sh -lc "command -v $Name >/dev/null 2>&1" 2>&1
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -eq 0)
+    {
+        return $true
+    }
+
+    # POSIX shells typically return 1 when command -v does not find the command, but we have seen sh returning 127.
+    if ($exitCode -eq 1 -or $exitCode -eq 127)
+    {
+        Write-Warning "$Name not found in WSL. For a more complete log collection install $Name."
+        return $false
+    }
+
+    # Any other exit code is assumed to indicate WSL itself failed
+    # (e.g., no distro installed, WSL disabled, or other startup error).
+    if (-not [string]::IsNullOrWhiteSpace($wslOutput))
+    {
+        Write-Warning "Unable to check for $Name in WSL. wsl.exe exited with code $exitCode. Output: $wslOutput"
+    }
+    else
+    {
+        Write-Warning "Unable to check for $Name in WSL. wsl.exe exited with code $exitCode."
+    }
+
+    return $false
+}
+
 function Collect-WindowsNetworkState {
     param (
         $Folder,
@@ -89,6 +127,9 @@ else
 # Networking-specific setup
 if ($LogProfile -eq "networking")
 {
+    Test-WslApplication -Name "tcpdump" | Out-Null
+    Test-WslApplication -Name "iptables" | Out-Null
+
     # Copy/download networking.sh script
     $networkingBashScript = "$folder/networking.sh"
     if (Test-Path "$PSScriptRoot/networking.sh")
@@ -136,7 +177,11 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder | Out-Null
 }
 
+# Collect high-level WSL install log (written by WriteInstallLog() in install.cpp)
 Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
+
+# Collect MSI verbose install log (preserved on failure by wsl --update or WslInstaller service).
+Copy-Item "$env:TEMP\wsl-install-logs.txt" $folder -ErrorAction ignore
 
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
@@ -296,6 +341,50 @@ if ($LogProfile -eq "networking")
     Remove-Item $networkingBashScript
 }
 
+# Collect WSLg logs (https://github.com/microsoft/wslg)
+$wslgFolder = "$folder/wslg"
+New-Item -ItemType Directory -Force -Path $wslgFolder | Out-Null
+
+# Run in a job with a timeout so a wedged WSL service can't hang collection. --system --user root
+# reaches /mnt/wslg even when the default distro is WSL1 or isn't running, and can read root-only logs.
+$wslgJob = Start-Job -ScriptBlock {
+    param($DestFull, $CollectDumps)
+
+    $destWsl = "$(& wsl.exe --system --user root -e wslpath -u "$DestFull" 2>$null)".Trim()
+    if ([string]::IsNullOrWhiteSpace($destWsl)) { return }
+
+    # Destination is passed as $1 so paths containing a single quote are handled safely. In
+    # `sh -c '<script>' sh <arg>`, the token after the script becomes $0 (here "sh") and the
+    # next becomes $1 (the destination path).
+    & wsl.exe --system --user root -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
+
+    if ($CollectDumps)
+    {
+        & wsl.exe --system --user root -e sh -c '[ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$destWsl"
+    }
+} -ArgumentList (Resolve-Path $wslgFolder).Path, ([bool]$Dump)
+
+if (Wait-Job $wslgJob -Timeout 20)
+{
+    Receive-Job $wslgJob | Out-Null
+}
+else
+{
+    Write-Host -ForegroundColor Yellow "WSLg log collection timed out and was skipped."
+    Stop-Job $wslgJob
+}
+Remove-Job $wslgJob -Force
+
+# Crash dumps are only collected with -Dump, since users may not expect dumps to be published by default.
+if ($Dump)
+{
+    $wslCrashes = "$env:TEMP\wsl-crashes"
+    if (Test-Path $wslCrashes)
+    {
+        Copy-Item $wslCrashes "$wslgFolder/wsl-crashes" -Recurse -ErrorAction Ignore
+    }
+}
+
 if ($Dump)
 {
     $Assembly = [PSObject].Assembly.GetType('System.Management.Automation.WindowsErrorReporting')
@@ -304,7 +393,7 @@ if ($Dump)
     $dumpFolder = Join-Path (Resolve-Path "$folder") dumps
     New-Item -ItemType "directory" -Path "$dumpFolder"
 
-    $executables = "wsl", "wslservice", "wslhost", "msrdc", "dllhost"
+    $executables = "wsl", "wslservice", "wslhost", "wslcsession", "wslrelay", "wslg", "msrdc", "dllhost"
     foreach($process in Get-Process | Where-Object { $executables -contains $_.ProcessName})
     {
         $dumpFile =  "$dumpFolder/$($process.ProcessName).$($process.Id).dmp"
@@ -328,8 +417,28 @@ if ($Dump)
     }
 }
 
-$logArchive = "$(Resolve-Path $folder).zip"
-Compress-Archive -Path $folder -DestinationPath $logArchive
-Remove-Item $folder -Recurse
+$logArchive = "$(Resolve-Path $folder).tar.gz"
+tar.exe -czf $logArchive $folder
+if ($LASTEXITCODE -eq 0)
+{
+    Remove-Item $folder -Recurse
+    Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+}
+else
+{
+    Remove-Item $logArchive -ErrorAction Ignore
 
-Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    # Fall back to zip if tar fails (e.g. on SKUs that lack tar.exe)
+    $logArchive = "$(Resolve-Path $folder).zip"
+    try
+    {
+        Compress-Archive -Path $folder -DestinationPath $logArchive -Force
+        Remove-Item $folder -Recurse
+        Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    }
+    catch
+    {
+        Remove-Item $logArchive -ErrorAction Ignore
+        Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
+    }
+}

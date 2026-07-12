@@ -12,12 +12,15 @@ REPO = 'microsoft/wsl'
 @click.argument('committer', required=True)
 @click.argument('message', required=True)
 @click.argument('branch', required=True)
+@click.argument('target_branch', required=True)
 @click.option('--debug', default=False, is_flag=True)
-def main(repo_path: str, token: str, committer: str, message: str, branch: str, debug: bool):
+def main(repo_path: str, token: str, committer: str, message: str, branch: str, target_branch: str, debug: bool):
     try:
         repo = Repo(repo_path)
 
-        changed_files = [e.a_path for e in repo.index.diff(None)]
+        modified_files = [e.a_path for e in repo.index.diff(None)]
+        untracked_files = list(repo.untracked_files)
+        changed_files = modified_files + untracked_files
 
         if not changed_files:
             print('No files changed, skipping')
@@ -32,7 +35,9 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             config.set_value("user", "email", COMMITTER_EMAIL)
             config.set_value("user", "name", committer)
 
-        repo.git.commit('-a', m=message)
+        # 'git add -A' so newly created files in new directories are staged too.
+        repo.git.add(A=True)
+        repo.git.commit(m=message)
         repo.git.push('origin', branch)
 
         headers = {'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + token}
@@ -41,7 +46,7 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             'title': message,
             'description': 'Automated change',
             'head': branch,
-            'base': 'master'
+            'base': target_branch
         }
 
         response = requests.post(f'https://api.github.com/repos/{REPO}/pulls', headers=headers, data=json.dumps(body), timeout=30)

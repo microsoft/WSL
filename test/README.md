@@ -12,6 +12,16 @@ Executing tests with TAEF is done by invoking the `TE.exe` binary:
 2. Navigate to the subdirectory containing the built test binaries (`bin/<X64|Arm64>/<Debug|Release>/`)
 3. Execute the binaries via invoking TE and passing the test dll/s as arguments: `TE.exe test1.dll test2.dll test3.dll`
 
+## test.bat Options
+
+The following options are handled by `test.bat` / `run-tests.ps1` before invoking TE.exe:
+
+### **/attachdebugger**
+
+Automatically launches WinDbgX and attaches it to the test host process. Requires [WinDbg](https://aka.ms/windbg) to be installed (`winget install Microsoft.WinDbg`). Under the hood it passes `/waitfordebugger /inproc` to TE.exe so tests run in-process, then attaches WinDbgX directly to `TE.exe`.
+
+`test.bat /attachdebugger /name:*MyTest*`
+
 ## Useful **TE.exe** Command Line Parameters for Debugging/Executing Tests
 
 Command Line parameters are passed to `TE.exe` after supplying the target `.dll`:
@@ -81,6 +91,18 @@ Below is a brief overview:
 
 ### Writing the Test
 
+For tests that only apply to a specific WSL version, use the version-specific test method macros instead of `TEST_METHOD`:
+
+- `WSL2_TEST_METHOD(Name)` — test only runs on WSL2
+- `WSL1_TEST_METHOD(Name)` — test only runs on WSL1
+- `WSLC_TEST_METHOD(Name)` — test only runs on WSL2 (for use in WSLC test classes)
+- `TEST_METHOD(Name)` — test runs on both WSL1 and WSL2
+
+These macros use TAEF metadata properties to tag tests with their required WSL version.
+When tests are run via `run-tests.ps1` or CloudTest, a `/select:` query automatically
+filters out tests that don't match the target version—so they don't appear in results at all
+(no "skipped" noise).
+
 For example, consider the file below, named `ExampleTest.cpp`:
 
 ```cpp
@@ -96,12 +118,18 @@ For example, consider the file below, named `ExampleTest.cpp`:
         {
             TEST_CLASS(ExampleTest) // define this as a test class
 
-            // add tests via test methods of the test class
-            TEST_METHOD(HelloWorldTest) // ExampleTest::ExampleTest::HelloWorldTest
+            // runs on both WSL1 and WSL2
+            TEST_METHOD(HelloWorldTest)
             {
                 std::wstring outputExpected = L"Linux on Windows Rocks!\n";
                 auto [output, __] = LxsstuLaunchWslAndCaptureOutput(L"echo Linux on Windows Rocks!"); // from /test/Common.h
                 VERIFY_ARE_EQUAL(output, outputExpected); // TAEF test method that passes if both are equal, and fails otherwise.
+            }
+
+            // only runs on WSL2
+            WSL2_TEST_METHOD(Wsl2OnlyTest)
+            {
+                // ...
             }
         };
     } //namespace ExampleTest

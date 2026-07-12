@@ -33,7 +33,7 @@ static const LXT_TEST LxtTests[] = {
     {"fscommon", false, FsCommonTestEntry},
     {"fstab", false, FstabTestEntry},
     {"get_set_id", false, GetSetIdTestEntry},
-    {"get_addr_info", false, GetSetIdTestEntry},
+    {"get_addr_info", false, GetAddrInfoTestEntry},
     {"get_time", false, GetTimeTestEntry},
     {"inotify", false, InotifyTestEntry},
     {"interop", false, InteropTestEntry},

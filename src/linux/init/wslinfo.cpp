@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file wslpath function definitions.
+    This file contains wslinfo function definitions.
 
 --*/
 
@@ -111,8 +111,8 @@ Return Value:
                 std::cout << "mirrored";
                 break;
 
-            case LxMiniInitNetworkingModeVirtioProxy:
-                std::cout << "virtioproxy";
+            case LxMiniInitNetworkingModeConsomme:
+                std::cout << "consomme";
                 break;
 
             default:

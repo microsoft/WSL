@@ -850,7 +850,7 @@ Expected<UINT32> File::ReadLink(gsl::span<char> name)
 {
     const auto fileName = GetFileName();
     util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
-    int result = readlinkat(m_Root->RootFd, fileName.c_str(), name.data(), name.size());
+    ssize_t result = readlinkat(m_Root->RootFd, fileName.c_str(), name.data(), name.size());
     if (result < 0)
     {
         return LxError{-errno};
@@ -1060,7 +1060,7 @@ LX_INT File::Access(AccessFlags flags)
     }
 
     std::string parentPath;
-    const int index = name.find_last_of('/');
+    const auto index = name.find_last_of('/');
     if (index != std::string::npos)
     {
         parentPath = name.substr(0, index);

@@ -26,10 +26,20 @@ Abstract:
 #include "versionhelpers.h"
 #include <regstr.h>
 
+// Version numbers for various functionality that was backported.
+
+#define VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR 40
+#define NICKEL_BUILD_FLOOR 22350
+#define VMEMM_SUFFIX_COBALT_REFRESH_BUILD_NUMBER 22138
+#define VMMEM_SUFFIX_COBALT_RELEASE_UBR 71
+#define VMMEM_SUFFIX_NICKEL_BUILD_NUMBER 22420
+
 using wsl::windows::common::helpers::LaunchWslRelayFlags;
 
 constexpr auto c_WslSupportInterfaceKey = L"Software\\Classes\\Interface\\{46f3c96d-ffa3-42f0-b052-52f5e7ecbb08}";
 constexpr auto c_WslSupportInterfaceName = L"IWslSupport";
+
+constexpr ULONG c_MaxStorageHwQueues = 4;
 
 namespace {
 
@@ -89,7 +99,8 @@ public:
         }
     };
 
-    [[nodiscard]] wil::unique_handle Launch(_In_opt_ HANDLE UserToken, _In_ bool HideWindow, _In_ bool CreateNoWindow = false) const
+    [[nodiscard]] wil::unique_handle Launch(
+        _In_opt_ HANDLE UserToken, _In_ bool HideWindow, _In_ bool CreateNoWindow = false, _In_opt_ HANDLE JobObject = nullptr) const
     {
         // If a user token was provided, create an environment block from the token.
         wsl::windows::common::helpers::unique_environment_block environmentBlock{nullptr};
@@ -117,6 +128,7 @@ public:
 
         process.SetEnvironment(environmentBlock.get());
         process.SetToken(UserToken);
+        process.SetJobObject(JobObject);
 
         // Launch the process.
         return process.Start();
@@ -129,7 +141,13 @@ private:
 };
 
 [[nodiscard]] wil::unique_handle LaunchWslHost(
-    _In_opt_ LPCGUID DistroId, _In_opt_ HANDLE InteropHandle, _In_opt_ HANDLE EventHandle, _In_opt_ HANDLE ParentHandle, _In_opt_ LPCGUID VmId, _In_opt_ HANDLE UserToken)
+    _In_opt_ LPCGUID DistroId,
+    _In_opt_ HANDLE InteropHandle,
+    _In_opt_ HANDLE EventHandle,
+    _In_opt_ HANDLE ParentHandle,
+    _In_opt_ LPCGUID VmId,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ HANDLE JobObject = nullptr)
 {
     // Construct the command line.
     //
@@ -143,7 +161,7 @@ private:
     launcher.AddHandleOption(wslhost::handle_option, InteropHandle);
     launcher.AddHandleOption(wslhost::event_option, EventHandle);
     launcher.AddHandleOption(wslhost::parent_option, ParentHandle);
-    return launcher.Launch(UserToken, true);
+    return launcher.Launch(UserToken, true, false, JobObject);
 }
 
 [[nodiscard]] wil::unique_handle LaunchWslRelay(
@@ -154,7 +172,8 @@ private:
     _In_opt_ std::optional<int> Port,
     _In_opt_ HANDLE ExitEvent,
     _In_opt_ HANDLE UserToken,
-    _In_ LaunchWslRelayFlags Flags)
+    _In_ LaunchWslRelayFlags Flags,
+    _In_opt_ HANDLE JobObject = nullptr)
 {
     // Construct the command line.
     //
@@ -183,7 +202,7 @@ private:
         launcher.AddOption(wslrelay::connect_pipe_option);
     }
 
-    return launcher.Launch(UserToken, WI_IsFlagSet(Flags, LaunchWslRelayFlags::HideWindow));
+    return launcher.Launch(UserToken, WI_IsFlagSet(Flags, LaunchWslRelayFlags::HideWindow), false, JobObject);
 }
 } // namespace
 
@@ -215,7 +234,7 @@ void wsl::windows::common::helpers::ConnectPipe(_In_ HANDLE Pipe, _In_ DWORD Tim
             }
 
             const auto Result = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(WaitHandles.size()), WaitHandles.data(), FALSE, Timeout);
-            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result <= WAIT_OBJECT_0 + WaitHandles.size())
+            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result < WAIT_OBJECT_0 + WaitHandles.size())
             {
                 THROW_HR(E_ABORT);
             }
@@ -264,6 +283,18 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     THROW_IF_WIN32_BOOL_FALSE(InitializeProcThreadAttributeList(List.get(), AttributeCount, 0, &Size));
 
     return List;
+}
+
+wil::unique_handle wsl::windows::common::helpers::CreateKillOnCloseJob()
+{
+    wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+
+    return job;
 }
 
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
@@ -372,7 +403,7 @@ std::string wsl::windows::common::helpers::GetLinuxTimezone(_In_opt_ HANDLE User
 
         THROW_HR_IF_MSG(E_FAIL, (U_FAILURE(status) != false), "%hs", u_errorName(status));
 
-        timezone.resize(buffer.size());
+        timezone.resize(size);
         u_UCharsToChars(buffer.data(), timezone.data(), static_cast<int32_t>(timezone.size()));
     }
     CATCH_LOG()
@@ -467,6 +498,52 @@ bool wsl::windows::common::helpers::IsServicePresent(_In_ LPCWSTR ServiceName)
     return !!service;
 }
 
+bool wsl::windows::common::helpers::IsServiceRunning(_In_ LPCWSTR ServiceName)
+{
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    if (!manager)
+    {
+        return false;
+    }
+
+    const wil::unique_schandle service{OpenServiceW(manager.get(), ServiceName, SERVICE_QUERY_STATUS)};
+    if (!service)
+    {
+        return false;
+    }
+
+    SERVICE_STATUS status;
+    if (!QueryServiceStatus(service.get(), &status))
+    {
+        return false;
+    }
+
+    return status.dwCurrentState != SERVICE_STOPPED;
+}
+
+bool wsl::windows::common::helpers::IsVirtioSerialConsoleSupported()
+{
+    // See if the Windows version has the required platform change.
+    //
+    // N.B. If the package is running on a vibranium or iron build, then it means that lifted
+    //      support is available, so virtio serial is available as well (since it was done in the same LCU).
+
+    auto windowsVersion = GetWindowsVersion();
+    return windowsVersion.BuildNumber != WindowsBuildNumbers::Cobalt ||
+           windowsVersion.UpdateBuildRevision >= VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR;
+}
+
+bool wsl::windows::common::helpers::IsVmemmSuffixSupported()
+{
+    auto windowsVersion = GetWindowsVersion();
+
+    // See if the Windows version has the required platform change.
+    return (
+        (windowsVersion.BuildNumber >= VMMEM_SUFFIX_NICKEL_BUILD_NUMBER) ||
+        ((windowsVersion.BuildNumber < NICKEL_BUILD_FLOOR) && (windowsVersion.BuildNumber >= VMEMM_SUFFIX_COBALT_REFRESH_BUILD_NUMBER)) ||
+        ((windowsVersion.BuildNumber == WindowsBuildNumbers::Cobalt) && (windowsVersion.UpdateBuildRevision >= VMMEM_SUFFIX_COBALT_RELEASE_UBR)));
+}
+
 bool wsl::windows::common::helpers::IsWindows11OrAbove()
 {
     return GetWindowsVersion().BuildNumber >= WindowsBuildNumbers::Cobalt;
@@ -494,7 +571,7 @@ bool wsl::windows::common::helpers::IsWslSupportInterfacePresent()
 }
 
 void wsl::windows::common::helpers::LaunchDebugConsole(
-    _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry)
+    _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     LaunchWslRelayFlags flags{};
     wil::unique_hfile pipe;
@@ -522,16 +599,24 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     THROW_LAST_ERROR_IF(!pipe);
 
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
-    wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::DebugConsole, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags)};
+    wil::unique_handle info{
+        LaunchWslRelay(wslrelay::RelayMode::DebugConsole, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags, JobObject)};
 }
 
 [[nodiscard]] wil::unique_handle wsl::windows::common::helpers::LaunchInteropServer(
-    _In_opt_ LPCGUID DistroId, _In_ HANDLE InteropHandle, _In_opt_ HANDLE EventHandle, _In_opt_ HANDLE ParentHandle, _In_opt_ LPCGUID VmId, _In_opt_ HANDLE UserToken)
+    _In_opt_ LPCGUID DistroId,
+    _In_ HANDLE InteropHandle,
+    _In_opt_ HANDLE EventHandle,
+    _In_opt_ HANDLE ParentHandle,
+    _In_opt_ LPCGUID VmId,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ HANDLE JobObject)
 {
-    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken);
+    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken, JobObject);
 }
 
-void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry)
+void wsl::windows::common::helpers::LaunchKdRelay(
+    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     // Create a new pipe server. The pipe should be:
     //     Bi-directional: PIPE_ACCESS_DUPLEX
@@ -545,15 +630,17 @@ void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HA
 
     LaunchWslRelayFlags flags = LaunchWslRelayFlags::ConnectPipe;
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
-    wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::KdRelay, nullptr, nullptr, pipe.get(), Port, ExitEvent, UserToken, flags)};
+    wil::unique_handle info{
+        LaunchWslRelay(wslrelay::RelayMode::KdRelay, nullptr, nullptr, pipe.get(), Port, ExitEvent, UserToken, flags, JobObject)};
 }
 
-void wsl::windows::common::helpers::LaunchPortRelay(_In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry)
+void wsl::windows::common::helpers::LaunchPortRelay(
+    _In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
 {
     LaunchWslRelayFlags flags{};
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
     wil::unique_handle info{LaunchWslRelay(
-        wslrelay::RelayMode::PortRelay, reinterpret_cast<HANDLE>(Socket), &VmId, nullptr, {}, nullptr, UserToken, flags)};
+        wslrelay::RelayMode::PortRelay, reinterpret_cast<HANDLE>(Socket), &VmId, nullptr, {}, nullptr, UserToken, flags, JobObject)};
 }
 
 void wsl::windows::common::helpers::LaunchWslSettingsOOBE(_In_ HANDLE UserToken)
@@ -657,4 +744,64 @@ bool wsl::windows::common::helpers::TryAttachConsole()
     }
 
     return ReopenStdHandles();
+}
+
+void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
+try
+{
+    std::wstring registeredVersion;
+    if (IncludeVersionNumber)
+    {
+        registeredVersion.assign(TEXT(WSL_PACKAGE_VERSION));
+    }
+    else
+    {
+        registeredVersion.assign(L"0.0.0.0");
+    }
+
+    wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+}
+CATCH_LOG()
+
+void wsl::windows::common::helpers::AppendCommonKernelCommandLine(
+    _Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes, _In_ ULONG cpuCount)
+{
+    // Set number of processors.
+    kernelCmdLine += std::format(L" nr_cpus={}", cpuCount);
+
+    // Enable timesync workaround to sync on resume from sleep in modern standby.
+    kernelCmdLine += L" hv_utils.timesync_implicit=1";
+
+    // Disable rate limiting of user writes to dmesg.
+    kernelCmdLine += L" printk.devkmsg=on";
+
+    // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
+    kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
+
+    // Reserve a swiotlb bounce buffer for virtio devices.
+    if (swiotlbSizeBytes != 0)
+    {
+        kernelCmdLine += std::format(L" swiotlb=force hv_pci_swiotlb={}", swiotlbSizeBytes);
+    }
+
+    // Cap the storage hw queue count. Default is CPU count.
+    if (cpuCount > c_MaxStorageHwQueues)
+    {
+        kernelCmdLine += std::format(L" hv_storvsc.storvsc_max_hw_queues={}", c_MaxStorageHwQueues);
+    }
+}
+
+UINT64 wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes)
+{
+    constexpr UINT64 c_swiotlbSize = 64 * _1MB;
+
+    // Skip swiotlb on VMs that cannot fit the reserved buffer. Users can still opt in explicitly
+    // via experimental.swiotlb in .wslconfig.
+    if (memoryBytes < _1GB + c_swiotlbSize)
+    {
+        return {};
+    }
+
+    return c_swiotlbSize;
 }

@@ -96,7 +96,6 @@ DistributionRegistration DistributionRegistration::Create(
     distribution.Write(Property::Version, Version);
     distribution.Write(Property::BasePath, BasePath);
     distribution.Write(Property::Flags, Flags);
-    distribution.Write(Property::Flags, Flags);
     distribution.Write(Property::DefaultUid, DefaultUID);
     distribution.Write(Property::RunOOBE, EnableOobe);
 

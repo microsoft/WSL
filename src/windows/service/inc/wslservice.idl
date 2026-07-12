@@ -10,6 +10,8 @@ Abstract:
 
     This file contains the COM object definitions used to talk with the WSL
     service "WslService"
+    // N.B. These interfaces are internal and non-stable. ABI breaking changes in this
+    // file are OK, since the client and service always ship together in the same package.
 
 --*/
 
@@ -95,7 +97,7 @@ cpp_quote("#define LXSS_DISTRO_VERSION_2 2")
 cpp_quote("#define LXSS_DISTRO_VERSION_CURRENT LXSS_DISTRO_VERSION_2")
 cpp_quote("#define LXSS_DISTRO_USES_WSL_FS(DistroVersion) (DistroVersion >= LXSS_DISTRO_VERSION_2)")
 
-cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=x86_64\0LANG=en_US.UTF-8\0PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games\0TERM=xterm-256color\0\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=\" DISTRO_HOSTTYPE \"\\0LANG=en_US.UTF-8\\0PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games\\0TERM=xterm-256color\\0\"")
 
 cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
 
@@ -159,6 +161,7 @@ cpp_quote("const GUID CLSID_LxssUserSessionInBox = {0x4f476546, 0xb412, 0x4579, 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce7e\") LxssUserSession;")
 cpp_quote("class DECLSPEC_UUID(\"4f476546-b412-4579-b64c-123df331e3d6\") LxssUserSessionInBox;")
+
 cpp_quote("#endif")
 
 [

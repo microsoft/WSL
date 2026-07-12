@@ -73,10 +73,8 @@ class SimpleTests
         VERIFY_IS_TRUE(WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE) == sparse);
     }
 
-    TEST_METHOD(CheckSparse)
+    WSL2_TEST_METHOD(CheckSparse)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig({.sparse = true}));
 
         std::filesystem::path tar = std::tmpnam(nullptr);

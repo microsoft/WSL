@@ -1,8 +1,13 @@
 name: Validate distributions
 
-on: 
-  pull_request: 
+on:
+  pull_request:
     paths: ['distributions/**']
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
 
 jobs:
   check:

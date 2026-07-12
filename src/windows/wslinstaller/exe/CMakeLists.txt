@@ -16,6 +16,7 @@ add_dependencies(wslinstaller wslinstalleridl)
 set_target_properties(wslinstaller PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_WslInstaller_COM")
 target_link_libraries(wslinstaller
                       ${COMMON_LINK_LIBRARIES}
+                      ${MSI_LINK_LIBRARIES}
                       common
                       legacy_stdio_definitions)
 

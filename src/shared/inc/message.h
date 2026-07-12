@@ -93,6 +93,13 @@ public:
         gsl::copy(Span, InsertBuffer(Span.size()));
     }
 
+    template <typename T>
+    gsl::span<T> InsertArray(unsigned int& Index, unsigned int& SizeInMessage, unsigned int ArraySize)
+    {
+        SizeInMessage = ArraySize;
+        return InsertBuffer(Index, ArraySize * sizeof(T));
+    }
+
     gsl::span<std::byte> InsertBuffer(unsigned int& Index, size_t BufferSize, unsigned int& Size)
     {
         Size = BufferSize;
@@ -140,6 +147,38 @@ public:
         WriteString(Index, wsl::shared::string::WideToMultiByte(String));
     }
 
+    // Write an array of strings.
+    // Each field is prefixed with its size as int32_t, and the array ends with a -1 terminator.
+    void WriteStringArray(unsigned int& Index, const char* const* String, size_t Count)
+    {
+        size_t totalSize = sizeof(int32_t); // The array ends with a '-1' terminator.
+        for (size_t i = 0; i < Count; i++)
+        {
+            totalSize += strlen(String[i]) + sizeof(int32_t);
+        }
+
+        auto span = InsertBuffer(Index, totalSize);
+        auto it = span.begin();
+
+        auto insertSize = [&](int32_t size) {
+            it = std::copy(reinterpret_cast<const std::byte*>(&size), reinterpret_cast<const std::byte*>(&size) + sizeof(size), it);
+        };
+
+        for (size_t i = 0; i < Count; i++)
+        {
+            auto size = strlen(String[i]);
+            THROW_INVALID_ARG_IF(size > std::numeric_limits<int32_t>::max());
+
+            insertSize(static_cast<int32_t>(size));
+
+            it = std::copy(reinterpret_cast<const std::byte*>(String[i]), reinterpret_cast<const std::byte*>(String[i] + size), it);
+        }
+
+        insertSize(-1);
+
+        assert(it == span.end());
+    }
+
     gsl::span<std::byte> Span()
     {
         // In case the structure is padded,
@@ -167,12 +206,13 @@ private:
 
     size_t GetRelativeIndex(unsigned int& Index)
     {
-        const size_t Offset = reinterpret_cast<char*>(&Index) - reinterpret_cast<char*>(m_buffer.data());
+        const auto* indexPtr = reinterpret_cast<char*>(&Index);
+        const auto* bufferStart = reinterpret_cast<char*>(m_buffer.data());
 
         // Validate that 'Index' is actually within the bounds of our buffer
-        assert(Offset >= 0 && Offset < m_buffer.size());
+        assert(indexPtr >= bufferStart && indexPtr + sizeof(Index) <= bufferStart + m_buffer.size());
 
-        return Offset;
+        return static_cast<size_t>(indexPtr - bufferStart);
     }
 
     void WriteRelativeIndex(size_t Offset, unsigned int Value)
@@ -181,6 +221,5 @@ private:
     }
 
     std::vector<std::byte> m_buffer;
-    size_t m_offset = 0;
 };
 } // namespace wsl::shared

@@ -816,7 +816,7 @@ std::pair<std::string, std::string> wsl::windows::common::filesystem::GetHostAnd
     }
     else
     {
-        domainName.resize(size - 1, L'\0');
+        domainName.resize(size - 1, '\0');
         THROW_LAST_ERROR_IF(!GetComputerNameExA(ComputerNameDnsDomain, domainName.data(), &size));
         WI_ASSERT(domainName.size() == size);
 
@@ -838,10 +838,10 @@ std::string wsl::windows::common::filesystem::GetLinuxHostName()
 {
     DWORD size = 0;
     WI_VERIFY(GetComputerNameExA(ComputerNamePhysicalDnsHostname, nullptr, &size) == FALSE);
-    std::string hostName(size, '\0');
+    std::string hostName(size - 1, '\0');
     THROW_LAST_ERROR_IF(!GetComputerNameExA(ComputerNamePhysicalDnsHostname, hostName.data(), &size));
 
-    WI_ASSERT((size <= LX_HOST_NAME_MAX) && (hostName.size() == size + 1));
+    WI_ASSERT((size <= LX_HOST_NAME_MAX) && (hostName.size() == size));
 
     return wsl::shared::string::CleanHostname(hostName);
 }
@@ -929,6 +929,12 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
                 CurrentEntry.append("\n");
                 WindowsHosts.append(CurrentEntry);
             }
+        }
+
+        if (WindowsHosts.size() > 8 * _1MB)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageHostsFileTooLarge());
+            return {};
         }
     }
 

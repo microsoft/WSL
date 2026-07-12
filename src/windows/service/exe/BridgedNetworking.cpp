@@ -77,7 +77,7 @@ void BridgedNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGU
     message.NetworkingMode = LxMiniInitNetworkingModeBridged;
     message.DisableIpv6 = !m_config.EnableIpv6;
     message.EnableDhcpClient = m_config.EnableDhcp;
-    message.DhcpTimeout = static_cast<int>(std::round(m_config.DhcpTimeout / 1000));
+    message.DhcpTimeout = static_cast<int>(std::round(m_config.DhcpTimeout / 1000.0));
     message.PortTrackerType = m_config.EnableLocalhostRelay ? LxMiniInitPortTrackerTypeRelay : LxMiniInitPortTrackerTypeNone;
 }
 

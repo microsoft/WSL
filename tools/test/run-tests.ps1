@@ -9,8 +9,10 @@
     Path to a setup script to be run prior to running the tests. Defaults to ".\test-setup.ps1".
 .PARAMETER DistroPath
     Path to a .tar/.tar.gz file of the distro to be imported to run the tests with. Defaults to ".\test_distro.tar.gz".
+.PARAMETER TestDataPath
+    Path to test data folder. Defaults to ".\test_data".
 .PARAMETER Package
-    Path to the wsl.msix package to install. Defaults to ".\wsl.msix".
+    Path to the wsl.msix package to install. Defaults to ".\installer.msix".
 .PARAMETER UnitTestsPath
     Path to the linux/unit_tests directory to copy and install the unit tests.
 .PARAMETER PullRequest
@@ -28,6 +30,7 @@ param (
     [string]$Version = 2,
     [string]$SetupScript = ".\test-setup.ps1",
     [string]$DistroPath = ".\test_distro.tar.gz",
+    [string]$TestDataPath = ".\test_data",
     [string]$Package = ".\installer.msix",
     [string]$UnitTestsPath = ".\unit_tests",
     [switch]$PullRequest = $false,
@@ -45,9 +48,48 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript  /p:Version=$Version /p:DistroPath=$DistroPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
-
-if (!$?)
+# Handle /attachdebugger: verify WinDbgX is available, then add /waitfordebugger so we can find and attach to the test host.
+$AttachDebugger = $false
+if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
 {
-    exit 1
+    $TeArgs = @($TeArgs | Where-Object { $_ -ine '/attachdebugger' })
+    if (Get-Command "WinDbgX.exe" -ErrorAction SilentlyContinue)
+    {
+        $AttachDebugger = $true
+        $TeArgs += '/waitfordebugger'
+        # Run in-process so WinDbgX can attach directly to TE.exe without
+        # polling for a TE.ProcessHost.exe child process.
+        if (-not ($TeArgs -icontains '/inproc'))
+        {
+            $TeArgs += '/inproc'
+        }
+    }
+    else
+    {
+        Write-Warning "/attachdebugger was requested, but WinDbgX.exe was not found. Continuing without debugger."
+    }
 }
+
+$teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath", "/p:TestDataPath=$TestDataPath",
+    "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
+
+if ($AttachDebugger)
+{
+    $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
+    # /inproc is always added above, so attach directly to TE.exe.
+    Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
+    Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
+
+    $teProcess | Wait-Process
+    exit $teProcess.ExitCode
+}
+else
+{
+    te.exe $teArgList
+    if ($LASTEXITCODE -ne 0)
+    {
+        exit $LASTEXITCODE
+    }
+}
+

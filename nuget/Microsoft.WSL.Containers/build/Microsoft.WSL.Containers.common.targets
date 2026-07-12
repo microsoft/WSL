@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <!-- ================================================================== -->
+    <!-- Container Image Build Targets                                      -->
+    <!-- ================================================================== -->
+
+    <!-- Default properties -->
+    <PropertyGroup>
+        <!-- Default to bare 'wslc' so cmd.exe resolves it via PATH (the WSL MSI puts wslc.exe there).
+             Override with WslcCliPath property if needed. -->
+        <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
+        <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
+        <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
+    </PropertyGroup>
+
+    <!-- Default metadata for WslcImage items. Image is the full ref;
+         ':latest' is appended automatically when no tag is given. -->
+    <ItemDefinitionGroup>
+        <WslcImage>
+            <Image></Image>
+            <TarLocation></TarLocation>
+        </WslcImage>
+    </ItemDefinitionGroup>
+
+    <!-- Check that wslc CLI is installed (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="WslcCheckDependencies">
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; --version"
+              IgnoreExitCode="true"
+              ConsoleToMSBuild="true"
+              StandardOutputImportance="low"
+              StandardErrorImportance="low">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcExitCode" />
+        </Exec>
+
+        <Error Condition="'$(_WslcExitCode)' != '0'"
+               Code="WSLC0001"
+               Text="The wslc CLI check failed: '$(WslcCliPath) --version' returned exit code $(_WslcExitCode). Install WSL by running 'wsl --install --no-distribution', or set the WslcCliPath property to a specific wslc.exe path." />
+    </Target>
+
+    <!-- Validate required metadata on WslcImage items (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="_WslcValidateItems">
+
+        <Error Condition="'%(WslcImage.Dockerfile)' == ''"
+               Code="WSLC0002"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Dockerfile metadata." />
+
+        <Error Condition="'%(WslcImage.Context)' == ''"
+               Code="WSLC0003"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
+
+        <!-- Identity is used as default tar filename and in .tlog filenames; reject filename-invalid chars. -->
+        <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
+               Code="WSLC0004"
+               Text="WslcImage with Include='%(WslcImage.Identity)' contains a character invalid for filesystem names (one of / \ : * ? &quot; &lt; &gt; |). The Identity is used as the default tar filename and in .tlog filenames. Use a simple identity in Include (e.g. Include=&quot;my-image&quot;) and put the registry/org/tag in the Image metadata." />
+    </Target>
+
+    <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
+         1. Sources may contain semicolons (multi-directory) which conflict with Properties syntax
+         2. Wildcard expansion in Inputs requires an intermediate ItemGroup (_WslcCollectSources)
+            that must run per-image in a separate evaluation context
+
+         Build + save run together per image, and StopOnFirstFailure halts the
+         batch on the first failure — so later images aren't attempted before
+         earlier ones are finished. Within an image, save uses .tmp+Move so a
+         half-written tar is never visible (a build-success/save-failure does
+         still leave the image in the daemon without a tar on disk). -->
+    <Target Name="WslcBuildAllImages"
+            AfterTargets="Build"
+            DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true' AND '$(IsCrossTargetingBuild)' != 'true'">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcBuildAndSaveSingleImage"
+                 StopOnFirstFailure="true"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
+    </Target>
+
+    <!--
+        Collect source files for incremental check.
+        Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
+        where they get escaped). Sources can be semicolon separated directory paths;
+        each is expanded with **\* to collect all files recursively.
+        If Sources is omitted, fall back to tracking the full Context directory so changes to
+        .dockerignore and other Docker build inputs still invalidate the marker.
+    -->
+    <Target Name="_WslcCollectSources">
+        <ItemGroup>
+            <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
+            <_WslcSourceFiles Include="$(_WslcDockerfile)" />
+            <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
+            <_WslcSourceFiles Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
+        </ItemGroup>
+    </Target>
+
+    <!-- Resolve _WslcFullRef. Falls back to Identity when Image unset; appends
+         ':latest' when no tag is present (':' after the last '/'). -->
+    <Target Name="_WslcResolveImageRef">
+        <PropertyGroup>
+            <_WslcRawRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcRawRef>
+            <_WslcRawRef Condition="'$(_WslcRawRef)' == ''">$(_WslcName)</_WslcRawRef>
+            <_WslcLastSlash>$([System.String]::Copy('$(_WslcRawRef)').LastIndexOf('/'))</_WslcLastSlash>
+            <_WslcLastColon>$([System.String]::Copy('$(_WslcRawRef)').LastIndexOf(':'))</_WslcLastColon>
+            <_WslcFullRef Condition="$(_WslcLastColon) &gt; $(_WslcLastSlash)">$(_WslcRawRef)</_WslcFullRef>
+            <_WslcFullRef Condition="'$(_WslcFullRef)' == ''">$(_WslcRawRef):latest</_WslcFullRef>
+        </PropertyGroup>
+    </Target>
+
+    <!-- Resolve tar path into a property so _WslcBuildAndSaveSingleImage can use it in Inputs/Outputs. -->
+    <Target Name="_WslcResolveSavePath" DependsOnTargets="_WslcResolveImageRef">
+        <PropertyGroup>
+            <!-- Resolve tar path: user-provided TarLocation, else $(OutDir)<name>.tar -->
+            <_WslcTarPath Condition="'$(_WslcTarLocation)' != ''">$(_WslcTarLocation)</_WslcTarPath>
+            <_WslcTarPath Condition="'$(_WslcTarPath)' == ''">$(_WslcOutDir)$(_WslcName).tar</_WslcTarPath>
+
+            <_WslcTarDir>$([System.IO.Path]::GetDirectoryName('$(_WslcTarPath)'))</_WslcTarDir>
+        </PropertyGroup>
+    </Target>
+
+    <!-- Build + save one image atomically (per-image, so a mid-list failure
+         leaves a coherent state). Save writes <tar>.tmp and Moves on success. -->
+    <Target Name="_WslcBuildAndSaveSingleImage"
+            DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef;_WslcResolveSavePath"
+            Inputs="@(_WslcSourceFiles)"
+            Outputs="$(_WslcTarPath)">
+
+        <MakeDir Directories="$(_WslcIntDir)" />
+        <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
+
+        <Message Importance="high"
+                 Text="WSLC: Building image '$(_WslcFullRef)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcFullRef)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+              ConsoleToMSBuild="true" />
+
+        <Message Importance="high"
+                 Text="WSLC: Saving image '$(_WslcFullRef)' to '$(_WslcTarPath)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath).tmp&quot; &quot;$(_WslcFullRef)&quot;"
+              ConsoleToMSBuild="true" />
+
+        <Move SourceFiles="$(_WslcTarPath).tmp" DestinationFiles="$(_WslcTarPath)" />
+
+        <!-- Opt-in: WslcPruneAfterBuild=true. Prune failure is a Warning by default;
+             set WslcTreatPruneFailureAsError=true to fail the build instead. -->
+        <Message Importance="high"
+                 Text="WSLC: Pruning dangling images..."
+                 Condition="'$(WslcPruneAfterBuild)' == 'true'" />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image prune"
+              ConsoleToMSBuild="true"
+              IgnoreExitCode="true"
+              Condition="'$(WslcPruneAfterBuild)' == 'true'">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcPruneExitCode" />
+        </Exec>
+
+        <Error Condition="'$(WslcPruneAfterBuild)' == 'true' AND '$(WslcTreatPruneFailureAsError)' == 'true' AND '$(_WslcPruneExitCode)' != '0'"
+               Code="WSLC0007"
+               Text="wslc image prune failed (exit code $(_WslcPruneExitCode)). The image and tar were saved successfully; only the post-build prune failed." />
+
+        <Warning Condition="'$(WslcPruneAfterBuild)' == 'true' AND '$(WslcTreatPruneFailureAsError)' != 'true' AND '$(_WslcPruneExitCode)' != '0'"
+                 Code="WSLC0007"
+                 Text="wslc image prune failed (exit code $(_WslcPruneExitCode)). The image and tar were saved successfully; only the post-build prune was skipped. Set WslcTreatPruneFailureAsError=true to fail the build instead." />
+    </Target>
+
+    <!-- Clean container artifacts. ContinueOnError so a transient file lock
+         (AV scanner, downstream consumer) doesn't block the rest of clean.
+         .tmp variants are removed too — a failed save can leave one behind. -->
+    <Target Name="WslcClean"
+            AfterTargets="Clean"
+            Condition="'@(WslcImage)' != ''">
+
+        <Delete Files="%(WslcImage.TarLocation)"
+                Condition="'%(WslcImage.TarLocation)' != ''"
+                ContinueOnError="WarnAndContinue" />
+
+        <Delete Files="%(WslcImage.TarLocation).tmp"
+                Condition="'%(WslcImage.TarLocation)' != ''"
+                ContinueOnError="WarnAndContinue" />
+
+        <Delete Files="$(OutDir)%(WslcImage.Identity).tar"
+                Condition="'%(WslcImage.TarLocation)' == ''"
+                ContinueOnError="WarnAndContinue" />
+
+        <Delete Files="$(OutDir)%(WslcImage.Identity).tar.tmp"
+                Condition="'%(WslcImage.TarLocation)' == ''"
+                ContinueOnError="WarnAndContinue" />
+    </Target>
+
+</Project>
