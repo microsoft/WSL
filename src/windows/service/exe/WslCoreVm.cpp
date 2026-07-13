@@ -912,50 +912,67 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-void WslCoreVm::AddPlan9Share(
-    _In_ PCWSTR AccessName, _In_ PCWSTR Path, [[maybe_unused]] _In_ UINT32 Port, _In_ hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_opt_ PCWSTR VirtIoTag)
+void WslCoreVm::AddPlan9Share(_In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_opt_ PCWSTR VirtIoTag)
 {
-    bool addNewDevice = false;
-    wil::com_ptr<IPlan9FileSystem> server;
+    // Decide which plan9 transports to register the share with. In the default
+    // configuration this is exactly one (virtio9p OR hvsocket), but the
+    // experimental DrvFsTransports option forces both so that all three DrvFs
+    // transports (plan9-over-hvsocket, virtio9p, virtiofs) are available
+    // concurrently for testing.
+    const bool wantVirtio9p = m_vmConfig.IsVirtio9pTransportAvailable();
+    const bool wantHvsocket = !m_vmConfig.EnableVirtio9p || m_vmConfig.DrvFsTransports;
 
+    // This is called from AddDrvFsShare, which is called from InitializeDrvFs,
+    // so m_guestDeviceLock is already held.
+
+    bool addNewDevice = false;
+    wil::com_ptr<IPlan9FileSystem> virtio9pServer;
+
+    if (wantVirtio9p)
+    {
+        WI_ASSERT(VirtIoTag != nullptr);
+
+        auto revert = wil::impersonate_token(UserToken);
+
+        virtio9pServer = m_guestDeviceManager->GetRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag);
+        if (!virtio9pServer)
+        {
+            virtio9pServer = wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(UserToken);
+            m_guestDeviceManager->AddRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag, virtio9pServer);
+
+            // Start with one device to handle the first mount request. After
+            // each mount, the Plan9 file-system will request additional
+            // devices via the IPlan9FileSystemHost::NotifyAllDevicesInUse
+            // callback.
+            addNewDevice = true;
+        }
+
+        HRESULT result = virtio9pServer->AddSharePath(AccessName, Path, static_cast<UINT32>(Flags));
+        if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+        {
+            result = S_OK;
+        }
+
+        THROW_IF_FAILED(result);
+    }
+
+    if (wantHvsocket)
     {
         auto revert = wil::impersonate_token(UserToken);
 
-        // This is called from AddDrvFsShare, which is called from InitializeDrvFs, so m_guestDeviceLock is
-        // already held.
-
-        if (m_vmConfig.EnableVirtio9p)
+        wil::com_ptr<IPlan9FileSystem> server;
+        const auto existingServer = m_plan9Servers.find(Port);
+        if (existingServer != m_plan9Servers.end())
         {
-            server = m_guestDeviceManager->GetRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag);
-        }
-        else
-        {
-            const auto existingServer = m_plan9Servers.find(Port);
-            if (existingServer != m_plan9Servers.end())
-            {
-                server = existingServer->second;
-            }
+            server = existingServer->second;
         }
 
         if (!server)
         {
             server = wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(UserToken);
-            if (m_vmConfig.EnableVirtio9p)
-            {
-                m_guestDeviceManager->AddRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag, server);
-
-                // Start with one device to handle the first mount request. After
-                // each mount, the Plan9 file-system will request additional
-                // devices via the IPlan9FileSystemHost::NotifyAllDevicesInUse
-                // callback.
-                addNewDevice = true;
-            }
-            else
-            {
-                THROW_IF_FAILED(server->Init(&m_runtimeId, Port));
-                THROW_IF_FAILED(server->Resume());
-                m_plan9Servers.insert(std::make_pair(Port, server));
-            }
+            THROW_IF_FAILED(server->Init(&m_runtimeId, Port));
+            THROW_IF_FAILED(server->Resume());
+            m_plan9Servers.insert(std::make_pair(Port, server));
         }
 
         HRESULT result = server->AddSharePath(AccessName, Path, static_cast<UINT32>(Flags));
@@ -970,7 +987,7 @@ void WslCoreVm::AddPlan9Share(
     if (addNewDevice)
     {
         // This requires more privileges than the user may have, so impersonation is disabled.
-        (void)m_guestDeviceManager->AddNewDevice(VIRTIO_PLAN9_DEVICE_ID, server, VirtIoTag);
+        (void)m_guestDeviceManager->AddNewDevice(VIRTIO_PLAN9_DEVICE_ID, virtio9pServer, VirtIoTag);
     }
 }
 
@@ -2174,7 +2191,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 _Requires_lock_held_(m_guestDeviceLock)
 std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
-    WI_ASSERT(m_vmConfig.EnableVirtioFs);
+    WI_ASSERT(m_vmConfig.IsVirtioFsTransportAvailable());
 
     if (!ARGUMENT_PRESENT(UserToken))
     {
@@ -2468,7 +2485,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
     }
 
-    if (m_vmConfig.EnableHostFileSystemAccess && m_vmConfig.EnableVirtioFs)
+    if (m_vmConfig.EnableHostFileSystemAccess && m_vmConfig.IsVirtioFsTransportAvailable())
     {
         // Create a thread listening for handling virtiofs requests.
         auto listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_VIRTIOFS_PORT);
