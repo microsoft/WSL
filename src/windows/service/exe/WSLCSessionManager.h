@@ -129,6 +129,16 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
+                // Session is gone. Notifying plugins fires OnWslcSessionStopping, which is a plugin
+                // callback and must not nest inside another plugin callback (ExecutionContext forbids
+                // it). If a plugin called back into WSLC from within a notification (e.g. creating a
+                // process from OnWslcVmStopping), defer this lazy notify + prune to a later, non-
+                // reentrant pass rather than firing OnWslcSessionStopping on top of the current one.
+                if (InPluginNotificationContext())
+                {
+                    return false; // Keep in tracking; clean up on a later pass.
+                }
+
                 // Session is gone: notify plugins (if not already), then drop persistent reference if any.
                 NotifySessionStoppingLockHeld(entry);
 
@@ -173,6 +183,9 @@ private:
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
     void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
+
+    // Returns true if the calling thread is currently running inside a plugin notification callback.
+    static bool InPluginNotificationContext() noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;

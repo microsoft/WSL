@@ -567,6 +567,7 @@ try
 CATCH_RETURN();
 
 HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
+try
 {
     if (g_testType != PluginTestType::WslcVmRestart)
     {
@@ -574,8 +575,33 @@ HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
     }
 
     g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+
+    // Proves OnVmStopping doesn't deadlock a plugin that calls back in: on idle teardown the session
+    // is alive so these restart the VM and succeed; on permanent teardown they fail cleanly.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM stopping reentrant WSLCCreateProcess: " << (SUCCEEDED(processHr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(processHr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    constexpr auto* mountpoint = "/test-plugin/vm-stopping-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM stopping mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM stopping mount+unmount: skipped" << std::endl;
+    }
+
     return S_OK;
 }
+CATCH_RETURN();
 
 EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPluginAPIV1* Api, WSLPluginHooksV1* Hooks)
 {

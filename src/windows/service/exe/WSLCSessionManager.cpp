@@ -181,6 +181,12 @@ try
 }
 CATCH_LOG()
 
+bool WSLCSessionManagerImpl::InPluginNotificationContext() noexcept
+{
+    const auto* context = wsl::windows::common::ExecutionContext::Current();
+    return context != nullptr && WI_IsFlagSet(context->CurrentContext(), wsl::windows::common::Context::Plugin);
+}
+
 void WSLCSessionManagerImpl::CreateSession(
     _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {

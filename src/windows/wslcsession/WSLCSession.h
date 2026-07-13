@@ -357,8 +357,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
-    wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
 
     WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
     std::wstring m_terminationDetails;

@@ -642,14 +642,6 @@ interface IWSLCSession : IUnknown
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
-
-    // Keeps the VM alive for the duration of a client-side container operation. The CLI performs
-    // each mutation as two round-trips (OpenContainer followed by the operation) and may stream
-    // output afterwards. With on-demand VM idle-termination the VM could otherwise tear down
-    // between those calls, disconnecting the container wrapper and failing the second call with
-    // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
-    // it (or the client exiting) lets the VM idle-terminate again.
-    HRESULT BeginContainerOperation([out] IUnknown** Operation);
     HRESULT ListContainers([in, unique] const WSLCListContainersOptions* Options,[out, size_is(, *Count)] WSLCContainerEntry** Containers,[out] ULONG* Count, [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports, [out] ULONG* PortsCount);
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
@@ -701,9 +693,19 @@ interface IWSLCSession : IUnknown
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 
     // Used only for testing. Synchronously runs the idle-termination teardown path, ignoring the
-    // activity-count and idle-timeout-enabled guards so a test can force the VM down even while a
-    // container holds an activity reference. WasAlreadyIdle is TRUE when the VM was not running.
+    // activity-count guard so a test can force the VM down even while a container holds an activity
+    // reference. The idle-termination-enabled (persistent-storage) guard is still honored: a
+    // tmpfs-backed session is never torn down, since that would lose unrecoverable state.
+    // WasAlreadyIdle is TRUE when the VM was not running.
     HRESULT TriggerIdleTermination([out] BOOL* WasAlreadyIdle);
+
+    // Keeps the VM alive for the duration of a client-side container operation. The CLI performs
+    // each mutation as two round-trips (OpenContainer followed by the operation) and may stream
+    // output afterwards. With on-demand VM idle-termination the VM could otherwise tear down
+    // between those calls, disconnecting the container wrapper and failing the second call with
+    // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
+    // it (or the client exiting) lets the VM idle-terminate again.
+    HRESULT BeginContainerOperation([out] IUnknown** Operation);
 }
 
 //

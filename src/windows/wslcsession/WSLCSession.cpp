@@ -36,7 +36,7 @@ using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-constexpr auto c_containerdStorage = "/var/lib/docker";
+constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
@@ -456,12 +456,28 @@ try
         RecoverExistingContainers();
     };
 
-    hooks.TearDownSessionState = [this]() {
+    hooks.TearDownSessionState = [this](bool permanent) {
         std::lock_guard containersLock(m_containersLock);
         std::lock_guard networksLock(m_networksLock);
 
-        m_containers.clear();
+        // Network metadata is rebuilt from dockerd on every VM start, so it is always dropped.
         m_networks.clear();
+
+        // Container wrappers are kept alive across idle teardown (only cleared on permanent shutdown)
+        // so client COM references stay valid; RecoverState reattaches them to the restarted VM.
+        if (permanent)
+        {
+            m_containers.clear();
+        }
+        else
+        {
+            // Session lives on but the VM is going down: reconcile each surviving wrapper to a stopped
+            // state (releasing its VM activity hold) before teardown.
+            for (auto& [id, container] : m_containers)
+            {
+                container->OnVmTornDown();
+            }
+        }
     };
 
     hooks.OnSpontaneousExit = [this]() { LOG_IF_FAILED(Terminate()); };
@@ -489,8 +505,8 @@ try
     sessionContext.Id = m_id;
     sessionContext.DisplayName = m_displayName;
     sessionContext.Terminating = &m_terminating;
-    sessionContext.SessionTerminatingEvent = std::addressof(m_sessionTerminatingEvent);
-    sessionContext.SessionTerminatedEvent = std::addressof(m_sessionTerminatedEvent);
+    sessionContext.SessionTerminatingEvent = m_sessionTerminatingEvent;
+    sessionContext.SessionTerminatedEvent = m_sessionTerminatedEvent;
 
     m_runtime.Initialize(m_vmFactoryGitCookie, m_git, &m_settings, idleGracePeriod, std::move(sessionContext), std::move(hooks));
 
@@ -3557,6 +3573,35 @@ void WSLCSession::RecoverExistingContainers()
 
     for (const auto& dockerContainer : containers)
     {
+        // A kept-alive wrapper's cached state already matches dockerd's (reconciled in OnVmTornDown).
+        // Leave it (and its COM references) in place, just re-register its ports on the restarted VM.
+        if (auto existing = m_containers.find(dockerContainer.Id); existing != m_containers.end())
+        {
+            // Isolate a port re-reservation conflict to this container so it can't fail the lazy start
+            // for every client: log, warn and continue, mirroring the Open() failure path below.
+            try
+            {
+                // Honor --rm for a survivor forced to Exited in OnVmTornDown (delete deferred): remove
+                // it rather than leaking it. Otherwise re-register its VM-scoped port allocations.
+                bool removed = false;
+                auto wrapper = existing->second->RemoveExitedAutoRemoveSurvivor(removed);
+                if (removed)
+                {
+                    m_containers.erase(existing);
+                    continue;
+                }
+
+                existing->second->RecoverPorts(dockerContainer);
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION_MSG("Failed to recover ports for container: %hs", dockerContainer.Id.c_str());
+                EMIT_USER_WARNING(
+                    Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+            }
+            continue;
+        }
+
         try
         {
             auto container = WSLCContainerImpl::Open(

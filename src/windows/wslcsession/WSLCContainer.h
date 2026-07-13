@@ -118,6 +118,21 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Reconciles a surviving wrapper after its VM was torn down (idle-termination or crash) while the
+    // container was running: records a synthetic init-process exit, releases VM-scoped resources and
+    // drops to Exited (releasing the VM activity hold). Keeps the wrapper connected so client COM
+    // references stay valid across the VM restart.
+    void OnVmTornDown() noexcept;
+
+    // Re-registers a survivor's VM-scoped port allocations against the restarted VM (see OnVmTornDown).
+    void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
+
+    // Honors --rm for a survivor that was running when the VM was torn down: OnVmTornDown forced it to
+    // Exited but deferred the auto-remove delete while dockerd was down. Removes it now that the VM is
+    // back, mirroring OnStopped's Running->Exited delete. Sets Removed and returns the disconnect
+    // wrapper (destroy after dropping the container from tracking) when it deletes; otherwise a no-op.
+    [[nodiscard]] unique_com_disconnect RemoveExitedAutoRemoveSurvivor(bool& Removed);
+
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
@@ -174,6 +189,16 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
+    // Accessors for the session's VM-scoped resources. The container outlives any single VM: it
+    // survives idle-termination and is reused when the VM restarts. These fetch the current VM's
+    // objects from the (stable) runtime rather than caching references that would dangle across a
+    // restart. They are only valid while a VM lease is held (i.e. the VM is running).
+    WSLCVirtualMachine& Vm() const;
+    DockerHTTPClient& Docker() const;
+    WSLCVolumes& Volumes() const;
+    DockerEventTracker& Events() const;
+    IORelay& Relay() const;
+
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
@@ -197,24 +222,20 @@ private:
     // Must be acquired before m_lock when both are needed.
     std::mutex m_stopLock;
 
-    DockerHTTPClient& m_dockerClient;
+    WSLCSessionRuntime& m_runtime;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;
-    WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
 
     std::vector<std::string> m_namedVolumes;
-    WSLCVolumes& m_volumes;
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
-    DockerEventTracker& m_eventTracker;
     DockerEventTracker::EventTrackingReference m_containerEvents;
-    IORelay& m_ioRelay;
     std::string m_networkMode;
 
     // Held (non-empty) exactly while the container is Running so the session's VM stays alive even

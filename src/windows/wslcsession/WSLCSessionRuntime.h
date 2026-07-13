@@ -58,7 +58,11 @@ public:
     {
         std::function<void()> BringUp;
         std::function<void()> RecoverState;
-        std::function<void()> TearDownSessionState;
+        // Invoked while tearing down the VM, with the VM-scoped state still alive. The argument is
+        // true only for a permanent session shutdown (not an idle teardown): on idle teardown the
+        // container wrappers must be kept alive so client COM references stay valid and are reused
+        // when the VM restarts.
+        std::function<void(bool permanent)> TearDownSessionState;
         std::function<void()> OnSpontaneousExit;
         WSLCVirtualMachine::TOnCrashDump OnCrashDump;
 
@@ -67,8 +71,11 @@ public:
         // VM is (re)created for the session.
         std::function<void()> OnVmStarted;
 
-        // Fired when a VM is about to be torn down (best-effort). Invoked under the runtime lock, so
-        // the handler must not call back into the session. Paired with a prior OnVmStarted.
+        // Fired when a VM is about to be torn down (best-effort), while the VM is still alive. Invoked
+        // without the runtime lock held so the handler may call back into the session or into a plugin
+        // that acquires a VM lease. Paired once with a prior OnVmStarted -- fires on both idle and
+        // permanent teardown. On a permanent teardown the session is terminating, so a callback that
+        // resolves this session (e.g. to create a process) fails cleanly instead of restarting the VM.
         std::function<void()> OnVmStopping;
     };
 
@@ -77,8 +84,8 @@ public:
         ULONG Id{};
         std::wstring DisplayName;
         const std::atomic<bool>* Terminating{};
-        wil::unique_event* SessionTerminatingEvent{};
-        wil::unique_event* SessionTerminatedEvent{};
+        wil::shared_event SessionTerminatingEvent;
+        wil::shared_event SessionTerminatedEvent;
     };
 
     class VmLease
@@ -180,6 +187,12 @@ private:
     // VM down before the notification is delivered.
     void NotifyVmStarted();
 
+    // Fires the OnVmStopping hook (paired once with a prior OnVmStarted via m_vmStartNotified). Must
+    // be called without the runtime lock held: the handler may call into a plugin that acquires a VM
+    // lease (which takes m_lock), so firing under the lock would deadlock. Called while the VM is
+    // still running so the handler can still operate on it.
+    void NotifyVmStopping();
+
     WSLCSession* m_session{};
     RuntimeHooks m_hooks;
 
@@ -187,8 +200,8 @@ private:
     std::wstring m_displayName;
     bool m_initialized{};
     const std::atomic<bool>* m_terminating{};
-    wil::unique_event* m_sessionTerminatingEvent{};
-    wil::unique_event* m_sessionTerminatedEvent{};
+    wil::shared_event m_sessionTerminatingEvent;
+    wil::shared_event m_sessionTerminatedEvent;
 
     DWORD m_vmFactoryGitCookie{};
     wil::com_ptr<IGlobalInterfaceTable> m_git;
@@ -215,6 +228,10 @@ private:
 
     // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
     // never finished starting (or had no started notification) does not emit a spurious stopping.
+    // Accessed under m_notifyLock so the gate check and hook call are atomic across the (unlocked)
+    // start/stop notifications, preventing unpaired or reordered plugin notifications when a lazy VM
+    // start races a permanent shutdown.
+    std::mutex m_notifyLock;
     std::atomic<bool> m_vmStartNotified{false};
     std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
 

@@ -15,12 +15,13 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
+#include "WSLCSessionDefaults.h"
 
 using wsl::windows::service::wslc::WSLCSessionRuntime;
 
 namespace {
 
-constexpr auto c_containerdStorage = "/var/lib/docker";
+constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -51,6 +52,9 @@ void WSLCSessionRuntime::Initialize(
     m_hooks = std::move(hooks);
 
     m_idleState->Initialize(idleGrace, [this]() { OnIdleTimer(); });
+
+    // Session-scoped: subscriptions must survive VM restarts. Rebound per-VM in InitializeDockerRuntime.
+    m_eventTracker.emplace(*m_session);
 
     m_initialized = true;
 }
@@ -232,7 +236,7 @@ void WSLCSessionRuntime::EnsureVmRunning()
         // Do not (re)start the VM once the session is terminating or has terminated. This also
         // bounds VmLease's retry loop: a lease that races with Terminate() fails here instead of
         // restarting a VM that is being permanently torn down.
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent->is_signaled());
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
 
         if (m_vmState.load() != VmState::Running)
         {
@@ -254,10 +258,31 @@ void WSLCSessionRuntime::EnsureVmRunning()
 
 void WSLCSessionRuntime::NotifyVmStarted()
 {
+    // m_notifyLock keeps the start/stop decision atomic against a concurrent NotifyVmStopping so hooks
+    // stay paired. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
+    auto lock = std::lock_guard(m_notifyLock);
+
+    if (m_terminating->load())
+    {
+        return;
+    }
+
     if (m_hooks.OnVmStarted)
     {
         m_vmStartNotified.store(true);
         m_hooks.OnVmStarted();
+    }
+}
+
+void WSLCSessionRuntime::NotifyVmStopping()
+{
+    // Paired once with a prior OnVmStarted (skipped if bring-up never completed). m_notifyLock makes
+    // the gate check and hook call atomic against NotifyVmStarted.
+    auto lock = std::lock_guard(m_notifyLock);
+
+    if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
+    {
+        m_hooks.OnVmStopping();
     }
 }
 
@@ -311,7 +336,7 @@ void WSLCSessionRuntime::StartVmLockHeld()
     wil::com_ptr<IWSLCVirtualMachine> vm;
     THROW_IF_FAILED(vmFactory->CreateVirtualMachine(&vm));
 
-    m_virtualMachine.emplace(vm.get(), m_settings, m_sessionTerminatingEvent->get(), WSLCVirtualMachine::TOnCrashDump(m_hooks.OnCrashDump));
+    m_virtualMachine.emplace(vm.get(), m_settings, m_sessionTerminatingEvent.get(), WSLCVirtualMachine::TOnCrashDump(m_hooks.OnCrashDump));
     m_virtualMachine->Initialize();
 
     // Get an event from the service that is signaled when the VM exits.
@@ -348,8 +373,9 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-    //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), *m_session, *m_ioRelay);
+    // (Re)bind the session-scoped event tracker to this VM's docker client and relay. Existing
+    // container subscriptions are preserved across restarts.
+    m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
 
     m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
 }
@@ -375,17 +401,9 @@ void WSLCSessionRuntime::StopVmLockHeld()
 
 void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
 {
-    // Notify plugins that the VM is about to stop, paired with a prior OnVmStarted. Skipped for a
-    // VM that never finished starting (m_vmStartNotified false, e.g. bring-up failure). Fired under
-    // the lock, so the handler must not call back into the session.
-    if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
-    {
-        m_hooks.OnVmStopping();
-    }
-
     if (m_hooks.TearDownSessionState)
     {
-        m_hooks.TearDownSessionState();
+        m_hooks.TearDownSessionState(CaptureTerminationReason);
     }
 
     m_volumes.reset();
@@ -406,7 +424,8 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         m_allocatedPorts.clear();
     }
 
-    m_eventTracker.reset();
+    // Not reset: session-scoped, subscriptions outlive the VM. Its stream handle dies with the IO relay
+    // above; InitializeDockerRuntime re-binds it on the next start.
     m_dockerClient.reset();
 
     if (CaptureTerminationReason)
@@ -528,12 +547,36 @@ try
         m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
     });
 
+    // Final activity re-check under the lock before the irreversible OnVmStopping notification: a
+    // VmLease that bumped the count since the check above is now blocked on the shared lock we hold.
+    // Abandon here -- no notification, no teardown -- rather than stopping a VM about to be used again.
+    if (m_idleState->ActivityCount() != 0)
+    {
+        return;
+    }
+
+    // Fire OnVmStopping with m_lock dropped so a plugin handler may take a VM lease without
+    // deadlocking, then commit to the teardown unconditionally. A lease that races in during this
+    // window finds the VM stopped (VmLease re-checks under the shared lock) and restarts it, firing a
+    // fresh OnVmStarted, so hooks stay paired. StopVmLockHeld no-ops if a concurrent Terminate already
+    // tore the VM down, and TearDownVmLockHeld handles a VM that died in the window.
+    lock.reset();
+    NotifyVmStopping();
+    lock = m_lock.lock_exclusive();
+
     StopVmLockHeld();
 }
 CATCH_LOG();
 
 bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
 {
+    // tmpfs sessions have no persistent storage to recover from, so tearing the VM down loses all
+    // state. Match OnIdleTimer and refuse, so this shipping hook can't force data loss.
+    if (!IdleTerminationEnabled())
+    {
+        return false;
+    }
+
     // Mirror OnIdleTimer's MTA context on a dedicated thread: the incoming RPC thread is an STA, so
     // both re-initializing MTA on it and running teardown inline would fail (RPC_E_CHANGED_MODE /
     // RPC_E_WRONG_THREAD when releasing the VM's cross-process COM proxies).
@@ -563,6 +606,12 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
                 auto stopRequested = VmExitDisposition::StopRequested;
                 m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
             });
+
+            // Fire OnVmStopping without holding m_lock (see OnIdleTimer) so a plugin handler can
+            // acquire a VM lease without deadlocking.
+            lock.reset();
+            NotifyVmStopping();
+            lock = m_lock.lock_exclusive();
 
             StopVmLockHeld();
         }
@@ -693,7 +742,7 @@ void WSLCSessionRuntime::OnVmExited()
         TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
         TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "Name"),
-        TraceLoggingValue(!m_sessionTerminatingEvent->is_signaled(), "Unexpected"));
+        TraceLoggingValue(!m_sessionTerminatingEvent.is_signaled(), "Unexpected"));
 
     if (m_hooks.OnSpontaneousExit)
     {
@@ -712,8 +761,16 @@ void WSLCSessionRuntime::Shutdown(
     // Acquire an exclusive lock to ensure that no operation is running.
     WI_VERIFY(sessionLock);
 
-    // Tear down the VM (if running) and all VM-scoped state, capturing the termination reason.
-    // This mirrors the soft teardown used for idle shutdown, but here it is permanent.
+    // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
+    // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
+    // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
+    // rather than restarting the VM, and the reacquire can't block on it.
+    sessionLock.reset();
+    NotifyVmStopping();
+    sessionLock = m_lock.lock_exclusive();
+
+    // Tear down the VM (if running) and all VM-scoped state, capturing the termination reason; the
+    // reacquired exclusive lock satisfies TearDownVmLockHeld's precondition.
     TearDownVmLockHeld(/* CaptureTerminationReason */ true);
 
     m_vmState.store(VmState::None);
@@ -723,7 +780,7 @@ void WSLCSessionRuntime::Shutdown(
 
     // Signal completion last so any observer of the terminated event sees a fully torn-down
     // session and a populated termination reason.
-    m_sessionTerminatedEvent->SetEvent();
+    m_sessionTerminatedEvent.SetEvent();
 
     // Release the exclusive lock before disarming the idle timer. If a timer callback is currently
     // blocked acquiring the exclusive lock (about to evaluate idle teardown), it must be able to
