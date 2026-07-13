@@ -94,12 +94,13 @@ class WSLCE2EImageBuildTests
             "COPY hello.txt /hello.txt\n"
             "CMD [\"cat\", \"/hello.txt\"]\n");
 
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} -t {} --build-arg TEST_LABEL=wslc_e2e_test",
-            contextDir.wstring(),
-            dockerfilePath.wstring(),
-            BuiltImageTag1.NameAndTag(),
-            BuiltImageTag2.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(
+                L"build \"{}\" -f \"{}\" -t {} -t {} --build-arg TEST_LABEL=wslc_e2e_test",
+                contextDir.wstring(),
+                dockerfilePath.wstring(),
+                BuiltImageTag1.NameAndTag(),
+                BuiltImageTag2.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify both tags are present by inspecting each one
@@ -138,8 +139,9 @@ class WSLCE2EImageBuildTests
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
         // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(
+                L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(buildResult.Stdout.has_value());
@@ -166,8 +168,12 @@ class WSLCE2EImageBuildTests
             "COPY --from=build-stage /stage.txt /stage.txt\n"
             "CMD [\"cat\", \"/stage.txt\"]\n");
 
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(
+                L"build \"{}\" -f \"{}\" -t {} --target build-stage",
+                contextDir.wstring(),
+                dockerfilePath.wstring(),
+                BuiltImageTarget.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
@@ -196,11 +202,12 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
 
         // Use both the short alias (-l) and long form (--label) to confirm both parse paths.
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
-            contextDir.wstring(),
-            dockerfilePath.wstring(),
-            BuiltImageLabel.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(
+                L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
+                contextDir.wstring(),
+                dockerfilePath.wstring(),
+                BuiltImageLabel.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
@@ -231,11 +238,12 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(
             dockerfilePath, "FROM debian:latest\nLABEL conflict=from-dockerfile\nCMD [\"echo\", \"label-override-ok\"]\n");
 
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
-            contextDir.wstring(),
-            dockerfilePath.wstring(),
-            BuiltImageLabelOverride.NameAndTag()));
+        auto buildResult = RunWslc(
+            std::format(
+                L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
+                contextDir.wstring(),
+                dockerfilePath.wstring(),
+                BuiltImageLabelOverride.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());

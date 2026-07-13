@@ -447,9 +447,10 @@ class Plan9Tests
 
         // Create a folder that's unaccessible to plan9testuser
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"mkdir -p /tmp/plan9-group-test && groupadd -f plan9testgroup && chown root:plan9testgroup "
-                            L"/tmp/plan9-group-test && "
-                            L"echo -n foo > /tmp/plan9-group-test/bar && chmod 770 /tmp/plan9-group-test"),
+            LxsstuLaunchWsl(
+                L"mkdir -p /tmp/plan9-group-test && groupadd -f plan9testgroup && chown root:plan9testgroup "
+                L"/tmp/plan9-group-test && "
+                L"echo -n foo > /tmp/plan9-group-test/bar && chmod 770 /tmp/plan9-group-test"),
             0u);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

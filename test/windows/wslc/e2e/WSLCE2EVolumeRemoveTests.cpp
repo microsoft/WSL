@@ -113,12 +113,13 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
 
         // Create a container that uses the volume to ensure it's in use
-        result = RunWslc(std::format(
-            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
-            L"infinity\"",
-            WslcContainerName,
-            TestVolumeName,
-            DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(
+                L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
+                L"infinity\"",
+                WslcContainerName,
+                TestVolumeName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Attempt to remove the volume while it's in use
@@ -168,12 +169,13 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
 
         // Create a container that uses the volume to ensure it's in use
-        result = RunWslc(std::format(
-            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
-            L"infinity\"",
-            WslcContainerName,
-            TestVolumeName,
-            DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(
+                L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
+                L"infinity\"",
+                WslcContainerName,
+                TestVolumeName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // --force does not bypass in-use checks, volume should still fail to be removed

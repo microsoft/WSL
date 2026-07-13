@@ -458,8 +458,9 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
 {
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
-        GetCurrentProcess(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), InheritHandle, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::DuplicateHandle(
+            GetCurrentProcess(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), InheritHandle, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }
@@ -470,8 +471,9 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
-        caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::DuplicateHandle(
+            caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }
@@ -482,8 +484,9 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
-        GetCurrentProcess(), Handle, caller.get(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ::DuplicateHandle(
+            GetCurrentProcess(), Handle, caller.get(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }

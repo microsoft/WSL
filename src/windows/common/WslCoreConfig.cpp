@@ -138,8 +138,9 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
             LOG_WIN32_MSG(error, "opening config file failed");
             if (error != ERROR_FILE_NOT_FOUND)
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToOpenConfigFile(
-                    ConfigFilePath, wsl::windows::common::wslutil::GetErrorString(HRESULT_FROM_WIN32(error))));
+                EMIT_USER_WARNING(
+                    wsl::shared::Localization::MessageFailedToOpenConfigFile(
+                        ConfigFilePath, wsl::windows::common::wslutil::GetErrorString(HRESULT_FROM_WIN32(error))));
             }
         }
     }

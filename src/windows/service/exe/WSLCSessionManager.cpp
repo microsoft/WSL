@@ -309,8 +309,9 @@ void WSLCSessionManagerImpl::CreateSession(
         }
 
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
+        m_sessions.push_back(
+            SessionEntry{
+                std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);

@@ -182,9 +182,8 @@ void GnsEngine::ProcessNotification(const nlohmann::json& payload, Interface& in
         break;
 
     default:
-        throw RuntimeErrorWithSourceLocation(std::format(
-            "Unexpected LxGnsMessageNotification for interfaceName {}: {}", interface.Name(), payload["ResourceType"].get<std::string>()));
-        break;
+        throw RuntimeErrorWithSourceLocation(
+            std::format("Unexpected LxGnsMessageNotification for interfaceName {}: {}", interface.Name(), payload["ResourceType"].get<std::string>()));
     }
 }
 
@@ -573,8 +572,9 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
             auto table = manager.FindRoutingTableIdForInterface(interface);
             if (!table.has_value())
             {
-                throw RuntimeErrorWithSourceLocation(std::format(
-                    "LxGnsMessageInitialIpConfigurationNotification: failed to find routing table with name {}", interface.Name()));
+                throw RuntimeErrorWithSourceLocation(
+                    std::format(
+                        "LxGnsMessageInitialIpConfigurationNotification: failed to find routing table with name {}", interface.Name()));
             }
 
             GNS_LOG_INFO(
@@ -706,9 +706,8 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
             break;
         }
         default:
-            throw RuntimeErrorWithSourceLocation(std::format(
-                "Unexpected Wslcore::Networking::OperationType : {}", static_cast<int>(interfaceNetFilterRequest.operation)));
-            break;
+            throw RuntimeErrorWithSourceLocation(
+                std::format("Unexpected Wslcore::Networking::OperationType : {}", static_cast<int>(interfaceNetFilterRequest.operation)));
         }
         break;
     }

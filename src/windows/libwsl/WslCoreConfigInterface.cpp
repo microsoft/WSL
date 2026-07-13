@@ -367,8 +367,9 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
         }
 
         std::string ignoredPortsUtf8;
-        if (FAILED(wil::ResultFromException(
-                [&]() { ignoredPortsUtf8 = wsl::shared::string::WideToMultiByte(wslConfigSetting.StringValue); })))
+        if (FAILED(wil::ResultFromException([&]() {
+                ignoredPortsUtf8 = wsl::shared::string::WideToMultiByte(wslConfigSetting.StringValue);
+            })))
         {
             return ERROR_INVALID_PARAMETER;
         }

@@ -268,8 +268,7 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(
-            L"container exec -e {}=value-a -e {}=value-b {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
+        result = RunWslc(std::format(L"container exec -e {}=value-a -e {}=value-b {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=value-a", HostEnvVariableName)));
@@ -307,8 +306,8 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(
-            L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
+        result = RunWslc(
+            std::format(L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a"));
@@ -334,8 +333,9 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
+        result = RunWslc(
+            std::format(
+                L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a"));
@@ -364,18 +364,20 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Later --env-file wins
-        result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
+        result = RunWslc(
+            std::format(
+                L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_DUP=from-file-2"));
 
         // Explicit -e wins over env-file
-        result = RunWslc(std::format(
-            L"container exec -e WSLC_TEST_EXEC_ENV_DUP=from-cli --env-file {} --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            WslcContainerName));
+        result = RunWslc(
+            std::format(
+                L"container exec -e WSLC_TEST_EXEC_ENV_DUP=from-cli --env-file {} --env-file {} {} env",
+                EscapePath(EnvTestFile1.wstring()),
+                EscapePath(EnvTestFile2.wstring()),
+                WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_DUP=from-cli"));
@@ -477,13 +479,14 @@ class WSLCE2EContainerExecTests
         result = RunWslc(std::format(L"container exec -d {} sh -c \"sleep 1 && echo wslc-detach-ok > {}\"", WslcContainerName, markerPath));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
-                readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
-            },
-            std::chrono::milliseconds(200),
-            std::chrono::seconds(10)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    auto readResult = RunWslc(std::format(L"container exec {} cat {}", WslcContainerName, markerPath));
+                    readResult.Verify({.Stdout = L"wslc-detach-ok\n", .Stderr = L"", .ExitCode = 0});
+                },
+                std::chrono::milliseconds(200),
+                std::chrono::seconds(10)));
     }
 
 private:
