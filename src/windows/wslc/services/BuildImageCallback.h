@@ -38,9 +38,6 @@ private:
     void CollapseWindow();
     void Redraw();
     void RedrawIfNeeded();
-    // Routes terminal writes through the Reporter's Info channel so each frame is emitted
-    // as a single atomic write and respects the global output state.
-    void WriteTerminal(std::wstring_view content) const;
     bool IsCancelled() const;
 
     Reporter& m_reporter;

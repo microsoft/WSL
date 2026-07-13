@@ -70,15 +70,17 @@ class WSLCE2EPushPullTests
 
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
-            // Push should succeed.
+            // Standalone push/pull send progress to stdout (Docker parity), leaving stderr empty.
             auto result = RunWslc(std::format(L"push {}", registryImage));
-            result.Verify({.ExitCode = 0});
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_IS_FALSE(result.Stdout.value().empty());
 
             // Delete the local copy and pull it back.
             RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
 
             result = RunWslc(std::format(L"pull {}", registryImage));
             result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_IS_FALSE(result.Stdout.value().empty());
 
             // Verify the image is now present.
             auto registryRepo = registryImage.substr(0, registryImage.rfind(L':'));

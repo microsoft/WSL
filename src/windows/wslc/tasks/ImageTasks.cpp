@@ -227,7 +227,7 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    ImageProgressCallback callback(context.Reporter);
+    ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
 }
 
@@ -238,7 +238,7 @@ void PushImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    ImageProgressCallback callback(context.Reporter);
+    ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
     services::ImageService::Push(session, WideToMultiByte(imageId), &callback);
 }
 

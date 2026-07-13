@@ -35,7 +35,13 @@ auto MaskInput(wsl::windows::wslc::Reporter& reporter)
         THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT));
         return wil::scope_exit(std::function<void()>([input, mode, &reporter] {
             SetConsoleMode(input, mode);
-            reporter.Info(L"\n");
+            // This runs from a scope_exit destructor (implicitly noexcept), possibly during
+            // exception unwinding, so swallow any output failure to avoid std::terminate.
+            try
+            {
+                reporter.Info(L"\n");
+            }
+            CATCH_LOG()
         }));
     }
 

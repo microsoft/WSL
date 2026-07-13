@@ -247,8 +247,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
         {
-            // Attempt to pull the image if not found
-            ImageProgressCallback callback(reporter);
+            // Implicit pull for run/create: progress goes to Info (stderr), keeping stdout for the
+            // container id/output.
+            ImageProgressCallback callback(reporter, Reporter::Level::Info);
             reporter.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
             ImageService imageService;
             imageService.Pull(session, image, &callback);

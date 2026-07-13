@@ -21,25 +21,19 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
-void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
-{
-    // Route progress rendering through the Reporter's Info channel (stderr) so it
-    // respects the global output state and keeps stdout clean for scripting. Each
-    // call is emitted as a single atomic write.
-    m_reporter.Write(Reporter::Level::Info, L"{}", content);
-}
-
 auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        WriteTerminal(Cursor::Up(line).Get());
+        m_reporter.Write(m_level, L"{}", Cursor::Up(line));
     }
 
-    return wil::scope_exit([line = line, this]() {
+    // scope_exit is noexcept and may fire during unwinding; scope_exit_log swallows output
+    // failures so a throw here can't call std::terminate.
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [line = line, this]() {
         if (line > 1)
         {
-            WriteTerminal(Cursor::Down(line - 1).Get());
+            m_reporter.Write(m_level, L"{}", Cursor::Down(line - 1));
         }
     });
 }
@@ -48,40 +42,55 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
-        // The in-place progress display relies on cursor movement, so it only renders
-        // when the Info channel is an interactive VT console. When redirected, skip it.
+        // The in-place progress display needs cursor movement, so when output is redirected fall
+        // back to a log stream: one line per new status, deduping the repeated byte-progress
+        // callbacks that share a status text.
         if (!m_vtEnabled)
         {
+            const char* const statusText = (status != nullptr) ? status : "";
+            if (id == nullptr || *id == '\0')
+            {
+                m_reporter.Write(m_level, L"{}\n", statusText);
+            }
+            else
+            {
+                auto [it, inserted] = m_lastStatusById.try_emplace(id, statusText);
+                if (inserted || it->second != statusText)
+                {
+                    it->second = statusText;
+                    m_reporter.Write(m_level, L"{}: {}\n", id, statusText);
+                }
+            }
+
             return S_OK;
         }
 
-        // Hide the cursor while rendering so the user doesn't see it bouncing through the
-        // cursor movements, then restore it at the final position. scope_exit guarantees the
-        // cursor is shown again on every exit path.
-        WriteTerminal(Cursor::Hide.Get());
-        auto showCursor = wil::scope_exit([this]() { WriteTerminal(Cursor::Show.Get()); });
+        // Hide the cursor while rendering so it doesn't bounce through the movements; scope_exit_log
+        // restores it on every exit path and can't call std::terminate during unwinding.
+        m_reporter.Write(m_level, L"{}", Cursor::Hide);
+        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_reporter.Write(m_level, L"{}", Cursor::Show); });
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            WriteTerminal(std::format(L"{}\n", status));
+            m_reporter.Write(m_level, L"{}\n", status);
             m_currentLine++;
             return S_OK;
         }
 
-        const auto visibleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info);
+        const auto visibleWidth = m_reporter.GetConsoleWidth(m_level);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
+            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, visibleWidth) + L'\n');
+            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
         }
 
         return S_OK;
