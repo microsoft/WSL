@@ -258,31 +258,50 @@ void WSLCSessionRuntime::EnsureVmRunning()
 
 void WSLCSessionRuntime::NotifyVmStarted()
 {
-    // m_notifyLock keeps the start/stop decision atomic against a concurrent NotifyVmStopping so hooks
-    // stay paired. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
-    auto lock = std::lock_guard(m_notifyLock);
-
-    if (m_terminating->load())
+    // Flip the pairing state under m_notifyLock so it stays atomic against a concurrent NotifyVmStopping,
+    // then fire the hook after releasing the lock. The handler may reentrantly restart the VM (e.g.
+    // WSLCCreateProcess -> NotifyVmStarted/Stopping); invoking it under this non-recursive mutex would
+    // self-deadlock. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
+    std::function<void()> hook;
     {
-        return;
+        auto lock = std::lock_guard(m_notifyLock);
+
+        if (m_terminating->load())
+        {
+            return;
+        }
+
+        if (m_hooks.OnVmStarted)
+        {
+            m_vmStartNotified.store(true);
+            hook = m_hooks.OnVmStarted;
+        }
     }
 
-    if (m_hooks.OnVmStarted)
+    if (hook)
     {
-        m_vmStartNotified.store(true);
-        m_hooks.OnVmStarted();
+        hook();
     }
 }
 
 void WSLCSessionRuntime::NotifyVmStopping()
 {
-    // Paired once with a prior OnVmStarted (skipped if bring-up never completed). m_notifyLock makes
-    // the gate check and hook call atomic against NotifyVmStarted.
-    auto lock = std::lock_guard(m_notifyLock);
-
-    if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
+    // Decide the pairing under m_notifyLock (paired once with a prior OnVmStarted, skipped if bring-up
+    // never completed), then fire the hook after releasing the lock. The handler may reentrantly restart
+    // the VM and call NotifyVmStarted; invoking it under this non-recursive mutex would self-deadlock.
+    std::function<void()> hook;
     {
-        m_hooks.OnVmStopping();
+        auto lock = std::lock_guard(m_notifyLock);
+
+        if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
+        {
+            hook = m_hooks.OnVmStopping;
+        }
+    }
+
+    if (hook)
+    {
+        hook();
     }
 }
 
@@ -751,26 +770,26 @@ void WSLCSessionRuntime::OnVmExited()
 }
 
 void WSLCSessionRuntime::Shutdown(
-    wil::rwlock_release_exclusive_scope_exit& sessionLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails)
+    wil::rwlock_release_exclusive_scope_exit& runtimeLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails)
 {
     if (!m_initialized)
     {
         return;
     }
 
-    // Acquire an exclusive lock to ensure that no operation is running.
-    WI_VERIFY(sessionLock);
+    // runtimeLock is an exclusive hold on m_lock, guaranteeing no operation is running.
+    WI_VERIFY(runtimeLock);
 
     // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
     // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
     // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
     // rather than restarting the VM, and the reacquire can't block on it.
-    sessionLock.reset();
+    runtimeLock.reset();
     NotifyVmStopping();
-    sessionLock = m_lock.lock_exclusive();
+    runtimeLock = m_lock.lock_exclusive();
 
     // Tear down the VM (if running) and all VM-scoped state, capturing the termination reason; the
-    // reacquired exclusive lock satisfies TearDownVmLockHeld's precondition.
+    // reacquired exclusive hold on m_lock satisfies TearDownVmLockHeld's precondition.
     TearDownVmLockHeld(/* CaptureTerminationReason */ true);
 
     m_vmState.store(VmState::None);
@@ -786,7 +805,7 @@ void WSLCSessionRuntime::Shutdown(
     // blocked acquiring the exclusive lock (about to evaluate idle teardown), it must be able to
     // obtain it, observe m_terminating, and return — otherwise Disarm()'s wait for in-flight
     // callbacks below would deadlock.
-    sessionLock.reset();
+    runtimeLock.reset();
 
     // Permanently disable idle teardown and drain any in-flight timer callback so it cannot
     // reference this session after it is destroyed.

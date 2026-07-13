@@ -176,7 +176,9 @@ public:
 
     [[nodiscard]] bool TriggerIdleTerminationForTest();
 
-    void Shutdown(wil::rwlock_release_exclusive_scope_exit& sessionLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
+    // runtimeLock is an exclusive hold on m_lock (this runtime's lock), which is dropped and reacquired
+    // internally so the OnVmStopping notification can fire without it and TearDownVmLockHeld runs with it.
+    void Shutdown(wil::rwlock_release_exclusive_scope_exit& runtimeLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
 
 private:
     bool IdleTerminationEnabled() const noexcept;
@@ -228,9 +230,9 @@ private:
 
     // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
     // never finished starting (or had no started notification) does not emit a spurious stopping.
-    // Accessed under m_notifyLock so the gate check and hook call are atomic across the (unlocked)
-    // start/stop notifications, preventing unpaired or reordered plugin notifications when a lazy VM
-    // start races a permanent shutdown.
+    // The gate flip happens under m_notifyLock so it stays atomic across the start/stop notifications;
+    // the hook itself is copied out and fired after the lock is released, because the handler may
+    // reentrantly restart the VM (re-entering these notifications) and would self-deadlock otherwise.
     std::mutex m_notifyLock;
     std::atomic<bool> m_vmStartNotified{false};
     std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
