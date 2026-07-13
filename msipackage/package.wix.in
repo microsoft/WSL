@@ -5,7 +5,11 @@
 
         <StandardDirectory Id="ProgramFiles64Folder">
             <Directory Id="INSTALLDIR" Name="WSL">
-                <Directory Id="TOOLSFOLDER" Name="tools" />
+                <Directory Id="TOOLSFOLDER" Name="tools">
+                    <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
+                        <Directory Id="LINUX_HEADERS_FOLDER" Name="linux-headers" />
+                    <?endif?>
+                </Directory>
                 <Directory Id="LIBFOLDER" Name="lib" />
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                     <Directory Id="WSLSETTINGS" Name="wslsettings"/>
@@ -494,6 +498,13 @@
         </DirectoryRef>
 
         <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
+            <ComponentGroup Id="linux_headers" Directory="LINUX_HEADERS_FOLDER" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/linux-headers">
+                <Component Id="linux_headers_component" Guid="8F57D60A-104C-4EE7-8B2A-79624CBC4D10" Bitness="always64" UninstallWhenSuperseded="yes" />
+                <Files Include="**/*.h" />
+            </ComponentGroup>
+        <?endif?>
+
+        <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
             <ComponentGroup Id="msrdc_localization" Directory="INSTALLDIR" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}">
                 <Component Id="msrdc_mui" Guid="EDBB5FC5-058D-45D7-BB03-FB1337B3B577" Bitness="always64"  UninstallWhenSuperseded="yes" />
                 <Files Include="**.mui" />
@@ -591,6 +602,7 @@
                 <ComponentRef Id="msal" />
                 <ComponentGroupRef Id="msrdc_localization" />
                 <ComponentRef Id="directx" />
+                <ComponentGroupRef Id="linux_headers" />
             <?endif?>
 
             <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>

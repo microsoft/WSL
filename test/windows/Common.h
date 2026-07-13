@@ -567,6 +567,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernel;
     std::optional<std::wstring> kernelCommandLine;
     std::optional<std::wstring> kernelModules;
+    std::optional<std::wstring> kernelHeaders;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
     std::optional<std::wstring> systemDistro;

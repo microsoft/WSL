@@ -257,6 +257,46 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         }
     }
 
+    // Resolve the kernel headers directory. The bundled headers ship as loose files in the kernel
+    // nuget (and are installed under tools/linux-headers/ in the MSI), and are mounted into the
+    // distro via a read-only 9p share. A custom path is only valid when a custom kernel is also
+    // specified. Safe mode skips the mount entirely.
+    if (!m_vmConfig.EnableSafeMode)
+    {
+        if (m_vmConfig.KernelHeadersPath.empty())
+        {
+            if (m_defaultKernel)
+            {
+#ifdef WSL_KERNEL_HEADERS_PATH
+
+                m_vmConfig.KernelHeadersPath = std::wstring(TEXT(WSL_KERNEL_HEADERS_PATH));
+
+#else
+
+                m_vmConfig.KernelHeadersPath = m_installPath / LXSS_TOOLS_DIRECTORY / L"linux-headers";
+
+#endif
+            }
+        }
+        else if (m_defaultKernel)
+        {
+            THROW_HR_WITH_USER_ERROR(WSL_E_CUSTOM_KERNEL_NOT_FOUND, Localization::MessageMismatchedKernelHeadersError());
+        }
+
+        if (!m_vmConfig.KernelHeadersPath.empty())
+        {
+            if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelHeadersPath.c_str()))
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_CUSTOM_KERNEL_NOT_FOUND,
+                    Localization::MessageCustomKernelHeadersNotFound(
+                        wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelHeadersPath.c_str()));
+            }
+
+            m_mountKernelHeaders = true;
+        }
+    }
+
     // If debug console was requested, create a randomly-named pipe and spawn a wslhost process to read from the pipe.
     //
     // N.B. wslhost.exe is launched at medium integrity level and its lifetime
@@ -417,6 +457,17 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 #endif
 
         addShare(TEXT(LXSS_GPU_PACKAGED_LIB_SHARE), path.c_str());
+    }
+
+    // Add a read-only 9p share for the kernel headers directory. Mini-init mounts this share at a
+    // temporary path and hands it off to distro init, which moves it under
+    // /usr/src/linux-headers-$(uname -r)/include and creates the /lib/modules/$(uname -r)/build
+    // symlink expected by out-of-tree module tooling.
+    if (m_mountKernelHeaders)
+    {
+        constexpr auto flags = (hcs::Plan9ShareFlags::ReadOnly | hcs::Plan9ShareFlags::AllowOptions);
+        wsl::windows::common::hcs::AddPlan9Share(
+            m_system.get(), TEXT(LXSS_KERNEL_HEADERS_SHARE), TEXT(LXSS_KERNEL_HEADERS_SHARE), m_vmConfig.KernelHeadersPath.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
     }
 
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
@@ -1868,6 +1919,7 @@ void WslCoreVm::InitializeGuest()
     message->EnableGuiApps = LXSS_ENABLE_GUI_APPS();
     message->MountGpuShares = m_vmConfig.EnableGpuSupport;
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
+    message->MountKernelHeaders = m_mountKernelHeaders;
     if (m_networkingEngine)
     {
         m_networkingEngine->FillInitialConfiguration(message->NetworkingConfiguration);

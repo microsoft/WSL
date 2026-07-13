@@ -648,6 +648,10 @@ Build time: {}</value>
     <value>The custom kernel modules VHD in {} was not found: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageCustomKernelHeadersNotFound" xml:space="preserve">
+    <value>The custom kernel headers directory specified by 'wsl2.kernelHeaders' in {} was not found: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="wsl2.kernelHeaders"}This is a configuration setting name and should not be translated.</comment>
+  </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
     <value>The custom system distribution specified in {} was not found or is not the correct format.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1171,6 +1175,10 @@ Error code: {}</value>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
     <value>Customised kernel modules were supplied without specifying a customised kernel. Please see https://aka.ms/wslcustomkernel for more information.</value>
   </data>
+  <data name="MessageMismatchedKernelHeadersError" xml:space="preserve">
+    <value>Customised kernel headers were supplied without specifying a customised kernel. The 'wsl2.kernelHeaders' setting requires 'wsl2.kernel' to also be set. Please see https://aka.ms/wslcustomkernel for more information.</value>
+    <comment>{Locked="wsl2.kernelHeaders"}{Locked="wsl2.kernel"}These are configuration setting names and should not be translated.</comment>
+  </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Due to a current compatibility issue with Global Secure Access Client, DNS Tunneling is disabled.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
@@ -1292,6 +1300,21 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>An absolute Windows path to a custom Linux kernel modules VHD.</value>
     <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="Settings_CustomKernelHeadersPath.Header" xml:space="preserve">
+    <value>Custom kernel headers</value>
+  </data>
+  <data name="Settings_CustomKernelHeadersPath.Description" xml:space="preserve">
+    <value>An absolute Windows path to a directory containing Linux kernel headers. Requires a custom kernel to also be set.</value>
+  </data>
+  <data name="Settings_CustomKernelHeadersPathBrowseButton.Content" xml:space="preserve">
+    <value>Browse kernel headers</value>
+  </data>
+  <data name="Settings_CustomKernelHeadersPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Custom kernel headers</value>
+  </data>
+  <data name="Settings_CustomKernelHeadersPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>An absolute Windows path to a directory containing Linux kernel headers. Requires a custom kernel to also be set.</value>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Custom system distro</value>

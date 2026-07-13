@@ -54,6 +54,19 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
+                <ctControls:SettingsExpander x:Name="CustomKernelHeadersPathExpander" x:Uid="Settings_CustomKernelHeadersPath">
+                    <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomKernelHeadersPath, Mode=OneWay}"/>
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="CustomKernelHeadersPathTextBox" x:Uid="Settings_CustomKernelHeadersPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Text="{x:Bind ViewModel.CustomKernelHeadersPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                <Button x:Uid="Settings_CustomKernelHeadersPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Click="CustomKernelHeadersPath_Click"/>
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
                 <ctControls:SettingsExpander x:Name="CustomSystemDistroPathExpander" x:Uid="Settings_CustomSystemDistroPath">
                     <ctControls:SettingsExpander.Description>
                         <controls:HyperlinkTextBlock x:Uid="Settings_CustomSystemDistroPathDescription"/>

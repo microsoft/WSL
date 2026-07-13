@@ -261,6 +261,8 @@ Abstract:
 #define LX_WSL2_GUI_APP_SUPPORT_ENV "WSL2_GUI_APPS_ENABLED"
 #define LX_WSL2_KERNEL_MODULES_MOUNT_ENV "WSL2_KERNEL_MODULES_MOUNT"
 #define LX_WSL2_KERNEL_MODULES_PATH_ENV "WSL2_KERNEL_MODULES_PATH"
+#define LX_WSL2_KERNEL_HEADERS_MOUNT_ENV "WSL2_KERNEL_HEADERS_MOUNT"
+#define LX_WSL2_KERNEL_HEADERS_PATH_ENV "WSL2_KERNEL_HEADERS_PATH"
 #define LX_WSL2_SYSTEM_DISTRO_SHARE_ENV "WSL2_SYSTEM_DISTRO_SHARE"
 #define LX_WSL2_GPU_SHARE_ENV "WSL2_GPU_SHARE_ENV_"
 #define LX_WSL2_SHARED_MEMORY_OB_DIRECTORY "WSL2_SHARED_MEMORY_OB_DIRECTORY"
@@ -1336,6 +1338,7 @@ typedef struct _LX_MINI_INIT_CONFIG_MESSAGE
     bool EnableGuiApps;
     bool MountGpuShares;
     bool EnableInboxGpuLibs;
+    bool MountKernelHeaders;
     LX_MINI_INIT_NETWORKING_CONFIGURATION NetworkingConfiguration;
     char Buffer[];
 
@@ -1345,6 +1348,7 @@ typedef struct _LX_MINI_INIT_CONFIG_MESSAGE
         FIELD(MountGpuShares),
         FIELD(EntropyOffset),
         FIELD(EnableInboxGpuLibs),
+        FIELD(MountKernelHeaders),
         FIELD(NetworkingConfiguration.NetworkingMode),
         FIELD(NetworkingConfiguration.PortTrackerType),
         FIELD(NetworkingConfiguration.EphemeralPortRangeStart),
