@@ -188,8 +188,7 @@ int SessionService::TerminateSession(Reporter& reporter, const Session& session)
         wil::unique_cotaskmem_string displayName;
         if (SUCCEEDED(session.Get()->GetDisplayName(&displayName)) && displayName)
         {
-            reporter.Error(
-                L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString));
+            reporter.Error(L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString));
         }
         else
         {

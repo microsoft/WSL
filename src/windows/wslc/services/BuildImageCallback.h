@@ -24,7 +24,8 @@ class DECLSPEC_UUID("3EDD5DBF-CA6C-4CF7-923A-AD94B6A732E5") BuildImageCallback
 {
 public:
     // The cancel event handle must remain valid for the lifetime of this callback.
-    BuildImageCallback(Reporter& reporter, HANDLE cancelEvent, bool verbose) : m_reporter(reporter), m_verbose(verbose), m_cancelEvent(cancelEvent)
+    BuildImageCallback(Reporter& reporter, HANDLE cancelEvent, bool verbose) :
+        m_reporter(reporter), m_verbose(verbose), m_cancelEvent(cancelEvent)
     {
     }
     ~BuildImageCallback();

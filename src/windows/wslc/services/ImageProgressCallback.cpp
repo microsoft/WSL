@@ -21,6 +21,10 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
+// Fallback width for the in-place progress display when the console width can't be queried, so a
+// wrapped line can't corrupt the cursor-based rendering.
+constexpr int c_fallbackConsoleWidth = 80;
+
 auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
@@ -77,7 +81,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
             return S_OK;
         }
 
-        const auto visibleWidth = m_reporter.GetConsoleWidth(m_level);
+        const int visibleWidth = m_reporter.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
@@ -98,7 +102,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
     CATCH_RETURN();
 }
 
-std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth)
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth)
 {
     std::wstring line;
     if (total != 0)
@@ -144,25 +148,21 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         line = std::format(L"{}: {}", id, status);
     }
 
-    // Truncate to the console width to prevent wrapping that would break cursor repositioning.
-    // When the width is unknown (redirected) the line is written as-is.
-    if (visibleWidth)
+    // Truncate to the console width to prevent wrapping that breaks cursor repositioning, then pad
+    // to erase any previously written characters on the line.
+    if (line.size() > static_cast<size_t>(visibleWidth))
     {
-        if (line.size() > static_cast<size_t>(*visibleWidth))
+        line.resize(visibleWidth);
+
+        // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
+        // drop it so we don't emit an invalid UTF-16 sequence.
+        if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
         {
-            line.resize(*visibleWidth);
-
-            // Avoid splitting a surrogate pair — if the last code unit is a high surrogate,
-            // drop it so we don't emit an invalid UTF-16 sequence.
-            if (!line.empty() && IS_HIGH_SURROGATE(line.back()))
-            {
-                line.pop_back();
-            }
+            line.pop_back();
         }
-
-        // Erase any previously written char on that line.
-        line.resize(*visibleWidth, L' ');
     }
+
+    line.resize(visibleWidth, L' ');
 
     return line;
 }

@@ -392,6 +392,7 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     context.Reporter.Output(L"\n");
-    context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    context.Reporter.Output(
+        L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

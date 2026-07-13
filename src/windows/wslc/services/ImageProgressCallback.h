@@ -16,7 +16,6 @@ Abstract:
 #include "SessionService.h"
 #include "VTSupport.h"
 #include <map>
-#include <optional>
 #include <string>
 
 namespace wsl::windows::wslc::services {
@@ -35,7 +34,7 @@ public:
 
 private:
     auto MoveToLine(int line);
-    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, std::optional<int> visibleWidth);
+    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth);
     Reporter& m_reporter;
     // Declared before m_vtEnabled, whose initializer reads it.
     const Reporter::Level m_level;

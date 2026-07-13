@@ -167,7 +167,10 @@ void CreateContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     auto result = ContainerService::Create(
-        context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        context.Data.Get<Data::ContainerOptions>());
     context.Reporter.Output(L"{}\n", MultiByteToWide(result.Id));
 }
 
@@ -177,7 +180,10 @@ void ExecContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Exec(
-        context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ContainerId>()), context.Data.Get<Data::ContainerOptions>());
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ContainerId>()),
+        context.Data.Get<Data::ContainerOptions>());
 }
 
 void GetContainers(CLIExecutionContext& context)
@@ -631,7 +637,10 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Run(
-        context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
+        context.Reporter,
+        context.Data.Get<Data::Session>(),
+        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        context.Data.Get<Data::ContainerOptions>());
 }
 
 void SetContainerOptionsFromArgs(CLIExecutionContext& context)
@@ -1105,6 +1114,7 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     context.Reporter.Output(L"\n");
-    context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    context.Reporter.Output(
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task
