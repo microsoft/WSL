@@ -262,6 +262,8 @@ void WSLCSessionRuntime::NotifyVmStarted()
     // then fire the hook after releasing the lock. The handler may reentrantly restart the VM (e.g.
     // WSLCCreateProcess -> NotifyVmStarted/Stopping); invoking it under this non-recursive mutex would
     // self-deadlock. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
+    // m_vmStartNotified tracks the VM lifecycle, not whether OnVmStarted is installed, so a hooks user
+    // that sets only OnVmStopping still gets paired stop notifications.
     std::function<void()> hook;
     {
         auto lock = std::lock_guard(m_notifyLock);
@@ -271,11 +273,8 @@ void WSLCSessionRuntime::NotifyVmStarted()
             return;
         }
 
-        if (m_hooks.OnVmStarted)
-        {
-            m_vmStartNotified.store(true);
-            hook = m_hooks.OnVmStarted;
-        }
+        m_vmStartNotified.store(true);
+        hook = m_hooks.OnVmStarted;
     }
 
     if (hook)
@@ -575,13 +574,23 @@ try
     }
 
     // Fire OnVmStopping with m_lock dropped so a plugin handler may take a VM lease without
-    // deadlocking, then commit to the teardown unconditionally. A lease that races in during this
-    // window finds the VM stopped (VmLease re-checks under the shared lock) and restarts it, firing a
-    // fresh OnVmStarted, so hooks stay paired. StopVmLockHeld no-ops if a concurrent Terminate already
-    // tore the VM down, and TearDownVmLockHeld handles a VM that died in the window.
+    // deadlocking. A lease that races in during this window finds the VM still Running (StopVmLockHeld
+    // has not run yet), so it does not restart and may leave a long-lived activity token (e.g. a
+    // process keep-alive). Re-check the activity count after reacquiring the lock: if it is non-zero,
+    // abandon the teardown and re-pair the notification with a fresh OnVmStarted (with m_lock dropped,
+    // same reentrancy reason) rather than tearing down a VM that is in use again. StopVmLockHeld no-ops
+    // if a concurrent Terminate already tore the VM down, and TearDownVmLockHeld handles a VM that died
+    // in the window.
     lock.reset();
     NotifyVmStopping();
     lock = m_lock.lock_exclusive();
+
+    if (m_idleState->ActivityCount() != 0)
+    {
+        lock.reset();
+        NotifyVmStarted();
+        return;
+    }
 
     StopVmLockHeld();
 }
