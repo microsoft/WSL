@@ -11884,7 +11884,15 @@ class WSLCTests
         }
 
         stop.store(true);
-        VERIFY_ARE_EQUAL(worker.wait_for(std::chrono::seconds(60)), std::future_status::ready);
+
+        // A real teardown/operation deadlock would leave the worker wedged forever. The std::future
+        // destructor blocks until the task completes, so letting a failed VERIFY unwind here would hang
+        // the test host -- exactly what this test guards against. Fail fast with a dump on timeout so we
+        // never unwind with an unfinished async task.
+        FAIL_FAST_IF_MSG(
+            worker.wait_for(std::chrono::seconds(60)) != std::future_status::ready,
+            "hammering worker did not drain after stop; likely teardown/operation deadlock");
+
         worker.get();
 
         LogInfo("TriggerIdleTerminationConcurrentWithOperations tolerated %u operation failures", opFailures.load());
