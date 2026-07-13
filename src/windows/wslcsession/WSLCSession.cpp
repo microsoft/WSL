@@ -21,6 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
+#include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
 
@@ -38,7 +39,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
-constexpr auto c_storageVhdFilename = L"storage.vhdx";
+constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -503,6 +504,11 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
 
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
+
+        if (WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsWarnCustomLocation))
+        {
+            EMIT_USER_WARNING(Localization::MessageWslcSessionStorageCustomLocation(storagePath.c_str()));
+        }
 
         std::filesystem::create_directories(storagePath);
         wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
@@ -3405,7 +3411,9 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock(m_containersLock);
 
-    WI_VERIFY(m_containers.erase(Container->ID()) == 1);
+    // N.B. once a container transitions to a 'Deleted' state, a call to ListContainers() can remove it from m_containers.
+    // Therefore it's possible that the container is already removed when the callback from Delete() is invoked.
+    m_containers.erase(Container->ID());
 }
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)

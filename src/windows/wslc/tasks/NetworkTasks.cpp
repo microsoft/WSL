@@ -191,10 +191,10 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<3>({L"NETWORK ID", L"NAME", L"DRIVER"});
+        auto table = wsl::windows::wslc::TableOutput<3>(context.Reporter, {L"NETWORK ID", L"NAME", L"DRIVER"});
         for (const auto& network : networks)
         {
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(TruncateId(network.Id)),
                 MultiByteToWide(network.Name),
                 MultiByteToWide(network.Driver),
@@ -226,5 +226,27 @@ void PruneNetworks(CLIExecutionContext& context)
     {
         context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
     }
+}
+
+void ConnectNetwork(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+
+    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
+    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    NetworkService::Connect(context.Data.Get<Data::Session>(), networkName, containerId);
+}
+
+void DisconnectNetwork(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+
+    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
+    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkName, containerId);
 }
 } // namespace wsl::windows::wslc::task

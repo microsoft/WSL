@@ -285,6 +285,12 @@ typedef struct _WSLCContainerOptions
 
     // Ignored unless WSLCContainerFlagsStopTimeout is set in Flags.
     LONG StopTimeout;
+
+    [unique] LPCSTR HealthCmd;
+    LONGLONG HealthIntervalNs;
+    LONGLONG HealthTimeoutNs;
+    LONGLONG HealthStartPeriodNs;
+    LONG HealthRetries;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -492,6 +498,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
+    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
 }
 
 typedef struct _WSLCDeletedImageInformation

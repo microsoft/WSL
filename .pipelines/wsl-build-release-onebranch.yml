@@ -4,6 +4,11 @@ parameters:
   type: boolean
   default: false
 
+- name: pushToStore
+  displayName: 'Push the release to the Microsoft Store'
+  type: boolean
+  default: false
+
 - name: testVersion
   displayName: 'Test the release pipeline'
   type: string
@@ -74,6 +79,7 @@ extends:
         publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
+        pushToStore: ${{ parameters.pushToStore }}
 
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self

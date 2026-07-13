@@ -3014,8 +3014,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(
-                DeleteFileW(Configuration.ShortcutPath->c_str()), "Failed to delete %ls", Configuration.ShortcutPath->c_str());
+            // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
+            try
+            {
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(10),
+                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+            }
+            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }
 
         // Remove the terminal profile, if any.

@@ -85,7 +85,7 @@ std::wstring RegistryCommand::LongDescription() const
 
 void RegistryCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 
 // Registry Login Command

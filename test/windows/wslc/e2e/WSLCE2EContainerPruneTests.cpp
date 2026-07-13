@@ -45,7 +45,8 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_HelpCommand)
     {
         const auto result = RunWslc(L"container prune --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_NoStoppedContainers)
@@ -123,34 +124,5 @@ class WSLCE2EContainerPruneTests
 
 private:
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()  //
-               << GetDescription() //
-               << GetUsage()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerPruneLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container prune [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

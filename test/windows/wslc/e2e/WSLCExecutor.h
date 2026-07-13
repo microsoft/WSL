@@ -46,6 +46,7 @@ struct WSLCExecutionResult
     std::wstring GetStdoutOneLine() const;
     bool StdoutContainsLine(const std::wstring& expectedLine) const;
     bool StdoutContainsSubstring(const std::wstring& substring) const;
+    bool StderrContainsSubstring(const std::wstring& substring) const;
 };
 
 struct PseudoConsole
@@ -126,14 +127,15 @@ private:
     std::optional<std::string> m_ignoreSequence;
 };
 
-WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
+WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, HANDLE stdinHandle = nullptr);
 WSLCExecutionResult RunWslcAndRedirectToFile(
     const std::wstring& commandLine,
     std::optional<std::filesystem::path> outputPath = std::nullopt,
     ElevationType elevationType = ElevationType::Elevated);
+WSLCExecutionResult RunWslcWithStdinFile(
+    const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType = ElevationType::Elevated);
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
 
-std::wstring GetWslcHeader();
 WSLCInteractiveSession RunWslcInteractive(
     const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<PseudoConsole> pseudoConsole = std::nullopt);
 

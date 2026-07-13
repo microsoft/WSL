@@ -184,22 +184,26 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        using enum ColumnOverflow;
 
-        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
-        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
-                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"IMAGE ID", {12, 12, false}},
-                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
-                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        auto table =
+            trunc
+                ? wsl::windows::wslc::TableOutput<5>(
+                      context.Reporter,
+                      {{{L"REPOSITORY", {.Overflow = Shrink}},
+                        {L"TAG", {.Overflow = Shrink}},
+                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
+                        {L"CREATED", {.Overflow = Shrink}},
+                        {L"SIZE", {.Overflow = Shrink}}}},
+                      images.size())
+                : wsl::windows::wslc::TableOutput<5>(context.Reporter, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
         {
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(image.Repository.value_or("<untagged>")),
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),

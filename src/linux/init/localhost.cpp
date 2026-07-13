@@ -301,6 +301,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
+                    LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
                     return;
                 }
 
