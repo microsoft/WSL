@@ -562,6 +562,20 @@ try
         g_api->WSLCReleaseProcess(process);
     }
 
+    // Also exercise a reentrant mount + unmount from the started hook; the session is alive here so
+    // both calls succeed, validating that mount management reentrant from OnVmStarted does not deadlock.
+    constexpr auto* mountpoint = "/test-plugin/vm-started-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM started mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM started mount+unmount: skipped" << std::endl;
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

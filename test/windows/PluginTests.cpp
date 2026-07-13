@@ -828,11 +828,13 @@ class PluginTests
             WSLC Session created, name=plugin-wslc-vm-restart, id=*, pid=*, token=set, sid=set
             WSLC VM started, session=*
             WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
             WSLC VM stopping, session=*
             WSLC VM stopping reentrant WSLCCreateProcess: ok
             WSLC VM stopping mount+unmount: ok
             WSLC VM started, session=*
             WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
             WSLC VM stopping, session=*
             WSLC VM stopping reentrant WSLCCreateProcess: failed
             WSLC VM stopping mount+unmount: skipped
