@@ -2708,22 +2708,30 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
+try
 {
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, DestPath == nullptr);
     RETURN_HR_IF(E_INVALIDARG, DestPath[0] == '\0');
+
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::UploadArchive, TarHandle, DestPath, ContentSize);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+try
 {
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
     RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
+
+    auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
