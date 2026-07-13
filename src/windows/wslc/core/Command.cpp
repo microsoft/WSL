@@ -15,12 +15,17 @@ Abstract:
 #include "Command.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
+#include "RootCommand.h"
+#include "TableOutput.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::vt;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
+
+std::wstring s_ExecutableName = L"wslc";
 
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
     m_name(name), m_aliases(std::move(aliases))
@@ -38,33 +43,32 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     }
 }
 
-// This is the header applied before every help output.
-// It is separate in case we need to show it in other contexts, such as error messages, or
-// during specific command executions.
-void Command::OutputIntroHeader() const
+void Command::OutputHelp(Reporter& reporter, const CommandException* exception) const
 {
-    std::wostringstream infoOut;
-    infoOut << Localization::WSLCCLI_CopyrightHeader() << std::endl;
-    PrintMessage(infoOut.str(), stdout);
-}
+    constexpr size_t c_helpRowIndent = 2;
+    constexpr size_t c_helpColumnPadding = 2;
+    const auto helpLevel = exception ? Reporter::Level::Info : Reporter::Level::Output;
 
-void Command::OutputHelp(const CommandException* exception) const
-{
-    // Header
-    OutputIntroHeader();
+    // Emphasis sequences for help output.
+    static const auto& HelpHeadingEmphasis = Format::Bright;
+    static const auto& HelpCommandEmphasis = Format::Bright;
+    static const auto& HelpArgumentEmphasis = Format::Bright;
+    static const auto& HelpMetaEmphasis = Format::Dim;
+    static const auto& HelpPlaceholderEmphasis = Format::Fg::BrightCyan;
+
+    // Copyright header (dimmed)
+    reporter.Write(helpLevel, L"{}{}{}\n\n", HelpMetaEmphasis, Localization::WSLCCLI_CopyrightHeader(), Format::Default);
 
     // Error if given
     if (exception)
     {
-        PrintMessage(exception->Message(), stderr);
+        reporter.Error(L"{}\n\n", exception->Message());
     }
 
     // Description
-    std::wostringstream infoOut;
-    infoOut << LongDescription() << std::endl << std::endl;
+    reporter.Write(helpLevel, L"{}\n\n", LongDescription());
 
-    // Example usage for this command
-    // First create the command chain for output
+    // Build command chain from full name (replace ParentSplitChar with spaces, strip root).
     std::wstring commandChain = FullName();
     size_t firstSplit = commandChain.find_first_of(ParentSplitChar);
     if (firstSplit == std::wstring::npos)
@@ -83,37 +87,23 @@ void Command::OutputHelp(const CommandException* exception) const
         }
     }
 
-    // Usage follows the Microsoft convention:
-    // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/command-line-syntax-key
-
-    // Output the command preamble and command chain
-    infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
-
     auto commandAliases = Aliases();
     auto commands = GetCommands();
     auto arguments = GetAllArguments();
 
-    // Separate arguments by Kind
     std::vector<Argument> standardArgs;
     std::vector<Argument> positionalArgs;
     std::vector<Argument> forwardArgs;
-    bool requiredPositionalArgsExist = false;
     for (const auto& arg : arguments)
     {
         switch (arg.Kind())
         {
         case Kind::Flag:
-            standardArgs.emplace_back(arg);
-            break;
         case Kind::Value:
             standardArgs.emplace_back(arg);
             break;
         case Kind::Positional:
             positionalArgs.emplace_back(arg);
-            if (arg.Required())
-            {
-                requiredPositionalArgsExist = true;
-            }
             break;
         case Kind::Forward:
             forwardArgs.emplace_back(arg);
@@ -121,154 +111,254 @@ void Command::OutputHelp(const CommandException* exception) const
         }
     }
 
-    bool hasArguments = !positionalArgs.empty();
-    bool hasOptions = !standardArgs.empty();
-    bool hasForwardArgs = !forwardArgs.empty();
+    const bool hasArguments = !positionalArgs.empty();
+    const bool hasOptions = !standardArgs.empty();
+    const bool hasForwardArgs = !forwardArgs.empty();
 
-    // Output the command token, made optional if arguments are present.
-    if (!commands.empty())
+    // Global options from the root command, shown on every command's help.
+    auto globalArgs = RootCommand().GetGlobalArguments();
+
+    // Build usage line with Write calls for each segment.
     {
-        infoOut << ' ';
+        std::wstring usageText = Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
-        if (!arguments.empty())
+        while (!usageText.empty() && usageText.back() == L' ')
         {
-            infoOut << L'[';
+            usageText.pop_back();
         }
 
-        infoOut << L'<' << Localization::WSLCCLI_Command() << L'>';
+        reporter.Write(helpLevel, L"{}{}{}", HelpHeadingEmphasis, usageText, Format::Default);
 
-        if (!arguments.empty())
+        if (!commands.empty())
         {
-            infoOut << L']';
+            if (!arguments.empty())
+            {
+                reporter.Write(helpLevel, L" {}[{}", HelpMetaEmphasis, Format::Default);
+            }
+            else
+            {
+                reporter.Write(helpLevel, L" ");
+            }
+
+            reporter.Write(
+                helpLevel,
+                L"{}<{}{}{}{}{}>{}",
+                HelpMetaEmphasis,
+                Format::Default,
+                HelpPlaceholderEmphasis,
+                Localization::WSLCCLI_Command(),
+                Format::Default,
+                HelpMetaEmphasis,
+                Format::Default);
+            if (!arguments.empty())
+            {
+                reporter.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
+            }
         }
+
+        if (hasOptions)
+        {
+            reporter.Write(
+                helpLevel,
+                L" {}[<{}{}{}{}{}>]{}",
+                HelpMetaEmphasis,
+                Format::Default,
+                HelpPlaceholderEmphasis,
+                Localization::WSLCCLI_Options(),
+                Format::Default,
+                HelpMetaEmphasis,
+                Format::Default);
+        }
+
+        for (const auto& arg : positionalArgs)
+        {
+            reporter.Write(helpLevel, L" ");
+            if (!arg.Required())
+            {
+                reporter.Write(helpLevel, L"{}[{}", HelpMetaEmphasis, Format::Default);
+            }
+
+            reporter.Write(
+                helpLevel, L"{}<{}{}{}{}{}>{}", HelpMetaEmphasis, Format::Default, HelpPlaceholderEmphasis, arg.Name(), Format::Default, HelpMetaEmphasis, Format::Default);
+            if (arg.Limit() > 1)
+            {
+                reporter.Write(helpLevel, L"{}...{}", HelpMetaEmphasis, Format::Default);
+            }
+
+            if (!arg.Required())
+            {
+                reporter.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
+            }
+        }
+
+        if (hasForwardArgs)
+        {
+            reporter.Write(
+                helpLevel,
+                L" {}[<{}{}{}{}{}>...]{}",
+                HelpMetaEmphasis,
+                Format::Default,
+                HelpPlaceholderEmphasis,
+                forwardArgs.front().Name(),
+                Format::Default,
+                HelpMetaEmphasis,
+                Format::Default);
+        }
+
+        reporter.Write(helpLevel, L"\n\n");
     }
-
-    // For WSLC format of command [<options>] <positional> <args | positional2..>
-
-    // Add options to the usage if there are options present.
-    if (hasOptions)
-    {
-        infoOut << L" [<" << Localization::WSLCCLI_Options() << L">]";
-    }
-
-    // Add arguments to the usage if there are arguments present. Positional come after
-    // options and may be optional or required.
-    for (const auto& arg : positionalArgs)
-    {
-        infoOut << L' ';
-
-        if (!arg.Required())
-        {
-            infoOut << L'[';
-        }
-
-        infoOut << L'<' << arg.Name() << L'>';
-
-        if (arg.Limit() > 1)
-        {
-            infoOut << L"...";
-        }
-
-        if (!arg.Required())
-        {
-            infoOut << L']';
-        }
-    }
-
-    if (hasForwardArgs)
-    {
-        // Assume only one forward arg is present, as multiple forwards would be
-        // ambiguous in usage. Revisit if this becomes a scenario.
-        infoOut << L" [<" << forwardArgs.front().Name() << L">...]";
-    }
-
-    infoOut << std::endl << std::endl;
 
     if (!commandAliases.empty())
     {
-        infoOut << Localization::WSLCCLI_AvailableCommandAliases() << L' ';
-        infoOut << string::Join(commandAliases, L' ');
-        infoOut << std::endl << std::endl;
+        reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingAliases(), Format::Default);
+
+        std::wstring aliasLine;
+        for (size_t i = 0; i < commandAliases.size(); ++i)
+        {
+            if (i != 0)
+            {
+                aliasLine += L", ";
+            }
+            aliasLine += commandAliases[i];
+        }
+
+        reporter.Write(helpLevel, L"{}{}\n\n", std::wstring(c_helpRowIndent, L' '), aliasLine);
     }
+
+    // Col0: name/command
+    // Col1: description (word-wraps at computed column width)
+    const auto MakeHelpTable = [&reporter, helpLevel]() -> TableOutput<2> {
+        TableOutput<2> table{reporter, {L"", L""}, 50, c_helpColumnPadding, helpLevel};
+        table.SetShowHeader(false);
+        table.SetRowIndent(c_helpRowIndent);
+        table.SetColumnConfig(
+            1,
+            ColumnWidthConfig{
+                .MinWidth = ColumnWidthConfig::NoLimit,
+                .MaxWidth = ColumnWidthConfig::NoLimit,
+                .Overflow = ColumnOverflow::Wrap,
+            });
+        return table;
+    };
 
     if (!commands.empty())
     {
-        if (Name() == FullName())
-        {
-            infoOut << Localization::WSLCCLI_AvailableCommands() << std::endl;
-        }
-        else
-        {
-            infoOut << Localization::WSLCCLI_AvailableSubcommands() << std::endl;
-        }
+        reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingCommands(), Format::Default);
 
-        size_t maxCommandNameLength = 0;
+        auto table = MakeHelpTable();
         for (const auto& command : commands)
         {
-            maxCommandNameLength = std::max(maxCommandNameLength, command->Name().length());
+            table.WriteRow({
+                FormattedCell(command->Name(), HelpCommandEmphasis),
+                FormattedCell(command->ShortDescription()),
+            });
         }
+        table.Complete();
 
-        for (const auto& command : commands)
-        {
-            size_t fillChars = (maxCommandNameLength - command->Name().length()) + 2;
-            infoOut << L"  " << command->Name() << std::wstring(fillChars, L' ') << command->ShortDescription() << std::endl;
-        }
-
-        infoOut << std::endl << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L']' << std::endl;
+        reporter.Write(helpLevel, L"\n{} [{}]\n", Localization::WSLCCLI_HelpForDetails(), WSLC_CLI_HELP_ARG_STRING);
     }
 
     if (!arguments.empty())
     {
         if (!commands.empty())
         {
-            infoOut << std::endl;
+            reporter.Write(helpLevel, L"\n");
         }
 
-        size_t maxArgNameLength = 0;
-        for (const auto& arg : arguments)
+        // Arguments table: positional and forward args, name (emphasized) | description
+        if (hasArguments || hasForwardArgs)
         {
-            auto argLength = arg.GetUsageString().length();
-            maxArgNameLength = std::max(maxArgNameLength, argLength);
-        }
+            reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingArguments(), Format::Default);
 
-        if (hasArguments)
-        {
-            infoOut << Localization::WSLCCLI_AvailableArguments() << std::endl;
+            auto table = MakeHelpTable();
 
             for (const auto& arg : positionalArgs)
             {
-                size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;
-                infoOut << L"  " << arg.Name() << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
+                table.WriteRow({
+                    FormattedCell(arg.Name(), HelpArgumentEmphasis),
+                    FormattedCell(arg.Description()),
+                });
             }
-        }
 
-        if (hasForwardArgs)
-        {
             for (const auto& arg : forwardArgs)
             {
-                size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;
-                infoOut << L"  " << arg.Name() << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
-            }
-        }
-
-        if (hasOptions)
-        {
-            if (hasArguments || hasForwardArgs)
-            {
-                infoOut << std::endl;
+                table.WriteRow({
+                    FormattedCell(arg.Name(), HelpArgumentEmphasis),
+                    FormattedCell(arg.Description()),
+                });
             }
 
-            infoOut << Localization::WSLCCLI_AvailableOptions() << std::endl;
-            for (const auto& arg : standardArgs)
-            {
-                auto usage = arg.GetUsageString();
-                size_t fillChars = (maxArgNameLength - usage.length()) + 2;
-                infoOut << L"  " << usage << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
-            }
+            table.Complete();
         }
     }
 
-    PrintMessage(infoOut.str(), stdout);
+    // Col0: short alias (e.g. "-f")
+    // Col1: long name  (e.g. "--force")
+    // Col2: description (word-wraps at computed column width)
+    const auto MakeOptionsTable = [&reporter, helpLevel]() -> TableOutput<3> {
+        TableOutput<3> table{reporter, {L"", L"", L""}, {}, 50, c_helpColumnPadding, helpLevel};
+        table.SetShowHeader(false);
+        table.SetRowIndent(c_helpRowIndent);
+        table.SetColumnConfig(
+            2,
+            ColumnWidthConfig{
+                .MinWidth = ColumnWidthConfig::NoLimit,
+                .MaxWidth = ColumnWidthConfig::NoLimit,
+                .Overflow = ColumnOverflow::Wrap,
+            });
+        return table;
+    };
+
+    // Options table: alias (emphasized) | long name (emphasized) | description
+    // Global options are appended to the same table so column widths are shared.
+    if (hasOptions || !globalArgs.empty())
+    {
+        if (hasArguments || hasForwardArgs)
+        {
+            reporter.Write(helpLevel, L"\n");
+        }
+        else if (!commands.empty() && arguments.empty())
+        {
+            reporter.Write(helpLevel, L"\n");
+        }
+
+        auto table = MakeOptionsTable();
+
+        const auto AddOptionRows = [&table](const std::vector<Argument>& args) {
+            for (const auto& arg : args)
+            {
+                FormattedCell aliasCell{L""};
+                if (!arg.Alias().empty())
+                {
+                    aliasCell = FormattedCell(std::wstring{WSLC_CLI_ARG_ID_CHAR} + arg.Alias(), HelpArgumentEmphasis);
+                }
+
+                table.WriteRow({
+                    std::move(aliasCell),
+                    FormattedCell(std::wstring{WSLC_CLI_ARG_ID_CHAR} + std::wstring{WSLC_CLI_ARG_ID_CHAR} + arg.Name(), HelpArgumentEmphasis),
+                    FormattedCell(arg.Description()),
+                });
+            }
+        };
+
+        if (hasOptions)
+        {
+            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
+            AddOptionRows(standardArgs);
+        }
+
+        if (!globalArgs.empty())
+        {
+            if (hasOptions)
+            {
+                table.WriteLine();
+            }
+            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingGlobalOptions(), HelpHeadingEmphasis));
+            AddOptionRows(globalArgs);
+        }
+
+        table.Complete();
+    }
 }
 
 std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
@@ -375,7 +465,7 @@ void Command::Execute(CLIExecutionContext& context) const
     // If Help was part of the validated argument set, we will output help instead of executing.
     if (context.Args.Contains(ArgType::Help))
     {
-        OutputHelp();
+        OutputHelp(context.Reporter);
     }
     else
     {

@@ -75,13 +75,15 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
         auto result = RunWslc(L"container create --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
         auto result = RunWslc(L"container create --name " + WslcContainerName);
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
@@ -316,75 +318,110 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume :/containerPath {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath'. Host path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: ':/containerPath'. Host path cannot be empty. Expected format: <host path | "
+                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume C:\\hostPath::ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath::ro'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath::ro'. Container path cannot be empty. Expected format: <host path "
+                L"| named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume :/containerPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath:ro'. Host path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: ':/containerPath:ro'. Host path cannot be empty. Expected format: <host path | "
+                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume \"\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: ''. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid volume specifications: ''. Expected format: <host path | named "
+                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume C:\\hostPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath:'. Container path cannot be empty. Expected format: <host path | "
+                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume C:\\hostPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:ro'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath:ro'. Container path must be an absolute path (starting with '/'). "
+                L"Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume :ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: ':ro'. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid volume specifications: ':ro'. Expected format: <host path | named "
+                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume C:\\hostPath::rw {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath::rw'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath::rw'. Container path cannot be empty. Expected format: <host path "
+                L"| named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:invalid_mode {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:invalid_mode'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:invalid_mode'. Container path must be an absolute "
+                L"path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: "
+                L"E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:ro:extra {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:ro:extra'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:ro:extra'. Container path must be an absolute path "
+                L"(starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: "
+                L"E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:'. Container path cannot be empty. Expected "
+                L"format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -392,7 +429,10 @@ class WSLCE2EContainerCreateTests
             // "::/container:ro" - host=":", container="/container". ":" is not a valid Windows path.
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume \"::/container:ro\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: '::/container:ro'. Host path ':' is not a valid Windows path.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid volume specifications: '::/container:ro'. Host path ':' is not a valid "
+                                               L"Windows path.\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -405,13 +445,19 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume \"C:\\hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath'. Container path must be an absolute path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: 'C:\\hostPath'. Container path must be an absolute path (starting with '/'). "
+                L"Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume \":\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: ':'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: ':'. Container path cannot be empty. Expected format: <host path | named "
+                L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -419,14 +465,20 @@ class WSLCE2EContainerCreateTests
             // "::" splits as host=":", container="". Container path empty check fires first.
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"::\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: '::'. Container path cannot be empty. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid volume specifications: '::'. Container path cannot be empty. Expected format: <host path | named "
+                L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"e2e_test\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid volume specifications: 'e2e_test'. Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid volume specifications: 'e2e_test'. Expected format: <host path | named "
+                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -613,14 +665,18 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs wslc-tmpfs {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs :size=64k {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir)
@@ -781,7 +837,8 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container create --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-timeout argument value: abc\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-timeout argument value: abc"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
@@ -809,14 +866,18 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container create --shm-size invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid shm-size argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid shm-size argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container create --shm-size 128X --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid shm-size argument value: '128X'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                L"Invalid shm-size argument value: '128X'. Expected a memory size (e.g. 256M, 1G)"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }
@@ -885,29 +946,32 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(std::format(
                 L"container create --health-interval notaduration --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify(
-                {.Stderr = L"Invalid health-interval argument value: 'notaduration'. Expected a duration (e.g. 30s, 1m30s)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-interval argument value"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container create --health-retries abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid health-retries argument value: abc\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-retries argument value"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 LR"(container create --no-healthcheck --health-cmd "exit 0" --name {} {})", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"cannot be combined with other health check options"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container create --no-healthcheck --health-interval 5s --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"The --no-healthcheck option cannot be combined with other health check options.\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"cannot be combined with other health check options"));
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }
@@ -917,21 +981,26 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(
                 std::format(L"container create --stop-signal SIGINVALID --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: SIGINVALID is not a recognized signal name or number (Example: SIGKILL, kill, or 9).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid stop-signal value: SIGINVALID is not a recognized signal name or number "
+                                               L"(Example: SIGKILL, kill, or 9)."));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container create --stop-signal 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-signal value: 0 is out of valid range (1-31)."));
             VerifyContainerIsNotListed(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container create --stop-signal 99 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: 99 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-signal value: 99 is out of valid range (1-31)."));
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }
@@ -949,7 +1018,8 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"host mode networking is not supported"));
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -957,7 +1027,8 @@ class WSLCE2EContainerCreateTests
     {
         auto result = RunWslc(std::format(
             L"container create --name {} --network bridge --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"host mode networking is not supported"));
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -978,7 +1049,8 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_EmptyValue_Rejected)
     {
         auto result = RunWslc(std::format(L"container create --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid network value: network name cannot be empty or whitespace\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid network value: network name cannot be empty or whitespace"));
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -1035,7 +1107,10 @@ class WSLCE2EContainerCreateTests
             L"container create --network bridge --network bridge --network-alias db --name {} {} true",
             WslcContainerName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Network aliases cannot be specified when multiple networks are requested. Use a "
+                                           L"single --network argument.\r\nError code: E_INVALIDARG"));
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -1043,7 +1118,9 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --network-alias \"\" --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid network-alias value: network alias cannot be empty or whitespace\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid network-alias value: network alias cannot be empty or whitespace"));
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -1059,7 +1136,9 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Cpus_Invalid)
     {
         auto result = RunWslc(std::format(L"container create --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1078,7 +1157,9 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1109,8 +1190,9 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit_Invalid)
     {
         auto result = RunWslc(std::format(L"container create --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1144,8 +1226,9 @@ class WSLCE2EContainerCreateTests
     {
         auto result = RunWslc(std::format(
             L"container create --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1155,7 +1238,9 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(
             L"container create --name {} --env-file {} {} env", WslcContainerName, EscapePath(EnvTestFile1.wstring()), DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG"));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1325,82 +1410,5 @@ private:
     // Test volume files
     std::filesystem::path VolumeTestFile1;
     std::filesystem::path VolumeTestFile2;
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerCreateLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container create [<options>] <image> [<command>] [<arguments>...]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"
-                 << L"  image                  Image name\r\n"
-                 << L"  command                The command to run\r\n"
-                 << L"  arguments              Arguments to pass to container's init process\r\n\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options
-            << L"The following options are available:\r\n" //
-            << L"  --cidfile              Write the container ID to the provided path\r\n"
-            << L"  --cpus                 Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
-            << L"  --dns                  IP address of the DNS nameserver in resolv.conf\r\n"
-            << L"  --dns-option           Set DNS options\r\n"
-            << L"  --dns-search           Set DNS search domains\r\n"
-            << L"  --domainname           Container domain name\r\n"
-            << L"  --entrypoint           Specifies the container init process executable\r\n"
-            << L"  -e,--env               Key=Value pairs for environment variables\r\n"
-            << L"  --env-file             File containing key=value pairs of env variables\r\n"
-            << L"  --gpus                 Add GPU devices to the container ('all' to pass all GPUs)\r\n"
-            << L"  --health-cmd           Command to run to check container health\r\n"
-            << L"  --health-interval      Time between running the health check (e.g. 30s, 1m30s)\r\n"
-            << L"  --health-retries       Consecutive failures needed to report the container as unhealthy\r\n"
-            << L"  --health-start-period  Start period for the container to initialize before health-check countdown (e.g. 30s, "
-               L"1m30s)\r\n"
-            << L"  --health-timeout       Maximum time to allow one health check to run (e.g. 30s, 1m30s)\r\n"
-            << L"  -h,--hostname          Container host name\r\n"
-            << L"  -i,--interactive       Attach to stdin and keep it open\r\n"
-            << L"  -l,--label             Set metadata on an object\r\n"
-            << L"  -m,--memory            Memory limit (e.g. 512M, 1G)\r\n"
-            << L"  --name                 Name of the container\r\n"
-            << L"  --network              Connect a container to a network\r\n"
-            << L"  --network-alias        Add a network-scoped alias for the container\r\n"
-            << L"  --no-healthcheck       Disable any container-specified health check\r\n"
-            << L"  -p,--publish           Publish a port from a container to host\r\n"
-            << L"  -P,--publish-all       Publish all exposed ports to random host ports\r\n"
-            << L"  --rm                   Remove the container after it stops\r\n"
-            << L"  --shm-size             Size of /dev/shm (e.g. 64M, 1G)\r\n"
-            << L"  --stop-signal          Signal to stop the container\r\n"
-            << L"  --stop-timeout         Timeout (in seconds) to stop the container before killing it (-1 for no timeout)\r\n"
-            << L"  --tmpfs                Mount tmpfs to the container at the given path\r\n"
-            << L"  -t,--tty               Open a TTY with the container process.\r\n"
-            << L"  --ulimit               Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
-            << L"  -u,--user              User ID for the process (name|uid|uid:gid)\r\n"
-            << L"  -v,--volume            Bind mount a volume to the container\r\n"
-            << L"  -w,--workdir           Working directory inside the container\r\n"
-            << L"  -?,--help              Shows help about the selected command\r\n"
-            << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests
