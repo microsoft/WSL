@@ -148,6 +148,7 @@ public:
     std::atomic<VmState>& StateAtomic() noexcept;
     std::atomic<VmExitDisposition>& ExitDispositionAtomic() noexcept;
     wil::unique_event& VmExitedEvent() noexcept;
+    bool VmExited() const noexcept;
     wil::unique_event& DockerdReadyEvent() noexcept;
     std::optional<ServiceRunningProcess>& ContainerdProcess();
     std::optional<ServiceRunningProcess>& DockerdProcess();

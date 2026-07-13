@@ -2435,7 +2435,21 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
 
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
     UnmapPorts();
-    UnmountVolumes(m_mountedVolumes, Vm());
+
+    // A VM that already exited (crash / external kill) has dropped every guest mount, so calling
+    // UnmountWindowsFolder would only block on the RPC timeout and emit spurious unmount-failed
+    // warnings. Mark the mounts inactive without touching the dead VM.
+    if (m_runtime.VmExited())
+    {
+        for (auto& volume : m_mountedVolumes)
+        {
+            volume.Mounted = false;
+        }
+    }
+    else
+    {
+        UnmountVolumes(m_mountedVolumes, Vm());
+    }
 }
 
 __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::ReleaseResources()

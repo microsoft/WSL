@@ -153,6 +153,11 @@ wil::unique_event& WSLCSessionRuntime::VmExitedEvent() noexcept
     return m_vmExitedEvent;
 }
 
+bool WSLCSessionRuntime::VmExited() const noexcept
+{
+    return m_vmExitedEvent && m_vmExitedEvent.is_signaled();
+}
+
 wil::unique_event& WSLCSessionRuntime::DockerdReadyEvent() noexcept
 {
     return m_dockerdReadyEvent;
