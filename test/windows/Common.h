@@ -611,6 +611,11 @@ void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 void Trim(std::wstring& string);
 
+// Returns the /dev/sd* node of the 20MB test block device attached to the WSL VM, waiting up
+// to 30s for it to appear. The device letter is not stable across runs (it shifts with the
+// number of VHDs attached to the VM), so callers must look it up rather than hard-coding it.
+std::wstring GetBlockDeviceInWsl();
+
 inline auto EnableSystemd(const std::string& extraConfig = "")
 {
     // enable systemd on the test distro by editing /etc/wsl.conf

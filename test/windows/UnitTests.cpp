@@ -6697,7 +6697,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {}  -SizeBytes 20MB", testVhd));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--mount {} --vhd --bare", testVhd)), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 /dev/sde"), 0L);
+
+            // Locate the bare-mounted disk by its size rather than hard-coding a device node.
+            // The /dev/sd* letter depends on how many other VHDs are attached to the VM (e.g.
+            // the per-instance system distro overlay scratch vhd), which shifts the bare disk.
+            const auto bareDevice = GetBlockDeviceInWsl();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl((L"-u root mkfs.ext4 " + bareDevice).c_str()), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), 0L);
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place broken-test-distro {}", testVhd), -1);
