@@ -74,11 +74,12 @@ void ListSessions(CLIExecutionContext& context)
     }
 
     TableOutput<3> table(
+        context.Reporter,
         {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
 
     for (const auto& session : sessions)
     {
-        table.OutputLine({
+        table.WriteRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,

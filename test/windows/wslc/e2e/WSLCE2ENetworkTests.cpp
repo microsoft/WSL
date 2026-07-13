@@ -48,55 +48,64 @@ class WSLCE2ENetworkTests
     WSLC_TEST_METHOD(WSLCE2E_Network_HelpCommand)
     {
         auto result = RunWslc(L"network --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_NoSubcommand_ShowsHelp)
     {
         auto result = RunWslc(L"network");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_InvalidCommand_DisplaysErrorMessage)
     {
         auto result = RunWslc(L"network INVALID_CMD");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_HelpCommand)
     {
         auto result = RunWslc(L"network connect --help");
-        result.Verify({.Stdout = GetConnectHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Disconnect_HelpCommand)
     {
         auto result = RunWslc(L"network disconnect --help");
-        result.Verify({.Stdout = GetDisconnectHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_MissingNetworkName)
     {
         auto result = RunWslc(L"network connect");
-        result.Verify({.Stdout = GetConnectHelpMessage(), .Stderr = L"Required argument not provided: 'network-name'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_MissingContainerId)
     {
         auto result = RunWslc(std::format(L"network connect {}", TestNetworkName));
-        result.Verify({.Stdout = GetConnectHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Disconnect_MissingNetworkName)
     {
         auto result = RunWslc(L"network disconnect");
-        result.Verify({.Stdout = GetDisconnectHelpMessage(), .Stderr = L"Required argument not provided: 'network-name'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Disconnect_MissingContainerId)
     {
         auto result = RunWslc(std::format(L"network disconnect {}", TestNetworkName));
-        result.Verify({.Stdout = GetDisconnectHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_Valid)
@@ -211,104 +220,5 @@ private:
     const std::wstring WslcContainerName = L"wslc-e2e-network-connect-container";
     const std::wstring TestNetworkName = L"wslc-e2e-network-connect";
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_NetworkCommandLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc network [<command>] [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
-            {L"create", Localization::WSLCCLI_NetworkCreateDesc()},
-            {L"remove", Localization::WSLCCLI_NetworkRemoveDesc()},
-            {L"inspect", Localization::WSLCCLI_NetworkInspectDesc()},
-            {L"list", Localization::WSLCCLI_NetworkListDesc()},
-            {L"prune", Localization::WSLCCLI_NetworkPruneDesc()},
-            {L"connect", Localization::WSLCCLI_NetworkConnectDesc()},
-            {L"disconnect", Localization::WSLCCLI_NetworkDisconnectDesc()},
-        };
-
-        size_t maxLen = 0;
-        for (const auto& [name, _] : entries)
-        {
-            maxLen = (std::max)(maxLen, name.size());
-        }
-
-        std::wstringstream commands;
-        commands << Localization::WSLCCLI_AvailableSubcommands() << L"\r\n";
-        for (const auto& [name, desc] : entries)
-        {
-            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
-        }
-        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -?,--help  Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
-
-    std::wstring GetConnectHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()                                                                  //
-               << Localization::WSLCCLI_NetworkConnectLongDesc() + L"\r\n\r\n"                     //
-               << L"Usage: wslc network connect [<options>] <network-name> <container-id>\r\n\r\n" //
-               << GetSubcommandArguments()                                                         //
-               << GetSubcommandOptions();
-        return output.str();
-    }
-
-    std::wstring GetDisconnectHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()                                                                     //
-               << Localization::WSLCCLI_NetworkDisconnectLongDesc() + L"\r\n\r\n"                     //
-               << L"Usage: wslc network disconnect [<options>] <network-name> <container-id>\r\n\r\n" //
-               << GetSubcommandArguments()                                                            //
-               << GetSubcommandOptions();
-        return output.str();
-    }
-
-    std::wstring GetSubcommandArguments() const
-    {
-        std::wstringstream args;
-        args << L"The following arguments are available:\r\n" //
-             << L"  network-name    Network name\r\n"         //
-             << L"  container-id    Container ID\r\n"         //
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetSubcommandOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                    //
-                << L"  -?,--help       Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

@@ -69,7 +69,13 @@ doc/site/
 directory.build.targets
 test-storage/
 *.vhdx
+*.vhd
 *.tar
 *.etl
 *.lscache
 __pycache__
+deploy-log.txt
+test-output*.txt
+test-results.txt
+testfile.txt
+output/

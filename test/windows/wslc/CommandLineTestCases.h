@@ -149,6 +149,27 @@ COMMAND_LINE_TEST_CASE(L"create --gpus all ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --gpus all ubuntu sh", L"create", true)
 COMMAND_LINE_TEST_CASE(L"create --gpus none ubuntu", L"create", false) // Only 'all' is supported
 COMMAND_LINE_TEST_CASE(L"create --gpus", L"create", false)             // Missing value for --gpus
+// Health check tests for container run
+COMMAND_LINE_TEST_CASE(L"run --health-cmd \"exit 0\" ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(
+    L"run --health-interval 30s --health-timeout 5s --health-retries 3 --health-start-period 10s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval 1m30s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval notaduration ubuntu", L"run", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"run --health-timeout -5s ubuntu", L"run", false)           // Negative duration
+COMMAND_LINE_TEST_CASE(L"run --health-retries abc ubuntu", L"run", false)           // Non-numeric retries
+COMMAND_LINE_TEST_CASE(L"run --health-retries -1 ubuntu", L"run", false)            // Negative retries
+COMMAND_LINE_TEST_CASE(L"run --health-interval ubuntu", L"run", false)              // Missing value for --health-interval
+COMMAND_LINE_TEST_CASE(L"run --health-cmd", L"run", false)                          // Missing value for --health-cmd
+// Health check tests for container create
+COMMAND_LINE_TEST_CASE(L"create --health-cmd \"exit 0\" ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(
+    L"container create --health-cmd \"curl -f http://localhost/\" --health-interval 30s --health-timeout 5s --health-retries 3 "
+    L"--health-start-period 10s ubuntu",
+    L"create",
+    true)
+COMMAND_LINE_TEST_CASE(L"create --health-start-period 500ms ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --health-timeout invalid ubuntu", L"create", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"create --health-retries 2.5 ubuntu", L"create", false)     // Non-integer retries
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
@@ -181,6 +202,28 @@ COMMAND_LINE_TEST_CASE(L"container export --output foo cont1", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export -o foo cont1", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
+
+// Cp command tests
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path/to/deep/dir", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp somefile cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=true - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=false - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=true - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=false - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=1 - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=0 - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=invalid - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=invalid - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp -", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp - ", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --unknown - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --help", L"cp", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)

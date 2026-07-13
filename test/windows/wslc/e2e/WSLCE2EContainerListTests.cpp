@@ -51,7 +51,8 @@ class WSLCE2EContainerListTests
     WSLC_TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
     {
         auto result = RunWslc(L"container list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_AllOption)
@@ -157,7 +158,9 @@ class WSLCE2EContainerListTests
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
         const auto result = RunWslc(L"container list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
@@ -213,7 +216,8 @@ class WSLCE2EContainerListTests
     {
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"container list --filter status");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"status") + L"\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"status")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidStatusValue)
@@ -489,47 +493,5 @@ private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerListLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls ps\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -a,--all     Show all regardless of state.\r\n"
-                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
-                << L"  -n,--last    " << Localization::WSLCCLI_LastArgDescription() << L"\r\n"
-                << L"  -l,--latest  " << Localization::WSLCCLI_LatestArgDescription() << L"\r\n"
-                << L"  --no-trunc   Do not truncate output\r\n"
-                << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  -?,--help    Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

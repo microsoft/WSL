@@ -34,6 +34,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        Localization::WSLCCLI_AllArgDescription()) \
+_(Archive,        "archive",             L"a",              Kind::Flag,        Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildArgDescription()) \
 _(BuildPull,      "pull",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_BuildPullArgDescription()) \
@@ -64,6 +65,11 @@ _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L
 _(Gateway,        "gateway",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkGatewayArgDescription()) \
 _(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
+_(HealthCmd,      "health-cmd",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthCmdArgDescription()) \
+_(HealthInterval, "health-interval",     NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthIntervalArgDescription()) \
+_(HealthRetries,  "health-retries",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthRetriesArgDescription()) \
+_(HealthStartPeriod, "health-start-period", NO_ALIAS,       Kind::Value,       Localization::WSLCCLI_HealthStartPeriodArgDescription()) \
+_(HealthTimeout,  "health-timeout",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthTimeoutArgDescription()) \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ImageForceArgDescription()) \
@@ -83,6 +89,7 @@ _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  L
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoColor,        "no-color",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoColorArgDescription()) \
+_(NoHealthcheck,  "no-healthcheck",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoHealthcheckArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ObjectIdArgDescription()) \

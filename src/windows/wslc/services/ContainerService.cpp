@@ -146,6 +146,36 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetShmSize(options.ShmSize.value());
     }
 
+    if (options.HealthCmd.has_value())
+    {
+        containerLauncher.SetHealthCmd(std::string(options.HealthCmd.value()));
+    }
+
+    if (options.HealthInterval.has_value())
+    {
+        containerLauncher.SetHealthInterval(options.HealthInterval.value());
+    }
+
+    if (options.HealthTimeout.has_value())
+    {
+        containerLauncher.SetHealthTimeout(options.HealthTimeout.value());
+    }
+
+    if (options.HealthStartPeriod.has_value())
+    {
+        containerLauncher.SetHealthStartPeriod(options.HealthStartPeriod.value());
+    }
+
+    if (options.HealthRetries.has_value())
+    {
+        containerLauncher.SetHealthRetries(options.HealthRetries.value());
+    }
+
+    if (options.NoHealthcheck)
+    {
+        containerLauncher.SetNoHealthcheck();
+    }
+
     if (options.MemoryBytes.has_value())
     {
         containerLauncher.SetMemoryLimit(options.MemoryBytes.value());
@@ -620,6 +650,22 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
         outputHandle, Localization::MessageWslcExportInProgress(), wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
 
     THROW_IF_FAILED(container->Export(ToCOMInputHandle(outputHandle)));
+}
+
+void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
+}
+
+void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
