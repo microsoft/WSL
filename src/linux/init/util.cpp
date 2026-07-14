@@ -3571,6 +3571,11 @@ Return Value:
 
     if (Content.empty())
     {
+        if (LogErrors)
+        {
+            LOG_ERROR("read({}) returned empty content", Path);
+        }
+
         return std::nullopt;
     }
 
@@ -3657,10 +3662,10 @@ Routine Description:
     bytes) by parsing /proc/meminfo.
 
     It deliberately counts only memory that cache reclaim can actually return to
-    the host: file-backed page cache (Active(file) + Inactive(file)) plus
-    reclaimable slab (SReclaimable). Anonymous memory is excluded because neither
-    drop_caches nor cgroup reclaim of clean cache can free it, so it must not
-    drive the reclaim trigger.
+    the host: known file-backed page cache counters (Active(file) and
+    Inactive(file)) plus reclaimable slab (SReclaimable), when present. Anonymous
+    memory is excluded because neither drop_caches nor cgroup reclaim of clean
+    cache can free it, so it must not drive the reclaim trigger.
 
 Arguments:
 
