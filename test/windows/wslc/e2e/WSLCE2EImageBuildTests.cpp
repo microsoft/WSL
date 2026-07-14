@@ -55,6 +55,22 @@ class WSLCE2EImageBuildTests
         });
     }
 
+    // All secret tests build from this single shared (empty) context directory. The session never
+    // releases virtiofs shares (see WSLCVirtualMachine::UnmountWindowsFolder), so every distinct
+    // mounted directory permanently consumes one of a small number of share slots for the session's
+    // lifetime. Giving each secret test its own context directory would exhaust that budget; reusing
+    // one path keeps all secret tests to a single shared slot. The per-test Dockerfile and any secret
+    // source files live under each test's own testRoot and are never mounted (the Dockerfile is
+    // streamed via -f and file secrets are read client-side).
+    static std::filesystem::path SharedSecretBuildContext()
+    {
+        auto dir = std::filesystem::current_path() / L"wslc-e2e-build-secret-context";
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(dir));
+        return dir;
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_EmptyContextDirectory_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImage);
@@ -261,6 +277,408 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(std::string("from-cli"), it->second);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_Env_Success)
+    {
+        // Set the env var the --secret will reference; ensure cleanup so we don't leak into other tests.
+        constexpr auto envName = L"WSLC_E2E_SECRET_VALUE";
+        constexpr auto envValue = L"expected-secret-content-12345";
+        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
+        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecret);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-env";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        // RUN with type=secret asserts the secret value matches; if mismatched, RUN exits non-zero and the build fails.
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"expected-secret-content-12345\" ]\n"
+            "CMD [\"echo\", \"secret-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecret.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecret.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_BareId_UsesEnvNamedById_Success)
+    {
+        // Docker parity: '--secret id=NAME' with no env=/src= reads the host env var named NAME.
+        constexpr auto envName = L"WSLC_E2E_BARE_SECRET";
+        constexpr auto envValue = L"bare-id-secret-content-67890";
+        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
+        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretBareId);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-bare-id";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        // The docker secret id equals the env var name, so the mount reads /run/secrets/<envName>.
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=WSLC_E2E_BARE_SECRET "
+            "[ \"$(cat /run/secrets/WSLC_E2E_BARE_SECRET)\" = \"bare-id-secret-content-67890\" ]\n"
+            "CMD [\"echo\", \"secret-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=WSLC_E2E_BARE_SECRET",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretBareId.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretBareId.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_MissingEnvVar_EmptyValue_Success)
+    {
+        // Docker parity: an unset environment variable yields an empty secret value, not an error.
+        constexpr auto envName = L"WSLC_E2E_SECRET_UNSET_VAR";
+        SetEnvironmentVariableW(envName, nullptr); // Ensure it's not set even if a prior run leaked.
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretMissingEnv);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-missing";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret [ -z \"$(cat /run/secrets/mysecret)\" ]\n"
+            "CMD [\"echo\", \"secret-empty-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_UNSET_VAR",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretMissingEnv.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretMissingEnv.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_Src_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretSrc);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-src";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+        std::error_code ec;
+
+        // Place the secret OUTSIDE the build context; the client reads its bytes and the server writes
+        // them to a tmpfs file inside the VM, so the secret's directory is never mounted.
+        auto secretDir = testRoot / L"secrets";
+        std::filesystem::create_directories(secretDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(secretDir));
+        auto secretFile = secretDir / L"token.txt";
+        WriteTestFileContent(secretFile, "file-secret-content-67890");
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"file-secret-content-67890\" ]\n"
+            "CMD [\"echo\", \"secret-src-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretSrc.NameAndTag(),
+            secretFile.wstring()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretSrc.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_SrcSymlink_Success)
+    {
+        // A symlink whose target lives in a separate directory must resolve to the target's content.
+        // The client reads the resolved file's bytes and the server writes them to a tmpfs file inside
+        // the VM, so neither the link's nor the target's directory is ever mounted.
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretSrcSymlink);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-src-symlink";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+        std::error_code ec;
+
+        auto targetDir = testRoot / L"target";
+        std::filesystem::create_directories(targetDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(targetDir));
+        auto targetFile = targetDir / L"real-secret.txt";
+        WriteTestFileContent(targetFile, "symlinked-secret-content-44444");
+
+        auto linkDir = testRoot / L"links";
+        std::filesystem::create_directories(linkDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(linkDir));
+        auto linkFile = linkDir / L"token.txt";
+        std::filesystem::create_symlink(targetFile, linkFile);
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"symlinked-secret-content-44444\" ]\n"
+            "CMD [\"echo\", \"secret-symlink-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretSrcSymlink.NameAndTag(),
+            linkFile.wstring()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretSrcSymlink.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_SrcFileMissing_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-src-missing";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto missingFile = testRoot / L"does-not-exist.txt";
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=x,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), missingFile.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"source file not found or not a regular file") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_EnvAndSrc_EnvWins_Success)
+    {
+        // Docker parity: when both 'env=' and 'src=' are given, the environment variable wins and
+        // the file path is ignored (no error).
+        constexpr auto envName = L"WSLC_E2E_ENV_WINS_VALUE";
+        constexpr auto envValue = L"env-wins-content-55555";
+        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
+        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretEnvWins);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-both";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        // The src file holds different content; it must be ignored in favor of the env value.
+        auto secretFile = testRoot / L"ignored.txt";
+        WriteTestFileContent(secretFile, "this-file-should-be-ignored");
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"env-wins-content-55555\" ]\n"
+            "CMD [\"echo\", \"secret-env-wins-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_ENV_WINS_VALUE,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretEnvWins.NameAndTag(),
+            secretFile.wstring()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretEnvWins.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_TypeEnv_Success)
+    {
+        constexpr auto envName = L"WSLC_E2E_TYPE_ENV_VALUE";
+        constexpr auto envValue = L"type-env-content-11111";
+        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
+        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretTypeEnv);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-env";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-content-11111\" ]\n"
+            "CMD [\"echo\", \"secret-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,env=WSLC_E2E_TYPE_ENV_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeEnv.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretTypeEnv.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_TypeEnvSrcIsEnvName_Success)
+    {
+        // Docker parity: with type=env, a bare src= names the env var to read (not a file path).
+        constexpr auto envName = L"WSLC_E2E_TYPE_ENV_SRC_VALUE";
+        constexpr auto envValue = L"type-env-src-content-22222";
+        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
+        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretTypeEnvSrc);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-env-src";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-src-content-22222\" ]\n"
+            "CMD [\"echo\", \"secret-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,src=WSLC_E2E_TYPE_ENV_SRC_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeEnvSrc.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretTypeEnvSrc.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_TypeFile_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretTypeFile);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-file";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto secretFile = testRoot / L"token.txt";
+        WriteTestFileContent(secretFile, "type-file-content-33333");
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(cat /run/secrets/mysecret)\" = \"type-file-content-33333\" ]\n"
+            "CMD [\"echo\", \"secret-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeFile.NameAndTag(),
+            secretFile.wstring()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretTypeFile.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_BinaryFile_Success)
+    {
+        // A file secret must be delivered byte-for-byte, including an embedded NUL and high bytes that
+        // an environment-variable (NUL-terminated, text-only) transport could never carry. The content
+        // below is 13 bytes with a NUL at offset 6; the in-container checks assert both the exact byte
+        // count (proving no NUL truncation) and that the bytes on either side of the NUL survived.
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretBinary);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-binary";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto secretFile = testRoot / L"blob.bin";
+        WriteTestFileContent(secretFile, std::string("before\0after\xff", 13));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret "
+            "[ \"$(wc -c < /run/secrets/mysecret)\" = \"13\" ] && "
+            "[ \"$(tr -d '\\000' < /run/secrets/mysecret | tr -d '\\377')\" = \"beforeafter\" ]\n"
+            "CMD [\"echo\", \"secret-binary-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretBinary.NameAndTag(),
+            secretFile.wstring()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretBinary.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_UnknownType_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-bad";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --secret id=x,type=bogus", contextDir.wstring(), dockerfilePath.wstring()));
+        buildResult.Verify(
+            {.Stderr =
+                 L"Invalid --secret value 'id=x,type=bogus': unsupported secret type 'bogus'\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
@@ -373,6 +791,16 @@ private:
     const TestImage BuiltImageNoCache{L"wslc-e2e-build-no-cache", L"latest", L""};
     const TestImage BuiltImageLabel{L"wslc-e2e-build-label", L"latest", L""};
     const TestImage BuiltImageLabelOverride{L"wslc-e2e-build-label-override", L"latest", L""};
+    const TestImage BuiltImageSecret{L"wslc-e2e-build-secret-env", L"latest", L""};
+    const TestImage BuiltImageSecretBareId{L"wslc-e2e-build-secret-bare-id", L"latest", L""};
+    const TestImage BuiltImageSecretMissingEnv{L"wslc-e2e-build-secret-missing-env", L"latest", L""};
+    const TestImage BuiltImageSecretEnvWins{L"wslc-e2e-build-secret-env-wins", L"latest", L""};
+    const TestImage BuiltImageSecretTypeEnv{L"wslc-e2e-build-secret-type-env", L"latest", L""};
+    const TestImage BuiltImageSecretTypeEnvSrc{L"wslc-e2e-build-secret-type-env-src", L"latest", L""};
+    const TestImage BuiltImageSecretTypeFile{L"wslc-e2e-build-secret-type-file", L"latest", L""};
+    const TestImage BuiltImageSecretSrc{L"wslc-e2e-build-secret-src", L"latest", L""};
+    const TestImage BuiltImageSecretSrcSymlink{L"wslc-e2e-build-secret-src-symlink", L"latest", L""};
+    const TestImage BuiltImageSecretBinary{L"wslc-e2e-build-secret-binary", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {

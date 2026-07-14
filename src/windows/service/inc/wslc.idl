@@ -169,6 +169,22 @@ typedef struct _WSLCStringArray
     ULONG Count;
 } WSLCStringArray;
 
+typedef struct _WSLCBuildSecret
+{
+    [string] LPCSTR Id; // Value for docker's --secret id= field.
+    // Raw secret bytes (never cross into argv). Carried as a counted byte array so arbitrary binary
+    // content - including embedded NULs - round-trips losslessly; the server materializes it into a
+    // root-only tmpfs file inside the VM and references it with docker's --secret src=.
+    [unique, size_is(ValueSize)] const byte* Value;
+    ULONG ValueSize;
+} WSLCBuildSecret;
+
+typedef struct _WSLCBuildSecretArray
+{
+    [unique, size_is(Count)] const WSLCBuildSecret* Values;
+    ULONG Count;
+} WSLCBuildSecretArray;
+
 typedef struct _WSLCProcessOptions
 {
     [unique] LPCSTR CurrentDirectory;
@@ -524,6 +540,7 @@ typedef struct _WSLCBuildImageOptions
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
     WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
+    WSLCBuildSecretArray Secrets; // --secret entries; the server writes each secret's bytes to a root-only tmpfs file in the VM and emits the corresponding id=...,src=... spec.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
