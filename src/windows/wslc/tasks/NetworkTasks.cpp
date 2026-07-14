@@ -234,9 +234,36 @@ void ConnectNetwork(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
 
-    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
-    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    NetworkService::Connect(context.Data.Get<Data::Session>(), networkName, containerId);
+    models::ConnectNetworkOptions options{};
+    options.NetworkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
+    options.ContainerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+
+    for (const auto& alias : context.Args.GetAll<ArgType::NetworkAlias>())
+    {
+        options.Aliases.emplace_back(WideToMultiByte(alias));
+    }
+
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.Get<ArgType::IpAddress>());
+    }
+
+    for (const auto& link : context.Args.GetAll<ArgType::Link>())
+    {
+        options.Links.emplace_back(WideToMultiByte(link));
+    }
+
+    for (const auto& linkLocalIp : context.Args.GetAll<ArgType::LinkLocalIp>())
+    {
+        options.LinkLocalIps.emplace_back(WideToMultiByte(linkLocalIp));
+    }
+
+    for (const auto& driverOpt : context.Args.GetAll<ArgType::DriverOpt>())
+    {
+        options.DriverOpts.emplace_back(WideToMultiByte(driverOpt));
+    }
+
+    NetworkService::Connect(context.Data.Get<Data::Session>(), options);
 }
 
 void DisconnectNetwork(CLIExecutionContext& context)
