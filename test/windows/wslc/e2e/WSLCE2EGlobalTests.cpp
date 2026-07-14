@@ -592,10 +592,5 @@ private:
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
     }
-
-    std::wstring GetVersionJsonMessage() const
-    {
-        return std::format(L"{{\r\n  \"Client\": {{\r\n    \"Version\": \"{}\"\r\n  }}\r\n}}\r\n", WSL_PACKAGE_VERSION);
-    }
 };
 } // namespace WSLCE2ETests
