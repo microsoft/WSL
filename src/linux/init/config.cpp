@@ -992,17 +992,21 @@ try
 
     if (Config.BootCommand.has_value())
     {
-        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
-            //
-            // Restore default signal dispositions for the child process.
-            //
+        UtilCreateChildProcess(
+            "BootCommand",
+            [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
+                //
+                // Restore default signal dispositions for the child process.
+                //
 
-            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
-            THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+                THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
+                THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-            execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
-            LOG_ERROR("execl() failed, {}", errno);
-        });
+                execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
+                LOG_ERROR("execl() failed, {}", errno);
+            },
+            {},
+            Config.CgroupPath);
     }
 
     return 0;
