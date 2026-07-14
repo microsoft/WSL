@@ -392,6 +392,23 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
+void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    const auto prefix = wsl::shared::string::WideToMultiByte(repositoryPrefix);
+    for (const auto& image : images)
+    {
+        if (image.Repository && image.Tag && image.Repository->starts_with(prefix))
+        {
+            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", *image.Repository, *image.Tag));
+            RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
 void EnsureNoUntaggedImages()
 {
     auto result = RunWslc(L"image list --format json --filter dangling=true");
