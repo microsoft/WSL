@@ -314,6 +314,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
 
             auto key = entry.substr(0, separator);
             auto value = entry.substr(separator + 1);
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), isBlank(key));
             THROW_HR_WITH_USER_ERROR_IF(
                 E_INVALIDARG,
                 Localization::MessageWslcDriverOptDuplicate(key),
