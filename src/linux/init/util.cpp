@@ -3681,6 +3681,7 @@ Return Value:
 
     // /proc/meminfo values are in kB.
     long long TotalKb = 0;
+    bool FoundCounter = false;
     char* Save = nullptr;
     for (char* Line = strtok_r(Content->data(), "\n", &Save); Line != nullptr; Line = strtok_r(nullptr, "\n", &Save))
     {
@@ -3700,8 +3701,15 @@ Return Value:
 
         if (Value != nullptr)
         {
+            FoundCounter = true;
             TotalKb += strtoll(Value, nullptr, 10);
         }
+    }
+
+    if (!FoundCounter)
+    {
+        LOG_ERROR("failed to find reclaimable cache counters in /proc/meminfo");
+        return -1;
     }
 
     return TotalKb * 1024;
