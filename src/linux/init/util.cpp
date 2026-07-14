@@ -3925,8 +3925,14 @@ Return Value:
         return false;
     }
 
-    const long long Cache = GetReclaimableCacheBytes();
-    if (Cache >= 0 && (!State.ReclaimedThisIdlePeriod || Cache > State.CacheAtLastDrop + c_cacheGrowthRearmBytes))
+    bool DropCache = !State.ReclaimedThisIdlePeriod;
+    if (!DropCache)
+    {
+        const long long Cache = GetReclaimableCacheBytes();
+        DropCache = Cache >= 0 && Cache > State.CacheAtLastDrop + c_cacheGrowthRearmBytes;
+    }
+
+    if (DropCache)
     {
         // Best-effort; WriteToFile logs on failure.
         if (WriteToFile("/proc/sys/vm/drop_caches", "1\n") == 0)
