@@ -229,6 +229,11 @@ int WSLCSessionRuntime::StopProcess(ServiceRunningProcess& Process, DWORD Termin
 
 void WSLCSessionRuntime::EnsureVmRunning()
 {
+    // Reject leases once the session is terminating/terminated, including on the running fast path:
+    // Shutdown() drops the lock to fire OnVmStopping, and a reentrant lease that finds the VM still
+    // Running must fail here rather than run work against a VM being permanently torn down.
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
+
     if (m_vmState.load() == VmState::Running)
     {
         return;
@@ -238,7 +243,7 @@ void WSLCSessionRuntime::EnsureVmRunning()
     {
         auto lock = m_lock.lock_exclusive();
 
-        // Do not (re)start the VM once the session is terminating or has terminated. This also
+        // Re-check under the lock: terminating may have been set since the check above. This also
         // bounds VmLease's retry loop: a lease that races with Terminate() fails here instead of
         // restarting a VM that is being permanently torn down.
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
@@ -599,6 +604,16 @@ try
     lock.reset();
     NotifyVmStopping();
     lock = m_lock.lock_exclusive();
+
+    // If the VM crashed while the lock was dropped, OnVmExited() declined the teardown (we hold the
+    // expected-stop claim) and its exit handle is one-shot. Do not re-pair OnVmStarted onto a dead VM;
+    // tear it down so a waiting lease restarts a fresh instance. StopVmLockHeld skips guest-dependent
+    // calls on a dead VM.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+    {
+        StopVmLockHeld();
+        return;
+    }
 
     if (m_idleState->ActivityCount() != 0)
     {
