@@ -115,7 +115,11 @@ class WSLCE2EGlobalTests
 
     WSLC_TEST_METHOD(WSLCE2E_VersionCommand_FormatJson)
     {
-        RunWslcAndVerify(L"version --format json", {.Stdout = GetVersionJsonMessage(), .Stderr = L"", .ExitCode = 0});
+        auto result = RunWslc(L"version --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        const auto root = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(WSL_PACKAGE_VERSION), root["Client"]["Version"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_VersionCommand_FormatTable)
