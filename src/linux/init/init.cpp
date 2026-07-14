@@ -1840,6 +1840,11 @@ Return Value:
                         break;
                     }
                 }
+                else if (BytesWritten < BytesRead)
+                {
+                    assert(PendingStdin.empty());
+                    PendingStdin.assign(Buffer.begin() + BytesWritten, Buffer.begin() + BytesRead);
+                }
             }
         }
 
