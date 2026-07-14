@@ -19,16 +19,11 @@ Abstract:
 
 namespace wsl::windows::common::hvsocket {
 
-std::optional<wil::unique_socket> CancellableAccept(
-    _In_ SOCKET ListenSocket,
-    _In_ DWORD Timeout,
-    _In_opt_ HANDLE ExitHandle = nullptr,
-    const std::source_location& Location = std::source_location::current());
-
 wil::unique_socket Connect(
     _In_ const GUID& VmId,
     _In_ unsigned long Port,
     _In_opt_ HANDLE ExitHandle = nullptr,
+    ULONG Timeout = 30000, // TODO: Fix
     const std::source_location& Location = std::source_location::current());
 
 wil::unique_socket Create();

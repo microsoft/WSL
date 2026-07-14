@@ -90,59 +90,6 @@ private:
 };
 
 namespace details {
-    template <typename TLambda>
-    class lambda_call
-    {
-    public:
-        lambda_call(const lambda_call&) = delete;
-        lambda_call& operator=(const lambda_call&) = delete;
-        lambda_call& operator=(lambda_call&& other) = delete;
-
-        explicit lambda_call(TLambda&& lambda) noexcept : m_lambda(std::move(lambda))
-        {
-            static_assert(std::is_same<decltype(lambda()), void>::value, "scope_exit lambdas must not have a return value");
-            static_assert(
-                !std::is_lvalue_reference<TLambda>::value && !std::is_rvalue_reference<TLambda>::value,
-                "scope_exit should only be directly used with a lambda");
-        }
-
-        lambda_call(lambda_call&& other) noexcept : m_lambda(std::move(other.m_lambda)), m_call(other.m_call)
-        {
-            other.m_call = false;
-        }
-
-        ~lambda_call() noexcept
-        {
-            reset();
-        }
-
-        // Ensures the scope_exit lambda will not be called
-        void release() noexcept
-        {
-            m_call = false;
-        }
-
-        // Executes the scope_exit lambda immediately if not yet run; ensures it will not run again
-        void reset() noexcept
-        {
-            if (m_call)
-            {
-                m_call = false;
-                m_lambda();
-            }
-        }
-
-        // Returns true if the scope_exit lambda is still going to be executed
-        explicit operator bool() const noexcept
-        {
-            return m_call;
-        }
-
-    protected:
-        TLambda m_lambda;
-        bool m_call = true;
-    };
-
     inline void ThrowErrorIf(bool condition, int error, FailureInfo info)
     {
         if (condition)
@@ -190,6 +137,68 @@ namespace details {
             LogFailure(message, nullptr);
         }
     }
+
+    template <typename TLambda>
+    class lambda_call
+    {
+    public:
+        lambda_call(const lambda_call&) = delete;
+        lambda_call& operator=(const lambda_call&) = delete;
+        lambda_call& operator=(lambda_call&& other) = delete;
+
+        explicit lambda_call(TLambda&& lambda) noexcept : m_lambda(std::move(lambda))
+        {
+            static_assert(std::is_same<decltype(lambda()), void>::value, "scope_exit lambdas must not have a return value");
+            static_assert(
+                !std::is_lvalue_reference<TLambda>::value && !std::is_rvalue_reference<TLambda>::value,
+                "scope_exit should only be directly used with a lambda");
+        }
+
+        lambda_call(lambda_call&& other) noexcept : m_lambda(std::move(other.m_lambda)), m_call(other.m_call)
+        {
+            other.m_call = false;
+        }
+
+        ~lambda_call() noexcept
+        {
+            reset();
+        }
+
+        // Ensures the scope_exit lambda will not be called
+        void release() noexcept
+        {
+            m_call = false;
+        }
+
+        // Executes the scope_exit lambda immediately if not yet run; ensures it will not run again
+        void reset() noexcept
+        {
+            if (m_call)
+            {
+                m_call = false;
+
+                try
+                {
+                    m_lambda();
+                }
+                catch (...)
+                {
+                    LogCaughtException("Exception thrown from a scope_exit lambda");
+                }
+            }
+        }
+
+        // Returns true if the scope_exit lambda is still going to be executed
+        explicit operator bool() const noexcept
+        {
+            return m_call;
+        }
+
+    protected:
+        TLambda m_lambda;
+        bool m_call = true;
+    };
+
 } // namespace details
 
 inline int ResultFromCaughtException()
@@ -223,7 +232,7 @@ inline int ResultFromCaughtException()
 #define THROW_LAST_ERROR() THROW_ERRNO(errno);
 
 #define THROW_INVALID() THROW_ERRNO(EINVAL)
-#define THROW_UNEXCEPTED() THROW_ERRNO(EINVAL)
+#define THROW_UNEXPECTED() THROW_ERRNO(EINVAL)
 #define THROW_INVALID_IF(Condition) THROW_ERRNO_IF(EINVAL, (Condition))
 #define THROW_UNEXPECTED_IF(Condition) THROW_ERRNO_IF(EINVAL, (Condition))
 
@@ -373,6 +382,11 @@ public:
         return fd;
     }
 
+    int* addressof() noexcept
+    {
+        return &m_Fd;
+    }
+
     friend void swap(unique_fd& fd1, unique_fd& fd2)
     {
         std::swap(fd1.m_Fd, fd2.m_Fd);
@@ -437,7 +451,7 @@ public:
     static unique_pipe create(int flags)
     {
         int pipe[2] = {-1, -1};
-        if (pipe2(pipe, flags) < -1)
+        if (pipe2(pipe, flags) < 0)
         {
             THROW_ERRNO(errno);
         }

@@ -14,6 +14,8 @@ public:
 
     GUID AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag);
 
+    void RemoveDevice(const GUID& Type, const GUID& InstanceId);
+
     void AddRemoteFileSystem(const GUID& ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs);
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag);
@@ -42,15 +44,56 @@ public:
 private:
     struct RemoteFileSystemInfo
     {
-        RemoteFileSystemInfo(GUID ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Instance) :
-            ImplementationClsid{ImplementationClsid}, Tag{Tag}, Instance{Instance}
+        RemoteFileSystemInfo(GUID ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Instance, IGlobalInterfaceTable* git) :
+            ImplementationClsid{ImplementationClsid}, Tag{Tag}, m_git{git}
         {
+            THROW_IF_FAILED(git->RegisterInterfaceInGlobal(Instance.get(), __uuidof(IPlan9FileSystem), &Cookie));
         }
 
-        GUID ImplementationClsid;
+        ~RemoteFileSystemInfo()
+        {
+            if (Cookie != 0)
+            {
+                LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(Cookie));
+            }
+        }
+
+        RemoteFileSystemInfo(RemoteFileSystemInfo&& other) noexcept
+        {
+            *this = std::move(other);
+        }
+
+        RemoteFileSystemInfo& operator=(RemoteFileSystemInfo&& other) noexcept
+        {
+            if (this != &other)
+            {
+                if (Cookie != 0)
+                {
+                    LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(Cookie));
+                }
+
+                ImplementationClsid = other.ImplementationClsid;
+                Tag = std::move(other.Tag);
+                Cookie = other.Cookie;
+                m_git = other.m_git;
+                other.Cookie = 0;
+            }
+
+            return *this;
+        }
+
+        RemoteFileSystemInfo(const RemoteFileSystemInfo&) = delete;
+        RemoteFileSystemInfo& operator=(const RemoteFileSystemInfo&) = delete;
+
+        GUID ImplementationClsid{};
         std::wstring Tag;
-        wil::com_ptr<IPlan9FileSystem> Instance;
+        DWORD Cookie = 0;
+
+    private:
+        IGlobalInterfaceTable* m_git = nullptr;
     };
+
+    wil::com_ptr<IGlobalInterfaceTable> m_git;
 
     std::wstring m_systemId;
     GUID m_runtimeId;
@@ -70,6 +113,10 @@ private:
     wil::srwlock m_devicesLock;
     std::map<GUID, DeviceHostProxyEntry, wsl::windows::common::helpers::GuidLess> m_devices;
     bool m_devicesShutdown;
+
+    // A kill-on-close job per device host process, held for the proxy's lifetime so the
+    // processes are terminated when the VM shuts down. Guarded by m_devicesLock.
+    std::vector<wil::unique_handle> m_processJobs;
 
     static constexpr LPCWSTR c_hdvModuleName = L"vmdevicehost.dll";
     static constexpr LPCWSTR c_vmwpctrlModuleName = L"vmwpctrl.dll";

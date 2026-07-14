@@ -67,7 +67,8 @@ public:
         _In_ ULONG FeatureFlags,
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
-        _Out_opt_ ULONG* ConnectPort = nullptr);
+        _Out_opt_ ULONG* ConnectPort = nullptr,
+        _In_opt_ HANDLE JobObject = nullptr);
 
     virtual ~WslCoreInstance();
 
@@ -136,6 +137,7 @@ private:
     std::shared_ptr<WslCoreInstance> m_systemDistro;
     WSLDistributionInformation m_distributionInfo{};
     DWORD m_socketTimeout{};
+    HANDLE m_jobObject{};
     std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_oobeCompleteEvent;

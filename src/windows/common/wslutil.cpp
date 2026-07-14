@@ -15,7 +15,9 @@ Abstract:
 #include "precomp.h"
 #include "wslutil.h"
 #include "WslPluginApi.h"
+#include <wincrypt.h>
 #include "wslinstallerservice.h"
+#include "wslc.h"
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
@@ -86,6 +88,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
+    X(WSLC_E_CONTAINER_DISABLED),
+    X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
+    X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
     X_WIN32(ERROR_VERSION_PARSE_ERROR),
@@ -135,8 +140,32 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_INVALID_SECURITY_DESCR),
     X(VM_E_INVALID_STATE),
     X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS),
+    X(WININET_E_TIMEOUT),
+    X(WSAEADDRNOTAVAIL),
+    X_WIN32(ERROR_BAD_IMPERSONATION_LEVEL),
+    X_WIN32(ERROR_NO_DATA),
+    X_WIN32(WSAETIMEDOUT),
+    X_WIN32(ERROR_OPERATION_ABORTED),
+    X_WIN32(WSAECONNREFUSED),
     X_WIN32(ERROR_BAD_PATHNAME),
-    X(WININET_E_TIMEOUT)};
+    X(WININET_E_TIMEOUT),
+    X_WIN32(ERROR_INVALID_SID),
+    X_WIN32(ERROR_INVALID_STATE),
+    X(WSLC_E_IMAGE_NOT_FOUND),
+    X(WSLC_E_CONTAINER_NOT_FOUND),
+    X(WSLC_E_VOLUME_NOT_FOUND),
+    X(WSLC_E_VOLUME_NOT_AVAILABLE),
+    X(WSLC_E_CONTAINER_NOT_RUNNING),
+    X(WSLC_E_CONTAINER_IS_RUNNING),
+    X(WSLC_E_SESSION_RESERVED),
+    X(WSLC_E_INVALID_SESSION_NAME),
+    X(WSLC_E_NETWORK_NOT_FOUND),
+    X(WSLC_E_SESSION_NOT_FOUND),
+    X(WSLC_E_WU_SEARCH_FAILED),
+    X_WIN32(RPC_S_SERVER_UNAVAILABLE),
+    X_WIN32(ERROR_ELEVATION_REQUIRED),
+    X_WIN32(WSAEACCES),
+    X_WIN32(WSAEADDRINUSE)};
 
 #undef X
 
@@ -182,7 +211,8 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(HNS),
     X(ReadDistroConfig),
     X(MoveDistro),
-    X(VerifyChecksum)};
+    X(VerifyChecksum),
+    X(WslC)};
 
 #undef X
 
@@ -237,6 +267,28 @@ constexpr GUID EndianSwap(GUID value)
     value.Data2 = EndianSwap(value.Data2);
     value.Data3 = EndianSwap(value.Data3);
     return value;
+}
+
+std::regex BuildImageReferenceRegex()
+{
+    // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
+
+    std::string alphaNum = "[a-z0-9]+";
+    std::string separator = "(?:[._]|__|[-]*)";
+    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
+    std::string tag = "[\\w][\\w.-]{0,127}";
+    std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
+
+    auto group = [](const auto& exp) { return std::format("(?:{})", exp); };
+    auto optional = [&group](const auto& exp) { return group(exp) + "?"; };
+    auto repeated = [&group](const auto& exp) { return group(exp) + "+"; };
+    auto capture = [](const auto& exp) { return std::format("({})", exp); };
+
+    auto nameComponent = alphaNum + optional(repeated(separator + alphaNum));
+    auto domain = domainComponent + optional(repeated("\\." + domainComponent)) + optional(":[0-9]+");
+    auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
+
+    return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
 }
 
 } // namespace
@@ -296,7 +348,29 @@ GUID wsl::windows::common::wslutil::CreateV5Uuid(const GUID& namespaceGuid, cons
     return EndianSwap(newGuid);
 }
 
-std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename)
+std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress)
+{
+    wsl::windows::common::ConsoleProgressBar progressBar;
+    auto progress = [&](auto current, auto total) {
+        if (reportProgress)
+        {
+            progressBar.Print(current, total);
+        }
+        return true;
+    };
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (reportProgress)
+        {
+            progressBar.Clear();
+        }
+    });
+
+    return DownloadFileImpl(Url, Filename, progress);
+}
+
+std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
+    std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress)
 {
     const auto lastSlash = Url.find_last_of('/');
     THROW_HR_IF(E_INVALIDARG, lastSlash == std::wstring::npos);
@@ -306,14 +380,45 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
         Filename = Url.substr(lastSlash + 1);
     }
 
-    const auto downloadFolder =
-        winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(std::filesystem::temp_directory_path().wstring()).get();
+    // GetFolderFromPathAsync won't work if the folder is hidden or system.
+    auto downloadFolderPath = std::filesystem::temp_directory_path();
+    auto filenameStem = std::filesystem::path(Filename).stem().wstring();
+    auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
+    std::wstring filePath{};
+    winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
+    for (int suffix = 1; outputStream == nullptr; suffix++)
+    {
+        if (suffix == 1)
+        {
+            filePath = (downloadFolderPath / Filename).wstring();
+        }
+        else
+        {
+            filePath = (downloadFolderPath / std::format(L"{} ({}){}", filenameStem, suffix, filenameExtension)).wstring();
+        }
+        try
+        {
+            outputStream = winrt::Windows::Storage::Streams::FileRandomAccessStream::OpenAsync(
+                               filePath,
+                               winrt::Windows::Storage::FileAccessMode::ReadWrite,
+                               winrt::Windows::Storage::StorageOpenOptions::None,
+                               winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
+                               .get();
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            {
+                throw;
+            }
+        }
+    }
 
-    const auto file =
-        downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
-    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { file.DeleteAsync().get(); });
-
-    const auto outputStream = file.OpenAsync(winrt::Windows::Storage::FileAccessMode::ReadWrite).get().GetOutputStreamAt(0);
+    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        outputStream.Close();
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    });
 
     // By default downloaded files are cached in %appdata%/local/packages/{package-family}/AC/InetCache .
     // Disable caching since there's no reason to keep local copies of .msixbundle files.
@@ -326,7 +431,6 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
     const auto asyncResponse = client.GetInputStreamAsync(winrt::Windows::Foundation::Uri(Url));
 
     std::atomic<uint64_t> totalBytes;
-    wsl::windows::common::ConsoleProgressBar progressBar;
     asyncResponse.Progress(
         [&](const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Storage::Streams::IInputStream, winrt::Windows::Web::Http::HttpProgress>&,
             const winrt::Windows::Web::Http::HttpProgress& progress) {
@@ -341,15 +445,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
     download.Progress([&](const auto& _, uint64_t progress) {
         if (totalBytes != 0)
         {
-            progressBar.Print(progress, totalBytes);
+            Progress(progress, totalBytes);
         }
     });
 
     download.get();
-    progressBar.Clear();
     deleteFileOnFailure.release();
 
-    return file.Path().c_str();
+    return filePath;
 }
 
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
@@ -361,13 +464,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
     return newHandle;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess)
 {
     const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(caller.get(), Handle, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
+        caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }
@@ -431,7 +535,7 @@ std::wstring wsl::windows::common::wslutil::ErrorCodeToString(HRESULT Error)
 
 wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(const Error& error)
 {
-    ErrorStrings errorStrings;
+    ErrorStrings errorStrings{.Source = error.Source};
 
     if (error.Message.has_value())
     {
@@ -478,6 +582,23 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
     return errorStrings;
 }
 
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), Handle.Handle.File == nullptr || Handle.Handle.File == INVALID_HANDLE_VALUE);
+
+    switch (Handle.Type)
+    {
+    case WSLCHandleTypeFile:
+        return Handle.Handle.File;
+    case WSLCHandleTypePipe:
+        return Handle.Handle.Pipe;
+    case WSLCHandleTypeSocket:
+        return Handle.Handle.Socket;
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
+    }
+}
+
 std::wstring wsl::windows::common::wslutil::ConstructPipePath(std::wstring_view PipeName)
 {
     return c_pipePrefix + std::wstring(PipeName);
@@ -490,6 +611,24 @@ std::filesystem::path wsl::windows::common::wslutil::GetBasePath()
 
     path.resize(std::wcslen(path.c_str()));
     return std::filesystem::path(std::move(path));
+}
+
+std::optional<COMErrorInfo> wsl::windows::common::wslutil::GetCOMErrorInfo()
+{
+    wil::com_ptr<IErrorInfo> errorInfo;
+    THROW_IF_FAILED(GetErrorInfo(0, &errorInfo));
+
+    if (!errorInfo)
+    {
+        return {};
+    }
+
+    COMErrorInfo error{};
+
+    THROW_IF_FAILED(errorInfo->GetDescription(&error.Message));
+    THROW_IF_FAILED(errorInfo->GetSource(&error.Source));
+
+    return error;
 }
 
 std::wstring wsl::windows::common::wslutil::GetDebugShellPipeName(_In_ PSID Sid)
@@ -522,10 +661,36 @@ wsl::windows::common::wslutil::GetDefaultVersion(void)
     return version;
 }
 
+namespace {
+
+// Returns true if Windows Admin Protection (shadow admin) is enabled on
+// this system. The message is shown for both elevated and non-elevated
+// callers because either side may be missing the other's distributions.
+// Caches the DLL lookup on first call.
+bool IsAdminProtectionEnabled()
+{
+    using ShadowAdminEnabledFn = BOOL(WINAPI)();
+    static std::optional<LxssDynamicFunction<ShadowAdminEnabledFn>> s_fn;
+    static std::once_flag s_initFlag;
+
+    std::call_once(s_initFlag, []() {
+        LxssDynamicFunction<ShadowAdminEnabledFn> fn{DynamicFunctionErrorLogs::None};
+        if (SUCCEEDED(fn.load(L"SecurityHealthUdk.dll", "Shield_LUAIsShadowAdminEnabled")))
+        {
+            s_fn.emplace(std::move(fn));
+        }
+    });
+
+    return s_fn.has_value() && (*s_fn)();
+}
+
+} // anonymous namespace
+
 std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 {
     ULONG buildNumber = 0;
     std::wstring kbUrl;
+    std::wstring errorString;
 
     switch (result)
     {
@@ -545,23 +710,15 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
         return Localization::MessageHigherIntegrity();
 
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
-        return Localization::MessageNoDefaultDistro();
-
-    case HRESULT_FROM_WIN32(WSAECONNABORTED):
-    case HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS):
-        return Localization::MessageInstanceTerminated();
+        errorString = Localization::MessageNoDefaultDistro();
+        break;
 
     case WSL_E_DISTRO_NOT_FOUND:
-        return Localization::MessageDistroNotFound();
-
-    case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
-        return Localization::MessageDistroNameAlreadyExists();
+        errorString = Localization::MessageDistroNotFound();
+        break;
 
     case WSL_E_DISTRIBUTION_NAME_NEEDED:
         return Localization::MessageDistributionNameNeeded();
-
-    case HRESULT_FROM_WIN32(ERROR_FILE_EXISTS):
-        return Localization::MessageDistroInstallPathAlreadyExists();
 
     case WSL_E_TOO_MANY_DISKS_ATTACHED:
         return Localization::MessageTooManyDisks();
@@ -671,6 +828,9 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_NOT_A_LINUX_DISTRO:
         return Localization::MessageInvalidDistributionTar();
 
+    case WSLC_E_CONTAINER_DISABLED:
+        return Localization::MessageWSLContainerDisabled();
+
     case WSL_E_INVALID_USAGE:
     {
         const auto* context = wsl::windows::common::ExecutionContext::Current();
@@ -695,7 +855,26 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     }
     }
 
-    return GetSystemErrorString(result);
+    if (errorString.empty())
+    {
+        return GetSystemErrorString(result);
+    }
+
+    // If Admin Protection is enabled, prepend an informational message for
+    // errors that may be caused by the shadow admin's separate registry hive.
+    try
+    {
+        if (IsAdminProtectionEnabled())
+        {
+            auto message = Localization::MessageAdminProtectionEnabled();
+            message += L"\n\n";
+            message += errorString;
+            return message;
+        }
+    }
+    CATCH_LOG()
+
+    return errorString;
 }
 
 std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common::wslutil::GetGitHubAssetFromRelease(const GitHubRelease& Release)
@@ -926,6 +1105,25 @@ std::vector<BYTE> wsl::windows::common::wslutil::HashFile(HANDLE file, DWORD Alg
     return fileHash;
 }
 
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> wsl::windows::common::wslutil::GetInstalledPackageVersion()
+{
+    std::wstring packageVersion;
+    auto result = wil::ResultFromException([&]() {
+        auto msiKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
+
+        packageVersion = wsl::windows::common::registry::ReadString(msiKey.get(), L"Msi", L"Version");
+    });
+
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
+    {
+        return {};
+    }
+
+    THROW_IF_FAILED(result);
+
+    return ParseWslPackageVersion(packageVersion);
+}
+
 void wsl::windows::common::wslutil::InitializeWil()
 {
     wil::WilInitialize_CppWinRT();
@@ -986,6 +1184,44 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
+std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr auto officialPrefix = "library/";
+    constexpr auto legacyDomain = "index.docker.io";
+    constexpr auto localhost = "localhost";
+
+    auto slash = Input.find('/');
+    if (slash == std::string::npos)
+    {
+        return {defaultDomain, officialPrefix + Input};
+    }
+
+    auto domain = Input.substr(0, slash);
+    auto path = Input.substr(slash + 1);
+
+    if (domain == legacyDomain)
+    {
+        domain = defaultDomain;
+    }
+    else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
+                 return std::isupper(e);
+             }))
+    {
+        domain = defaultDomain;
+        path = Input;
+    }
+
+    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    {
+        path = "library/" + path;
+    }
+
+    return {domain, path};
+}
+
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
 {
     // Default to 4096 byte buffer, just like CreatePipe().
@@ -1043,8 +1279,8 @@ std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::O
 
 bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
 {
-    // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are available
-    // but calls to HNS will fail if vfpext isn't installed.
+    // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are
+    // available but calls to HNS will fail if vfpext isn't installed.
     return wsl::windows::common::helpers::IsServicePresent(L"HNS") &&
            wsl::windows::common::helpers::IsServicePresent(L"vmcompute") &&
            (helpers::GetWindowsVersion().BuildNumber < helpers::WindowsBuildNumbers::Nickel ||
@@ -1061,6 +1297,22 @@ wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD 
     }
 
     return caller;
+}
+
+void wsl::windows::common::wslutil::ParseIpv4Address(const char* Address, in_addr& Result)
+{
+    if (inet_pton(AF_INET, Address, &Result) != 1)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
+    }
+}
+
+void wsl::windows::common::wslutil::ParseIpv6Address(const char* Address, in_addr6& Result)
+{
+    if (inet_pton(AF_INET6, Address, &Result) != 1)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
+    }
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWslPackageVersion(_In_ const std::wstring& Version)
@@ -1082,6 +1334,42 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse WSL package version: '%ls', %hs", Version.c_str(), e.what());
     }
+}
+
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input, EnumReferenceFormat* Format)
+{
+    static const auto regex = BuildImageReferenceRegex();
+    std::smatch match;
+    if (!std::regex_match(Input, match, regex))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(Input.c_str()));
+    }
+
+    const auto& repo = match[1];
+    const auto& tag = match[2];
+    const auto& digest = match[3];
+
+    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
+
+    EnumReferenceFormat referenceFormat = EnumReferenceFormatNone;
+    std::optional<std::string> tagOrDigest;
+    if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
+    {
+        tagOrDigest = digest.str();
+        referenceFormat = EnumReferenceFormatDigest;
+    }
+    else if (tag.matched) // <repo>:<tag>
+    {
+        tagOrDigest = tag.str();
+        referenceFormat = EnumReferenceFormatTag;
+    }
+
+    if (Format)
+    {
+        *Format = referenceFormat;
+    }
+
+    return {repo.str(), std::move(tagOrDigest)};
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
@@ -1123,8 +1411,15 @@ void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)
     setMode(stdout, Mode);
     setMode(stderr, Mode);
 
-    // Set the locale to the current environment's default locale.
+    // Set the locale to the current environment's default locale for regional
+    // formatting (numeric, time, collation), then override LC_CTYPE to UTF-8
+    // so that narrow-to-wide conversions (e.g. %hs in wprintf) correctly decode
+    // UTF-8 multi-byte sequences from Linux/container processes.
     WI_VERIFY(_wsetlocale(LC_ALL, L"") != NULL);
+    if (Mode == _O_U8TEXT)
+    {
+        WI_VERIFY(_wsetlocale(LC_CTYPE, L".UTF-8") != NULL);
+    }
 }
 
 void wsl::windows::common::wslutil::SetThreadDescription(LPCWSTR Name)
@@ -1138,6 +1433,70 @@ wil::unique_hlocal_string wsl::windows::common::wslutil::SidToString(_In_ PSID U
     THROW_LAST_ERROR_IF(!ConvertSidToStringSid(UserSid, &sid));
 
     return sid;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access)
+{
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
+
+    // N.B. COM closes the handle when returning an out parameter.
+    // The return value of this method should always be passed to a COM out parameter.
+    auto comHandle = ToCOMInputHandle(duplicatedHandle.release());
+
+    return comHandle;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type)
+{
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
+
+    // N.B. COM closes the handle when returning an out parameter.
+    // The return value of this method should always be passed to a COM out parameter.
+    switch (Type)
+    {
+    case WSLCHandleTypeFile:
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = duplicatedHandle.release()}};
+    case WSLCHandleTypePipe:
+        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = duplicatedHandle.release()}};
+    case WSLCHandleTypeSocket:
+        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = duplicatedHandle.release()}};
+    default:
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", static_cast<int>(Type));
+    }
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle)
+{
+    auto type = GetFileType(Handle);
+    if (type == FILE_TYPE_PIPE)
+    {
+        int socketType{};
+        int len = sizeof(socketType);
+
+        // N.B. FILE_TYPE_PIPE can describe a pipe, a named pipe, or a socket.
+        // Check for a named pipe first, since getsockopt() can return success for a named pipe.
+
+        if (GetNamedPipeInfo(Handle, nullptr, nullptr, nullptr, nullptr))
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
+        }
+        else if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
+        {
+            return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = Handle}};
+        }
+        else
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
+        }
+    }
+    else if (type == FILE_TYPE_DISK)
+    {
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = Handle}};
+    }
+    else
+    {
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", type);
+    }
 }
 
 winrt::Windows::Management::Deployment::PackageVolume wsl::windows::common::wslutil::GetSystemVolume()
@@ -1160,4 +1519,88 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
+}
+
+std::string wsl::windows::common::wslutil::Base64Encode(const std::string& input)
+{
+    DWORD base64Size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()), static_cast<DWORD>(input.size()), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &base64Size));
+
+    auto buffer = std::make_unique<char[]>(base64Size);
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
+        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+        buffer.get(),
+        &base64Size));
+
+    return std::string(buffer.get());
+}
+
+std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encoded)
+{
+    DWORD size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
+
+    std::string result(size, '\0');
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
+
+    result.resize(size);
+    return result;
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password)
+{
+    nlohmann::json authJson = {{"username", username}, {"password", password}};
+    return Base64Encode(authJson.dump());
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken)
+{
+    nlohmann::json authJson = {{"identitytoken", identityToken}};
+    return Base64Encode(authJson.dump());
+}
+
+std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::string> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Value, "Value at index %lu is null", i);
+
+        if (reservedKey != nullptr)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, strcmp(pairs[i].Key, reservedKey) == 0, "Key '%hs' is reserved", reservedKey);
+        }
+
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), result.contains(pairs[i].Key), "Duplicate key: '%hs'", pairs[i].Key);
+
+        result[pairs[i].Key] = pairs[i].Value;
+    }
+
+    return result;
+}
+
+std::map<std::string, std::vector<std::string>> wsl::windows::common::wslutil::ParseKeyMultiValuePairs(const KeyValuePair* pairs, ULONG count)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::vector<std::string>> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_POINTER, pairs[i].Value, "Value at index %lu is null", i);
+
+        result[pairs[i].Key].emplace_back(pairs[i].Value);
+    }
+
+    return result;
 }

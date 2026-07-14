@@ -23,16 +23,12 @@ Abstract:
 extern HINSTANCE g_dllInstance;
 
 constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
-constexpr LPCWSTR c_optionalFeatureNameVmp = L"VirtualMachinePlatform";
-constexpr LPCWSTR c_optionalFeatureNameWsl = L"Microsoft-Windows-Subsystem-Linux";
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;
 using namespace wsl::windows::common::wslutil;
 
 namespace {
-std::vector<BYTE> ParseHex(const std::wstring& input);
-
 void EnforceFileHash(HANDLE file, const std::wstring& expectedHash)
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::VerifyChecksum);
@@ -40,7 +36,7 @@ void EnforceFileHash(HANDLE file, const std::wstring& expectedHash)
     const auto fileHash = wsl::windows::common::wslutil::HashFile(file, CALG_SHA_256);
 
     THROW_LAST_ERROR_IF(SetFilePointer(file, 0, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
-    if (fileHash != ParseHex(expectedHash))
+    if (fileHash != wsl::windows::common::string::HexToBytes(expectedHash))
     {
         THROW_HR_WITH_USER_ERROR(
             TRUST_E_BAD_DIGEST,
@@ -64,31 +60,6 @@ std::vector<std::wstring> GetInstalledOptionalComponents()
     return installedComponents;
 }
 
-std::vector<BYTE> ParseHex(const std::wstring& input)
-{
-    std::vector<BYTE> result;
-    for (auto i = 0; i < input.size(); i += 2)
-    {
-        // Skip '0x', if any
-        if (i == 0 && input[0] == '0' && tolower(input[1]) == 'x')
-        {
-            continue;
-        }
-
-        auto current = input.substr(i, 2);
-        wchar_t* endPtr{};
-
-        const auto byte = wcstoul(current.data(), &endPtr, 16);
-        if (endPtr != current.data() + 2)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(input.c_str()));
-        }
-
-        result.push_back(static_cast<BYTE>(byte));
-    }
-
-    return result;
-}
 }; // namespace
 
 HRESULT WslInstall::InstallDistribution(
@@ -239,18 +210,32 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
     return {rebootRequired, std::move(missingComponents)};
 }
 
-void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& components)
+DWORD WslInstall::InstallOptionalComponent(LPCWSTR component, bool consoleOutput)
 {
     std::wstring systemDirectory;
     THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
 
     const auto dismPath = std::filesystem::path(std::move(systemDirectory)) / L"dism.exe";
+
+    auto commandLine = std::format(L"{} /Online /NoRestart /enable-feature /featurename:{}", dismPath.native(), component);
+
+    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+    if (!consoleOutput)
+    {
+        process.SetFlags(CREATE_NEW_CONSOLE);
+        process.SetShowWindow(SW_HIDE);
+    }
+
+    return process.Run();
+}
+
+void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& components)
+{
     for (const auto& component : components)
     {
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageInstallingWindowsComponent(component));
 
-        auto commandLine = std::format(L"{} /Online /NoRestart /enable-feature /featurename:{}", dismPath.wstring(), component);
-        const auto exitCode = wsl::windows::common::helpers::RunProcess(commandLine);
+        const auto exitCode = InstallOptionalComponent(component.c_str(), true);
         if (exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
         {
             THROW_HR_WITH_USER_ERROR(WSL_E_INSTALL_COMPONENT_FAILED, Localization::MessageOptionalComponentInstallFailed(component, exitCode));

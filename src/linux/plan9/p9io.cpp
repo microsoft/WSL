@@ -24,14 +24,14 @@ CoroutineIoIssuer::CoroutineIoIssuer(int fd) : m_FileDescriptor(fd)
 void CoroutineIoIssuer::Callback(sigval value)
 {
     const auto operation = static_cast<CoroutineIoOperation*>(value.sival_ptr);
-    auto bytesTransferred = aio_return(&operation->ControlBlock);
-    int error = 0;
-    if (bytesTransferred < 0)
+    auto error = aio_error(&operation->ControlBlock);
+    if (error == EINPROGRESS)
     {
-        error = aio_error(&operation->ControlBlock);
+        return;
     }
+    auto bytesTransferred = aio_return(&operation->ControlBlock);
 
-    operation->Result = {error, static_cast<size_t>(bytesTransferred)};
+    operation->Result = {-error, error == 0 ? static_cast<size_t>(bytesTransferred) : 0};
     if (!operation->DoneOrCoroutine.exchange(true))
     {
         return;
@@ -55,7 +55,7 @@ bool CoroutineIoIssuer::PreIssue(CoroutineIoOperation& operation, CancelToken& t
     }
 
     // The operation has already been cancelled. Don't even issue the IO.
-    operation.Result = {ECANCELED, 0};
+    operation.Result = {-ECANCELED, 0};
     operation.DoneOrCoroutine = true;
     return false;
 }
@@ -286,7 +286,7 @@ Task<IoResult> WriteAsync(CoroutineIoIssuer& file, std::uint64_t offset, gsl::sp
         cb.aio_offset = offset;
         if (aio_write(&cb) < 0)
         {
-            return {errno, 0};
+            return {-errno, 0};
         }
 
         return {};

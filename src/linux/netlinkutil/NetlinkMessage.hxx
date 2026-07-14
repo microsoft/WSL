@@ -70,7 +70,7 @@ std::vector<const TAttribute*> NetlinkMessage<TMessage>::Attributes(int type) co
                     std::format(
                         "Attribute at offset {}: attempted to access beyond attribute offset ({} > {})",
                         (reinterpret_cast<const char*>(e) - &*m_responseBegin),
-                        sizeof(TMessage),
+                        sizeof(TAttribute),
                         e->rta_len));
             }
 

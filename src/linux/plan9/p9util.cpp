@@ -162,7 +162,7 @@ gid_t GetUserGroupId(uid_t uid)
     for (;;)
     {
         buffer.resize(size);
-        if (getpwuid_r(uid, &pwd, buffer.data(), size, &result) < 0)
+        if (getpwuid_r(uid, &pwd, buffer.data(), size, &result) != 0)
         {
             if (errno != ERANGE)
             {
@@ -198,7 +198,7 @@ gid_t GetGroupIdByName(const char* name)
     for (;;)
     {
         buffer.resize(size);
-        if (getgrnam_r(name, &grp, buffer.data(), size, &result) < 0)
+        if (getgrnam_r(name, &grp, buffer.data(), size, &result) != 0)
         {
             if (errno != ERANGE)
             {
@@ -242,17 +242,21 @@ FsUserContext::FsUserContext(uid_t uid, gid_t gid, const std::vector<gid_t>& gro
 // Restores the effective uid and gid to root.
 FsUserContext::~FsUserContext()
 {
-    if (m_Restore)
+    try
     {
-        // Use the syscall directly since the wrappers change the value on all threads.
-        THROW_LAST_ERROR_IF(sys_setresuid(-1, 0, -1) < 0);
-        THROW_LAST_ERROR_IF(sys_setresgid(c_InvalidGid, 0, c_InvalidGid) < 0);
-    }
+        if (m_Restore)
+        {
+            // Use the syscall directly since the wrappers change the value on all threads.
+            THROW_LAST_ERROR_IF(sys_setresuid(-1, 0, -1) < 0);
+            THROW_LAST_ERROR_IF(sys_setresgid(c_InvalidGid, 0, c_InvalidGid) < 0);
+        }
 
-    if (m_restoreGroups)
-    {
-        THROW_LAST_ERROR_IF(sys_setgroups(0, nullptr) < 0);
+        if (m_restoreGroups)
+        {
+            THROW_LAST_ERROR_IF(sys_setgroups(0, nullptr) < 0);
+        }
     }
+    CATCH_LOG()
 }
 
 } // namespace p9fs::util

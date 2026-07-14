@@ -357,7 +357,7 @@ std::string wsl::core::networking::GenerateResolvConf(_In_ const DnsInfo& Info)
 
 std::vector<std::string> wsl::core::networking::GetAllDnsSuffixes(const std::vector<IpAdapterAddress>& AdapterAddresses)
 {
-    const auto com = wil::CoInitializeEx();
+    const auto com = InitializeCOMState();
     wsl::core::WmiService service(L"ROOT\\StandardCimv2");
 
     // DNS suffixes will be configured in Linux in the following order, *similar* (not 100% the same) to the order in which Windows tries suffixes.

@@ -16,6 +16,17 @@ Abstract:
 
 #if defined(_MSC_VER)
 #define THROW_INVALID_ARG_IF(condition) THROW_HR_IF(E_INVALIDARG, condition)
+
+#define THROW_IF_FAILED_EXCEPT(result, accepted) \
+    do \
+    { \
+        auto _result = (result); \
+        if (FAILED(_result) && _result != (accepted)) \
+        { \
+            THROW_HR(_result); \
+        } \
+    } while (0)
+
 #elif defined(__GNUC__)
 #define THROW_INVALID_ARG_IF(condition) THROW_ERRNO_IF(EINVAL, condition)
 #define _stricmp strcasecmp
@@ -40,6 +51,11 @@ inline constexpr std::uint32_t VersionMajor = WSL_PACKAGE_VERSION_MAJOR;
 inline constexpr std::uint32_t VersionMinor = WSL_PACKAGE_VERSION_MINOR;
 inline constexpr std::uint32_t VersionRevision = WSL_PACKAGE_VERSION_REVISION;
 inline constexpr std::tuple<uint32_t, uint32_t, uint32_t> PackageVersion{VersionMajor, VersionMinor, VersionRevision};
+
+// Maximum number of virtiofs shares that can be mounted (with different paths) over the lifetime of a VM.
+// This limit is there to avoid a hang when too many virtiofs shares are mounted.
+// TODO: Remove once we can use the same PCI devices for all shares.
+inline constexpr size_t c_maxVirtioFsShares = 15;
 
 #ifdef WSL_OFFICIAL_BUILD
 
