@@ -113,6 +113,17 @@ class WSLCE2EGlobalTests
         RunWslcAndVerify(L"--version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_VersionCommand_FormatJson)
+    {
+        RunWslcAndVerify(L"version --format json", {.Stdout = GetVersionJsonMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_VersionCommand_FormatTable)
+    {
+        // Explicit table format matches the default plain-text output.
+        RunWslcAndVerify(L"version --format table", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Session_DefaultElevated)
     {
         // Run container list to create the default elevated session
@@ -576,6 +587,10 @@ private:
     std::wstring GetVersionMessage() const
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+    }
+    std::wstring GetVersionJsonMessage() const
+    {
+        return std::format(L"{{\r\n  \"Client\": {{\r\n    \"Version\": \"{}\"\r\n  }}\r\n}}\r\n", WSL_PACKAGE_VERSION);
     }
 };
 } // namespace WSLCE2ETests
