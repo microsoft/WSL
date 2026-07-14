@@ -1915,20 +1915,23 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto primaryConfig =
         ResolveEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
 
-    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
         primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+
+    const bool hasNonAliasEndpointSettings =
+        primaryConfig.IPAMConfig.has_value() || primaryConfig.Links.has_value() || primaryConfig.DriverOpts.has_value();
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcEndpointSettingsRequireNetwork(networkMode),
+        hasNonAliasEndpointSettings && !NetworkModeAllocatesVmPorts(networkMode));
 
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
     request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
 
-    // Docker API v1.44 requires the primary network in EndpointsConfig when it is non-empty; also insert when the caller
-    // supplied any primary endpoint settings. ResolveEndpoints rejects additional networks that alias networkMode, so
-    // try_emplace here always creates a fresh entry — full replacement is safe.
     const bool hasPrimaryEndpointSettings = primaryConfig.Aliases.has_value() || primaryConfig.IPAMConfig.has_value() ||
                                             primaryConfig.Links.has_value() || primaryConfig.DriverOpts.has_value();
     if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || hasPrimaryEndpointSettings))
