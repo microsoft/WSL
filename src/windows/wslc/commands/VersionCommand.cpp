@@ -43,18 +43,6 @@ void VersionCommand::PrintVersion()
     wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
 }
 
-void VersionCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
-}
-
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     FormatType format = FormatType::Table;
