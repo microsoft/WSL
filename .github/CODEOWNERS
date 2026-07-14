@@ -11,5 +11,6 @@
 /src/windows/common/WSLC*          @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/service/exe/WSLC*     @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/service/inc/wslc.idl  @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/service/inc/WSLC*.idl @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/inc/wslc_schema.h     @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/linux/init/WSLC*              @microsoft/wsl-maintainers @microsoft/wslc-team
