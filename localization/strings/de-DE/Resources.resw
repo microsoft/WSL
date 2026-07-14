@@ -379,8 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux
-aus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux:
 
 Verbrauch:
     /l, /list [Option]
@@ -1589,8 +1588,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, 
-auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
@@ -2267,6 +2265,10 @@ Verwendung:
      <value>Kennzeichenargument darf keinen angrenzenden Wert enthalten: „{}“</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Ungültiger boolescher Wert für das Flag-Argument: "{}". Es wurde "true", "false", "1" oder "0" erwartet.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Ein positionelles Argument wurde gefunden, obwohl keines erwartet wurde: „{}“</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2435,7 +2437,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>Sitzungsspeicher wird unter „{}“ erstellt, wie von session.storagePath konfiguriert. Wenn Sie diese Einstellung später ändern oder entfernen, werden die hier gespeicherten Daten nicht mehr von der standardmäßigen Sitzung verwendet und können gelöscht werden, um Speicherplatz freizugeben.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2490,6 +2492,58 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>In eine Datei schreiben, anstatt STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Dateien zwischen einem Container und dem lokalen Dateisystem kopieren.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Dateien zwischen einem Container und dem lokalen Dateisystem kopieren.
+Verwendung: wslc container cp [OPTIONEN] QUELLE ZIEL
+  Lokal zu Container: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Container zu lokal: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin zu Container: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Quelle: lokaler Pfad, CONTAINER:PATH oder '-' für stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Ziel: lokaler Pfad oder CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Ungültiges Zielformat. Erwartet wurde CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Ungültiges Quellformat. Erwartet wurde CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Quellpfad nicht gefunden: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe nicht gefunden. Für das Kopieren lokaler Dateien ist Windows-Tar erforderlich.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Ungültige Kopierrichtung. Verwenden Sie CONTAINER:PATH entweder als Quelle oder als Ziel.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Kann keine Tar-Daten vom Terminal lesen. Leiten Sie ein Tar-Archiv an stdin weiter.
+Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Keine extrahierbaren Dateien aus dem Containerarchiv gefunden</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Ein Verzeichnis kann nicht in einen Dateipfad kopiert werden. Verwenden Sie stattdessen ein Verzeichnisziel (mit nachgestelltem Trennzeichen).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Einen Container überprüfen.</value>
@@ -2791,6 +2845,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Alle anzeigen, unabhängig vom Zustand.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Archivmodus (zur Kompatibilität mit der Docker-CLI akzeptiert)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Buildzeitvariablen festlegen (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2857,6 +2915,24 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Ungültiger {}-Wert: „{}“. Es wird nur „alle“ unterstützt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Befehl zum Ausführen der Integritätsprüfung des Containers</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Zeit zwischen den Ausführungen der Integritätsprüfung (z. B. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Anzahl aufeinanderfolgender Fehler, die erforderlich ist, um den Container als fehlerhaft zu melden</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Startzeitraum für die Initialisierung des Containers vor dem Countdown der Integritätsprüfung (z. B. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Maximale Zeit, die für die Ausführung einer Integritätsprüfung zugelassen ist (z. B. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Bilder löschen, auch wenn sie verwendet werden</value>
   </data>
@@ -2913,6 +2989,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Zwischenspeichern beim Erstellen des Bildes nicht verwenden</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Vom Container angegebene Integritätsprüfung deaktivieren</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Nicht markierte übergeordnete Elemente nicht löschen</value>
@@ -3094,6 +3173,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Ungültiger {}-Argumentwert: "{}". Arbeitsspeichergröße erwartet (z. B. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Ungültiger {}-Argumentwert: "{}". Erwartete Dauer (z. B. 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>Die Option --no-healthcheck kann nicht mit anderen Health-Check-Optionen kombiniert werden.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>Die CID-Datei „{}“ ist bereits vorhanden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3184,6 +3271,18 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Gelöscht: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Verbinden eines Containers mit einem Netzwerk</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Verbindet einen Container mit einem bestehenden Netzwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Trennen sie einen Container von einem Netzwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Trennt einen Container von einem bestehenden Netzwerk.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes verwalten.</value>

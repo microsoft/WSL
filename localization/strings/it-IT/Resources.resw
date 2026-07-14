@@ -2265,6 +2265,10 @@ Utilizzo:
      <value>L'argomento flag non può contenere un valore contiguo: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Valore booleano non valido per l'argomento del flag: '{}'. Previsto vero, falso, 1 o 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>È stato trovato un argomento posizionale nonostante non ne fosse previsto alcuno: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2433,7 +2437,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>Creazione dell'archiviazione della sessione in '{}' secondo la configurazione di session.storagePath. Se in seguito modifichi o rimuovi questa impostazione, i dati archiviati qui non verranno più utilizzati dalla sessione predefinita e potranno essere eliminati per recuperare spazio.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2488,6 +2492,58 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Scrivi in un file, invece di STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Copia i file tra un contenitore e il file system locale.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Copia i file tra un contenitore e il filesystem locale.
+Uso: wslc container cp [OPZIONI] SORGENTE DEST
+  Da locale a contenitore: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Da contenitore a locale: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin a contenitore: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Origine: percorso locale, CONTAINER:PATH oppure '-' per STDIN</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Destinazione: percorso locale o CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Formato di destinazione non valido. Previsto CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Formato di origine non valido. Previsto CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Percorso origine non trovato: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe non trovato. Il tar di Windows è necessario per la copia del file locale.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Direzione di copia non valida. Usa CONTAINER:PATH come origine o destinazione.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Non è possibile leggere i dati tar dal terminale. Reindirizza un archivio tar a STDIN.
+Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Nessun file estratto dall'archivio dei contenitori</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Impossibile copiare una directory in un percorso di file. Utilizzare una destinazione directory (con separatore finale).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Ispeziona un contenitore.</value>
@@ -2789,6 +2845,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Visualizza tutto indipendentemente dallo stato.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Modalità archivio (accettata per compatibilità con l'interfaccia della riga di comando di Docker)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Imposta variabili del tempo di build (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2855,6 +2915,24 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Valore {} non valido: '{}'. È supportato solo 'all'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Comando da eseguire per controllare l'integrità del container</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Intervallo di tempo tra l'esecuzione del controllo integrità (ad esempio 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Errori consecutivi necessari per segnalare il contenitore come non integro</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Periodo di avvio per inizializzare il contenitore prima del conto alla rovescia del controllo integrità (es. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Tempo massimo consentito per l'esecuzione di un controllo integrità (ad esempio 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Elimina le immagini anche se sono in uso</value>
   </data>
@@ -2911,6 +2989,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Non usare la cache durante la compilazione dell'immagine</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Disabilita qualsiasi di verifica dell'integrità specificata dal contenitore</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Non eliminare i genitori non etichettati</value>
@@ -3092,6 +3173,14 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Valore dell'argomento {} non valido: '{}'. È prevista una dimensione di memoria (ad esempio 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Valore argomento {} non valido: '{}'. È prevista una durata (ad esempio 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>L'opzione --no-healthcheck non può essere combinata con altre opzioni di controllo dell'integrità.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>Il file CID '{}' esiste già</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3182,6 +3271,18 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Eliminato: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Collega un contenitore a una rete</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Collega un contenitore a una rete esistente.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Disconnetti un contenitore da una rete.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Disconnette un contenitore da una rete esistente.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Gestisci volumi.</value>
