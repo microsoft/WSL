@@ -97,7 +97,12 @@ namespace {
             std::filesystem::remove_all(storagePath, error);
             if (error)
             {
-                Log::Error(std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), error.message()).c_str());
+                Log::Error(
+                    std::format(
+                        L"Failed to cleanup storage path {}: {}",
+                        storagePath.wstring(),
+                        wsl::shared::string::MultiByteToWide(error.message()))
+                        .c_str());
             }
         }
     }
@@ -367,8 +372,8 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         auto nameAndTag = wsl::shared::string::WideToMultiByte(image.NameAndTag());
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
-            auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
+            auto result = RunWslc(std::format(L"container remove --force {}", wsl::shared::string::MultiByteToWide(container.Id)));
+            result.Verify({.Stdout = std::format(L"{}\r\n", wsl::shared::string::MultiByteToWide(container.Id)), .Stderr = L"", .ExitCode = 0});
         }
     }
 }

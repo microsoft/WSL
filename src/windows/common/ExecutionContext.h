@@ -6,10 +6,22 @@
 
 namespace wsl::windows::common {
 
+// User-facing error/warning messages may be produced as wide strings (Localization on Windows)
+// or narrow strings (e.g. std::string from lower layers). Normalize to wide for reporting.
+inline std::wstring ToUserErrorMessage(std::wstring_view message)
+{
+    return std::wstring{message};
+}
+
+inline std::wstring ToUserErrorMessage(std::string_view message)
+{
+    return wsl::shared::string::MultiByteToWide(std::string{message});
+}
+
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
     do \
     { \
-        auto _messageWide = std::format(L"{}", Message); \
+        auto _messageWide = wsl::windows::common::ToUserErrorMessage(Message); \
         if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
         { \
             ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \
@@ -20,7 +32,7 @@ namespace wsl::windows::common {
 #define THROW_HR_WITH_USER_ERROR_MSG(Result, Message, Format, ...) \
     do \
     { \
-        auto _messageWide = std::format(L"{}", Message); \
+        auto _messageWide = wsl::windows::common::ToUserErrorMessage(Message); \
         if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
         { \
             ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \

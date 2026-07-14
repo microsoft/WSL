@@ -445,7 +445,7 @@ public:
 
             // Mount the share.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs '{}' '{}'", sourceDir.string(), mountPoint)), 0);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs '{}' '{}'", sourceDir.wstring(), mountPoint)), 0);
 
             // Validate that it can be accessed.
             {

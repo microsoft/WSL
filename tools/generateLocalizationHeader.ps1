@@ -108,7 +108,10 @@ function generateEntry
     {
         $ArgumentTypes = [string]::Join(', ', ((1..$ArgumentsCount) |% {"typename T$_"}))
         $ArgumentHeaders = [string]::Join(', ', ((1..$ArgumentsCount) |% {"const T$_& arg$_"}))
-        $Arguments = [string]::Join(', ', ((1..$ArgumentsCount) |% {"arg$_"}))
+        # Widen narrow arguments once into lifetime-extended locals so make_[w]format_args (which
+        # requires lvalues) can bind to them. LocalizationArg is identity on non-narrow types.
+        $LocalDecls = [string]::Join("`r`n            ", ((1..$ArgumentsCount) |% {"auto&& _formatArg$_ = ::wsl::shared::string::WideFormatArg(arg$_);"}))
+        $Arguments = [string]::Join(', ', ((1..$ArgumentsCount) |% {"_formatArg$_"}))
         return '
         /* Message: {4}*/
         
@@ -118,9 +121,10 @@ function generateEntry
             {5};
 
             auto message = LookupString(strings, options);
+            {6}
             return std::vformat(message, ARGS({3}));
         }}
-        ' -f $Name, $ArgumentTypes, $ArgumentHeaders, $Arguments, $Content.split("`n")[0], $map
+        ' -f $Name, $ArgumentTypes, $ArgumentHeaders, $Arguments, $Content.split("`n")[0], $map, $LocalDecls
 
     }
 }

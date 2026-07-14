@@ -164,7 +164,8 @@ uint16_t ConsommeNetworking::ModifyOpenPorts(
 
     const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
 
-    std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddressStr.c_str());
+    std::wstring portString =
+        std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, wsl::shared::string::MultiByteToWide(hostAddressStr));
 
     if (HostPort != WSLC_EPHEMERAL_PORT)
     {

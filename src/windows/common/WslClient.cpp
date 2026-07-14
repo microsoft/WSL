@@ -1293,13 +1293,22 @@ int Version()
     const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersionString();
     wsl::windows::common::wslutil::PrintMessage(
         Localization::MessagePackageVersions(
-            WSL_PACKAGE_VERSION, KERNEL_VERSION, WSLG_VERSION, MSRDC_VERSION, DIRECT3D_VERSION, DXCORE_VERSION, windowsVersion),
+            STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION),
+            STRING_TO_WIDE_STRING(KERNEL_VERSION),
+            STRING_TO_WIDE_STRING(WSLG_VERSION),
+            STRING_TO_WIDE_STRING(MSRDC_VERSION),
+            STRING_TO_WIDE_STRING(DIRECT3D_VERSION),
+            STRING_TO_WIDE_STRING(DXCORE_VERSION),
+            windowsVersion),
         stdout);
 
     if constexpr (!wsl::shared::OfficialBuild)
     {
         // Print additional information if running a debug build.
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageBuildInfo(_MSC_VER, COMMIT_HASH, __TIME__ " " __DATE__), stdout);
+        wsl::windows::common::wslutil::PrintMessage(
+            Localization::MessageBuildInfo(
+                _MSC_VER, STRING_TO_WIDE_STRING(COMMIT_HASH), STRING_TO_WIDE_STRING(__TIME__) L" " STRING_TO_WIDE_STRING(__DATE__)),
+            stdout);
     }
 
     return 0;

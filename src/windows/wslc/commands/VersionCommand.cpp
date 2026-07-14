@@ -29,7 +29,7 @@ std::wstring VersionCommand::LongDescription() const
 
 void VersionCommand::PrintVersion()
 {
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
+    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION)));
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const

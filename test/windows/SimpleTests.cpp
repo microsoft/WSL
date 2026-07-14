@@ -101,7 +101,9 @@ class SimpleTests
             CATCH_LOG()
         });
 
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_EXPORT_ARG, LXSS_DISTRO_NAME_TEST, tar.wstring()).c_str()), (DWORD)0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_EXPORT_ARG, STRING_TO_WIDE_STRING(LXSS_DISTRO_NAME_TEST), tar.wstring()).c_str()),
+            (DWORD)0);
         LxsstuLaunchWsl(std::format(L"{} {}", WSL_UNREGISTER_ARG, tempDistro).c_str());
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_IMPORT_ARG, tempDistro, vhdDir.wstring(), tar.wstring()).c_str(),

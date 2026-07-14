@@ -770,7 +770,7 @@ class UnitTests
             DistroFileChange groups(L"/etc/group", true);
             CommandLine = std::format(L"-- for i in $(seq 1 64); do groupadd group$i; usermod -a -G group$i {}; done", LXSST_TEST_USERNAME);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(CommandLine), (DWORD)0);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_USER_ARG_LONG, LXSST_TEST_USERNAME, "echo success")), (DWORD)0);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_USER_ARG_LONG, LXSST_TEST_USERNAME, L"echo success")), (DWORD)0);
         }
 
         //
@@ -962,14 +962,14 @@ class UnitTests
 
         {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --version");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", WSL_PACKAGE_VERSION));
+            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION)));
             VERIFY_ARE_EQUAL(err, L"");
         }
 
         {
             // Ensure the old version query command still works.
             const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --wsl-version");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", WSL_PACKAGE_VERSION));
+            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION)));
             VERIFY_ARE_EQUAL(err, L"");
         }
 
@@ -4636,7 +4636,7 @@ VERSION_ID="Invalid|Format"
 
                     VERIFY_ARE_EQUAL(
                         LxsstuLaunchWsl(
-                            std::format(L"--import {} \"{}\" {}", distroName, location, "distro-default-name-icon.tar")),
+                            std::format(L"--import {} \"{}\" {}", distroName, location, L"distro-default-name-icon.tar")),
                         0L);
 
                     auto [json, profile_path] = ValidateDistributionTerminalProfile(distroName, false);
@@ -6443,7 +6443,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_ARE_EQUAL(lines[1], L"# [network]");
             VERIFY_ARE_EQUAL(lines[2], L"# generateHosts = false");
             VERIFY_ARE_EQUAL(lines[3], L"127.0.0.1\tlocalhost");
-            VERIFY_ARE_EQUAL(lines[4], std::format(L"127.0.1.1\t{}.{}\t{}", hostname, domain, hostname));
+            VERIFY_ARE_EQUAL(
+                lines[4],
+                std::format(
+                    L"127.0.1.1\t{}.{}\t{}",
+                    wsl::shared::string::MultiByteToWide(hostname),
+                    wsl::shared::string::MultiByteToWide(domain),
+                    wsl::shared::string::MultiByteToWide(hostname)));
         }
     }
 
@@ -6809,7 +6815,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     WSL2_TEST_METHOD(CGroupv1)
     {
         auto expectedMount = [](const char* path, const wchar_t* expected) {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+            auto [out, _] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", wsl::shared::string::MultiByteToWide(path)));
 
             VERIFY_ARE_EQUAL(out, expected);
         };

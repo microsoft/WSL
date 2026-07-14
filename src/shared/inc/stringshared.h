@@ -16,6 +16,9 @@ Abstract:
 #include <set>
 #include <vector>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include <sstream>
 #include <fstream>
 #include <gsl/gsl>
@@ -659,6 +662,40 @@ inline std::wstring MultiByteToWide(const std::string& string)
     return MultiByteToWide(string.c_str());
 }
 
+//
+// Boundary helper used when narrow string arguments must be fed into a wide (wchar_t) std::format
+// context (e.g. the generated Localization::Message*() formatters, and Windows-only test helpers).
+//
+// Any narrow string argument (const char*, char[N], std::string, std::string_view) must be widened
+// first: C++20/23 explicitly disables formatter<char*, wchar_t> and friends ([format.formatter.spec]),
+// and libc++ 20+ ships them as deleted specializations. Converting here, at the single point where
+// arguments enter the wide format context, lets callers keep passing narrow strings without any
+// non-conformant formatter specialization and without per-call-site conversions. Non-string and
+// already-wide arguments are forwarded unchanged (and the widening branches are compiled out on
+// non-Windows builds, where the format context is already narrow).
+//
+template <typename T>
+inline decltype(auto) WideFormatArg([[maybe_unused]] T&& value)
+{
+#ifdef WIN32
+    using Decayed = std::decay_t<T>;
+    if constexpr (std::is_same_v<std::remove_cvref_t<T>, std::string> || std::is_same_v<std::remove_cvref_t<T>, std::string_view>)
+    {
+        return MultiByteToWide(std::string{value});
+    }
+    else if constexpr (std::is_same_v<Decayed, char*> || std::is_same_v<Decayed, const char*>)
+    {
+        return MultiByteToWide(value);
+    }
+    else
+    {
+        return std::forward<T>(value);
+    }
+#else
+    return std::forward<T>(value);
+#endif
+}
+
 inline std::string WideToMultiByte(const wchar_t* string)
 {
 
@@ -927,71 +964,12 @@ struct std::formatter<std::source_location, wchar_t>
     template <typename TCtx>
     auto format(const std::source_location& location, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), L"{}[{}:{}]", location.function_name(), location.file_name(), location.line());
-    }
-};
-
-template <>
-struct std::formatter<char*, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char* str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <>
-struct std::formatter<const char*, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char* str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <std::size_t N>
-struct std::formatter<char[N], wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char str[N], TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <class Traits, class Allocator>
-struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const std::basic_string<char, Traits, Allocator>& str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(
+            ctx.out(),
+            L"{}[{}:{}]",
+            wsl::shared::string::MultiByteToWide(location.function_name()),
+            wsl::shared::string::MultiByteToWide(location.file_name()),
+            location.line());
     }
 };
 

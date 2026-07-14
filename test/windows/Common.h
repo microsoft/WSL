@@ -679,7 +679,8 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
     {
         if (actualCounts[value] != count)
         {
-            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+            error += std::format(
+                L"Value '{}' expected {} times but was found {} times.\n", wsl::shared::string::WideFormatArg(value), count, actualCounts[value]);
         }
     }
 
@@ -687,7 +688,7 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
     {
         if (expectedCounts.find(value) == expectedCounts.end())
         {
-            error += std::format(L"Unexpected value found: '{}'", value);
+            error += std::format(L"Unexpected value found: '{}'", wsl::shared::string::WideFormatArg(value));
         }
     }
 
@@ -696,14 +697,14 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
         error += std::format(L"Expected ({} elements):\n", expected.size());
         for (const auto& e : expected)
         {
-            error += std::format(L"- {}\n", e);
+            error += std::format(L"- {}\n", wsl::shared::string::WideFormatArg(e));
         }
 
         error += std::format(L"Actual ({} elements):\n", actual.size());
 
         for (const auto& e : actual)
         {
-            error += std::format(L"- {}\n", e);
+            error += std::format(L"- {}\n", wsl::shared::string::WideFormatArg(e));
         }
 
         error += std::format(L"Called from: {}", source);

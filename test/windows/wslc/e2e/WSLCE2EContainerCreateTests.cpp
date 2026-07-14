@@ -91,7 +91,7 @@ class WSLCE2EContainerCreateTests
         auto session = OpenDefaultElevatedSession();
 
         auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 5000);
-        auto reference = std::format(L"{}/invalid-image:latest", registryAddress);
+        auto reference = std::format(L"{}/invalid-image:latest", wsl::shared::string::MultiByteToWide(registryAddress));
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
 
@@ -521,8 +521,12 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         const auto& prompt = ">";
-        auto result = RunWslc(std::format(
-            L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                L"container create -it -e PS1={} --name {} {} bash --norc",
+                wsl::shared::string::MultiByteToWide(prompt),
+                WslcContainerName,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 

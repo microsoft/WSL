@@ -53,7 +53,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            WriteTerminal(std::format(L"{}\n", status));
+            WriteTerminal(std::format(L"{}\n", wsl::shared::string::MultiByteToWide(status)));
             m_currentLine++;
             return S_OK;
         }
@@ -121,15 +121,19 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
             progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
         }
 
-        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
+        line = std::format(L"{}: {} [{}] {}", wsl::shared::string::MultiByteToWide(id), wsl::shared::string::MultiByteToWide(status), bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
+        line = std::format(
+            L"{}: {} {}",
+            wsl::shared::string::MultiByteToWide(id),
+            wsl::shared::string::MultiByteToWide(status),
+            wsl::shared::string::FormatBytes(current));
     }
     else
     {
-        line = std::format(L"{}: {}", id, status);
+        line = std::format(L"{}: {}", wsl::shared::string::MultiByteToWide(id), wsl::shared::string::MultiByteToWide(status));
     }
 
     // Use the visible window width (not the buffer width) to prevent wrapping.

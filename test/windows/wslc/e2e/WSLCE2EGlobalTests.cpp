@@ -575,7 +575,7 @@ class WSLCE2EGlobalTests
 private:
     std::wstring GetVersionMessage() const
     {
-        return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+        return std::format(L"wslc {}\r\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION));
     }
 };
 } // namespace WSLCE2ETests
