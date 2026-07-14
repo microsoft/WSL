@@ -27,6 +27,7 @@ struct VersionCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(const ArgMap& source) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 } // namespace wsl::windows::wslc
