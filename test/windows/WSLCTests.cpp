@@ -3763,19 +3763,28 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
-            // Capture the mount source and type, unmount, then remount without read-only.
+            // Aggregate virtio-fs children are bind-mounts of a subdirectory of the
+            // shared aggregate root, so the mount SOURCE is not a standalone
+            // virtio-fs source that can be remounted fresh. Instead, bind the share
+            // elsewhere and clear read-only on the bind to confirm the guest cannot
+            // regain write access: the read-only aggregate's backend rejects writes
+            // (EROFS) regardless of the guest's bind-mount flags. The findmnt check
+            // proves the bind really is read-write so the write failure can only come
+            // from host-side enforcement.
             ExpectCommandResult(
                 session.get(),
                 {"/bin/sh",
                  "-c",
-                 "src=$(findmnt -n -o SOURCE /win-path) && "
-                 "fstype=$(findmnt -n -o FSTYPE /win-path) && "
-                 "umount /win-path && "
-                 "mount -t $fstype $src /win-path"},
+                 "mkdir -p /win-path-rw && "
+                 "mount --bind /win-path /win-path-rw && "
+                 "mount -o remount,bind,rw /win-path-rw && "
+                 "findmnt -n -o VFS-OPTIONS /win-path-rw | grep -qE '(^|,)rw(,|$)'"},
                 0);
 
-            // Verify the folder is still not writeable.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+            // Verify the folder is still not writeable through the read-write bind.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path-rw/file.txt"}, 1);
+
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "umount /win-path-rw && rmdir /win-path-rw"}, 0);
 
             VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
             ExpectMount(session.get(), "/win-path", {});

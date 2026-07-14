@@ -59,11 +59,13 @@ Return Value:
 
 {
 
+    const char* ActualRoot;
     int Direction;
     const char* ExpectedSourceActual;
     struct libmnt_fs* FileSystem;
     char LocalPath[PATH_MAX];
     int MountId;
+    const char* NextSlash;
     int Result;
     struct stat Stat;
     struct libmnt_table* Table;
@@ -124,7 +126,22 @@ Return Value:
         strcat(LocalPath, "//deleted");
     }
 
-    LxtCheckStringEqual(LocalPath, mnt_fs_get_root(FileSystem));
+    //
+    // Aggregate virtiofs exposes each share as a child of a synthetic
+    // read-only root, so the mount root reported in mountinfo is prefixed with
+    // an opaque per-share component (for example "/<hash>"). Strip that leading
+    // component before comparing so the checks remain agnostic to the
+    // non-deterministic share name.
+    //
+
+    ActualRoot = mnt_fs_get_root(FileSystem);
+    if ((strcmp(ExpectedFsType, "virtiofs") == 0) && (strcmp(ActualRoot, LocalPath) != 0) && (ActualRoot[0] == '/'))
+    {
+        NextSlash = strchr(ActualRoot + 1, '/');
+        ActualRoot = (NextSlash != NULL) ? NextSlash : "/";
+    }
+
+    LxtCheckStringEqual(LocalPath, ActualRoot);
     LxtCheckStringEqual(ExpectedMountOptions, mnt_fs_get_vfs_options(FileSystem));
     if (ExpectedFsOptions != NULL)
     {

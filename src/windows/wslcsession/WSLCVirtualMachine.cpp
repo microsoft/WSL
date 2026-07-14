@@ -852,7 +852,7 @@ void WSLCVirtualMachine::Mount(LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR
     Mount(m_initChannel, Source, Target, Type, Options, Flags);
 }
 
-void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
+void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags, LPCSTR Subname)
 {
     static_assert(WSLCMountFlagsNone == WSLC_MOUNT::None);
     static_assert(WSLCMountFlagsReadOnly == WSLC_MOUNT::ReadOnly);
@@ -872,6 +872,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     optionalAdd(Target, message->DestinationIndex);
     optionalAdd(Type, message->TypeIndex);
     optionalAdd(Options, message->OptionsIndex);
+    optionalAdd(Subname, message->SubnameIndex);
     message->Flags = Flags;
 
     const auto& response = Channel.Transaction<WSLC_MOUNT>(message.Span());
@@ -882,6 +883,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
         TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
         TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
+        TraceLoggingValue(Subname == nullptr ? "<null>" : Subname, "Subname"),
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
@@ -1155,8 +1157,21 @@ try
     }
     else
     {
+        //
+        // Mount the share as a child of an aggregate virtio-fs device. The
+        // Source is the fixed aggregate tag selected by the share's access
+        // mode (read-only shares use a separate aggregate whose backend
+        // enforces read-only); the per-share entry is selected by Subname,
+        // derived from the same share GUID the host used (see
+        // GuidToHexString). ReadOnly is also applied here as the bind-mount
+        // option, but enforcement is host-side: the read-only aggregate's
+        // FUSE backend rejects writes regardless of the guest mount flags.
+        //
         std::string options = readOnly ? "ro" : "rw";
-        Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+        const auto& aggregateTag = readOnly ? c_wslcVirtioFsAggregateReadOnlyTag : c_wslcVirtioFsAggregateTag;
+        auto tag = shared::string::GuidToString<char>(aggregateTag, shared::string::None);
+        auto subname = shared::string::GuidToHexString<char>(shareGuid);
+        Mount(m_initChannel, tag.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags, subname.c_str());
     }
 
     deleteOnFailure.release();

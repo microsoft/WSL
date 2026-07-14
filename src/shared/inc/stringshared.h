@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #pragma once
+#include <algorithm>
 #include <set>
 #include <vector>
 #include <string>
@@ -489,6 +490,21 @@ inline std::basic_string<TChar> GuidToString(const GUID& guid, GuidToStringFlags
         std::transform(output.begin(), output.end(), output.begin(), toupper);
     }
 
+    return output;
+}
+
+//
+// Format a GUID as 32 lowercase hexadecimal characters (no braces or
+// dashes). Used to derive a virtio-fs aggregate subname that is safe to
+// use directly as a path component. Both host and guest format the same
+// GUID through this helper to agree on the subname without transmitting
+// it.
+//
+template <typename TChar>
+inline std::basic_string<TChar> GuidToHexString(const GUID& guid)
+{
+    auto output = GuidToString<TChar>(guid, GuidToStringFlags::None);
+    output.erase(std::remove(output.begin(), output.end(), static_cast<TChar>('-')), output.end());
     return output;
 }
 

@@ -20,9 +20,12 @@ Abstract:
 #include "drvfs.h"
 #include "config.h"
 #include "message.h"
+#include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <optional>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -44,19 +47,23 @@ int MountFilesystem(const char* FsType, const char* Source, const char* Target, 
 
 int MountWithRetry(const char* Source, const char* Target, const char* FsType, const char* Options, int* ExitCode = nullptr);
 
-void SaveVirtiofsTagMapping(const char* Tag, const char* Source)
+void SaveVirtiofsTagMapping(const char* Tag, const char* Subname, const char* Source)
 
 /*++
 
 Routine Description:
 
-    This routine creates a symlink in VIRTIOFS_TAG_DIR that maps a virtiofs tag
-    to its Windows mount source path. This allows QueryVirtiofsMountSource to
-    resolve tags without talking to the service.
+    This routine creates a symlink in VIRTIOFS_TAG_DIR that maps a virtiofs
+    (aggregate) tag and child subname to its Windows mount source path.
+    This allows QueryVirtiofsMountSource to resolve tags without talking to
+    the service.
 
 Arguments:
 
-    Tag - Supplies the virtiofs tag.
+    Tag - Supplies the virtiofs (aggregate) tag.
+
+    Subname - Supplies the child subname inside the aggregate's synthetic
+        root. Empty for legacy direct-mount shares.
 
     Source - Supplies the Windows path the tag refers to.
 
@@ -79,6 +86,23 @@ Return Value:
     }
 
     //
+    // Validate the subname (when provided) is 32 lowercase hex chars so
+    // we can use it as a path component without escaping concerns.
+    //
+
+    const bool hasSubname = Subname && *Subname != '\0';
+    if (hasSubname)
+    {
+        std::string_view sv{Subname};
+        if (sv.size() != 32 ||
+            !std::all_of(sv.begin(), sv.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }))
+        {
+            LOG_WARNING("Invalid virtiofs subname {}", Subname);
+            return;
+        }
+    }
+
+    //
     // Canonicalize path separators to backslashes before persisting.
     //
 
@@ -87,7 +111,21 @@ Return Value:
 
     UtilMkdirPath(VIRTIOFS_TAG_DIR, 0755);
 
-    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+    //
+    // For aggregate shares, the layout is VIRTIOFS_TAG_DIR/<Tag>/<Subname>;
+    // for legacy direct-mount shares, it stays VIRTIOFS_TAG_DIR/<Tag>.
+    //
+    std::string LinkPath;
+    if (hasSubname)
+    {
+        const auto TagDir = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+        UtilMkdirPath(TagDir.c_str(), 0755);
+        LinkPath = std::format("{}/{}", TagDir, Subname);
+    }
+    else
+    {
+        LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+    }
 
     //
     // Remove any existing symlink for this tag before creating a new one.
@@ -543,6 +581,181 @@ try
 }
 CATCH_RETURN_ERRNO()
 
+int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode);
+int RemountVirtioFs(const char* Tag, const char* Subname, const char* Target, const char* Options, bool Admin);
+
+namespace {
+
+//
+// Check whether the aggregate device for Tag is already mounted at
+// VIRTIOFS_AGGREGATE_ROOT_DIR/<Tag> by scanning /proc/self/mountinfo.
+//
+bool IsAggregateRootMounted(const char* Tag, const std::string& Target)
+{
+    try
+    {
+        mountutil::MountEnum MountEnum;
+        while (MountEnum.Next())
+        {
+            const auto& Entry = MountEnum.Current();
+            if (strcmp(Entry.FileSystemType, VIRTIO_FS_TYPE) == 0 && strcmp(Entry.Source, Tag) == 0 && Target == Entry.MountPoint)
+            {
+                return true;
+            }
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+    }
+
+    return false;
+}
+
+//
+// Ensure the aggregate virtiofs device for Tag is mounted at the
+// well-known root VIRTIOFS_AGGREGATE_ROOT_DIR/<Tag>. The synthetic-root
+// FUSE directory exposes one child entry per share registered against
+// this tag. Idempotent across processes via a /proc/self/mountinfo scan
+// instead of any in-memory state.
+//
+int EnsureAggregateRootMounted(const char* Tag)
+try
+{
+    //
+    // Validate the tag is a GUID; it becomes a path component.
+    //
+
+    const auto Guid = wsl::shared::string::ToGuid(Tag);
+    if (!Guid)
+    {
+        LOG_ERROR("Invalid virtiofs aggregate tag {}", Tag);
+        errno = EINVAL;
+        return -1;
+    }
+
+    UtilMkdirPath(VIRTIOFS_AGGREGATE_ROOT_DIR, 0755);
+    const auto Target = std::format("{}/{}", VIRTIOFS_AGGREGATE_ROOT_DIR, Tag);
+    UtilMkdirPath(Target.c_str(), 0755);
+
+    if (IsAggregateRootMounted(Tag, Target))
+    {
+        return 0;
+    }
+
+    if (MountWithRetry(Tag, Target.c_str(), VIRTIO_FS_TYPE, "") < 0)
+    {
+        //
+        // Another thread may have raced us to the mount; recheck before
+        // failing to keep mount idempotent.
+        //
+        if (IsAggregateRootMounted(Tag, Target))
+        {
+            return 0;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+} // namespace
+
+//
+// Bind-mount an aggregate child onto the user's requested target,
+// then apply MountOptions (if any) via a remount. Bounded retry around
+// the initial bind absorbs the brief lag between AddSharePath returning
+// on the host and the FUSE LOOKUP on the synthetic root resolving the
+// new child name.
+//
+int MountVirtioFsAggregateChild(const char* Tag, const char* Subname, const char* Target, const char* MountOptions)
+try
+{
+    if (EnsureAggregateRootMounted(Tag) < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Validate Subname is 32 lowercase hex chars before using it as a
+    // path component, to guard against path traversal from untrusted
+    // message input.
+    //
+
+    if (Subname == nullptr)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    std::string_view SubnameView{Subname};
+    if (SubnameView.size() != 32 || !std::all_of(SubnameView.begin(), SubnameView.end(), [](char c) {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+        }))
+    {
+        LOG_ERROR("Invalid virtiofs aggregate subname {}", Subname);
+        errno = EINVAL;
+        return -1;
+    }
+
+    const auto BindSource = std::format("{}/{}/{}", VIRTIOFS_AGGREGATE_ROOT_DIR, Tag, Subname);
+
+    //
+    // Ensure target exists; bind-mount the child.
+    //
+    if (UtilMkdirPath(Target, 0755) < 0)
+    {
+        return -1;
+    }
+
+    constexpr int c_maxAttempts = 5;
+    constexpr auto c_retryDelay = std::chrono::milliseconds{50};
+    int LastErrno = 0;
+    for (int attempt = 0; attempt < c_maxAttempts; ++attempt)
+    {
+        if (mount(BindSource.c_str(), Target, nullptr, MS_BIND, nullptr) == 0)
+        {
+            LastErrno = 0;
+            break;
+        }
+
+        LastErrno = errno;
+        if (LastErrno != ENOENT)
+        {
+            break;
+        }
+
+        std::this_thread::sleep_for(c_retryDelay);
+    }
+
+    if (LastErrno != 0)
+    {
+        errno = LastErrno;
+        LOG_ERROR("bind-mount {} -> {} failed {}", BindSource, Target, LastErrno);
+        return -1;
+    }
+
+    //
+    // Apply caller-supplied mount options via remount-bind, if any.
+    //
+    if (MountOptions != nullptr && *MountOptions != '\0')
+    {
+        auto Parsed = mountutil::MountParseFlags(MountOptions);
+        if (mount(nullptr, Target, nullptr, MS_REMOUNT | MS_BIND | Parsed.MountFlags, Parsed.StringOptions.c_str()) < 0)
+        {
+            const int RemountErrno = errno;
+            LOG_ERROR("remount-bind {} flags={:#x} options=\"{}\" failed {}", Target, Parsed.MountFlags, Parsed.StringOptions, RemountErrno);
+            umount2(Target, MNT_DETACH);
+            errno = RemountErrno;
+            return -1;
+        }
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
 int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
 
 /*++
@@ -621,12 +834,41 @@ try
     }
 
     //
-    // Perform the mount operation.
+    // Perform the mount operation. For aggregate shares the response
+    // carries a non-empty Subname identifying the child entry inside the
+    // device's synthetic root; bind-mount that child onto the user's
+    // requested target. Legacy direct-mount responses (empty Subname)
+    // still mount the tag directly.
     //
 
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
+
+    //
+    // SubnameOffset is an appended trailing field. Two guards are required:
+    //   1. The message must be large enough to contain it.
+    //   2. The decoded offset itself must land within the message payload.
+    // If either fails, treat as an empty Subname (legacy direct-mount). This
+    // protects new-init talking to an old service whose wire payload happens
+    // to be large enough to satisfy the SocketChannel sizeof(TMessage) check
+    // but whose SubnameOffset slot overlaps stale buffer bytes (garbage).
+    //
+
+    const char* Subname = "";
+    if (Response.Header.MessageSize >= offsetof(LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, SubnameOffset) + sizeof(unsigned int) &&
+        Response.SubnameOffset >= sizeof(LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE) && Response.SubnameOffset < Response.Header.MessageSize)
+    {
+        Subname = wsl::shared::string::FromSpan(ResponseSpan, Response.SubnameOffset);
+    }
+
+    if (Subname != nullptr && *Subname != '\0')
+    {
+        THROW_LAST_ERROR_IF(MountVirtioFsAggregateChild(Tag, Subname, Target, MountOptions.c_str()) < 0);
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
+    }
 
     //
     // Save the tag mapping.
@@ -634,13 +876,18 @@ try
     // N.B. Use the source path from the response since the service canonicalizes it.
     //
 
-    SaveVirtiofsTagMapping(Tag, ResponseSource);
+    SaveVirtiofsTagMapping(Tag, Subname, ResponseSource);
+
+    if (ExitCode)
+    {
+        *ExitCode = 0;
+    }
 
     return 0;
 }
 CATCH_RETURN_ERRNO()
 
-int RemountVirtioFs(const char* Tag, const char* Target, const char* Options, bool Admin)
+int RemountVirtioFs(const char* Tag, const char* Subname, const char* Target, const char* Options, bool Admin)
 
 /*++
 
@@ -651,7 +898,10 @@ Routine Description:
 
 Arguments:
 
-    Tag - Supplies the virtiofs tag to remount.
+    Tag - Supplies the (aggregate) virtiofs tag to remount.
+
+    Subname - Supplies the child subname inside the aggregate's synthetic
+        root, or an empty string for legacy direct-mount shares.
 
     Target - Supplies the mount target.
 
@@ -672,6 +922,7 @@ try
     wsl::shared::MessageWriter<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE> RemountShare(LxInitMessageRemountVirtioFsDevice);
     RemountShare->Admin = Admin;
     RemountShare.WriteString(RemountShare->TagOffset, Tag);
+    RemountShare.WriteString(RemountShare->SubnameOffset, Subname ? Subname : "");
 
     //
     // Connect to the host and send the remount request.
@@ -693,26 +944,44 @@ try
 
     auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+    const char* NewSubname = "";
+    if (Response.Header.MessageSize >= offsetof(LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, SubnameOffset) + sizeof(unsigned int) &&
+        Response.SubnameOffset >= sizeof(LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE) && Response.SubnameOffset < Response.Header.MessageSize)
+    {
+        NewSubname = wsl::shared::string::FromSpan(ResponseSpan, Response.SubnameOffset);
+    }
 
-    SaveVirtiofsTagMapping(NewTag, Source);
+    if (NewSubname != nullptr && *NewSubname != '\0')
+    {
+        THROW_LAST_ERROR_IF(MountVirtioFsAggregateChild(NewTag, NewSubname, Target, Options) < 0);
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+    }
+
+    SaveVirtiofsTagMapping(NewTag, NewSubname, Source);
 
     return 0;
 }
 CATCH_RETURN_ERRNO()
 
-std::string QueryVirtiofsMountSource(const char* Tag)
+std::string QueryVirtiofsMountSource(const char* Tag, const char* Subname)
 
 /*++
 
 Routine Description:
 
-    This routine takes a virtiofs tag and determines the Windows path it refers to
-    by reading the symlink created during mount.
+    This routine takes a virtiofs tag and (optional) child subname and
+    determines the Windows path it refers to by reading the symlink
+    created during mount.
 
 Arguments:
 
-    Tag - Supplies the virtiofs tag to query.
+    Tag - Supplies the virtiofs (aggregate) tag to query.
+
+    Subname - Supplies the child subname inside the aggregate's synthetic
+        root. Empty for legacy direct-mount shares.
 
 Return Value:
 
@@ -738,11 +1007,43 @@ try
     }
 
     //
-    // Read the symlink that maps this tag to its Windows source path.
+    // Read the symlink that maps this tag (and optional subname) to its
+    // Windows source path. Aggregate shares live nested under the tag
+    // directory; legacy shares are direct children of VIRTIOFS_TAG_DIR.
     //
 
-    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
-    return std::filesystem::read_symlink(LinkPath).string();
+    std::string LinkPath;
+    if (Subname != nullptr && *Subname != '\0')
+    {
+        std::string_view sv{Subname};
+        if (sv.size() != 32 ||
+            !std::all_of(sv.begin(), sv.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }))
+        {
+            return {};
+        }
+        LinkPath = std::format("{}/{}/{}", VIRTIOFS_TAG_DIR, Tag, Subname);
+    }
+    else
+    {
+        LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+    }
+
+    //
+    // Use the error-code overload to avoid throwing for the common case
+    // where this path is the aggregate device's root directory (which
+    // contains per-subname symlinks for its children, but is not itself
+    // a symlink). A legacy direct-mount share IS a symlink here, so the
+    // read succeeds; the aggregate device's raw root mount returns
+    // empty silently, letting the caller skip it.
+    //
+
+    std::error_code ec;
+    auto target = std::filesystem::read_symlink(LinkPath, ec);
+    if (ec)
+    {
+        return {};
+    }
+    return target.string();
 }
 catch (...)
 {
