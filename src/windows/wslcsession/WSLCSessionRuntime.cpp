@@ -113,9 +113,9 @@ bool WSLCSessionRuntime::HasVolumes() const noexcept
     return m_volumes.has_value();
 }
 
-wil::srwlock& WSLCSessionRuntime::Lock() noexcept
+wil::rwlock_release_exclusive_scope_exit WSLCSessionRuntime::TryLockExclusive() noexcept
 {
-    return m_lock;
+    return m_lock.try_lock_exclusive();
 }
 
 IdleState& WSLCSessionRuntime::Idle() noexcept
@@ -138,44 +138,39 @@ WSLCSessionRuntime::VmExitDisposition WSLCSessionRuntime::ExitDisposition() cons
     return m_vmExitDisposition.load();
 }
 
-std::atomic<WSLCSessionRuntime::VmState>& WSLCSessionRuntime::StateAtomic() noexcept
-{
-    return m_vmState;
-}
-
-std::atomic<WSLCSessionRuntime::VmExitDisposition>& WSLCSessionRuntime::ExitDispositionAtomic() noexcept
-{
-    return m_vmExitDisposition;
-}
-
-wil::unique_event& WSLCSessionRuntime::VmExitedEvent() noexcept
-{
-    return m_vmExitedEvent;
-}
-
 bool WSLCSessionRuntime::VmExited() const noexcept
 {
     return m_vmExited.load();
 }
 
-wil::unique_event& WSLCSessionRuntime::DockerdReadyEvent() noexcept
+void WSLCSessionRuntime::ResetDockerdReady() noexcept
 {
-    return m_dockerdReadyEvent;
+    m_dockerdReadyEvent.ResetEvent();
 }
 
-std::optional<ServiceRunningProcess>& WSLCSessionRuntime::ContainerdProcess()
+bool WSLCSessionRuntime::IsDockerdReady() const noexcept
 {
-    return m_containerdProcess;
+    return m_dockerdReadyEvent.is_signaled();
 }
 
-std::optional<ServiceRunningProcess>& WSLCSessionRuntime::DockerdProcess()
+void WSLCSessionRuntime::SignalDockerdReady() noexcept
 {
-    return m_dockerdProcess;
+    m_dockerdReadyEvent.SetEvent();
 }
 
-std::filesystem::path& WSLCSessionRuntime::SwapVhdPath() noexcept
+void WSLCSessionRuntime::SetContainerdProcess(ServiceRunningProcess&& process)
 {
-    return m_swapVhdPath;
+    m_containerdProcess = std::move(process);
+}
+
+void WSLCSessionRuntime::SetDockerdProcess(ServiceRunningProcess&& process)
+{
+    m_dockerdProcess = std::move(process);
+}
+
+void WSLCSessionRuntime::SetSwapVhdPath(std::filesystem::path path)
+{
+    m_swapVhdPath = std::move(path);
 }
 
 void WSLCSessionRuntime::SetStorageMounted(bool value) noexcept

@@ -349,10 +349,10 @@ private:
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_runtime.Lock() must be acquired before acquiring m_containersLock or m_networksLock.
-    // These locks protect m_containers without requiring an exclusive m_runtime.Lock().
+    // N.B. The runtime lock must be acquired before acquiring m_containersLock or m_networksLock.
+    // These locks protect m_containers without requiring an exclusive hold on the runtime lock.
     // This allows independent operations to proceed while container bookkeeping remains synchronized.
-    // WSLCVolumes has its own internal srwlock and does not require m_runtime.Lock().
+    // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
     std::mutex m_networksLock;

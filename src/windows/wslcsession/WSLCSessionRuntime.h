@@ -140,20 +140,19 @@ public:
     bool HasEvents() const noexcept;
     WSLCVolumes& Volumes();
     bool HasVolumes() const noexcept;
-    wil::srwlock& Lock() noexcept;
+    [[nodiscard]] wil::rwlock_release_exclusive_scope_exit TryLockExclusive() noexcept;
     IdleState& Idle() noexcept;
     std::shared_ptr<IdleState> IdleStateShared() const noexcept;
     VmState State() const noexcept;
     VmExitDisposition ExitDisposition() const noexcept;
-    std::atomic<VmState>& StateAtomic() noexcept;
-    std::atomic<VmExitDisposition>& ExitDispositionAtomic() noexcept;
-    wil::unique_event& VmExitedEvent() noexcept;
     bool VmExited() const noexcept;
-    wil::unique_event& DockerdReadyEvent() noexcept;
-    std::optional<ServiceRunningProcess>& ContainerdProcess();
-    std::optional<ServiceRunningProcess>& DockerdProcess();
+    void ResetDockerdReady() noexcept;
+    bool IsDockerdReady() const noexcept;
+    void SignalDockerdReady() noexcept;
+    void SetContainerdProcess(ServiceRunningProcess&& process);
+    void SetDockerdProcess(ServiceRunningProcess&& process);
 
-    std::filesystem::path& SwapVhdPath() noexcept;
+    void SetSwapVhdPath(std::filesystem::path path);
     void SetStorageMounted(bool value) noexcept;
 
     std::mutex& AllocatedPortsLock() noexcept;

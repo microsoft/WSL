@@ -445,7 +445,7 @@ try
 
         // Reset the readiness event before (re)starting dockerd so a stale signal from a prior
         // VM instance is not observed.
-        m_runtime.DockerdReadyEvent().ResetEvent();
+        m_runtime.ResetDockerdReady();
         StartDockerd();
 
         m_runtime.InitializeDockerRuntime(m_storageVhdPath.parent_path());
@@ -659,8 +659,8 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     {
         try
         {
-            auto& swapVhdPath = m_runtime.SwapVhdPath();
-            swapVhdPath = storagePath / "swap.vhdx";
+            std::filesystem::path swapVhdPath = storagePath / "swap.vhdx";
+            m_runtime.SetSwapVhdPath(swapVhdPath);
             DeleteFileW(swapVhdPath.c_str()); // Remove stale swap from prior run
             wsl::core::filesystem::CreateVhd(swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
 
@@ -703,7 +703,7 @@ CATCH_RETURN();
 
 void WSLCSession::OnDockerdExited()
 {
-    if (!m_sessionTerminatingEvent.is_signaled() && m_runtime.ExitDispositionAtomic().load() != WSLCSessionRuntime::VmExitDisposition::StopRequested)
+    if (!m_sessionTerminatingEvent.is_signaled() && m_runtime.ExitDisposition() != WSLCSessionRuntime::VmExitDisposition::StopRequested)
     {
         WSL_LOG("UnexpectedDockerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
     }
@@ -711,7 +711,7 @@ void WSLCSession::OnDockerdExited()
 
 void WSLCSession::OnContainerdExited()
 {
-    if (!m_sessionTerminatingEvent.is_signaled() && m_runtime.ExitDispositionAtomic().load() != WSLCSessionRuntime::VmExitDisposition::StopRequested)
+    if (!m_sessionTerminatingEvent.is_signaled() && m_runtime.ExitDisposition() != WSLCSessionRuntime::VmExitDisposition::StopRequested)
     {
         WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
     }
@@ -732,11 +732,11 @@ try
         TraceLoggingValue(entry.c_str(), "Content"),
         TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    if (!m_runtime.DockerdReadyEvent().is_signaled())
+    if (!m_runtime.IsDockerdReady())
     {
         if (entry.find(c_dockerdReadyLogLine) != std::string::npos)
         {
-            m_runtime.DockerdReadyEvent().SetEvent();
+            m_runtime.SignalDockerdReady();
         }
     }
 }
@@ -773,8 +773,7 @@ void WSLCSession::StartContainerd()
         args.emplace_back("debug");
     }
 
-    m_runtime.ContainerdProcess() =
-        StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
+    m_runtime.SetContainerdProcess(StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this)));
     WSL_LOG("ContainerdStarted");
 }
 
@@ -787,7 +786,7 @@ void WSLCSession::StartDockerd()
         args.emplace_back("--debug");
     }
 
-    m_runtime.DockerdProcess() = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
+    m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this)));
     WSL_LOG("DockerdStarted");
 }
 
@@ -2982,10 +2981,10 @@ bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::mi
 HRESULT WSLCSession::Terminate()
 try
 {
-    // Ensure only one Terminate() runs. This must be checked before taking m_runtime.Lock()
-    // because OnVmExited() is called from the IORelay thread — if an external Terminate()
-    // holds m_runtime.Lock() and calls m_runtime.Relay()->Stop(), the relay thread must not re-enter
-    // Terminate() and deadlock on m_runtime.Lock().
+    // Ensure only one Terminate() runs. This must be checked before taking the runtime's exclusive
+    // lock because OnVmExited() is called from the IORelay thread — if an external Terminate()
+    // holds that lock and calls m_runtime.Relay()->Stop(), the relay thread must not re-enter
+    // Terminate() and deadlock on it.
     if (m_terminating.exchange(true))
     {
         return S_OK;
@@ -3007,8 +3006,8 @@ try
         {
             std::lock_guard lock(m_userHandlesLock);
 
-            // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_runtime.Lock().
-            // This allows a session to be unblocked if a stuck operation is holding m_runtime.Lock().
+            // m_sessionTerminatingEvent is always valid, so it can be signalled without holding the runtime lock.
+            // This allows a session to be unblocked if a stuck operation is holding the runtime lock.
             // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
             if (!m_sessionTerminatingEvent.is_signaled())
             {
@@ -3028,7 +3027,7 @@ try
             CancelUserCOMCallbacks();
         }
 
-        sessionLock = m_runtime.Lock().try_lock_exclusive();
+        sessionLock = m_runtime.TryLockExclusive();
         retrying = true;
     }
 
