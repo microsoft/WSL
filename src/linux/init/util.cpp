@@ -3775,7 +3775,7 @@ struct MemoryReclaimState
     bool ReclaimedThisIdlePeriod = false;
     long long CacheAtLastDrop = 0;
 
-    long long FreeAtLastCompaction = 0;
+    std::optional<long long> FreeAtLastCompaction;
 };
 
 bool RequestCgroupReclaim(long long Bytes)
@@ -3937,12 +3937,16 @@ Routine Description:
     bool Compact = Reclaimed;
     if (Free >= 0)
     {
-        if (Free > State.FreeAtLastCompaction + c_compactFreeGrowthBytes)
+        if (!State.FreeAtLastCompaction.has_value())
+        {
+            State.FreeAtLastCompaction = Free;
+        }
+        else if (Free > *State.FreeAtLastCompaction + c_compactFreeGrowthBytes)
         {
             Compact = true;
         }
 
-        if (Free < State.FreeAtLastCompaction)
+        if (Free < *State.FreeAtLastCompaction)
         {
             State.FreeAtLastCompaction = Free;
         }
@@ -4046,20 +4050,16 @@ try
 
                 if (!State.HavePreviousSample)
                 {
+                    const long long Free = GetFreeMemoryBytes();
+                    if (Free < 0)
+                    {
+                        continue;
+                    }
+
                     State.PreviousBusy = Busy;
                     State.PreviousIdle = Idle;
                     State.HavePreviousSample = true;
-
-                    //
-                    // Seed the compaction baseline so the first tick measures free-memory growth from
-                    // startup rather than from zero (which would always trigger an initial compaction).
-                    //
-
-                    const long long Free = GetFreeMemoryBytes();
-                    if (Free >= 0)
-                    {
-                        State.FreeAtLastCompaction = Free;
-                    }
+                    State.FreeAtLastCompaction = Free;
 
                     continue;
                 }
