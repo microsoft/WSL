@@ -1200,7 +1200,7 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
-    <comment>{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. {Locked="[wsl2]"}{Locked="isolateDistroCgroup=false"}{Locked="Cgroup v1"}{Locked="cgroup v1"}Configuration keys and commands should not be translated.</comment>
+    <comment>{Locked="--shutdown"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. {Locked="[wsl2]"}{Locked="isolateDistroCgroup=false"}{Locked="Cgroup v1"}{Locked="cgroup v1"}Configuration keys and commands should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>
