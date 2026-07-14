@@ -218,6 +218,11 @@ private:
     std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     wil::unique_event m_vmExitedEvent;
+    // Lock-free mirror of "the current VM instance has exited": written under the runtime lock when a
+    // VM starts (false) or is observed dead during teardown (true), read without the lock by container
+    // teardown to skip VM-dependent cleanup. Avoids racing on m_vmExitedEvent, which is reset/replaced
+    // under the lock.
+    std::atomic<bool> m_vmExited{false};
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
 
     std::filesystem::path m_swapVhdPath;

@@ -155,7 +155,7 @@ wil::unique_event& WSLCSessionRuntime::VmExitedEvent() noexcept
 
 bool WSLCSessionRuntime::VmExited() const noexcept
 {
-    return m_vmExitedEvent && m_vmExitedEvent.is_signaled();
+    return m_vmExited.load();
 }
 
 wil::unique_event& WSLCSessionRuntime::DockerdReadyEvent() noexcept
@@ -365,6 +365,7 @@ void WSLCSessionRuntime::StartVmLockHeld()
     // Get an event from the service that is signaled when the VM exits.
     m_vmExitedEvent.reset();
     THROW_IF_FAILED(vm->GetTerminationEvent(&m_vmExitedEvent));
+    m_vmExited.store(false);
 
     if (m_hooks.BringUp)
     {
@@ -424,6 +425,15 @@ void WSLCSessionRuntime::StopVmLockHeld()
 
 void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
 {
+    // Latch whether the guest is already dead before running session-state cleanup so container
+    // teardown (ReleaseRuntimeResources) can skip VM-dependent calls, e.g. volume unmounts, on a VM
+    // that has exited. A graceful stop reaches here with the VM still alive (is_signaled() false), so
+    // its mounts are unmounted through the live VM; StartVmLockHeld clears this for the next instance.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+    {
+        m_vmExited.store(true);
+    }
+
     if (m_hooks.TearDownSessionState)
     {
         m_hooks.TearDownSessionState(CaptureTerminationReason);
