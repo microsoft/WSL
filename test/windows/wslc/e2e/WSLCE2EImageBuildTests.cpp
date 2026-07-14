@@ -24,32 +24,40 @@ class WSLCE2EImageBuildTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsLoaded(DebianTestImage());
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
-    TEST_METHOD_SETUP(MethodSetup)
-    {
-        DeleteAllBuiltImages();
-        return true;
-    }
+    // Each test owns and cleans up exactly the image(s) it builds via DeleteImageOnExit, so there is
+    // no per-method sweep. DeleteImagesWithRepositoryPrefix in the class setup/cleanup above is only a
+    // safety net for images left behind by a crashed run.
+    static constexpr auto c_builtImagePrefix = L"wslc-e2e-build-";
 
-    TEST_METHOD_CLEANUP(MethodCleanup)
+    // Returns an RAII guard that best-effort deletes the given image when it goes out of scope. It is
+    // deliberately non-throwing (no VERIFY) because it may run while the stack unwinds after a test
+    // failure; the class-level prune is the authoritative cleanup.
+    static auto DeleteImageOnExit(const TestImage& image)
     {
-        DeleteAllBuiltImages();
-        return true;
+        return wil::scope_exit([image]() {
+            try
+            {
+                RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
+            }
+            CATCH_LOG()
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_EmptyContextDirectory_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImage);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-empty-context";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -73,6 +81,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_BuildArgsFileAndMultipleTags_Success)
     {
+        auto imageCleanup1 = DeleteImageOnExit(BuiltImageTag1);
+        auto imageCleanup2 = DeleteImageOnExit(BuiltImageTag2);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-args-tags";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -124,6 +134,7 @@ class WSLCE2EImageBuildTests
     {
         SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
 
+        auto imageCleanup = DeleteImageOnExit(BuiltImagePull);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -148,6 +159,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageTarget);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-target";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -184,6 +196,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Label_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabel);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -219,6 +232,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_LabelOverridesDockerfile_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabelOverride);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label-override";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -249,11 +263,13 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
         BuildFromContextFile(L"Dockerfile", BuiltImageDockerfile);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_ContainerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageContainerfile);
         BuildFromContextFile(L"Containerfile", BuiltImageContainerfile);
     }
 
@@ -307,6 +323,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_NoCache_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageNoCache);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-no-cache";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -371,20 +388,6 @@ private:
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
         VERIFY_ARE_EQUAL(image.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
-    }
-
-    void DeleteAllBuiltImages()
-    {
-        EnsureImageIsDeleted(BuiltImage);
-        EnsureImageIsDeleted(BuiltImageTag1);
-        EnsureImageIsDeleted(BuiltImageTag2);
-        EnsureImageIsDeleted(BuiltImagePull);
-        EnsureImageIsDeleted(BuiltImageTarget);
-        EnsureImageIsDeleted(BuiltImageDockerfile);
-        EnsureImageIsDeleted(BuiltImageContainerfile);
-        EnsureImageIsDeleted(BuiltImageNoCache);
-        EnsureImageIsDeleted(BuiltImageLabel);
-        EnsureImageIsDeleted(BuiltImageLabelOverride);
     }
 };
 } // namespace WSLCE2ETests
