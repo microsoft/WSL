@@ -56,7 +56,7 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     case FormatType::Json:
     {
         nlohmann::json root;
-        root["Client"]["Version"] = std::wstring{WSL_PACKAGE_VERSION};
+        root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
         wsl::windows::common::wslutil::PrintMessage(MultiByteToWide(root.dump(c_jsonPrettyPrintIndent)));
         break;
     }
