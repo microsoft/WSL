@@ -3786,6 +3786,7 @@ struct MemoryReclaimState
 
     int IdleStreak = 0;
     bool ReclaimedThisIdlePeriod = false;
+    bool GradualReclaimActive = false;
     long long CacheAtLastDrop = 0;
 
     std::optional<long long> FreeAtLastCompaction;
@@ -3862,10 +3863,9 @@ Return Value:
 --*/
 
 {
-    (void)State;
-
     if (!IntervalIdle)
     {
+        State.GradualReclaimActive = false;
         return false;
     }
 
@@ -3876,10 +3876,18 @@ Return Value:
     }
 
     const long long Excess = Cache - c_floorBaseBytes;
-    if (Excess <= c_gradualHysteresisBytes)
+    if (Excess <= 0)
+    {
+        State.GradualReclaimActive = false;
+        return false;
+    }
+
+    if (!State.GradualReclaimActive && Excess <= c_gradualHysteresisBytes)
     {
         return false;
     }
+
+    State.GradualReclaimActive = true;
 
     // Cap each interval to a step so the cache bleeds down gradually instead of cliffing to the floor.
     const long long ToFree = (std::min)(Excess, c_gradualStepBytes);
@@ -4077,8 +4085,19 @@ try
                     continue;
                 }
 
+                const unsigned long long Total = Busy + Idle;
+                const unsigned long long PreviousTotal = State.PreviousBusy + State.PreviousIdle;
+                if (Busy < State.PreviousBusy || Idle < State.PreviousIdle || Total < Busy ||
+                    PreviousTotal < State.PreviousBusy || Total < PreviousTotal)
+                {
+                    LOG_WARNING("resetting memory reclaim CPU sample due to non-monotonic /proc/stat counters");
+                    State.PreviousBusy = Busy;
+                    State.PreviousIdle = Idle;
+                    continue;
+                }
+
                 const unsigned long long BusyDelta = Busy - State.PreviousBusy;
-                const unsigned long long TotalDelta = (Busy + Idle) - (State.PreviousBusy + State.PreviousIdle);
+                const unsigned long long TotalDelta = Total - PreviousTotal;
                 State.PreviousBusy = Busy;
                 State.PreviousIdle = Idle;
 
