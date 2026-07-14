@@ -595,9 +595,6 @@ private:
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
     }
-
-    // The pretty-printed JSON emitted by `version --format json`. Internal '\n' from the JSON
-    // serializer and the trailing newline are translated to '\r\n' by the text-mode stdout.
     std::wstring GetVersionJsonMessage() const
     {
         return std::format(L"{{\r\n  \"Client\": {{\r\n    \"Version\": \"{}\"\r\n  }}\r\n}}\r\n", WSL_PACKAGE_VERSION);
