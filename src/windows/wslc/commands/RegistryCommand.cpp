@@ -25,35 +25,39 @@ using namespace wsl::shared;
 
 namespace {
 
-auto MaskInput(wsl::windows::wslc::Reporter& reporter)
-{
-    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode = 0;
-
-    if ((input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode))
-    {
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT));
-        return wil::scope_exit(std::function<void()>([input, mode, &reporter] {
-            SetConsoleMode(input, mode);
-            // This runs from a scope_exit destructor (implicitly noexcept), possibly during
-            // exception unwinding, so swallow any output failure to avoid std::terminate.
-            try
-            {
-                reporter.Info(L"\n");
-            }
-            CATCH_LOG()
-        }));
-    }
-
-    return wil::scope_exit(std::function<void()>([] {}));
-}
-
 std::wstring Prompt(wsl::windows::wslc::Reporter& reporter, const std::wstring& label, bool maskInput)
 {
     // Write without a trailing newline so the cursor stays inline (matching Docker's behavior).
     reporter.Info(L"{}", label);
 
-    auto restoreConsole = maskInput ? MaskInput(reporter) : wil::scope_exit(std::function<void()>([] {}));
+    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD previousMode = 0;
+    const bool canMask = maskInput && (input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &previousMode);
+
+    // Armed before echo is disabled and built from a direct lambda (no allocation, can't throw) so a
+    // failure while masking still restores the console. Only acts once echo was actually disabled.
+    bool echoDisabled = false;
+    auto restoreConsole = wil::scope_exit([input, previousMode, &echoDisabled, &reporter]() {
+        if (!echoDisabled)
+        {
+            return;
+        }
+
+        SetConsoleMode(input, previousMode);
+        // Runs from a noexcept scope_exit destructor, possibly during unwinding, so swallow any
+        // output failure to avoid std::terminate.
+        try
+        {
+            reporter.Info(L"\n");
+        }
+        CATCH_LOG()
+    });
+
+    if (canMask)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, previousMode & ~ENABLE_ECHO_INPUT));
+        echoDisabled = true;
+    }
 
     std::wstring value;
     std::getline(std::wcin, value);

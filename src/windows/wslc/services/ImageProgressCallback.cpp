@@ -46,23 +46,25 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
+        // status is [unique] in the IDL, so it may be null; normalize before either path uses it.
+        status = (status != nullptr) ? status : "";
+
         // The in-place progress display needs cursor movement, so when output is redirected fall
         // back to a log stream: one line per new status, deduping the repeated byte-progress
         // callbacks that share a status text.
         if (!m_vtEnabled)
         {
-            const char* const statusText = (status != nullptr) ? status : "";
             if (id == nullptr || *id == '\0')
             {
-                m_reporter.Write(m_level, L"{}\n", statusText);
+                m_reporter.Write(m_level, L"{}\n", status);
             }
             else
             {
-                auto [it, inserted] = m_lastStatusById.try_emplace(id, statusText);
-                if (inserted || it->second != statusText)
+                auto [it, inserted] = m_lastStatusById.try_emplace(id, status);
+                if (inserted || it->second != status)
                 {
-                    it->second = statusText;
-                    m_reporter.Write(m_level, L"{}: {}\n", id, statusText);
+                    it->second = status;
+                    m_reporter.Write(m_level, L"{}: {}\n", id, status);
                 }
             }
 
@@ -104,6 +106,10 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
 std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth)
 {
+    // status/id are [unique] in the IDL and may be null; treat null as empty before formatting.
+    const char* const safeStatus = (status != nullptr) ? status : "";
+    const char* const safeId = (id != nullptr) ? id : "";
+
     std::wstring line;
     if (total != 0)
     {
@@ -137,15 +143,15 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
             progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
         }
 
-        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
+        line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
+        line = std::format(L"{}: {} {}", safeId, safeStatus, wsl::shared::string::FormatBytes(current));
     }
     else
     {
-        line = std::format(L"{}: {}", id, status);
+        line = std::format(L"{}: {}", safeId, safeStatus);
     }
 
     // Truncate to the console width to prevent wrapping that breaks cursor repositioning, then pad
