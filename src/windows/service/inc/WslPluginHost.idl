@@ -1,0 +1,245 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WslPluginHost.idl
+
+Abstract:
+
+    This file contains the COM interface definitions for out-of-process
+    plugin hosting. IWslPluginHost is implemented by the plugin host process
+    and called by the service. IWslPluginHostCallback is implemented by the
+    service and called by the plugin host when a plugin invokes API functions.
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+import "wslc.idl";
+
+cpp_quote("const GUID CLSID_WslPluginHost = {0x74c1b5a4, 0x055a, 0x44b5, {0xa9, 0x45, 0x0d, 0xa2, 0x02, 0x05, 0xe9, 0x4f}};")
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"74c1b5a4-055a-44b5-a945-0da20205e94f\") WslPluginHost;")
+cpp_quote("#endif")
+
+//
+// IWslPluginHostCallback - implemented by the service, called by the plugin host
+// when a plugin invokes WSLPluginAPIV1 functions (MountFolder, ExecuteBinary, etc.)
+//
+
+[
+    uuid(B09EEE6A-7EC9-4FEF-A4BD-1EA17BF4AD3D),
+    pointer_default(unique),
+    object
+]
+interface IWslPluginHostCallback : IUnknown
+{
+    HRESULT MountFolder(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR WindowsPath,
+        [in, string] LPCWSTR LinuxPath,
+        [in] BOOL ReadOnly,
+        [in, string] LPCWSTR Name);
+
+    HRESULT ExecuteBinary(
+        [in] DWORD SessionId,
+        [in, string] LPCSTR Path,
+        [in] DWORD ArgumentCount,
+        [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
+        [out, system_handle(sh_socket)] HANDLE* Socket);
+
+    HRESULT ExecuteBinaryInDistribution(
+        [in] DWORD SessionId,
+        [in] const GUID* DistributionId,
+        [in, string] LPCSTR Path,
+        [in] DWORD ArgumentCount,
+        [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
+        [out, system_handle(sh_socket)] HANDLE* Socket);
+
+    //
+    // WSLC plugin API. WslcCreateProcess returns a marshaled IWSLCProcess that
+    // the host wraps in an opaque WSLCProcessHandle for the plugin and calls
+    // directly (GetStdHandle/GetExitEvent/GetState), so there is no service-side
+    // process bookkeeping: lifetime is owned by the host via COM reference
+    // counting and the remote process is released when the host releases it (or
+    // when the host process exits).
+    //
+
+    HRESULT WslcMountFolder(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR WindowsPath,
+        [in, string] LPCSTR Mountpoint,
+        [in] BOOL ReadOnly);
+
+    HRESULT WslcUnmountFolder(
+        [in] DWORD SessionId,
+        [in, string] LPCSTR Mountpoint);
+
+    HRESULT WslcCreateProcess(
+        [in] DWORD SessionId,
+        [in, string] LPCSTR Executable,
+        [in] DWORD ArgumentCount,
+        [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
+        [in] DWORD EnvCount,
+        [in, unique, size_is(EnvCount), string] LPCSTR* Environment,
+        [out] IWSLCProcess** Process,
+        [out] int* Errno);
+};
+
+//
+// IWslPluginHost - implemented by the plugin host process, called by the service
+// to deliver lifecycle notifications to the plugin.
+//
+
+[
+    uuid(25BB890F-C873-409A-B799-08A9D98997FF),
+    pointer_default(unique),
+    object
+]
+interface IWslPluginHost : IUnknown
+{
+    //
+    // Initialize the plugin host: load the plugin DLL and call its entry point.
+    // The Callback interface is used by the plugin to call back into the service.
+    // JobObject is the service's job object; the host assigns itself to it before
+    // running any plugin code so that processes spawned by the plugin inherit the
+    // job and are terminated if the service exits unexpectedly.
+    //
+
+    HRESULT Initialize(
+        [in] IWslPluginHostCallback* Callback,
+        [in, system_handle(sh_job)] HANDLE JobObject,
+        [in, string] LPCWSTR PluginPath,
+        [in, string] LPCWSTR PluginName);
+
+    //
+    // Lifecycle hook dispatchers - mirror WSLPluginHooksV1.
+    // UserToken is duplicated into the host process by the service before calling.
+    // UserSid is serialized as a byte array.
+    //
+
+    HRESULT OnVMStarted(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] DWORD CustomConfigurationFlags,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnVMStopping(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData);
+
+    HRESULT OnDistributionStarted(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in] ULONGLONG PidNamespace,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in] DWORD InitPid,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnDistributionStopping(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in] ULONGLONG PidNamespace,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in] DWORD InitPid,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+
+    HRESULT OnDistributionRegistered(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+
+    HRESULT OnDistributionUnregistered(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+
+    //
+    // WSLC plugin hooks. Mirror WSLPluginHooksV1 WSLC entries.
+    // UserToken is duplicated into the host by COM's system_handle marshaling.
+    // UserSid is serialized as a byte array (same convention as WSL hooks).
+    //
+
+    HRESULT OnWslcSessionCreated(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnWslcSessionStopping(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData);
+
+    HRESULT OnWslcContainerStarted(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData,
+        [in, string] LPCSTR InspectJson,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnWslcContainerStopping(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData,
+        [in, string] LPCSTR ContainerId);
+
+    HRESULT OnWslcImageCreated(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData,
+        [in, string] LPCSTR InspectJson);
+
+    HRESULT OnWslcImageDeleted(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR DisplayName,
+        [in] DWORD ApplicationPid,
+        [in, unique, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, unique, size_is(SidSize)] BYTE* SidData,
+        [in, string] LPCSTR ImageId);
+};

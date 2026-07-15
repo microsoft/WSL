@@ -34,6 +34,17 @@ class PluginTests
     std::wstring pluginDll;
     std::optional<WslConfigChange> config;
 
+    // Returns true if the file does not exist, cannot be stat'd, or is zero
+    // bytes. Uses the non-throwing std::filesystem overloads so racy file
+    // deletion / access denials between the existence check and size query
+    // can't surface as exceptions out of test code.
+    static bool LogFileAbsentOrEmpty(const std::filesystem::path& path)
+    {
+        std::error_code ec;
+        const auto size = std::filesystem::file_size(path, ec);
+        return static_cast<bool>(ec) || size == 0;
+    }
+
     WSL_TEST_CLASS(PluginTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -151,6 +162,46 @@ class PluginTests
             {
                 LogInfo("Plugin log: %ls", fileContent.c_str());
                 std::wstring message = L"Line (" + actual + L") didn't match pattern: " + expected;
+                VERIFY_FAIL(message.c_str());
+            }
+        }
+    }
+
+    // Order-insensitive variant: every expected pattern must match exactly one
+    // log line, regardless of order. Used where lines are emitted from genuinely
+    // parallel notification threads (e.g. two WSLC sessions created at once), so
+    // their relative order in the log is nondeterministic.
+    void ValidateLogFileUnordered(LPCWSTR expected) const
+    {
+        StopWslService();
+
+        std::wifstream file(logFile);
+        auto fileContent = std::wstring{std::istreambuf_iterator<wchar_t>(file), {}};
+        LogInfo("Logfile: %ls", fileContent.c_str());
+
+        auto fileLines = wsl::shared::string::Split<wchar_t>(fileContent, '\n');
+        auto expectedLines = wsl::shared::string::Split<wchar_t>(expected, '\n');
+
+        VERIFY_ARE_EQUAL(expectedLines.size(), fileLines.size());
+
+        std::vector<bool> consumed(fileLines.size(), false);
+        for (const auto& expectedLine : expectedLines)
+        {
+            bool matched = false;
+            for (size_t i = 0; i < fileLines.size(); i++)
+            {
+                if (!consumed[i] && PathMatchSpec(fileLines[i].c_str(), expectedLine.c_str()))
+                {
+                    consumed[i] = true;
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched)
+            {
+                LogInfo("Plugin log: %ls", fileContent.c_str());
+                std::wstring message = L"Expected pattern not found in log: " + expectedLine;
                 VERIFY_FAIL(message.c_str());
             }
         }
@@ -340,11 +391,13 @@ class PluginTests
 
     WSL1_TEST_METHOD(SuccessWSL1)
     {
-        constexpr auto ExpectedOutput = LR"(Plugin loaded. TestMode=1)";
-
+        // Plugins are not loaded for WSL1-only sessions (no VM, no plugin hooks).
+        // Verify the plugin log file is absent/empty to assert no plugin code ran.
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(0);
-        ValidateLogFile(ExpectedOutput);
+
+        VERIFY_IS_TRUE(
+            LogFileAbsentOrEmpty(logFile), std::format(L"Expected plugin log file '{}' to be absent or empty for WSL1", logFile).c_str());
     }
 
     WSL2_TEST_METHOD(LoadFailureFatalWSL2)
@@ -363,13 +416,14 @@ class PluginTests
 
     WSL1_TEST_METHOD(LoadFailureNonFatalWSL1)
     {
-        constexpr auto ExpectedOutput =
-            LR"(Plugin loaded. TestMode=2
-            OnLoad: E_UNEXPECTED)";
-
+        // Plugins are not loaded for WSL1-only sessions, so a plugin that
+        // would fail to load on WSL2 has no effect on WSL1. Assert the plugin
+        // log file is absent/empty to confirm no plugin code ran.
         ConfigurePlugin(PluginTestType::FailToLoad);
         StartWsl(0);
-        ValidateLogFile(ExpectedOutput);
+
+        VERIFY_IS_TRUE(
+            LogFileAbsentOrEmpty(logFile), std::format(L"Expected plugin log file '{}' to be absent or empty for WSL1", logFile).c_str());
     }
 
     WSL2_TEST_METHOD(VmStartFailure)
@@ -598,6 +652,7 @@ class PluginTests
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
+
     static wil::com_ptr<IWSLCSessionManager> OpenWslcSessionManager()
     {
         wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -747,7 +802,8 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=19
             WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
-            OnWslcSessionCreated: ERROR_ACCESS_DENIED)";
+            OnWslcSessionCreated: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-rejected, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -776,6 +832,220 @@ class PluginTests
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // --- PR #40120 (out-of-process plugin host) coverage ---
+    //
+    // These tests validate the isolation and callback model:
+    //   * HostCrashIsFatal                — host process crash aborts the guarded operation (fatal).
+    //   * ConcurrentCallbacks             — many plugin threads issue API callbacks during a hook.
+    //   * AsyncApiCallFromWorker          — plugin API call from a worker thread OUTSIDE any hook.
+    //   * CallbacksDuringTerminationDoNotCrash — callbacks racing VM teardown fail gracefully, never crash.
+    //
+    // Callback model (PluginCallPump): a plugin API callback that arrives WHILE a
+    // notification hook is in flight is marshaled back onto the notifying thread
+    // (which holds the session's recursive m_instanceLock), reproducing in-process
+    // re-entrancy; a callback that arrives with no hook in flight runs directly on
+    // the RPC thread (taking m_instanceLock itself). There is no separate callback
+    // lock — m_instanceLock alone serializes callbacks against VM teardown.
+
+    WSL2_TEST_METHOD(HostCrashIsFatal)
+    {
+        // A plugin host process crash during a veto hook (OnVmStarted) is fatal:
+        // the guarded operation is aborted with a fatal plugin error rather than
+        // silently continuing (matching the pre-refactor behavior where an
+        // in-process plugin crash took down WSL). The exact HRESULT is whichever
+        // RPC/CO_E_* code COM surfaces for the dead host, so assert on the
+        // user-facing prefix rather than an exact error code.
+        ConfigurePlugin(PluginTestType::HostCrash);
+
+        constexpr auto fatalPrefix = L"A fatal error was returned by plugin 'TestPlugin'";
+
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+        VERIFY_IS_TRUE(
+            output.find(fatalPrefix) != std::wstring::npos, std::format(L"Expected a fatal plugin error, got: '{}'", output).c_str());
+
+        // The crash latches a fatal plugin error, so a subsequent operation also
+        // fails — the host is not re-activated for this service lifetime. Whether
+        // it fails fast via the latch (service still up) or re-crashes after the
+        // on-demand service idle-restarts and reloads the plugin, the user-facing
+        // result is the same fatal plugin error.
+        auto [output2, error2] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+        VERIFY_IS_TRUE(
+            output2.find(fatalPrefix) != std::wstring::npos,
+            std::format(L"Expected a fatal plugin error on the second attempt, got: '{}'", output2).c_str());
+
+        // Confirm the plugin actually ran up to the crash point.
+        StopWslService();
+
+        std::wifstream file(logFile);
+        const auto fileContent = std::wstring{std::istreambuf_iterator<wchar_t>(file), {}};
+        LogInfo("Logfile: %ls", fileContent.c_str());
+
+        VERIFY_IS_TRUE(
+            fileContent.find(L"Crashing host") != std::wstring::npos,
+            std::format(L"Expected the plugin to reach the crash point, log: '{}'", fileContent).c_str());
+    }
+
+    WSL2_TEST_METHOD(ConcurrentCallbacks)
+    {
+        // The hook spawns 4 threads behind two gates: the first ensures all
+        // workers are spawned, the second rendezvouses them at the callback
+        // boundary so maxConcurrent deterministically reaches 4 (proving the
+        // plugin issues 4 callbacks concurrently). Per-thread logging is
+        // intentionally suppressed; only the deterministic summary line is
+        // asserted. Lifecycle pre/post lines validate the hook itself ran
+        // to completion.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=23
+            VM created (settings->CustomConfigurationFlags=0)
+            Concurrent callbacks complete: success=4 failures=0 maxConcurrent=4
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+            VM Stopping)";
+
+        ConfigurePlugin(PluginTestType::ConcurrentApiCalls);
+        StartWsl(0);
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(AsyncApiCallFromWorker)
+    {
+        // The worker thread is created in OnDistroStarted, sleeps briefly to
+        // ensure it runs after the hook has returned, then calls
+        // ExecuteBinaryInDistribution. It's joined unconditionally in
+        // OnDistroStopping (which defers its own "Distribution Stopping" log
+        // until after the join), so the worker-output line is guaranteed to
+        // precede "Distribution Stopping" in the log.
+        //
+        // The wsl command sleeps for 1s so the distro is alive long enough
+        // for the post-hook worker call to land before shutdown.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=24
+            VM created (settings->CustomConfigurationFlags=0)
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Async worker output: hello-from-worker
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+            VM Stopping)";
+
+        ConfigurePlugin(PluginTestType::AsyncApiCall);
+
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"sh -c \"sleep 1; echo -n OK\"", 0);
+        VERIFY_ARE_EQUAL(output, L"OK");
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(CallbacksDuringTerminationDoNotCrash)
+    {
+        // Drain test: 4 workers loop ExecuteBinaryInDistribution (with /bin/true,
+        // sub-ms callback) while the distro is alive. They keep calling across
+        // OnDistroStopping and _VmTerminate. Because callbacks run under (or block
+        // on) the session's recursive m_instanceLock, _VmTerminate's m_utilityVm
+        // reset is naturally serialized against them: a racing callback either
+        // runs before the reset (valid VM) or after it (returns E_NOT_VALID_STATE).
+        // Either way the service must not crash. After OnVmStopping signals
+        // wind-down, workers run a bounded number of further iterations and exit
+        // (see Plugin.cpp), so termination is deterministic and no worker can
+        // revive against a later VM.
+        //
+        // The post-shutdown StartWsl below triggers a second OnDistroStarted that
+        // joins the finished workers, so this test needs no fixed sleep.
+        //
+        // Scope:
+        //   - Validates: callbacks racing teardown never crash; service survives.
+        //   - Does NOT validate: drain semantics when a callback is genuinely
+        //     stuck (e.g. service-side CreateLinuxProcess waiting on a hung
+        //     Linux init). That requires cancellation plumbing through
+        //     WslCoreInstance::CreateLinuxProcess and is tracked separately.
+        ConfigurePlugin(PluginTestType::CallbackDuringTermination);
+
+        // Use a 1s sleep so workers ramp up while the distro is alive.
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"sh -c \"sleep 1; echo -n OK\"", 0);
+        VERIFY_ARE_EQUAL(output, L"OK");
+
+        const DWORD pidBefore = GetWslServiceRunningPid();
+        VERIFY_IS_TRUE(pidBefore != 0);
+
+        // Trigger VM termination with workers still running.
+        WslShutdown();
+
+        // Subsequent WSL command must still succeed — service survived. Its
+        // OnDistroStarted also joins the wound-down workers.
+        StartWsl(0);
+
+        const DWORD pidAfter = GetWslServiceRunningPid();
+        VERIFY_ARE_EQUAL(pidBefore, pidAfter);
+    }
+
+    WSL2_TEST_METHOD(ParallelWslcWithCallbacks)
+    {
+        // Two WSLC sessions are created in parallel. Each hook spawns a worker
+        // thread that makes callbacks (WSLCCreateProcess) simultaneously. Proves:
+        //   1. Multiple plugin notification calls can run concurrently
+        //   2. Each gets its own PluginCallPump
+        //   3. Callbacks from different pumps can execute in parallel
+        //   4. Service handles concurrent callback routing correctly
+        //
+        // The test uses barriers so both sessions reach the callback boundary
+        // before proceeding, ensuring callbacks genuinely execute in parallel
+        // (maxConcurrent=2 proves this). The two sessions are notified on
+        // separate threads, so their per-session lifecycle log lines appear in
+        // nondeterministic order and are validated without regard to order.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=26
+            WSLC Session created, name=parallel-test-1, id=*, pid=*, token=set, sid=set
+            WSLC Session created, name=parallel-test-2, id=*, pid=*, token=set, sid=set
+            Parallel callbacks complete: success=2 maxConcurrent=2
+            WSLC Session stopping, name=parallel-test-1, id=*
+            WSLC Session stopping, name=parallel-test-2, id=*)";
+
+        ConfigurePlugin(PluginTestType::ParallelWslcWithCallbacks);
+
+        // Create both sessions in parallel to trigger concurrent OnWslcSessionCreated
+        std::thread t1([this] { CreateWslcSession(L"parallel-test-1"); });
+        std::thread t2([this] { CreateWslcSession(L"parallel-test-2"); });
+        t1.join();
+        t2.join();
+
+        // The two sessions are notified on separate threads, so their per-session
+        // "created"/"stopping" lines appear in nondeterministic order; validate
+        // membership rather than exact ordering.
+        ValidateLogFileUnordered(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcAsyncCallbackPostReturn)
+    {
+        // The plugin spawns a background thread in OnWslcSessionCreated, then
+        // RETURNS from the notification. The worker thread sleeps briefly (to
+        // ensure the pump is unregistered) and then calls WSLCCreateProcess.
+        // Proves:
+        //   1. InvokeOnWslPump correctly handles callbacks after pump stops
+        //   2. Direct lock acquisition path works (no pump registered)
+        //   3. Plugin can safely call back from any thread at any time
+        //
+        // The worker is joined in OnWslcSessionStopping, so the async output
+        // is guaranteed to appear before "Session stopping" in the log.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=27
+            WSLC Session created, name=async-callback-test, id=*, pid=*, token=set, sid=set
+            Async callback (post-notification): success
+            WSLC Session stopping, name=async-callback-test, id=*)";
+
+        ConfigurePlugin(PluginTestType::WslcAsyncCallbackPostReturn);
+
+        {
+            // Hold the session's strong reference: a non-persistent session is kept
+            // alive only by the caller's reference (the service holds a weak ref),
+            // so it must stay in scope until the worker has fired its post-return
+            // callback. The worker sleeps 200ms before calling back; releasing the
+            // session immediately would tear it down and the callback would race
+            // teardown, resolving to ERROR_NOT_FOUND instead of running.
+            auto session = CreateWslcSession(L"async-callback-test");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
 
         ValidateLogFile(ExpectedOutput);
     }
