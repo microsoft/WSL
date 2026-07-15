@@ -2926,6 +2926,56 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         ValidateOutput(L"dmesg | grep -iF \"failed to load module 'not-found'\" | wc -l", L"1\n", L"", 0);
     }
 
+    WSL2_TEST_METHOD(KernelArtifacts)
+    {
+        // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
+        // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
+        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
+        // /usr/lib/linux-tools/$(uname -r) with /usr/bin/perf symlinked to it.
+
+        // Headers: the build symlink and a representative uapi header are present.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
+
+        // Headers are usable: compile and run a tiny program that includes recent uapi headers. The
+        // identifiers below fail to compile if the headers are missing or too old (BPF_PROG_TYPE_NETFILTER
+        // added in 6.4, IORING_OP_FUTEX_WAKE added in 6.7). Their numeric values are not a stable API
+        // contract, so the program only checks that <linux/version.h> matches the running kernel.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                LR"BASH(bash -ec '
+                    d=$(mktemp -d)
+                    trap "rm -rf $d" EXIT
+                    cat > "$d/t.c" <<EOF
+#include <stdio.h>
+#include <linux/version.h>
+#include <linux/bpf.h>
+#include <linux/io_uring.h>
+int main(void){
+    (void)BPF_PROG_TYPE_NETFILTER;
+    (void)IORING_OP_FUTEX_WAKE;
+    printf("%u.%u.%u\n",
+        LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL, LINUX_VERSION_SUBLEVEL);
+    return 0;
+}
+EOF
+                    cc -isystem /lib/modules/$(uname -r)/build/include -o "$d/t" "$d/t.c"
+                    v=$("$d/t")
+                    case "$(uname -r)" in "$v"*) exit 0 ;; *) exit 8 ;; esac
+                ')BASH",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+
+        // perf: the versioned binary exists, /usr/bin/perf resolves to it, and it runs.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+    }
+
     WSL2_TEST_METHOD(CrashCollection)
     {
         const auto folder = std::filesystem::absolute(L"test-crash-dumps");

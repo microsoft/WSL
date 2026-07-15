@@ -1121,6 +1121,104 @@ Return Value:
     }
     CATCH_LOG()
 
+    try
+    {
+        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV);
+        if (tempMount)
+        {
+            const char* target = getenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+            if (target)
+            {
+                std::string targetPath{target};
+                unsetenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+
+                //
+                // MS_MOVE requires the destination to already exist, so create the target directory
+                // tree before moving the mount into place.
+                //
+
+                if (UtilMkdirPath(targetPath.c_str(), 0755) < 0)
+                {
+                    LOG_ERROR("UtilMkdirPath({}) failed {}", targetPath, errno);
+                }
+                else if (tempMount.MoveMount(targetPath.c_str()))
+                {
+                    constexpr std::string_view c_includeSuffix = "/include";
+                    if (targetPath.ends_with(c_includeSuffix))
+                    {
+                        const std::string headersRoot = targetPath.substr(0, targetPath.size() - c_includeSuffix.size());
+
+                        utsname unameBuffer{};
+                        THROW_LAST_ERROR_IF(uname(&unameBuffer) < 0);
+
+                        const std::string release{unameBuffer.release};
+                        const std::string modulesDir = std::format("/lib/modules/{}", release);
+                        if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
+                        {
+                            const std::string linkPath = modulesDir + "/build";
+                            if ((symlink(headersRoot.c_str(), linkPath.c_str()) < 0) && (errno != EEXIST))
+                            {
+                                LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
+                            }
+                        }
+                        else
+                        {
+                            LOG_ERROR("UtilMkdirPath({}) failed {}", modulesDir, errno);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    CATCH_LOG()
+
+    try
+    {
+        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_PERF_MOUNT_ENV);
+        if (tempMount)
+        {
+            const char* target = getenv(LX_WSL2_KERNEL_PERF_PATH_ENV);
+            if (target)
+            {
+                std::string targetPath{target};
+                unsetenv(LX_WSL2_KERNEL_PERF_PATH_ENV);
+
+                //
+                // MS_MOVE requires the destination to already exist, so create the target directory
+                // tree before moving the perf tooling into place.
+                //
+
+                if (UtilMkdirPath(targetPath.c_str(), 0755) < 0)
+                {
+                    LOG_ERROR("UtilMkdirPath({}) failed {}", targetPath, errno);
+                }
+                else if (tempMount.MoveMount(targetPath.c_str()))
+                {
+                    //
+                    // Expose perf on the default PATH via /usr/bin/perf, mirroring the Debian/Ubuntu
+                    // linux-tools layout.
+                    //
+
+                    const std::string perfBinary = targetPath + "/bin/perf";
+                    struct stat statBuffer{};
+                    if (stat(perfBinary.c_str(), &statBuffer) < 0)
+                    {
+                        LOG_WARNING("kernel modules VHD perf tooling has no perf binary at '{}'; /usr/bin/perf not created", perfBinary);
+                    }
+                    else if (UtilMkdirPath("/usr/bin", 0755) < 0)
+                    {
+                        LOG_ERROR("UtilMkdirPath(/usr/bin) failed {}", errno);
+                    }
+                    else if ((symlink(perfBinary.c_str(), "/usr/bin/perf") < 0) && (errno != EEXIST))
+                    {
+                        LOG_ERROR("symlink({}, /usr/bin/perf) failed {}", perfBinary, errno);
+                    }
+                }
+            }
+        }
+    }
+    CATCH_LOG()
+
     //
     // Change the permission of some devtmpfs devices to be more permissive.
     //
