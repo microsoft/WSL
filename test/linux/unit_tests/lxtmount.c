@@ -59,6 +59,7 @@ Return Value:
 
 {
 
+    const char* ActualRoot;
     int Direction;
     const char* ExpectedSourceActual;
     struct libmnt_fs* FileSystem;
@@ -66,6 +67,7 @@ Return Value:
     int MountId;
     int Result;
     struct stat Stat;
+    const char* SubPath;
     struct libmnt_table* Table;
 
     Table = NULL;
@@ -124,7 +126,24 @@ Return Value:
         strcat(LocalPath, "//deleted");
     }
 
-    LxtCheckStringEqual(LocalPath, mnt_fs_get_root(FileSystem));
+    //
+    // Aggregate virtio-fs exposes each Windows share as a named child of a
+    // single device, so a share mounted at <target> is a bind mount whose
+    // mountinfo root is "/<share-name>[<subpath>]" rather than the bare
+    // "<subpath>". The share name is a dynamically generated GUID, so strip the
+    // leading component before comparing against the expected root. Only strip
+    // when the root does not already match the expected value, so a virtio-fs
+    // mount whose root is already correct is left alone.
+    //
+
+    ActualRoot = mnt_fs_get_root(FileSystem);
+    if ((strcmp(ExpectedFsType, "virtiofs") == 0) && (strcmp(ActualRoot, LocalPath) != 0) && (ActualRoot[0] == '/'))
+    {
+        SubPath = strchr(ActualRoot + 1, '/');
+        ActualRoot = (SubPath != NULL) ? SubPath : "/";
+    }
+
+    LxtCheckStringEqual(LocalPath, ActualRoot);
     LxtCheckStringEqual(ExpectedMountOptions, mnt_fs_get_vfs_options(FileSystem));
     if (ExpectedFsOptions != NULL)
     {

@@ -2508,6 +2508,20 @@ int DrvFsTestInotifyEpoll(PLXT_ARGS Args)
         return 0;
     }
 
+    //
+    // FAT has no stable inode numbers, so the virtio-fs backend cannot
+    // deduplicate the guest inode across separate lookups (the FUSE entry
+    // timeout is zero). inotify_add_watch and the subsequent open() therefore
+    // observe different inodes, so the write's IN_MODIFY event is never
+    // delivered to the watch and epoll times out.
+    //
+
+    if ((g_LxtFsInfo.FsType == LxtFsTypeVirtioFs) && (DrvFsTestMode == DRVFS_FAT_TEST_MODE))
+    {
+        LxtLogInfo("This test is not supported on FAT over virtio-fs.");
+        return 0;
+    }
+
     return LxtFsInotifyEpollCommon(DRVFS_INOTIFY_TEST_BASE_DIR);
 }
 
