@@ -10,6 +10,7 @@ set(SOURCES
     PolicyTests.cpp
     InstallerTests.cpp
     WSLCTests.cpp
+    SlowOperationWatcherUnitTests.cpp
     WslcSdkTests.cpp
     WslcSdkWinRtTests.cpp
     WindowsUpdateTests.cpp)

@@ -8,14 +8,36 @@ Module Name:
 
 Abstract:
 
-    RAII guard that watches a scoped operation. A threadpool timer is armed in the
-    constructor for `SlowThreshold` (10 s default). On the fast path (scope exits
-    before the threshold) the watcher's destructor cancels and drains the timer and
-    nothing is emitted. If the threshold is reached first -- including while the
-    scope is still running or hung indefinitely -- the timer callback fires once,
-    emitting a single `SlowOperation` telemetry event carrying the phase name and
-    the call site captured via std::source_location, so the backend can attribute
-    where time is spent.
+    RAII guard that times a scoped operation and emits **at most one** `SlowOperation`
+    telemetry event. There are exactly three outcomes:
+
+      1. The operation finishes in under `SlowThreshold` (10 s default) -- the common,
+         healthy case. Nothing is emitted.
+      2. The operation finishes but took at least `SlowThreshold`. On the watched operation's
+         end -- the destructor, or the earlier Reset() call site -- one `timedOut=false` event
+         is emitted carrying the real `elapsedMs` measured from construction to that point (the
+         full scope lifetime for the destructor case; up to the Reset() call when Reset() is
+         used to disarm early). Note this says nothing about whether the operation *succeeded*:
+         a scope that exits by throwing is still reported here (the watcher is a pure duration
+         timer and has no visibility into the operation's result).
+      3. The operation is still running after `MaxDuration` (15 min default) -- i.e. it is
+         hung or pathologically slow. A single-shot timer fires once at `MaxDuration` and
+         emits one `timedOut=true` event with `elapsedMs ~= MaxDuration`, then stops.
+         This is the backstop for an operation that never returns (e.g. an HCS wait that
+         blocks INFINITE, where the destructor never runs). It never repeats, and once it
+         has fired the later scope exit does not emit a second event. This backstop is
+         best-effort: if the threadpool timer cannot be created at construction, it is
+         silently skipped (the watcher never affects the watched operation), so a hang
+         may go unreported in that rare case. MaxDuration is the time a hang stays silent,
+         so the default sits well above the longest legitimate operation timeout (the
+         service's hard timeouts are on the order of minutes) to avoid misreporting a
+         slow-but-valid operation, while still surfacing a true hang.
+
+    So `SlowThreshold` is the "slow enough to be worth reporting" filter applied at
+    completion, and `MaxDuration` is the "give up waiting and report the hang" deadline.
+    Every event carries the phase name and the call site (std::source_location). The
+    watcher is a passive observer: it never affects the operation it measures, and a
+    failure in the telemetry path can never crash or slow the watched code.
 
     Usage:
 
@@ -37,31 +59,68 @@ Abstract:
 
 #include <windows.h>
 #include <wil/resource.h>
+#include <atomic>
 #include <chrono>
 #include <source_location>
 
 class SlowOperationWatcher
 {
 public:
-    // Name is restricted to a string-literal reference (const char (&)[N]) to guarantee
-    // static storage duration: the raw pointer is dereferenced later from a threadpool
-    // callback, so accepting a `const char*` would make UAF via a temporary (e.g.
-    // std::string::c_str()) easy. Keep Name a short CamelCase phase identifier that the
-    // backend query can switch on (e.g. "WaitForMiniInitConnect").
+    // Alias for the millisecond durations used throughout the class (threshold, max, elapsed).
+    using Duration = std::chrono::milliseconds;
+
+    // Contents of one SlowOperation telemetry record. Exposed so tests can observe
+    // emissions through a custom sink without standing up an ETW listener.
+    struct Event
+    {
+        const char* Name;   // phase identifier; must outlive the watcher
+        Duration Threshold; // configured slow threshold
+        Duration Elapsed;   // real time since construction
+        bool TimedOut;      // false: the scope finished (slow); Elapsed is the total.
+                            // true:  still running at MaxDuration (hang backstop).
+                            // NOT a success/failure flag -- the watcher cannot know
+                            // the operation's result; a throwing scope is TimedOut=false.
+        // By value, not a reference: a diagnostic sink may copy the Event and read it after
+        // the watcher is destroyed, which would dangle a reference. std::source_location is
+        // cheap to copy, so keep Event self-contained.
+        std::source_location Location;
+    };
+
+    // Receives the (at most one) SlowOperation record. Must be noexcept and must not block:
+    // it is invoked either from the MaxDuration threadpool callback (timedOut=true) or from
+    // Reset()/the destructor (timedOut=false). The default writes the telemetry event.
+    using Sink = void (*)(const Event&) noexcept;
+
+    // Name is taken as a char-array reference (const char (&)[N]) rather than a const char*
+    // to force callers to pass an array and block the easy UAF of a temporary's pointer
+    // (e.g. std::string::c_str()): the raw pointer is dereferenced later from a threadpool
+    // callback, so the pointed-to storage must outlive the watcher and any pending callback.
+    // The array type does not by itself guarantee static storage -- a non-static array would
+    // also compile -- so in practice always pass a string literal. Keep Name a short CamelCase
+    // phase identifier that the backend query can switch on (e.g. "WaitForMiniInitConnect").
+    // SlowThreshold is the "slow enough to report at completion" filter; MaxDuration is the
+    // "report the hang and stop" deadline. OnSlow defaults to the telemetry emitter; tests
+    // inject a recording sink.
     template <size_t N>
     explicit SlowOperationWatcher(
         const char (&Name)[N],
-        std::chrono::milliseconds SlowThreshold = std::chrono::seconds{10},
-        std::source_location Location = std::source_location::current()) :
-        SlowOperationWatcher(static_cast<const char*>(Name), SlowThreshold, Location)
+        Duration SlowThreshold = std::chrono::seconds{10},
+        Duration MaxDuration = std::chrono::minutes{15},
+        Sink OnSlow = &EmitTelemetry,
+        std::source_location Location = std::source_location::current()) noexcept :
+        SlowOperationWatcher(static_cast<const char*>(Name), SlowThreshold, MaxDuration, OnSlow, Location)
     {
     }
 
-    ~SlowOperationWatcher() noexcept = default;
+    // On destruction, emits the timedOut=false record if the operation was slow (>= threshold)
+    // and the hang backstop hasn't already reported.
+    ~SlowOperationWatcher() noexcept;
 
-    // Disarm the watcher early. After Reset() returns, the threshold callback is
-    // guaranteed not to fire. Relies on wil::unique_threadpool_timer's destroyer to
-    // cancel pending callbacks and drain any in-flight one.
+    // Disarm the watcher early (equivalent to the destructor, but at an explicit point). Cancels
+    // and drains the MaxDuration timer, then -- if the operation took at least SlowThreshold and
+    // the hang backstop hasn't already fired -- emits one timedOut=false record with the real
+    // elapsed time. The fast path (under threshold) stays silent. Emits at most once across
+    // Reset() + the destructor.
     void Reset() noexcept;
 
     SlowOperationWatcher(const SlowOperationWatcher&) = delete;
@@ -70,12 +129,33 @@ public:
     SlowOperationWatcher& operator=(SlowOperationWatcher&&) = delete;
 
 private:
-    explicit SlowOperationWatcher(_In_z_ const char* Name, std::chrono::milliseconds SlowThreshold, std::source_location Location);
+    // clang-format off
+    explicit SlowOperationWatcher(
+        _In_z_ const char* Name,
+        Duration SlowThreshold,
+        Duration MaxDuration,
+        Sink OnSlow,
+        std::source_location Location) noexcept;
+    // clang-format on
 
     static void CALLBACK OnTimerFired(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_TIMER) noexcept;
 
+    // Default sink: writes the SlowOperation telemetry event.
+    static void EmitTelemetry(const Event& Record) noexcept;
+
+    Duration Elapsed() const noexcept;
+    void Emit(bool TimedOut, Duration Elapsed) noexcept;
+
+    // Cancel + drain the timer, then emit the timedOut=false record if the operation was slow
+    // and the hang backstop hasn't already reported.
+    void Finish() noexcept;
+
     const char* const m_name;
-    const std::chrono::milliseconds m_slowThreshold;
+    const Duration m_slowThreshold;
+    const Duration m_maxDuration;
     const std::source_location m_location;
+    const std::chrono::steady_clock::time_point m_start;
+    const Sink m_sink;
+    std::atomic<bool> m_reported; // set once the single event has been emitted (by either path)
     wil::unique_threadpool_timer m_timer;
 };
