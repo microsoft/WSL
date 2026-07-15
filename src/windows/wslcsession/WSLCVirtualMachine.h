@@ -160,6 +160,8 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    void RemoveDirectory(_In_ const std::string& Path);
+    std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
@@ -195,11 +197,11 @@ private:
     void ConfigureNetworking();
 
     // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
-    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
-    // can include the swiotlb token. Called after the root filesystem is mounted.
+    // reserved at boot) and forwards them to the service before virtio devices are created.
+    // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
-    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags, _In_opt_ LPCSTR Subname = nullptr);
+    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcessImpl(

@@ -1070,6 +1070,21 @@ Return Value:
     LxtCheckEqual(Stat.st_size, 11, "%lld");
 
     //
+    // Verify ftruncate succeeds on a descriptor opened with O_APPEND | O_WRONLY.
+    // Regression test for a virtiofs bug where ftruncate returned EACCES on an
+    // append-mode descriptor (GitHub issue #40987).
+    //
+
+    LxtCheckErrno(Fd = open(DRVFS_BASIC_PREFIX "/test", O_WRONLY | O_APPEND, 0666));
+    LxtCheckErrno(Size = write(Fd, "hello", 5));
+    LxtCheckEqual(Size, 5, "%ld");
+    LxtCheckErrnoZeroSuccess(ftruncate(Fd, 0));
+    LxtCheckErrnoZeroSuccess(ftruncate(Fd, 1));
+    LxtCheckClose(Fd);
+    LxtCheckErrnoZeroSuccess(stat(DRVFS_BASIC_PREFIX "/test", &Stat));
+    LxtCheckEqual(Stat.st_size, 1, "%lld");
+
+    //
     // Creating/removing items relative to the current working directory.
     //
 
@@ -1724,14 +1739,11 @@ Return Value:
     // "remembers" the first case used after the file is closed because the
     // directory entries are cached.
     //
-    // N.B. This is not the case with Plan 9 or virtiofs because Linux doesn't
-    //      know the file system is case-insensitive. The fuse/virtiofs guest
-    //      driver has no case-insensitive dentry operations, so opening "FOO"
-    //      creates a distinct "FOO" dentry rather than reusing the cached
-    //      "foo" one, and /proc/self/fd reports the as-opened case.
+    // N.B. This is not the case with Plan 9 because Linux doesn't know the
+    //      file system is case-insensitive.
     //
 
-    if (g_LxtFsInfo.FsType != LxtFsTypePlan9 && g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
+    if (g_LxtFsInfo.FsType != LxtFsTypePlan9)
     {
         LxtCheckErrno(Fd = open(DRVFS_CASE_INSENSITIVE_TEST_DIR "/foo", O_RDONLY));
         LxtCheckErrno(Fd2 = open(DRVFS_CASE_INSENSITIVE_TEST_DIR "/FOO", O_RDONLY));
@@ -1742,14 +1754,10 @@ Return Value:
     //
     // Listing the directory shows the file with the correct case.
     //
-    // N.B. As remarked above, for SMB over Plan 9 or virtiofs the case will
-    //      have changed, because Linux doesn't know the file system is
-    //      case-insensitive and NTFS lets you change the case on rename. (FAT
-    //      over virtiofs keeps the original case because a case-only rename is
-    //      a no-op on FAT at the NT level.)
+    // N.B. As remarked above, for SMB on Plan 9, the case will have changed.
     //
 
-    if (((g_LxtFsInfo.FsType == LxtFsTypePlan9) || (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)) && (DrvFsTestMode == DRVFS_SMB_TEST_MODE))
+    if ((g_LxtFsInfo.FsType == LxtFsTypePlan9) && (DrvFsTestMode == DRVFS_SMB_TEST_MODE))
     {
 
         LxtCheckResult(LxtCheckDirectoryContentsEx(DRVFS_CASE_INSENSITIVE_TEST_DIR, ChildrenPlan9Smb, LXT_COUNT_OF(Children), 0));
@@ -1799,13 +1807,11 @@ Return Value:
     int Result;
 
     //
-    // This test does not apply to VM mode because the "drvfs" filesystem type
-    // is not registered in the guest kernel (drvfs mounts are set up by the WSL
-    // mount helper over Plan 9 or virtiofs), so a raw mount() syscall fails with
-    // ENODEV. Plan 9 additionally doesn't support junction point symlinks.
+    // This test does not apply to VM mode because Plan 9 doesn't support
+    // junction point symlinks.
     //
 
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9 || g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
+    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
     {
         LxtLogInfo("This test is not relevant in VM mode.");
         Result = 0;

@@ -924,22 +924,14 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Root);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, MountEnum.Current().Root);
             if (MountSource.empty())
             {
                 continue;
             }
 
             MountEnum.Current().Source = MountSource.data();
-
-            //
-            // For aggregate virtio-fs the mountinfo "root" is the synthetic
-            // share name, and QueryVirtiofsMountSource already resolved it to
-            // the full Windows source. Unlike a regular bind mount, the root is
-            // not a subpath of the source, so it must not be appended below.
-            //
-
-            IsAggregateVirtioFs = true;
+            IsAggregateVirtioFs = strcmp(MountEnum.Current().Root, "/") != 0;
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {

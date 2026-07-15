@@ -60,7 +60,7 @@ SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
 // vmmem-XXX process name visible in Task Manager and parsed by various tooling).
 std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
 {
-    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::wstring sanitized{name};
     for (auto& c : sanitized)
     {
@@ -81,7 +81,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Store the user token.
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
-    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 
     std::lock_guard lock(m_lock);
@@ -155,8 +154,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 #endif
 
-    // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
-    // command line, virtiofs shares, and the Consomme virtio-net adapter.
+    // Compute a swiotlb size that fits this VM's RAM for the kernel command line.
     // Only needed when a virtio device that requires bounce buffers will be attached.
     ULONG64 swiotlbSizeBytes = 0;
     if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
@@ -166,8 +164,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
-    kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
-    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes);
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes, Settings->CpuCount);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -259,7 +256,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Setup boot VHDs
     hcs::Scsi scsiController{};
-    auto attachScsiDisk = [&](PCWSTR path) {
+    auto attachScsiDisk = [&](PCWSTR path, bool grantUserAccess) {
         const ULONG lun = AllocateLun();
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
@@ -269,12 +266,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         disk.AlwaysAllowSparseFiles = true;
         disk.SupportEncryptedFiles = true;
         scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+
         DiskInfo diskInfo{path};
+
+        if (grantUserAccess)
+        {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
+            hcs::GrantVmAccess(m_vmIdString.c_str(), path);
+            diskInfo.AccessGranted = true;
+        }
+
         m_attachedDisks.emplace(lun, std::move(diskInfo));
     };
 
-    attachScsiDisk(rootVhdPath.c_str());
-    attachScsiDisk(kernelModulesPath.c_str());
+    attachScsiDisk(rootVhdPath.c_str(), Settings->RootVhdOverride != nullptr);
+    attachScsiDisk(kernelModulesPath.c_str(), false);
 
     vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
@@ -495,7 +501,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
     else
     {
@@ -612,64 +618,9 @@ try
     }
     else
     {
-        //
-        // Share Windows folders through aggregate virtio-fs devices instead of
-        // one PCI device per share. Each share becomes a child of an aggregate's
-        // synthetic root, addressed by a subname derived from the share GUID.
-        // The aggregate tags are the fixed compile-time constants
-        // c_wslcVirtioFsAggregateTag (read-write) and
-        // c_wslcVirtioFsAggregateReadOnlyTag (read-only), so the guest agrees on
-        // the device name without AddShare needing a return channel.
-        //
-        // ReadOnly is enforced host-side: read-only shares go in a separate
-        // read-only aggregate whose virtio-fs backend rejects writes (EROFS)
-        // regardless of the guest's mount options. The device host requires all
-        // children of one aggregate to share the same readonly setting, so the
-        // per-root "ro" option matches the device-level "ro".
-        //
-        const auto subname = wsl::shared::string::GuidToString<wchar_t>(shareIdLocal, wsl::shared::string::None);
+        std::wstring options = ReadOnly ? L"ro" : L"";
 
-        const auto& aggregateTag = ReadOnly ? c_wslcVirtioFsAggregateReadOnlyTag : c_wslcVirtioFsAggregateTag;
-        const auto tag = wsl::shared::string::GuidToString<wchar_t>(aggregateTag, wsl::shared::string::None);
-
-        // Per-root option: mark the child read-only so it matches the aggregate.
-        std::wstring rootOptions = ReadOnly ? L"ro" : L"";
-
-        // Device-level options: the readonly marker (for read-only aggregates)
-        // plus the swiotlb/vcpu control configs.
-        std::wstring deviceOptions = ReadOnly ? L"ro" : L"";
-        auto appendOption = [&deviceOptions](const std::wstring& option) {
-            if (option.empty())
-            {
-                return;
-            }
-
-            if (!deviceOptions.empty())
-            {
-                deviceOptions += L";";
-            }
-
-            deviceOptions += option;
-        };
-
-        appendOption(m_swiotlbOption);
-        appendOption(c_vcpusOption);
-
-        m_guestDeviceManager->AddVirtioFsAggregateShareWithTag(
-            VIRTIO_FS_DEVICE_ID,
-            m_virtioFsClassId,
-            tag.c_str(),
-            subname.c_str(),
-            rootOptions.c_str(),
-            deviceOptions.c_str(),
-            WindowsPath,
-            VIRTIO_FS_FLAGS_TYPE_FILES,
-            m_userToken.get());
-
-        // Mark this share as virtio-fs (vs Plan9). The exact GUID is unused for
-        // aggregate shares since RemoveShare is a no-op (children are
-        // append-only), so the aggregate tag GUID serves as the marker.
-        it->second = aggregateTag;
+        it->second = m_guestDeviceManager->AddVirtiofsDevice(shareName.c_str(), options.c_str(), WindowsPath, m_userToken.get());
     }
 
     cleanup.release();
@@ -694,12 +645,7 @@ try
     }
     else
     {
-        //
-        // Virtio-fs shares are children of a shared aggregate device that is
-        // torn down with the VM. Removing the guest device here would destroy
-        // the device shared by every other Windows-folder share, so aggregate
-        // children are append-only: just drop the bookkeeping entry below.
-        //
+        m_guestDeviceManager->RemoveGuestDevice(it->second.value());
     }
 
     m_shares.erase(it);
@@ -715,11 +661,16 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF(E_INVALIDARG, !m_swiotlbOption.empty());
+    THROW_HR_IF(E_INVALIDARG, m_swiotlbConfigured);
 
     if (Capabilities->HvPciSwiotlbBase != 0 && Capabilities->HvPciSwiotlbSize != 0)
     {
-        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        if (m_guestDeviceManager)
+        {
+            m_guestDeviceManager->SetSwiotlb(Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        }
+
+        m_swiotlbConfigured = true;
     }
 
     WSL_LOG(
