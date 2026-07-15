@@ -300,6 +300,9 @@ COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remov
 // Version command tests
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)
 COMMAND_LINE_TEST_CASE(L"version --help", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format json", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format table", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format invalid", L"version", false)
 COMMAND_LINE_TEST_CASE(L"version extraarg", L"version", false)
 // Settings command
 COMMAND_LINE_TEST_CASE(L"settings", L"settings", true)
