@@ -14,6 +14,7 @@ Abstract:
 
 #include "common.h"
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <stdarg.h>
 #include <mountutilcpp.h>
 #include "util.h"
@@ -22,7 +23,9 @@ Abstract:
 #include "message.h"
 #include <cassert>
 #include <filesystem>
+#include <mutex>
 #include <optional>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -43,6 +46,173 @@ constexpr int c_exitCodeMountFail = 32;
 int MountFilesystem(const char* FsType, const char* Source, const char* Target, const char* Options, int* ExitCode = nullptr);
 
 int MountWithRetry(const char* Source, const char* Target, const char* FsType, const char* Options, int* ExitCode = nullptr);
+
+namespace {
+std::mutex g_virtiofsDeviceMutex;
+
+void LogVirtioFsMountState(std::string_view Stage, const std::string& RootTarget, const std::string& ChildSource, const char* Target)
+{
+    struct stat namespaceStat = {};
+    const auto namespaceResult = stat("/proc/self/ns/mnt", &namespaceStat);
+    const auto namespaceError = namespaceResult < 0 ? errno : 0;
+
+    struct stat rootStat = {};
+    const auto rootResult = stat(RootTarget.c_str(), &rootStat);
+    const auto rootError = rootResult < 0 ? errno : 0;
+
+    LOG_INFO(
+        "VirtioFsMountState stage={} namespaceInode={} namespaceError={} rootTarget={} rootDevice={} rootInode={} rootError={} "
+        "childSource={} target={}",
+        Stage,
+        namespaceResult == 0 ? namespaceStat.st_ino : 0,
+        namespaceError,
+        RootTarget,
+        rootResult == 0 ? rootStat.st_dev : 0,
+        rootResult == 0 ? rootStat.st_ino : 0,
+        rootError,
+        ChildSource,
+        Target);
+
+    MOUNT_ENUM mountEnum = {};
+    if (MountEnumCreate(&mountEnum) < 0)
+    {
+        LOG_WARNING("MountEnumCreate failed while tracing virtiofs mounts: {}", errno);
+        return;
+    }
+
+    auto cleanup = wil::scope_exit([&] { MountEnumFree(&mountEnum); });
+    while (MountEnumNext(&mountEnum) == 0)
+    {
+        const auto& mount = mountEnum.Current;
+        if (strcmp(mount.FileSystemType, VIRTIO_FS_TYPE) == 0)
+        {
+            LOG_INFO(
+                "VirtioFsMountInfo stage={} id={} parentId={} device={} root={} mountPoint={} mountOptions={} source={} superOptions={}",
+                Stage,
+                mount.Id,
+                mount.ParentId,
+                mount.Device,
+                mount.Root,
+                mount.MountPoint,
+                mount.MountOptions,
+                mount.Source,
+                mount.SuperOptions);
+        }
+    }
+}
+
+bool IsMountPoint(const std::string& Path)
+{
+    struct stat self = {};
+    struct stat parent = {};
+    if (stat(Path.c_str(), &self) != 0)
+    {
+        return false;
+    }
+
+    const auto parentPath = Path + "/..";
+    if (stat(parentPath.c_str(), &parent) != 0)
+    {
+        return false;
+    }
+
+    return self.st_dev != parent.st_dev;
+}
+} // namespace
+
+int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Target, const char* Options, int* ExitCode = nullptr)
+{
+    if ((strcmp(Tag, LX_INIT_DRVFS_VIRTIO_TAG) != 0 && strcmp(Tag, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) != 0) ||
+        !wsl::shared::string::ToGuid(ChildName))
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const auto rootTarget = std::format("{}/{}", VIRTIOFS_MOUNT_DIR, Tag);
+    const auto childSource = std::format("{}/{}", rootTarget, ChildName);
+    LogVirtioFsMountState("before-root-check", rootTarget, childSource, Target);
+    {
+        std::lock_guard<std::mutex> lock(g_virtiofsDeviceMutex);
+        if (!IsMountPoint(rootTarget))
+        {
+            if (UtilMkdirPath(rootTarget.c_str(), 0755) < 0)
+            {
+                return -1;
+            }
+
+            if (MountWithRetry(Tag, rootTarget.c_str(), VIRTIO_FS_TYPE, "", ExitCode) < 0 && !IsMountPoint(rootTarget))
+            {
+                return -1;
+            }
+        }
+    }
+    LogVirtioFsMountState("root-ready", rootTarget, childSource, Target);
+
+    if (UtilMkdirPath(Target, 0755) < 0)
+    {
+        return -1;
+    }
+
+    constexpr int c_maxAttempts = 5;
+    int lastError = 0;
+    for (int attempt = 0; attempt < c_maxAttempts; ++attempt)
+    {
+        if (mount(childSource.c_str(), Target, nullptr, MS_BIND, nullptr) == 0)
+        {
+            lastError = 0;
+            break;
+        }
+
+        lastError = errno;
+        if (lastError != ENOENT)
+        {
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    }
+
+    if (lastError != 0)
+    {
+        LogVirtioFsMountState("bind-failed", rootTarget, childSource, Target);
+        errno = lastError;
+        if (ExitCode != nullptr)
+        {
+            *ExitCode = c_exitCodeMountFail;
+        }
+
+        return -1;
+    }
+    LogVirtioFsMountState("bind-complete", rootTarget, childSource, Target);
+
+    const auto parsed = mountutil::MountParseFlags(Options ? Options : "");
+    auto bindFlags = parsed.MountFlags;
+    if ((bindFlags & (MS_NOATIME | MS_STRICTATIME)) == 0)
+    {
+        bindFlags |= MS_RELATIME;
+    }
+
+    if (mount(nullptr, Target, nullptr, MS_BIND | MS_REMOUNT | bindFlags, parsed.StringOptions.c_str()) < 0)
+    {
+        const auto savedError = errno;
+        umount2(Target, MNT_DETACH);
+        errno = savedError;
+        if (ExitCode != nullptr)
+        {
+            *ExitCode = c_exitCodeMountFail;
+        }
+
+        return -1;
+    }
+
+    if (ExitCode != nullptr)
+    {
+        *ExitCode = 0;
+    }
+
+    return 0;
+}
 
 void SaveVirtiofsTagMapping(const char* Tag, const char* Source)
 
@@ -127,7 +297,13 @@ Return Value:
     while (!Options.empty())
     {
         auto Option = UtilStringNextToken(Options, ",");
-        if ((Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
+        if (Option == "ro")
+        {
+            Plan9Options += ";ro";
+            StandardOptions += "ro,";
+        }
+        else if (
+            (Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
             (StartsWith(Option, "gid=")) || (StartsWith(Option, "umask=")) || (StartsWith(Option, "dmask=")) ||
             (StartsWith(Option, "fmask=")) || (StartsWith(Option, PLAN9_SYMLINK_ROOT_OPTION)))
         {
@@ -625,8 +801,9 @@ try
     //
 
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
+    THROW_LAST_ERROR_IF(MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0);
 
     //
     // Save the tag mapping.
@@ -634,7 +811,7 @@ try
     // N.B. Use the source path from the response since the service canonicalizes it.
     //
 
-    SaveVirtiofsTagMapping(Tag, ResponseSource);
+    SaveVirtiofsTagMapping(ChildName, ResponseSource);
 
     return 0;
 }
@@ -692,16 +869,17 @@ try
     }
 
     auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+    THROW_LAST_ERROR_IF(MountVirtioFsChild(NewTag, ChildName, Target, Options) < 0);
 
-    SaveVirtiofsTagMapping(NewTag, Source);
+    SaveVirtiofsTagMapping(ChildName, Source);
 
     return 0;
 }
 CATCH_RETURN_ERRNO()
 
-std::string QueryVirtiofsMountSource(const char* Tag)
+std::string QueryVirtiofsMountSource(const char* Tag, const char* Root)
 
 /*++
 
@@ -713,6 +891,8 @@ Routine Description:
 Arguments:
 
     Tag - Supplies the virtiofs tag to query.
+
+    Root - Optionally supplies the mountinfo root for an aggregate child.
 
 Return Value:
 
@@ -731,7 +911,13 @@ try
     // Validate the tag is a GUID.
     //
 
-    const auto Guid = wsl::shared::string::ToGuid(Tag);
+    const char* mappingName = Tag;
+    if (Root != nullptr && Root[0] == '/' && Root[1] != '\0')
+    {
+        mappingName = Root + 1;
+    }
+
+    const auto Guid = wsl::shared::string::ToGuid(mappingName);
     if (!Guid)
     {
         return {};
@@ -741,7 +927,7 @@ try
     // Read the symlink that maps this tag to its Windows source path.
     //
 
-    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, mappingName);
     return std::filesystem::read_symlink(LinkPath).string();
 }
 catch (...)

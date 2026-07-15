@@ -420,7 +420,7 @@ public:
         WINDOWS_11_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        constexpr auto c_iterations = 15;
+        constexpr auto c_iterations = 32;
         auto testDir = std::filesystem::current_path() / "virtiofs-loop-test";
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -432,6 +432,7 @@ public:
 
         for (int i = 0; i < c_iterations; ++i)
         {
+            const bool readOnly = (i % 2) != 0;
             const auto sourceDir = testDir / std::to_string(i);
             std::filesystem::create_directories(sourceDir);
 
@@ -445,7 +446,8 @@ public:
 
             // Mount the share.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs '{}' '{}'", sourceDir.string(), mountPoint)), 0);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"mount -t drvfs {}'{}' '{}'", readOnly ? L"-o ro " : L"", sourceDir.string(), mountPoint)), 0);
 
             // Validate that it can be accessed.
             {
@@ -457,8 +459,13 @@ public:
             {
                 auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}'", mountPoint));
 
-                VerifyPatternMatch(wsl::shared::string::WideToMultiByte(out.c_str()), std::format("{} * virtiofs rw,relatime\n", mountPoint));
+                VerifyPatternMatch(
+                    wsl::shared::string::WideToMultiByte(out.c_str()),
+                    std::format("{} * virtiofs {},relatime\n", mountPoint, readOnly ? "ro" : "rw"));
             }
+
+            const auto writeResult = LxsstuLaunchWsl(std::format(L"touch '{}/write-test'", mountPoint));
+            VERIFY_ARE_EQUAL(readOnly, writeResult != 0);
         }
     }
 

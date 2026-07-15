@@ -2162,7 +2162,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
+std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
     WI_ASSERT(m_vmConfig.EnableVirtioFs);
 
@@ -2187,7 +2187,7 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
 
     // Check if a matching share already exists.
     bool created = false;
-    std::wstring tag;
+    std::wstring childName;
     VirtioFsShare key(sharePath.c_str(), effectiveOptions.c_str(), Admin);
     if (!m_virtioFsShares.contains(key))
     {
@@ -2197,29 +2197,39 @@ std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admi
         GUID tagGuid{};
         THROW_IF_FAILED(CoCreateGuid(&tagGuid));
 
-        tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
-        WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
+        childName = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
+        WI_ASSERT(!FindVirtioFsShare(childName.c_str(), Admin));
 
-        (void)m_guestDeviceManager->AddVirtiofsDevice(tag.c_str(), key.OptionsString().c_str(), sharePath.c_str(), UserToken);
+        auto& device = Admin ? m_adminVirtioFsDevice : m_virtioFsDevice;
+        const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+        if (!device.has_value())
+        {
+            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
+            device = m_guestDeviceManager->AddVirtiofsDevice(deviceTag, L"", L"", UserToken, aggregateOptions);
+        }
+        m_guestDeviceManager->AddVirtiofsChild(device.value(), childName.c_str(), key.OptionsString().c_str(), sharePath.c_str());
 
-        m_virtioFsShares.emplace(std::move(key), tag);
+        m_virtioFsShares.emplace(std::move(key), childName);
         created = true;
     }
     else
     {
-        tag = m_virtioFsShares[key];
+        childName = m_virtioFsShares[key];
     }
+
+    const std::wstring deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
 
     WSL_LOG(
         "WslCoreVmAddVirtioFsShare",
         TraceLoggingValue(Admin, "admin"),
         TraceLoggingValue(sharePath.c_str(), "path"),
         TraceLoggingValue(effectiveOptions.c_str(), "options"),
-        TraceLoggingValue(tag.c_str(), "tag"),
+        TraceLoggingValue(deviceTag.c_str(), "tag"),
+        TraceLoggingValue(childName.c_str(), "childName"),
         TraceLoggingValue(created, "created"),
         TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
 
-    return {tag, sharePath};
+    return {deviceTag, childName, sharePath};
 }
 
 void WslCoreVm::OnCrash(_In_ LPCWSTR Details)
@@ -2642,11 +2652,12 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
 
     WSL_LOG("VirtiofsMessageRequest", TraceLoggingValue(header->PrettyPrint().c_str(), "Content"));
 
-    auto buildResponse = [header](const std::wstring& tag, const std::wstring& source, HRESULT result) {
+    auto buildResponse = [header](const std::wstring& tag, const std::wstring& childName, const std::wstring& source, HRESULT result) {
         // Respond to the guest with the tag that should be used to mount the device.
         wsl::shared::MessageWriter<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE> response(LxInitMessageAddVirtioFsDeviceResponse);
         response->Result = SUCCEEDED(result) ? 0 : EINVAL; // TODO: Improved HRESULT -> errno mapping.
         response.WriteString(response->TagOffset, tag);
+        response.WriteString(response->ChildNameOffset, childName);
         response.WriteString(response->SourceOffset, source);
 
         // Echo the request's transaction id and mark the message as the first (and only) reply.
@@ -2662,6 +2673,7 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
     if (header->MessageType == LxInitMessageAddVirtioFsDevice)
     {
         std::wstring tag;
+        std::wstring childName;
         std::wstring source;
         const auto result = wil::ResultFromException([&]() {
             const auto* addShare = gslhelpers::try_get_struct<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(Request);
@@ -2674,14 +2686,15 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
 
             // Acquire the lock and attempt to add the device.
             auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-            std::tie(tag, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
+            std::tie(tag, childName, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
         });
 
-        return buildResponse(tag, source, result);
+        return buildResponse(tag, childName, source, result);
     }
     else if (header->MessageType == LxInitMessageRemountVirtioFsDevice)
     {
         std::wstring newTag;
+        std::wstring childName;
         std::wstring source;
         const auto result = wil::ResultFromException([&]() {
             const auto* remountShare = gslhelpers::try_get_struct<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE>(Request);
@@ -2693,13 +2706,13 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
             const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
             THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
-            std::tie(newTag, source) =
+            std::tie(newTag, childName, source) =
                 AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
 
             WI_ASSERT(source == foundShare->Path);
         });
 
-        return buildResponse(newTag, source, result);
+        return buildResponse(newTag, childName, source, result);
     }
     else
     {

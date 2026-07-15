@@ -13,6 +13,8 @@ Abstract:
 --*/
 
 #pragma once
+
+#define VIRTIOFS_MOUNT_DIR "/run/wsl/virtiofs-mounts"
 #include <optional>
 #include "WslDistributionConfig.h"
 
@@ -31,4 +33,4 @@ int MountVirtioFs(const char* Source, const char* Target, const char* Options, s
 
 int RemountVirtioFs(const char* Tag, const char* Target, const char* Options, bool Admin);
 
-std::string QueryVirtiofsMountSource(const char* Tag);
+std::string QueryVirtiofsMountSource(const char* Tag, const char* Root = nullptr);
