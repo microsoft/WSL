@@ -90,7 +90,7 @@ private:
     uint32_t m_hostTcpEphemeralPortCap{};
     uint32_t m_hostUdpEphemeralPortCap{};
 
-    _Guarded_by_(m_dataLock) uint32_t m_hostTcpEphemeralPortsInUse{};
-    _Guarded_by_(m_dataLock) uint32_t m_hostUdpEphemeralPortsInUse{};
+    _Guarded_by_(m_dataLock) uint32_t m_hostTcpEphemeralPortsInUse {};
+    _Guarded_by_(m_dataLock) uint32_t m_hostUdpEphemeralPortsInUse {};
 };
 } // namespace wsl::core::networking
