@@ -36,6 +36,8 @@ struct ContainerService
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
+    static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
+    static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);

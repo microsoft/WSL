@@ -17,6 +17,7 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
     m_invocation(inv),
@@ -124,8 +125,6 @@ void ParseArgumentsStateMachine::AddFlag(ArgType type)
     if (!ConsumeOverrideIfPresent(type) && m_executionArgs.Contains(type))
     {
         // Repeating the same flag on the CLI is a no-op, matching docker.
-        // TODO: revisit when --flag=value (explicit bool) lands so a mismatch
-        // between env-preload and CLI-explicit can warn or error.
         return;
     }
 
@@ -343,9 +342,24 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return {};
     }
 
-    // Boolean flag - add it and process any adjoined flags. Once we have added a
-    // flag to m_executionArgs for this token, stopOnUnknown no longer applies for
-    // mid-chain unknowns; the token has already been claimed.
+    // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
+    if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
+    {
+        auto boolVal = string::ParseBool(std::wstring(currArg.substr(currentPos + 1)).c_str());
+        if (!boolVal.has_value())
+        {
+            return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
+        }
+
+        if (boolVal.value())
+        {
+            AddFlag(firstArg->Type());
+        }
+
+        return {};
+    }
+
+    // No adjoined value — add the flag as true.
     AddFlag(firstArg->Type());
 
     // Process remaining adjoined flags
@@ -378,6 +392,23 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
 
             // Value is adjoined after '='
             ProcessAdjoinedValue(nextArg->Type(), currArg.substr(nextPos + 1));
+            return {};
+        }
+
+        // Boolean flag in chain — check for adjoined boolean value.
+        if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
+        {
+            auto boolVal = string::ParseBool(std::wstring(currArg.substr(nextPos + 1)).c_str());
+            if (!boolVal.has_value())
+            {
+                return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
+            }
+
+            if (boolVal.value())
+            {
+                AddFlag(nextArg->Type());
+            }
+
             return {};
         }
 
@@ -430,10 +461,20 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
             // Found a match, process by kind.
             if (arg.Kind() == Kind::Flag)
             {
-                // TODO: Consider supporting --flag and --flag=true or --flag=false for bool args.
                 if (hasAdjoinedValue)
                 {
-                    return ArgumentException(Localization::WSLCCLI_FlagContainAdjoinedError(currArg));
+                    auto boolVal = string::ParseBool(std::wstring(argValue).c_str());
+                    if (!boolVal.has_value())
+                    {
+                        return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
+                    }
+
+                    if (boolVal.value())
+                    {
+                        AddFlag(arg.Type());
+                    }
+
+                    return {};
                 }
 
                 AddFlag(arg.Type());

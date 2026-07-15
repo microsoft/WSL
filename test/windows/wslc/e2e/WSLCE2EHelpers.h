@@ -155,6 +155,9 @@ std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, con
 
 void WaitForContainerOutput(const std::wstring& containerName, std::string_view expected, std::chrono::milliseconds timeout = std::chrono::seconds(60));
 
+wsl::windows::common::wslc_schema::Health WaitForContainerHealth(
+    const std::wstring& containerName, const std::string_view& expectedStatus, std::chrono::milliseconds timeout = std::chrono::seconds(120));
+
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
 void VerifyContainerIsNotListed(
