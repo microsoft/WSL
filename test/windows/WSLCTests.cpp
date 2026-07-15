@@ -3241,8 +3241,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(Invocation{
-                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(
+                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -7544,23 +7544,36 @@ class WSLCTests
             expectBothReject(container, nonExistentNetwork.c_str(), WSLC_E_NETWORK_NOT_FOUND, expectedError.c_str());
         }
 
-        // Host and none mode rejection.
+        // Host, none, and container:* mode rejection.
         {
             const std::string networkName = "test-connect-mode-net";
             createNetwork(networkName, "172.52.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            auto expectModeRejection = [&](const std::string& name, std::string mode) {
-                auto container = launchContainer(name, std::move(mode));
-                expectBothReject(
-                    container,
-                    networkName.c_str(),
-                    E_INVALIDARG,
-                    L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            auto expectModeRejection = [&](const std::string& name, const std::string& mode) {
+                auto container = launchContainer(name, mode);
+                const auto expected = std::format(
+                    L"The primary network mode '{}' does not support connecting or disconnecting additional networks.",
+                    std::wstring(mode.begin(), mode.end()));
+                expectBothReject(container, networkName.c_str(), E_INVALIDARG, expected.c_str());
             };
 
             expectModeRejection("test-connect-host-ctr", "host");
             expectModeRejection("test-connect-none-ctr", "none");
+
+            // container:<name> is resolved to container:<id> internally, so the emitted mode string
+            // contains the target's container ID rather than its name. Verify HRESULT + a stable substring.
+            const std::string ctrModeTarget = "test-connect-ctrmode-target";
+            auto target = launchContainer(ctrModeTarget);
+            auto ctrModeContainer = launchContainer("test-connect-ctrmode-ctr", "container:" + ctrModeTarget);
+            const std::wstring expectedSubstring = L"does not support connecting or disconnecting additional networks";
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessageContains(expectedSubstring);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().DisconnectFromNetwork(networkName.c_str()));
+            ValidateCOMErrorMessageContains(expectedSubstring);
         }
 
         // Connect and disconnect from the container's primary network.
@@ -7628,7 +7641,7 @@ class WSLCTests
             [&](auto& container, const std::vector<KeyValuePair>& settings, HRESULT expectedResult, const std::wstring& expectedMessage) {
                 WSLCNetworkConnectionOptions options{};
                 options.NetworkName = networkName.c_str();
-                options.Settings = settings.empty() ? nullptr : settings.data();
+                options.Settings = settings.data();
                 options.SettingsCount = static_cast<ULONG>(settings.size());
                 VERIFY_ARE_EQUAL(expectedResult, container.Get().ConnectToNetwork(&options));
                 ValidateCOMErrorMessage(expectedMessage);
@@ -7712,6 +7725,28 @@ class WSLCTests
             expectConnectReject(container, {{"DriverOpts", badEntry.c_str()}}, E_INVALIDARG, expected);
         }
 
+        // Driver option value containing '=' — everything after the first '=' is preserved verbatim.
+        {
+            auto container = launchContainer("connect-endpoint-eqvalue");
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "a=b=c";
+            const std::string driverOptEntry = driverOptKey + "=" + driverOptValue;
+
+            const std::vector<KeyValuePair> settings{{"DriverOpts", driverOptEntry.c_str()}};
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
         // Aliases + IPAddress + LinkLocalIPs + DriverOpts together — success, inspect verifies every field.
         {
             auto container = launchContainer("connect-endpoint-combo");
@@ -7776,6 +7811,26 @@ class WSLCTests
             VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
             const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Links, linkEntry) != endpoint.Links.end());
+        }
+
+        // Connecting a stopped container succeeds — Docker allows attach in created/exited state.
+        {
+            auto container = launchContainer("connect-endpoint-stopped");
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            const std::string alias = "stopped-alias";
+            const std::vector<KeyValuePair> settings{{"Aliases", alias.c_str()}};
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end());
         }
     }
 
@@ -7911,10 +7966,11 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(std::format(
-                L"Unknown endpoint setting '{}' for network '{}'.",
-                std::wstring(unknownKey.begin(), unknownKey.end()),
-                std::wstring(networkName.begin(), networkName.end())));
+            ValidateCOMErrorMessage(
+                std::format(
+                    L"Unknown endpoint setting '{}' for network '{}'.",
+                    std::wstring(unknownKey.begin(), unknownKey.end()),
+                    std::wstring(networkName.begin(), networkName.end())));
         }
 
         // Primary endpoint settings (IPAddress + Aliases + LinkLocalIPs + DriverOpts) round-trip via inspect at create time.
@@ -9785,15 +9841,18 @@ class WSLCTests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(
+                std::make_unique<DockerIORelayHandle>(
+                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                readStdout.append(buffer.data(), buffer.size());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
+                readStderr.append(buffer.data(), buffer.size());
+            }));
 
             io.Run({});
 
@@ -9872,8 +9931,9 @@ class WSLCTests
                 std::string output;
                 MultiHandleWait io;
 
-                io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+                io.AddHandle(
+                    std::make_unique<DockerIORelayHandle>(
+                        std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
                 io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
                     output.append(buffer.data(), buffer.size());
@@ -9913,8 +9973,9 @@ class WSLCTests
 
         // Collect the relayed output.
         std::string output;
-        io.AddHandle(std::make_unique<ReadHandle>(
-            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+        io.AddHandle(std::make_unique<ReadHandle>(std::move(dstRead), [&](const gsl::span<char>& buffer) {
+            output.append(buffer.data(), buffer.size());
+        }));
 
         io.Run({});
 
