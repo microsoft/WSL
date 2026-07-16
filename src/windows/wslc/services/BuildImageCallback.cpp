@@ -20,6 +20,9 @@ namespace wsl::windows::wslc::services {
 using wsl::windows::common::string::MultiByteToWide;
 using namespace wsl::windows::common::vt;
 
+// Fallback width used when the console width can't be queried.
+constexpr int c_fallbackConsoleWidth = 79;
+
 BuildImageCallback::~BuildImageCallback()
 try
 {
@@ -180,7 +183,7 @@ CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    const auto consoleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info);
+    const int consoleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info).value_or(c_fallbackConsoleWidth);
 
     const bool showPending = !m_pendingLine.empty();
     const int pullCount = static_cast<int>(m_pullLines.size());
@@ -213,9 +216,9 @@ void BuildImageCallback::Redraw()
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (consoleWidth.has_value() && wline.size() > static_cast<size_t>(*consoleWidth))
+        if (wline.size() > static_cast<size_t>(consoleWidth))
         {
-            wline.resize(static_cast<size_t>(*consoleWidth));
+            wline.resize(static_cast<size_t>(consoleWidth));
         }
         m_frameBuffer += std::move(wline);
         m_frameBuffer += Erase::LineForward;
