@@ -21,9 +21,10 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 
-// Fallback width for the in-place progress display when the console width can't be queried, so a
-// wrapped line can't corrupt the cursor-based rendering.
-constexpr int c_fallbackConsoleWidth = 80;
+// Fallback width for the in-place progress display when the console width can't be queried. This
+// value already includes the autowrap guard (visible width minus one) so a wrapped line can't
+// corrupt the cursor-based rendering.
+constexpr int c_fallbackConsoleWidth = 79;
 
 auto ImageProgressCallback::MoveToLine(int line)
 {

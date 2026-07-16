@@ -63,7 +63,7 @@ class WSLCE2EImageBuildTests
 
         auto buildResult = RunWslc(
             std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImage.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImage.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -100,7 +100,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageTag1.NameAndTag(),
             BuiltImageTag2.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         // Verify both tags are present by inspecting each one
         auto inspectData1 = InspectImage(BuiltImageTag1.NameAndTag());
@@ -137,13 +137,13 @@ class WSLCE2EImageBuildTests
 
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
-        // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
+        // "FROM docker.io/library/debian:latest@sha256:..."). Build progress goes to stderr.
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(buildResult.Stdout.has_value());
-        VERIFY_IS_TRUE(buildResult.Stdout->find(L"@sha256:") != std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"@sha256:") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
@@ -168,7 +168,7 @@ class WSLCE2EImageBuildTests
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -201,7 +201,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageLabel.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
         VERIFY_IS_TRUE(inspectData.Config.has_value());
@@ -236,7 +236,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageLabelOverride.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());
         VERIFY_IS_TRUE(inspectData.Config.has_value());
@@ -328,19 +328,19 @@ class WSLCE2EImageBuildTests
 
         // Seed the cache.
         auto firstBuild = RunWslc(buildCmd);
-        firstBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        firstBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto firstId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(std::string{}, firstId);
 
         // A repeated build without --no-cache should hit the cache and produce the same id.
         auto cachedBuild = RunWslc(buildCmd);
-        cachedBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        cachedBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
 
         // --no-cache must re-run the non-deterministic step, producing a new id.
         auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
-        noCacheBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        noCacheBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
     }
@@ -365,7 +365,7 @@ private:
         WriteTestFileContent(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\" -t {}", testRoot.wstring(), image.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(image.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
