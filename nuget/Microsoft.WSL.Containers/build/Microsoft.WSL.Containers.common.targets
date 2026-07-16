@@ -9,24 +9,23 @@
         <!-- Default to bare 'wslc' so cmd.exe resolves it via PATH (the WSL MSI puts wslc.exe there).
              Override with WslcCliPath property if needed. -->
         <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
+        <WslcImageBuildPull Condition="'$(WslcImageBuildPull)' == ''">false</WslcImageBuildPull>
+        <WslcImageBuildNoCache Condition="'$(WslcImageBuildNoCache)' == ''">false</WslcImageBuildNoCache>
         <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
         <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
         <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
         <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
     </PropertyGroup>
 
-    <!-- Default values for optional WslcImage metadata. Pull/NoCache
-         default to false (flag off); Image/TarLocation/BuildArgs/Labels default
-         to empty. Required metadata (Dockerfile, Context) is intentionally not
-         defaulted here so _WslcValidateItems reports it as missing. -->
+    <!-- Default values for optional WslcImage metadata. Required metadata
+         (Dockerfile, Context) is intentionally not defaulted here so
+         _WslcValidateItems reports it as missing. -->
     <ItemDefinitionGroup>
         <WslcImage>
             <Image></Image>
             <TarLocation></TarLocation>
             <BuildArgs></BuildArgs>
             <Labels></Labels>
-            <Pull>false</Pull>
-            <NoCache>false</NoCache>
         </WslcImage>
     </ItemDefinitionGroup>
 
@@ -81,7 +80,7 @@
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildAndSaveSingleImage"
                  StopOnFirstFailure="true"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcBuildArgs=$([MSBuild]::Escape('%(WslcImage.BuildArgs)'));_WslcLabels=$([MSBuild]::Escape('%(WslcImage.Labels)'));_WslcPull=%(WslcImage.Pull);_WslcNoCache=%(WslcImage.NoCache)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcBuildArgs=$([MSBuild]::Escape('%(WslcImage.BuildArgs)'));_WslcLabels=$([MSBuild]::Escape('%(WslcImage.Labels)'));_WslcPull=$(WslcImageBuildPull);_WslcNoCache=$(WslcImageBuildNoCache)" />
     </Target>
 
     <!--

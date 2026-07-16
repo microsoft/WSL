@@ -80,10 +80,13 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
              Sources="container/src/**"
              TarLocation="$(OutDir)my-server.tar"
              BuildArgs="VERSION=1.2.3;COMMIT=abcdef"
-             Labels="org.opencontainers.image.source=https://example.com/repo"
-             Pull="true"
-             NoCache="false" />
+             Labels="org.opencontainers.image.source=https://example.com/repo" />
 </ItemGroup>
+
+<PropertyGroup>
+  <WslcImageBuildPull>true</WslcImageBuildPull>
+  <WslcImageBuildNoCache>false</WslcImageBuildNoCache>
+</PropertyGroup>
 ```
 
 | Metadata | Required | Description |
@@ -95,14 +98,14 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
 | `TarLocation` | No | Output path for the saved `.tar` (defaults to `$(OutDir)<name>.tar`) |
 | `BuildArgs` | No | Semicolon-separated `KEY=VALUE` build-time variables (each forwarded as `--build-arg`) |
 | `Labels` | No | Semicolon-separated `KEY=VALUE` image labels (each forwarded as `--label`) |
-| `Pull` | No | `true` to always attempt to pull a newer base image (`--pull`) |
-| `NoCache` | No | `true` to build without the layer cache (`--no-cache`) |
 
 **Optional MSBuild properties:**
 
 | Property | Default | Description |
 |---|---|---|
 | `WslcCliPath` | `wslc` | Path to the `wslc` CLI executable |
+| `WslcImageBuildPull` | `false` | Always attempt to pull newer base images (`--pull`) |
+| `WslcImageBuildNoCache` | `false` | Build images without the layer cache (`--no-cache`) |
 | `WslcPruneAfterBuild` | `false` | Run `wslc image prune` after each successful build |
 | `WslcTreatPruneFailureAsError` | `false` | Fail the build if the post-build prune fails |
 
@@ -110,6 +113,9 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
 
 ```cmake
 find_package(Microsoft.WSL.Containers REQUIRED)
+
+set(WSLC_IMAGE_BUILD_PULL ON)
+set(WSLC_IMAGE_BUILD_NO_CACHE OFF)
 
 wslc_add_image(my-server
     IMAGE        ghcr.io/myorg/my-server:latest
@@ -119,8 +125,6 @@ wslc_add_image(my-server
     TAR_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/my-server.tar
     BUILD_ARGS   VERSION=1.2.3 COMMIT=abcdef
     LABELS       org.opencontainers.image.source=https://example.com/repo
-    PULL
-    NO_CACHE
 )
 
 add_dependencies(my_app my-server)
@@ -136,14 +140,14 @@ add_dependencies(my_app my-server)
 | `TAR_LOCATION` | No | Output path for the saved `.tar` (defaults to `${CMAKE_CURRENT_BINARY_DIR}/<target>.tar`) |
 | `BUILD_ARGS` | No | `KEY=VALUE` build-time variables (each forwarded as `--build-arg`) |
 | `LABELS` | No | `KEY=VALUE` image labels (each forwarded as `--label`) |
-| `PULL` | No | Always attempt to pull a newer base image (`--pull`) |
-| `NO_CACHE` | No | Build without the layer cache (`--no-cache`) |
 
 **Project-wide CMake variables:**
 
 | Variable | Default | Description |
 |---|---|---|
 | `WSLC_CLI_PATH` | Found on `PATH` | Path to the `wslc` CLI executable |
+| `WSLC_IMAGE_BUILD_PULL` | `OFF` | Always attempt to pull newer base images (`--pull`) |
+| `WSLC_IMAGE_BUILD_NO_CACHE` | `OFF` | Build images without the layer cache (`--no-cache`) |
 | `WSLC_PRUNE_AFTER_BUILD` | `OFF` | Run `wslc image prune` after each successful build |
 | `WSLC_TREAT_PRUNE_FAILURE_AS_ERROR` | `OFF` | Fail the build if the post-build prune fails |
 

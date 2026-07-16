@@ -60,8 +60,7 @@ unset(_wslcsdk_lib_dir)
   wslc_add_image(<target>
       IMAGE <ref> DOCKERFILE <path> CONTEXT <dir>
       [SOURCES <file>...] [TAR_LOCATION <path>]
-      [BUILD_ARGS <KEY=VALUE>...] [LABELS <KEY=VALUE>...]
-            [PULL] [NO_CACHE])
+      [BUILD_ARGS <KEY=VALUE>...] [LABELS <KEY=VALUE>...])
 
   Adds a target that builds a container image with 'wslc image build' and saves
   it to a tarball with 'wslc image save'. The image is rebuilt only when the
@@ -81,10 +80,12 @@ unset(_wslcsdk_lib_dir)
                    Defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar.
     BUILD_ARGS     Build-time variables (KEY=VALUE), each passed as --build-arg.
     LABELS         Image labels (KEY=VALUE), each passed as --label.
-    PULL           Always attempt to pull a newer base image (--pull).
-    NO_CACHE       Build without the layer cache (--no-cache).
 
   Global variables (apply to every target created by wslc_add_image):
+    WSLC_IMAGE_BUILD_PULL
+                   Always attempt to pull newer base images (--pull).
+    WSLC_IMAGE_BUILD_NO_CACHE
+                   Build images without the layer cache (--no-cache).
     WSLC_PRUNE_AFTER_BUILD
                    Run 'wslc image prune' after each image is saved.
     WSLC_TREAT_PRUNE_FAILURE_AS_ERROR
@@ -99,8 +100,7 @@ unset(_wslcsdk_lib_dir)
         DOCKERFILE container/Dockerfile
         CONTEXT    container/
         BUILD_ARGS VERSION=1.2.3 COMMIT=abcdef
-        LABELS     org.opencontainers.image.source=https://example.com/repo
-        PULL)
+        LABELS     org.opencontainers.image.source=https://example.com/repo)
 
     add_dependencies(my_app my-server)
 ]]
@@ -108,7 +108,7 @@ unset(_wslcsdk_lib_dir)
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
         PARSE_ARGV 1 ARG
-        "PULL;NO_CACHE"                              # options (boolean flags)
+        ""                                           # options (boolean flags)
         "IMAGE;DOCKERFILE;CONTEXT;TAR_LOCATION"      # one-value keywords
         "SOURCES;BUILD_ARGS;LABELS"                  # multi-value keywords
     )
@@ -193,10 +193,10 @@ function(wslc_add_image _target_name)
             list(APPEND _build_options --label "${_label}")
         endif()
     endforeach()
-    if(ARG_PULL)
+    if(WSLC_IMAGE_BUILD_PULL)
         list(APPEND _build_options --pull)
     endif()
-    if(ARG_NO_CACHE)
+    if(WSLC_IMAGE_BUILD_NO_CACHE)
         list(APPEND _build_options --no-cache)
     endif()
     list(APPEND _build_options -f "${_dockerfile_path}")
