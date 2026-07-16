@@ -277,8 +277,11 @@ try
 
     // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
     // will be issued to indicate that the callback has been cleaned up.
-    m_resolver.reset();
-    m_session.reset();
+    {
+        const auto requestLock = m_requestLock.lock();
+        m_resolver.reset();
+        m_session.reset();
+    }
 }
 CATCH_LOG()
 
@@ -442,6 +445,12 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     try
     {
         WI_ASSERT(m_callbackQueue.isRunningInQueue());
+        const auto requestLock = m_requestLock.lock();
+        if (m_stopping)
+        {
+            return;
+        }
+
         if (m_queryState == QueryState::PendingAndQueueAdditional)
         {
             return;
@@ -469,6 +478,10 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
         wil::unique_winhttp_hinternet resolver{};
         THROW_IF_WIN32_ERROR(WinHttpCreateProxyResolver(session.get(), &resolver));
 
+        executionStep = "WinHttpSetOption";
+        DWORD_PTR context = reinterpret_cast<DWORD_PTR>(this);
+        THROW_IF_WIN32_BOOL_FALSE(WinHttpSetOption(resolver.get(), WINHTTP_OPTION_CONTEXT_VALUE, &context, sizeof(context)));
+
         executionStep = "WinHttpSetStatusCallback";
         // We need to set flag WINHTTP_CALLBACK_FLAG_HANDLES in order to get the WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
         // status callback when a handle is closed.
@@ -483,10 +496,14 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
 
         WINHTTP_PROXY_SETTINGS_PARAM ProxySettingsParam{0, nullptr, nullptr};
 
+        // Track the request before calling WinHttp because it can complete asynchronously before returning.
+        m_requestFinished.ResetEvent();
+        m_queryState = QueryState::Pending;
+
         executionStep = "WinHttpGetProxySettingsEx";
         // Query the proxy settings
-        const DWORD dwError = s_WinHttpGetProxySettingsEx.value()(
-            resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, reinterpret_cast<DWORD_PTR>(this));
+        const DWORD dwError =
+            s_WinHttpGetProxySettingsEx.value()(resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, context);
 
         if (dwError != ERROR_IO_PENDING && dwError != ERROR_SUCCESS)
         {
@@ -496,8 +513,6 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
         // Transfer ownership of HTTP handles and track request
         m_resolver = std::move(resolver);
         m_session = std::move(session);
-        m_requestFinished.ResetEvent();
-        m_queryState = QueryState::Pending;
     }
     catch (...)
     {
@@ -514,8 +529,8 @@ HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken,
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(UserToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &m_userToken));
-    m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
     THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
+    m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
 }
 
 HttpProxyStateTracker::~HttpProxyStateTracker()
@@ -529,10 +544,16 @@ HttpProxyStateTracker::~HttpProxyStateTracker()
         }
         CATCH_LOG()
     }
-    // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
-    // will be issued and it will be the last callback for this request, making it safe to delete the ProxyStateTracker.
-    m_resolver.reset();
-    m_session.reset();
+
+    {
+        const auto requestLock = m_requestLock.lock();
+        m_stopping = true;
+
+        // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
+        // will be issued and it will be the last callback for this request, making it safe to delete the ProxyStateTracker.
+        m_resolver.reset();
+        m_session.reset();
+    }
 
     // Wait for all requests to complete. At this point no new requests can be started since we unregistered for proxy change
     // notifications. Without this we risk racing proxy callbacks and them calling into a cleaned up ProxyStateTracker.
