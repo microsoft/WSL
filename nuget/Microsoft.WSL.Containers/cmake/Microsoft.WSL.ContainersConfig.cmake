@@ -61,7 +61,7 @@ unset(_wslcsdk_lib_dir)
       IMAGE <ref> DOCKERFILE <path> CONTEXT <dir>
       [SOURCES <file>...] [TAR_LOCATION <path>]
       [BUILD_ARGS <KEY=VALUE>...] [LABELS <KEY=VALUE>...]
-      [PULL] [NO_CACHE] [VERBOSE])
+            [PULL] [NO_CACHE])
 
   Adds a target that builds a container image with 'wslc image build' and saves
   it to a tarball with 'wslc image save'. The image is rebuilt only when the
@@ -83,7 +83,6 @@ unset(_wslcsdk_lib_dir)
     LABELS         Image labels (KEY=VALUE), each passed as --label.
     PULL           Always attempt to pull a newer base image (--pull).
     NO_CACHE       Build without the layer cache (--no-cache).
-    VERBOSE        Emit verbose build output (--verbose).
 
   Global variables (apply to every target created by wslc_add_image):
     WSLC_PRUNE_AFTER_BUILD
@@ -109,7 +108,7 @@ unset(_wslcsdk_lib_dir)
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
         PARSE_ARGV 1 ARG
-        "PULL;NO_CACHE;VERBOSE"                      # options (boolean flags)
+        "PULL;NO_CACHE"                              # options (boolean flags)
         "IMAGE;DOCKERFILE;CONTEXT;TAR_LOCATION"      # one-value keywords
         "SOURCES;BUILD_ARGS;LABELS"                  # multi-value keywords
     )
@@ -199,9 +198,6 @@ function(wslc_add_image _target_name)
     endif()
     if(ARG_NO_CACHE)
         list(APPEND _build_options --no-cache)
-    endif()
-    if(ARG_VERBOSE)
-        list(APPEND _build_options --verbose)
     endif()
     list(APPEND _build_options -f "${_dockerfile_path}")
 

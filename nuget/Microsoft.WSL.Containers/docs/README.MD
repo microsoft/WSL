@@ -82,8 +82,7 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
              BuildArgs="VERSION=1.2.3;COMMIT=abcdef"
              Labels="org.opencontainers.image.source=https://example.com/repo"
              Pull="true"
-             NoCache="false"
-             Verbose="false" />
+             NoCache="false" />
 </ItemGroup>
 ```
 
@@ -98,7 +97,6 @@ Add `WslcImage` items to your project. Each item builds an image and saves it to
 | `Labels` | No | Semicolon-separated `KEY=VALUE` image labels (each forwarded as `--label`) |
 | `Pull` | No | `true` to always attempt to pull a newer base image (`--pull`) |
 | `NoCache` | No | `true` to build without the layer cache (`--no-cache`) |
-| `Verbose` | No | `true` to emit verbose build output (`--verbose`) |
 
 **Optional MSBuild properties:**
 
@@ -123,7 +121,6 @@ wslc_add_image(my-server
     LABELS       org.opencontainers.image.source=https://example.com/repo
     PULL
     NO_CACHE
-    VERBOSE
 )
 
 add_dependencies(my_app my-server)
@@ -141,7 +138,6 @@ add_dependencies(my_app my-server)
 | `LABELS` | No | `KEY=VALUE` image labels (each forwarded as `--label`) |
 | `PULL` | No | Always attempt to pull a newer base image (`--pull`) |
 | `NO_CACHE` | No | Build without the layer cache (`--no-cache`) |
-| `VERBOSE` | No | Emit verbose build output (`--verbose`) |
 
 **Project-wide CMake variables:**
 
