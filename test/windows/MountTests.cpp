@@ -341,6 +341,21 @@ class MountTests
         WaitForDiskReady();
     }
 
+    WSL2_TEST_METHOD(SpecifyInvalidMountName)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        for (const auto* name : {L"\"\"", L".", L"..", L"foo/bar"})
+        {
+            const auto mountCommand = std::format(L"--mount {} --vhd --name {} --partition 1", VhdDevice, name);
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(mountCommand), (DWORD)0, name);
+        }
+
+        const auto disk = GetBlockDeviceInWsl();
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+        VERIFY_IS_FALSE(GetBlockDeviceMount(disk + L"1").has_value());
+    }
+
     // Test ensuring that name collision detection works in --mount --name
     WSL2_TEST_METHOD(SpecifyMountNameCollision)
     {
