@@ -518,7 +518,9 @@ class UnitTests
 
     WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
     {
-        auto validate = [&](LPCWSTR peerDistroName, const std::string& automountRoot) {
+        constexpr auto peerDistroName = L"mount-guard-peer-test";
+
+        auto validate = [&](const std::string& automountRoot) {
             const auto extraConfig = automountRoot.empty() ? "" : std::format("[automount]\nroot={}\n", automountRoot);
             const auto effectiveAutomountRoot = automountRoot.empty() ? "/mnt" : automountRoot;
             const auto mountPoint = std::format(L"{}/wsl/mount-guard-test", wsl::shared::string::MultiByteToWide(effectiveAutomountRoot));
@@ -526,6 +528,7 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd(extraConfig);
 
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
             auto cleanupPeer = wil::scope_exit_log(
                 WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
@@ -552,8 +555,8 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"grep -qx survived {}/marker", mountPoint)), 0L);
         };
 
-        validate(L"mount-guard-default-root-peer-test", "");
-        validate(L"mount-guard-custom-root-peer-test", "/wsl-test-mount");
+        validate("");
+        validate("/wsl-test-mount");
     }
 
     WSL2_TEST_METHOD(ConfigUpdateLanguage)
