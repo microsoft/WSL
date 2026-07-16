@@ -63,8 +63,8 @@ unset(_wslcsdk_lib_dir)
       [BUILD_ARGS <KEY=VALUE>...] [LABELS <KEY=VALUE>...])
 
   Adds a target that builds a container image with 'wslc image build' and saves
-  it to a tarball with 'wslc image save'. The image is rebuilt only when the
-  Dockerfile or a tracked source file changes.
+  it to a tarball with 'wslc image save'. The image is rebuilt when the
+  Dockerfile, a tracked source file, or an image build option changes.
 
   Required:
     <target>       Name of the CMake target to create (first, positional).
@@ -201,6 +201,13 @@ function(wslc_add_image _target_name)
     endif()
     list(APPEND _build_options -f "${_dockerfile_path}")
 
+    # Track the effective build command as an input. file(GENERATE) preserves
+    # the timestamp when content is unchanged, so only option changes make the
+    # custom command out of date.
+    set(_build_signature_file "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_target_name}-$<CONFIG>.wslc-options")
+    string(JOIN "\n" _build_signature ${_build_options} "${_context_path}")
+    file(GENERATE OUTPUT "${_build_signature_file}" CONTENT "${_build_signature}\n")
+
     set(_prune_command "")
     set(_prune_comment "")
     if(WSLC_PRUNE_AFTER_BUILD)
@@ -228,7 +235,7 @@ function(wslc_add_image _target_name)
         COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}.tmp" "${_image_ref}"
         COMMAND ${CMAKE_COMMAND} -E rename "${ARG_TAR_LOCATION}.tmp" "${ARG_TAR_LOCATION}"
         ${_prune_command}
-        DEPENDS ${_resolved_sources} "${_dockerfile_path}"
+        DEPENDS ${_resolved_sources} "${_dockerfile_path}" "${_build_signature_file}"
         COMMENT "WSLC: Building image '${_image_ref}', saving to '${ARG_TAR_LOCATION}'${_prune_comment}..."
         VERBATIM
     )

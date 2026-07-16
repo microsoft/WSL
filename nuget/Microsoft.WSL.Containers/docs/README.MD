@@ -65,7 +65,7 @@ var settings = new SessionSettings("my-session", @"C:\path\to\storage");
 
 ## Building container images
 
-The package integrates the `wslc` CLI into your build system so container images are built and saved as part of your normal project build, with incremental rebuild support (images only rebuild when sources change).
+The package integrates the `wslc` CLI into your build system so container images are built and saved as part of your normal project build, with incremental rebuild support (images rebuild when tracked sources or image build options change).
 
 ### MSBuild
 

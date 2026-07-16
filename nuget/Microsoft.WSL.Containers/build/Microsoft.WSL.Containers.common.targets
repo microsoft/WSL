@@ -84,7 +84,7 @@
     </Target>
 
     <!--
-        Collect source files for incremental check.
+        Collect source files and the effective build options for incremental checks.
         Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
         where they get escaped). Sources can be semicolon separated directory paths;
         each is expanded with **\* to collect all files recursively.
@@ -92,11 +92,35 @@
         .dockerignore and other Docker build inputs still invalidate the marker.
     -->
     <Target Name="_WslcCollectSources">
+        <PropertyGroup>
+            <_WslcBuildSignaturePath>$(_WslcIntDir)wslc.$(_WslcName).options</_WslcBuildSignaturePath>
+        </PropertyGroup>
+
+        <MakeDir Directories="$(_WslcIntDir)" />
+
         <ItemGroup>
             <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
             <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
             <_WslcSourceFiles Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
+            <_WslcBuildArgItems Include="$([MSBuild]::Unescape('$(_WslcBuildArgs)').Split(';'))" Condition="'$(_WslcBuildArgs)' != ''" />
+            <_WslcLabelItems Include="$([MSBuild]::Unescape('$(_WslcLabels)').Split(';'))" Condition="'$(_WslcLabels)' != ''" />
+            <_WslcBuildSignature Include="Image=$(_WslcFullRef)" />
+            <_WslcBuildSignature Include="Dockerfile=$(_WslcDockerfile)" />
+            <_WslcBuildSignature Include="Context=$(_WslcContext)" />
+            <_WslcBuildSignature Include="Pull=$(_WslcPull)" />
+            <_WslcBuildSignature Include="NoCache=$(_WslcNoCache)" />
+            <_WslcBuildSignature Include="BuildArg=%(_WslcBuildArgItems.Identity)" />
+            <_WslcBuildSignature Include="Label=%(_WslcLabelItems.Identity)" />
+        </ItemGroup>
+
+        <WriteLinesToFile File="$(_WslcBuildSignaturePath)"
+                          Lines="@(_WslcBuildSignature)"
+                          Overwrite="true"
+                          WriteOnlyWhenDifferent="true" />
+
+        <ItemGroup>
+            <_WslcSourceFiles Include="$(_WslcBuildSignaturePath)" />
         </ItemGroup>
     </Target>
 
@@ -127,17 +151,11 @@
     <!-- Build + save one image atomically (per-image, so a mid-list failure
          leaves a coherent state). Save writes <tar>.tmp and Moves on success. -->
     <Target Name="_WslcBuildAndSaveSingleImage"
-            DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef;_WslcResolveSavePath"
+            DependsOnTargets="_WslcResolveImageRef;_WslcCollectSources;_WslcResolveSavePath"
             Inputs="@(_WslcSourceFiles)"
             Outputs="$(_WslcTarPath)">
 
-        <MakeDir Directories="$(_WslcIntDir)" />
         <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
-
-        <ItemGroup>
-            <_WslcBuildArgItems Include="$([MSBuild]::Unescape('$(_WslcBuildArgs)').Split(';'))" Condition="'$(_WslcBuildArgs)' != ''" />
-            <_WslcLabelItems Include="$([MSBuild]::Unescape('$(_WslcLabels)').Split(';'))" Condition="'$(_WslcLabels)' != ''" />
-        </ItemGroup>
 
         <PropertyGroup>
             <_WslcBuildOptions></_WslcBuildOptions>
