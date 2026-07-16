@@ -1222,7 +1222,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>Параметры подсистемы Windows для Linux позволяют разработчикам управлять файлом .wslconfig с помощью приложения с графическим интерфейсом.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Автоматическое освобождение памяти</value>
@@ -1302,13 +1302,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Пользовательский системный дистрибутив</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Обзор дистрибутивов</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1316,10 +1318,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Пользовательский системный дистрибутив</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Укажите путь к VHD, который будет загружаться как пользовательский системный дистрибутив, который в основном используется для работы приложений с графическим интерфейсом в WSL.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Включить консоль отладки</value>
@@ -1354,6 +1357,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Разработчик</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Документация</value>
@@ -1853,6 +1857,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Разработчик</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Управление дистрибутивами</value>
@@ -2261,6 +2266,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <value>Аргумент флага не может содержать присоединенное значение: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Недопустимое логическое значение для аргумента флага: "{}". Ожидается значение true, false, 1 или 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Найден позиционный аргумент, когда не ожидалось: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2347,8 +2356,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>Для параметра сетевого драйвера "Gateway" также требуется указать "Subnet".</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Для опции '--gateway' также требуется указать '--subnet'.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Сеть "{}" содержит активные конечные точки.</value>
@@ -2360,6 +2369,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Неподдерживаемый сетевой режим: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Недопустимое значение времени остановки: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2424,6 +2437,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Не удается использовать "{}" в качестве хранилища сеансов, поскольку это не является каталогом</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Создание хранилища сеансов в "{}" согласно настройке посредством параметра session.storagePath. Если позже вы измените или удалите этот параметр, хранящиеся здесь данные больше не будут использоваться стандартным сеансом и могут быть удалены для освобождения места.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
+  </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Недопустимый формат тега изображения: "{}". Ожидаемый формат: "имя:тег"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2476,6 +2493,58 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Записывать в файл вместо STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Копирование файлов между контейнером и локальной файловой системой.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Копирование файлов между контейнером и локальной файловой системой.
+Использование: wslc container cp [OPTIONS] SOURCE DEST
+  Локальный путь к контейнеру: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Контейнер в локальный каталог: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Ввод из стандартного потока в контейнер: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Источник: локальный путь, CONTAINER:PATH или "-" для стандартного ввода</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Пункт назначения: локальный путь или CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Недопустимый формат назначения. Ожидается CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Недопустимый формат источника. Ожидается CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Исходный путь не найден: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe не найден. Для локального копирования файлов требуется TAR Windows.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Недопустимое направление копирования. Используйте CONTAINER:PATH в качестве источника или назначения.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Не удается прочитать данные tar из терминала. Передать архив tar в стандартный ввод.
+Пример: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Файл не извлечен из архива контейнера</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Невозможно скопировать каталог в путь к файлу. Вместо этого используйте конечный объект каталога (с конечным разделителем).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Проверить контейнер.</value>
@@ -2777,6 +2846,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Показать все, независимо от состояния.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Режим архивации (поддерживается для совместимости с Docker CLI)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Задать переменные времени сборки (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2843,6 +2916,24 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Недопустимое значение {}: "{}". Поддерживается только "all".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Команда для проверки работоспособности контейнера</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Время между запусками проверки работоспособности системы (например, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Чтобы сообщить о контейнере как о неработоспособном, требуется заданное число последовательных сбоев</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Начальный период для инициализации контейнера перед обратным отсчетом проверки работоспособности (например, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Максимальное время, отведенное на выполнение одной проверки работоспособности (например, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Удалять образы, даже если они используются</value>
   </data>
@@ -2900,6 +2991,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Не использовать кэш при сборке образа</value>
   </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Отключить любую проверку работоспособности, указанную в контейнере</value>
+  </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Не удаляйте родительские файлы без тега</value>
   </data>
@@ -2926,6 +3020,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Сигнал для остановки контейнера</value>
+  </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Время ожидания (в секундах) на остановку контейнера перед его принудительным завершением (-1 — без ограничения времени ожидания)</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Размер /dev/shm (например, 64M, 1G)</value>
@@ -3077,6 +3174,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Недопустимое значение аргумента {}: "{}". Ожидается объем памяти (например, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Недопустимое значение аргумента {}: "{}". Ожидаемая длительность (например, 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>Параметр --no-healthcheck нельзя комбинировать с другими параметрами проверки работоспособности.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID-файл "{}" уже существует</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3094,6 +3199,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Запрошена загрузка, но входные данные не предоставлены.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Загруженное изображение: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>ИД загруженного изображения: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Управление сетями.</value>
@@ -3114,6 +3227,17 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Параметр сетевых метаданных</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Ограничение внешнего доступа к сети</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Подсеть в формате CIDR, представляющая сегмент сети</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Шлюз IPv4 или IPv6 для подсети</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Удалите одну или несколько сетей.</value>
@@ -3148,6 +3272,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Удалено: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Подключите контейнер к сети</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Подключает контейнер к существующей сети.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Отключите контейнер от сети.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Отключает контейнер от существующей сети.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Управление томами.</value>
@@ -3358,6 +3494,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Не удалось отключить том "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>Том {} содержит непустой каталог lost+found. Он остался на месте, и содержимое тома может быть не заполнено изображениями</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Не удалось остановить контейнер '{}' после отклонения подключаемого модуля</value>

@@ -164,7 +164,8 @@ WSLC_PARSER_TEST_CASE(List, false, LR"(wslc --invalidarg cont1)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc -i cont1 cont2)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc -vp cont1)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 -v cont2 -12)") \
-WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 --verbose=false cont2)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc cont1 --verbose=false cont2)") \
+WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 --verbose=invalid cont2)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 cont2 --invalidarg)") \
 \
 /* Root-level globals: strict optionsOnly parsing. Stops cleanly at the first \

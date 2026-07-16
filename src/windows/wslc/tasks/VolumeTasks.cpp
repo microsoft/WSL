@@ -183,10 +183,10 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>({L"DRIVER", L"VOLUME NAME"});
+        auto table = wsl::windows::wslc::TableOutput<2>(context.Reporter, {L"DRIVER", L"VOLUME NAME"});
         for (const auto& volume : volumes)
         {
-            table.OutputLine({
+            table.WriteRow({
                 MultiByteToWide(volume.Driver),
                 MultiByteToWide(volume.Name),
             });

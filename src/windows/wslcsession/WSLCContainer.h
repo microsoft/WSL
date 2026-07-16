@@ -64,7 +64,7 @@ struct ContainerPortMapping
     uint16_t ContainerPort{};
 };
 
-class WSLCContainerImpl
+class WSLCContainerImpl : public std::enable_shared_from_this<WSLCContainerImpl>
 {
 public:
     NON_COPYABLE(WSLCContainerImpl);
@@ -94,11 +94,15 @@ public:
 
     ~WSLCContainerImpl();
 
+    void Initialize();
+
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
+    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
+    void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -129,7 +133,7 @@ public:
         return m_containerFlags;
     }
 
-    static std::unique_ptr<WSLCContainerImpl> Create(
+    static std::shared_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
         const std::string& Name,
         WSLCSession& wslcSession,
@@ -142,7 +146,7 @@ public:
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
-    static std::unique_ptr<WSLCContainerImpl> Open(
+    static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
@@ -224,17 +228,19 @@ private:
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
-      public COMImplClass<WSLCContainerImpl>
+      public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
 public:
-    WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+    WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
+    IFACEMETHOD(UploadArchive)(_In_ WSLCHandle TarHandle, _In_ LPCSTR DestPath, _In_ ULONGLONG ContentSize) override;
+    IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ WSLCHandle OutHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;

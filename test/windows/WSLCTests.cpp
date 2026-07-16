@@ -1696,6 +1696,130 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(BuildImageHealthCheck)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-healthcheck";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-healthcheck:latest", WSLCDeleteImageFlagsForce).first);
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        // Create an image with a healthcheck that only passes once a specific file exists.
+        constexpr auto c_healthReadyFile = "/tmp/wslc-health-ready";
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "HEALTHCHECK --interval=1s --timeout=100ms --start-period=300s --retries=1000 CMD test -f "
+                       << c_healthReadyFile << "\n";
+            dockerfile << "CMD [\"sleep\", \"99999\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-healthcheck:latest"));
+        ExpectImagePresent(*m_defaultSession, "wslc-test-healthcheck:latest");
+
+        auto waitForHealthStatus = [](auto& container, const std::string& expectedStatus, std::chrono::seconds timeout) {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const auto inspect = container.Inspect();
+                    THROW_HR_IF_MSG(E_FAIL, !inspect.State.Health.has_value(), "container does not report a health status yet");
+                    THROW_HR_IF_MSG(
+                        E_FAIL,
+                        inspect.State.Health->Status != expectedStatus,
+                        "health status is '%hs', expected '%hs'",
+                        inspect.State.Health->Status.c_str(),
+                        expectedStatus.c_str());
+                },
+                std::chrono::milliseconds{100},
+                timeout);
+        };
+
+        // Validate that the image's default health check is inherited by a started container, and that its runtime
+        // status stays "starting" until the health command passes, then deterministically becomes "healthy".
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-default");
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", std::string("test -f ") + c_healthReadyFile};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.Interval.value_or(0));
+            VERIFY_ARE_EQUAL(100'000'000LL, health.Timeout.value_or(0));
+            VERIFY_ARE_EQUAL(300'000'000'000LL, health.StartPeriod.value_or(0));
+
+            // The health command fails while the file is absent, so the container stays "starting".
+            waitForHealthStatus(container, "starting", 60s);
+
+            auto touchProcess = WSLCProcessLauncher({}, {"/usr/bin/touch", c_healthReadyFile}).Launch(container.Get());
+            ValidateProcessOutput(touchProcess, {}, 0);
+
+            waitForHealthStatus(container, "healthy", 60s);
+        }
+
+        // Validate that the image's default health check can be overridden, and that a failing (exit 1) check drives
+        // the runtime status to "unhealthy".
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-override");
+            launcher.SetHealthCmd("exit 1");
+            launcher.SetHealthInterval(1'000'000'000LL);    // 1s
+            launcher.SetHealthStartPeriod(1'000'000'000LL); // 1s
+            launcher.SetHealthRetries(1);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 1"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.Interval.value_or(0));
+            // The override must set an explicit start period: otherwise the engine merges the image's healthcheck
+            // fields for any zero-valued field (see moby daemon merge()), inheriting the image's 300s start period,
+            // during which failing checks keep the container "starting" instead of transitioning to "unhealthy".
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value_or(0));
+            VERIFY_ARE_EQUAL(1, health.Retries.value_or(0));
+
+            // Validate that the container transitions to "unhealthy" after the health command fails.
+            waitForHealthStatus(container, "unhealthy", 60s);
+        }
+
+        // Validate that WSLCContainerFlagsNoHealthCheck disables the image's default health check.
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-disabled");
+            launcher.SetNoHealthcheck();
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"NONE"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // A disabled health check is not monitored, so the container never reports a runtime health status.
+            VERIFY_IS_FALSE(inspect.State.Health.has_value());
+        }
+
+        // Validate that combining WSLCContainerFlagsNoHealthCheck with an explicit health check command is rejected.
+        {
+            WSLCContainerLauncher launcher("wslc-test-healthcheck:latest", "wslc-healthcheck-test-conflict");
+            launcher.SetNoHealthcheck();
+            launcher.SetHealthCmd("exit 0");
+
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+            VERIFY_IS_FALSE(container.has_value());
+        }
+    }
+
     WSLC_TEST_METHOD(BuildImageWithContext)
     {
         auto contextDir = std::filesystem::current_path() / "build-context-file";
@@ -3408,11 +3532,19 @@ class WSLCTests
         auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        // Install socat in the container.
-        //
-        // TODO: revisit this in the future to avoid pulling packages from the network.
-        auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
-        ValidateProcessOutput(installSocat, {}, 0, 300 * 1000);
+        // Install socat in the VM.
+        {
+            constexpr auto c_mountPoint = "/testdata";
+            auto mountSource = std::filesystem::absolute(g_testDataPath);
+
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true));
+            auto unmount =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
+
+            const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
+            auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
+            ValidateProcessOutput(installSocat, {}, 0, 120 * 1000);
+        }
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
@@ -5752,7 +5884,7 @@ class WSLCTests
 
             // Invalid container flags are rejected with E_INVALIDARG.
             options.Image = "debian:latest";
-            options.Flags = static_cast<WSLCContainerFlags>(0x20);
+            options.Flags = static_cast<WSLCContainerFlags>(0x80);
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
 
             // Invalid init process flags are rejected with E_INVALIDARG.
@@ -6473,6 +6605,40 @@ class WSLCTests
             }
         }
 
+        // Validate that health check options are forwarded to the container configuration.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-health", {"sleep", "99999"});
+            launcher.SetHealthCmd("exit 0");
+            launcher.SetHealthInterval(5'000'000'000LL);    // 5s
+            launcher.SetHealthTimeout(3'000'000'000LL);     // 3s
+            launcher.SetHealthStartPeriod(1'000'000'000LL); // 1s
+            launcher.SetHealthRetries(2);
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 0"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+            VERIFY_ARE_EQUAL(5'000'000'000LL, health.Interval.value_or(0));
+            VERIFY_ARE_EQUAL(3'000'000'000LL, health.Timeout.value_or(0));
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value_or(0));
+            VERIFY_ARE_EQUAL(2, health.Retries.value_or(0));
+        }
+
+        // Validate that a container without health options reports no health check.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-no-health", {"sleep", "99999"});
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_FALSE(inspect.Config.Healthcheck.has_value());
+        }
+
         // Validate that Kill() works as expected
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-kill", {"sleep", "99999"}, {});
@@ -6771,6 +6937,82 @@ class WSLCTests
             // session list so the actual count should also be at most one.
             VERIFY_IS_TRUE(containers.size() <= 1u);
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerListDeleteStressTest)
+    {
+        constexpr auto c_iterations = 50;
+
+        const std::string containerName = "wslc-list-delete-stress";
+
+        std::atomic<unsigned int> failures = 0;
+
+        // One thread repeatedly creates a container and then deletes it.
+        std::thread thread([&]() {
+            for (unsigned int i = 0; i < c_iterations; ++i)
+            {
+                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"});
+
+                auto [hrCreate, container] = launcher.CreateNoThrow(*m_defaultSession);
+                if (FAILED(hrCreate))
+                {
+                    LogError("CreateContainer(%hs) unexpected HR: 0x%08x", containerName.c_str(), hrCreate);
+                    ++failures;
+                    continue;
+                }
+
+                if (i % 2 == 0)
+                {
+                    auto result = container->Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+                    if (FAILED(result))
+                    {
+                        LogError("Start(%hs) failed: 0x%08x", containerName.c_str(), result);
+                        ++failures;
+                    }
+
+                    if (i % 4 == 0)
+                    {
+                        result = container->Get().Stop(WSLCSignalSIGKILL, 0);
+                        if (FAILED(result))
+                        {
+                            LogError("Stop(%hs) failed: 0x%08x", containerName.c_str(), result);
+                            ++failures;
+                        }
+                    }
+                }
+
+                HRESULT result = container->Get().Delete(WSLCDeleteFlagsForce);
+                if (FAILED(result))
+                {
+                    LogError("Delete(%hs) failed: 0x%08x", containerName.c_str(), result);
+                    ++failures;
+                }
+                else
+                {
+                    container->SetDeleteOnClose(false);
+                }
+            }
+        });
+
+        while (WaitForSingleObject(thread.native_handle(), 0) == WAIT_TIMEOUT)
+        {
+            WSLCListContainersOptions options{};
+            options.Flags = WSLCListContainersFlagsAll;
+
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            HRESULT hrList = m_defaultSession->ListContainers(
+                &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>());
+            if (FAILED(hrList))
+            {
+                LogError("ListContainers unexpected HR: 0x%08x", hrList);
+                ++failures;
+            }
+        }
+
+        thread.join();
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
     }
 
     WSLC_TEST_METHOD(ContainerNetwork)

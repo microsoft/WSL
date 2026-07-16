@@ -44,6 +44,10 @@ struct WslDistributionConfig;
 
 #define CGROUP_MOUNTPOINT "/sys/fs/cgroup"
 #define CGROUP2_DEVICE "cgroup2"
+#define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
+#define WSL_USER_SYSTEMD_CGROUP_DIR "/systemd"
+#define WSL_USER_NON_SYSTEMD_CGROUP_DIR "/non-systemd"
+#define WSL_USER_NON_DISTRO_CGROUP_PATH WSL_USER_CGROUP_PATH "/non-distro"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
@@ -136,8 +140,10 @@ wil::unique_fd UtilConnectVsock(
 // Needs to be declared before UtilCreateChildProcess().
 void UtilSetThreadName(const char* Name);
 
+void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject);
+
 template <typename TMethod>
-int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {})
+int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, std::optional<std::string> CgroupPath = {})
 
 /*++
 
@@ -153,6 +159,8 @@ Arguments:
 
     CloneFlags - Supplies an optional value containing flags to use for the clone syscall.
         If no flags are specified, fork is used instead.
+
+    CgroupPath - Supplies an optional value containing the path of the cgroup to try move the child process into.
 
 Return Value:
 
@@ -180,6 +188,11 @@ Return Value:
     else if (ChildPid > 0)
     {
         return ChildPid;
+    }
+
+    if (CgroupPath.has_value())
+    {
+        UtilTryMoveSelfToDistroCgroup(CgroupPath.value(), false, ChildName);
     }
 
     try
@@ -329,4 +342,8 @@ int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY 
 // Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
 void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath);
+
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath);

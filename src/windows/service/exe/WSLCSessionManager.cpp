@@ -552,8 +552,9 @@ HRESULT WSLCSessionManagerImpl::CheckTokenAccess(const SessionEntry& Entry, cons
     return S_OK;
 }
 
-WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplClass<WSLCSessionManagerImpl>(Impl)
+WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl)
 {
+    Initialize(Impl);
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
