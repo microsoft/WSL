@@ -27,12 +27,13 @@ Abstract:
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
-        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
-        T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
-        T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
-        T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
-        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
+        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), T_VALUE(c, KernelBootTimeout), \
+        T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), \
+        T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), \
+        T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), T_ENUM(c, MemoryReclaim), \
+        T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), T_VALUE(c, ProcessorCount), \
+        T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), T_SET(c, SystemDistroPath), \
+        T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
 constexpr auto ToString(ConfigKeyPresence key)
@@ -277,6 +278,7 @@ namespace ConfigSetting {
     static constexpr auto AutoProxy = "wsl2.autoProxy";
     static constexpr auto LoadKernelModules = "wsl2.loadKernelModules";
     static constexpr auto LoadDefaultKernelModules = "wsl2.loadDefaultKernelModules";
+    static constexpr auto IsolateDistroCgroup = "wsl2.isolateDistroCgroup";
 
     namespace Experimental {
         static constexpr auto NetworkingMode = "experimental.networkingMode";
@@ -379,6 +381,7 @@ struct Config
     std::filesystem::path CrashDumpFolder;
     int MaxCrashDumpCount = 10;
     UINT64 SwiotlbSizeBytes = 0;
+    bool IsolateDistroCgroup = true;
 
     // Temporary config value to help root cause the truncated archive errors in SetVersion()
     bool SetVersionDebug = false;

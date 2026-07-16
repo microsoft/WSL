@@ -2259,6 +2259,10 @@ Usage:
      <value>A jelölő argumentum nem tartalmazhat szomszédos értéket: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Érvénytelen logikai érték a jelzőargumentumhoz: {}. A várt érték igaz, hamis, 1 vagy 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Nem várt helyen pozícióhoz kötött argumentum található: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2427,7 +2431,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>Munkamenet-tároló létrehozása a(z) {} helyen a session.storagePath által konfigurált módon. Ha később módosítja vagy eltávolítja ezt a beállítást, az itt tárolt adatokat már nem fogja használni az alapértelmezett munkamenet, és a lemezterület felszabadítása érdekében azok törölhetők.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2482,6 +2486,58 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Írás fájlba ahelyett, hogy a STDOUT-ra írna</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.
+Használat: wslc container cp [OPTIONS] SOURCE DEST
+  Helyi tároló: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Tárolóból helyi: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin-ről tárolóba: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Forrás: helyi elérési út, CONTAINER:PATH vagy "-" az stdin esetében</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Cél: helyi elérési út vagy CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Érvénytelen célformátum. Várt érték CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Érvénytelen forrásformátum. Várt érték CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>A forrás elérési útja nem található: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe nem található. A helyi fájlmásoláshoz Windows tar szükséges.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Érvénytelen másolási irány. Forrásként vagy célként használja a CONTAINER:PATH elemet.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Nem olvashatók a tar-adatok a terminálból. Tar-archívum továbbítása az stdin-re.
+Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Nincs fájl kibontva a tárolóarchívumból</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Könyvtár nem másolható fájlelérési útra. Használjon helyette könyvtárcélt (záró elválasztójellel).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Tároló vizsgálata.</value>
@@ -2783,6 +2839,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Az összes megjelenítése állapottól függetlenül.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Archiválási mód (a Docker CLI-kompatibilitás érdekében elfogadva)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Buildelési idő változóinak beállítása (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2849,6 +2909,24 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Érvénytelen {} érték: {}. Csak az "all" támogatott.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>A tároló állapotának ellenőrzéséhez futtatandó parancs</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Az állapot-ellenőrzés futtatása közötti idő (pl. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>A tároló nem megfelelő állapotúként való jelentéséhez szükséges egymást követő hibák száma</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>A tároló inicializálásának kezdő időszaka az állapot-ellenőrzés visszaszámlálása előtt (például 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Egy állapot-ellenőrzés futtatásának maximális ideje (pl. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Képek törlése akkor is, ha használatban vannak</value>
   </data>
@@ -2905,6 +2983,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Ne használjon gyorsítótárat a lemezkép létrehozásakor</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Tároló által megadott állapot-ellenőrzés letiltása</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Ne törölje a címkézetlen szülőket</value>
@@ -3086,6 +3167,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Érvénytelen {} argumentumérték: "{}". A rendszer memóriaméretet várt (például 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Érvénytelen {} argumentumérték: {}. A várt időtartam (pl. 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>A --no-healthcheck beállítás nem kombinálható más állapot-ellenőrzési beállításokkal.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>A(z) {} CID-fájl már létezik</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3176,6 +3265,18 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Törölve: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Tároló csatlakoztatása hálózathoz</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Egy tárolót csatlakoztat egy meglévő hálózathoz.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Tároló leválasztása a hálózatról.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Leválaszt egy tárolót egy meglévő hálózatról.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Kötetek kezelése.</value>

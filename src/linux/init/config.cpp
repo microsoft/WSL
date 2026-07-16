@@ -845,16 +845,16 @@ try
     }
 
     //
-    // Run the Plan 9 server. This requires a DrvFs mount for the socket file,
-    // so either fstab or automount must be enabled to have a chance for the
-    // mount to be available.
+    // Run the Plan 9 server. On WSL1 this requires a DrvFs mount for the socket
+    // file, so either fstab or automount must be enabled to have a chance for
+    // the mount to be available. WSL2 serves over an hvsocket and has no such
+    // dependency.
     //
     // N.B. Failure to start the server is non-fatal.
     //
-
     unsigned int Plan9Port = LX_INIT_UTILITY_VM_INVALID_PORT;
     if ((WI_IsFlagClear(Config.FeatureFlags.value(), LxInitFeatureDisable9pServer)) && (Config.Plan9Enabled) &&
-        (Config.AutoMount || Config.MountFsTab))
+        (UtilIsUtilityVm() || Config.AutoMount || Config.MountFsTab))
     {
         std::tie(Plan9Port, Config.Plan9ControlChannel) = StartPlan9Server(Plan9SocketPath, Config);
     }
@@ -992,17 +992,21 @@ try
 
     if (Config.BootCommand.has_value())
     {
-        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
-            //
-            // Restore default signal dispositions for the child process.
-            //
+        UtilCreateChildProcess(
+            "BootCommand",
+            [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
+                //
+                // Restore default signal dispositions for the child process.
+                //
 
-            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
-            THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+                THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
+                THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-            execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
-            LOG_ERROR("execl() failed, {}", errno);
-        });
+                execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
+                LOG_ERROR("execl() failed, {}", errno);
+            },
+            {},
+            Config.CgroupPath);
     }
 
     return 0;

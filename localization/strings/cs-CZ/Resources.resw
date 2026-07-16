@@ -2259,6 +2259,10 @@ Využití:
      <value>Argument příznaku nemůže obsahovat sousedící hodnotu: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Neplatná logická hodnota pro argument příznaku: '{}'. Očekávala se hodnota true, false, 1 nebo 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Našel se poziční argument, i když nebyl očekáván: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2427,7 +2431,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>Vytváří se úložiště relace v „{}“ podle nastavení session.storagePath. Pokud později toto nastavení změníte nebo odeberete, nebudou už data uložená tady ve výchozí relaci používána a je možné je odstranit, aby bylo možné uvolnit místo.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2482,6 +2486,58 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Zápis do souboru místo STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Kopíruje soubory mezi kontejnerem a místním systémem souborů.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Kopírujte soubory mezi kontejnerem a místním systémem souborů.
+Použití: wslc container cp [OPTIONS] SOURCE DEST
+  Z místního prostředí do kontejneru: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Z kontejneru do místního prostředí: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Ze stdin do kontejneru: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Zdroj: místní cesta, CONTAINER:PATH nebo '-' pro stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Cíl: místní cesta nebo CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Neplatný formát cíle. Očekávaný formát: CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Neplatný formát zdroje. Očekávaný formát: CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Zdrojová cesta se nenašla: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe se nenašel. Pro místní kopírování souborů je potřeba Windows tar.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Neplatný směr kopírování. Použijte CONTAINER:PATH jako zdroj nebo cíl.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Z terminálu nejde číst data tar. Předejte archiv tar přes kanál do stdin.
+Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Z archivního kontejneru nebyl extrahován žádný soubor</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Adresář nejde kopírovat do cesty k souboru. Místo toho použijte jako cíl adresář (s koncovým oddělovačem).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Zkontrolovat kontejner.</value>
@@ -2783,6 +2839,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Zobrazit vše bez ohledu na stav.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Režim archivu (přijímá se kvůli kompatibilitě s Docker CLI)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Nastavit proměnné pro sestavení (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2849,6 +2909,24 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Neplatná hodnota {}: '{}'. Podporuje se pouze 'all'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Příkaz ke spuštění pro kontrolu stavu kontejneru</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Doba mezi spuštěními kontroly stavu (např. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Počet po sobě jdoucích selhání potřebných k nahlášení kontejneru jako poškozeného</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Počáteční doba, po kterou se kontejner může inicializovat před odpočítáváním kontroly stavu (např. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Maximální doba, po kterou může běžet jedna kontrola stavu (např. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Odstranit image, i když se používají</value>
   </data>
@@ -2905,6 +2983,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Nepoužívejte mezipaměť při sestavování image</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Zakázat všechny kontroly stavu určené kontejnerem</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Neodstraňovat neoznačené nadřazené image</value>
@@ -3086,6 +3167,14 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Neplatná hodnota argumentu {}: {} Očekávaná velikost paměti (např. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Neplatná hodnota argumentu {}: {}. Očekává se doba trvání (např. 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>Možnost --no-healthcheck nejde kombinovat s jinými možnostmi kontroly stavu.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>Soubor CID '{}' již existuje</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3176,6 +3265,18 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Odstraněno: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Připojte kontejner k síti</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Připojuje kontejner k existující síti.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Odpojte kontejner od sítě.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Odpojí kontejner od existující sítě.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Spravujte svazky.</value>

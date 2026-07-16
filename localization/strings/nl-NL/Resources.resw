@@ -2259,6 +2259,10 @@ Gebruik:
      <value>Vlagargument mag geen verbonden waarde bevatten: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Ongeldige booleaanse waarde voor vlagargument: '{}'. Verwacht true, false, 1 of 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Er is een positioneel argument gevonden, terwijl er geen werd verwacht: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2482,6 +2486,58 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Schrijf naar een bestand, in plaats van STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Bestanden kopiëren tussen een container en het lokale bestandssysteem.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Kopieer bestanden tussen een container en het lokale bestandssysteem.
+Gebruik: wslc container cp [OPTIES] BRON BESTEMMING
+  Lokaal naar container: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Container naar lokaal: wslc container cp CONTAINER:PATH LOCAL_PATH
+  stdin naar container: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Bron: lokaal pad, CONTAINER:PATH, of '-' voor stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Doel: lokaal pad of CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Ongeldige doelindeling. Verwacht CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Ongeldige bronindeling. Verwacht CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Bronpad niet gevonden: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe niet gevonden. Windows tar is vereist voor het lokaal kopiëren van bestanden.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Ongeldige kopieerrichting. Gebruik CONTAINER:PATH als bron of doel.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Kan geen tar-gegevens van de terminal lezen. Stuur een tar-archief naar stdin.
+Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Er konden geen bestanden uit het containerarchief worden uitgepakt</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Kan een map niet naar een bestandspad kopiëren. Gebruik in plaats daarvan een mapdoel (met een afsluitend scheidingsteken).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Een container inspecteren.</value>
@@ -2783,6 +2839,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Alles weergeven, ongeacht de status.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Archiefmodus (geaccepteerd voor Docker CLI-compatibiliteit)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Set build-time variables (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2849,6 +2909,24 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {}-waarde: {}. Alleen 'all' wordt ondersteund.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Opdracht om uit te voeren om de gezondheid van de container te controleren</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Tijd tussen het uitvoeren van de healthcheck (bijv. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Het aantal opeenvolgende fouten dat nodig is om de container als niet in orde te melden</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Startperiode voor het initialiseren van de container voordat het aftellen voor de healthcheck begint (bijv. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Maximale tijd om één healthcheck uit te voeren (bijv. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Afbeeldingen verwijderen, zelfs als ze worden gebruikt</value>
   </data>
@@ -2905,6 +2983,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Gebruik geen cache bij het bouwen van de image</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Schakel een eventuele door de container opgegeven gezondheidscontrole uit</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Verwijder geen niet-getagde bovenliggende items</value>
@@ -3086,6 +3167,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Er wordt een duur verwacht (bijvoorbeeld 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>De optie --no-healthcheck kan niet worden gecombineerd met andere healthcheckopties.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID-bestand {} bestaat al</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3176,6 +3265,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Verwijderd: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Een container verbinden met een netwerk</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Verbindt een container met een bestaand netwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Koppel een container los van een netwerk.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Verbreekt de verbinding van een container met een bestaand netwerk.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Volumes beheren.</value>

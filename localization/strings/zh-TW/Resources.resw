@@ -453,11 +453,9 @@
             --enable-wsl1
                 啟用 WSL1 支援。
  
-
             --fixed-vhd
                 建立大小固定的磁碟，以儲存發佈。
  
-
             --from-file &lt;Path&gt;
                 從本機檔案安裝發佈。
 
@@ -485,9 +483,7 @@
             --web-download
                 從網際網路下載發佈，而非從 Microsoft Store 下載。
 
- 
     --manage &lt;Distro&gt; &lt;Options...&gt;
- 
         變更 distro 指定選項。
 
         選項:
@@ -497,7 +493,6 @@
             --set-sparse, -s &lt;true|false&gt;
 將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
  
-
             --set-default-user &lt;Username&gt;
                 設定發佈的預設使用者。
 
@@ -537,7 +532,6 @@
             --force
                 結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
 
- 
     --status
         顯示 Linux 版 Windows 子系統的狀態。
 
@@ -565,7 +559,6 @@
         stdout 的檔案名稱可以是 -。
 
         選項:
- 
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
@@ -2272,6 +2265,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <value>旗標引數不能包含鄰近值: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>旗標引數的布林值無效:「{}」。預期為 True、false、1 或 0。</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>在未預期的情況下找到位置引數: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2440,7 +2437,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>正在依照 session.storagePath 的設定，在 '{}' 建立工作階段儲存體。如果您稍後變更或移除此設定，預設工作階段將不再使用儲存在這裡的資料，而且您可以刪除這些資料以回收空間。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2495,6 +2492,58 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>寫入檔案，而不是 STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>在容器與本機檔案系統之間複製檔案。</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>在容器與本機檔案系統之間複製檔案。
+使用方式: wslc container cp [OPTIONS] SOURCE DEST
+  本機至容器: wslc container cp LOCAL_PATH CONTAINER:PATH
+  容器至區域l: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin 至容器: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>來源: stdin 的本機路徑、CONTAINER:PATH 或針對 stdin 的「-」</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>目的地: 區域路徑或 CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>無效目的格式。預期的 CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>無效來源格式。預期的 CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>找不到來源路徑: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>找不到 tar.exe。本機檔案複製需要 Windows tar。</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>複製方向無效。使用 CONTAINER:PATH 作為來源或目的地。</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>無法從終端機讀取 tar 資料。將一個 tar 封存輸送至 stdin。
+範例: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>未從容器封存層擷取檔案</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>無法將目錄複製到檔案路徑。請改用目錄目標 (，後置為分隔符號)。</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>檢查容器。</value>
@@ -2796,6 +2845,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>全部顯示 (不論狀態)。</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>封存模式 (已接受以確保 Docker CLI 相容性)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>設定建置時間變數 (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2862,6 +2915,24 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>{} 值無效： '{}'。僅支援 'all'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>用來檢查容器健康情況的執行命令</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>執行健康檢查之間的間隔時間 (例如 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>報告容器狀況不良所需的連續失敗</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>容器在健康檢查倒數開始前的初始化期間 (例如 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>允許單次健康檢查執行的最長時間 (例如 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>即使映像正在使用，仍將其刪除</value>
   </data>
@@ -2918,6 +2989,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>建置影像時請勿使用快取</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>停用任何容器指定的健康檢查</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>不要刪除未標記的父項</value>
@@ -3099,6 +3173,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>{} 引數值無效： '{}'。預期記憶體大小 (，例如 256M、1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>無效的 {} 引數值: '{}'。預期持續時間 (例如 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>--no-healthcheck 選項不能與其他健康檢查選項搭配使用。</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID 檔案 '{}' 已存在</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3189,6 +3271,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>已刪除: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>將容器連線到網路</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>將容器連接到現有網路。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>將容器從網路中斷連線。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>將容器從現有網路中斷連線。</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>管理磁碟區。</value>

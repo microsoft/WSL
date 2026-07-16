@@ -110,6 +110,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
         ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
         ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
+        ConfigKey(ConfigSetting::IsolateDistroCgroup, IsolateDistroCgroup),
 
         // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
