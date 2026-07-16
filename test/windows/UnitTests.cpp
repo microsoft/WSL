@@ -531,11 +531,11 @@ class UnitTests
         auto cleanupPeerSystemd = EnableSystemd("", peerDistroName);
 
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)),
-            0L);
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
 
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+            LxsstuLaunchWsl(std::format(
+                L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
             0L);
         auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
