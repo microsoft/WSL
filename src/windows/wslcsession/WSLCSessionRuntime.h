@@ -235,10 +235,11 @@ private:
 
     // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
     // never finished starting (or had no started notification) does not emit a spurious stopping.
-    // The gate flip happens under m_notifyLock so it stays atomic across the start/stop notifications;
-    // the hook itself is copied out and fired after the lock is released, because the handler may
-    // reentrantly restart the VM (re-entering these notifications) and would self-deadlock otherwise.
-    std::mutex m_notifyLock;
+    // The gate flip and the hook invocation both happen under m_notifyLock, so a start and a stop
+    // racing on different threads cannot interleave (which would otherwise let a stale OnVmStarted be
+    // delivered after the OnVmStopping it should have preceded). Recursive because the handler may
+    // reentrantly restart the VM, re-entering these notifications on the same thread.
+    std::recursive_mutex m_notifyLock;
     std::atomic<bool> m_vmStartNotified{false};
     std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
 

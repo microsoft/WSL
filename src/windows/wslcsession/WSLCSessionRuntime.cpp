@@ -263,49 +263,39 @@ void WSLCSessionRuntime::EnsureVmRunning()
 
 void WSLCSessionRuntime::NotifyVmStarted()
 {
-    // Flip the pairing state under m_notifyLock so it stays atomic against a concurrent NotifyVmStopping,
-    // then fire the hook after releasing the lock. The handler may reentrantly restart the VM (e.g.
-    // WSLCCreateProcess -> NotifyVmStarted/Stopping); invoking it under this non-recursive mutex would
-    // self-deadlock. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
+    // Hold m_notifyLock across both the pairing-state flip and the hook invocation, so a concurrent
+    // NotifyVmStopping on another thread cannot deliver its OnVmStopping in between and observe this
+    // OnVmStarted arrive late (which would otherwise leave the plugin with a trailing "started" for a
+    // VM that already stopped). m_notifyLock is recursive: the handler may reentrantly restart the VM
+    // (e.g. WSLCCreateProcess -> NotifyVmStarted/Stopping) on this same thread, which would self-deadlock
+    // under a plain mutex. Suppressed once terminating, else a racing Shutdown leaves OnVmStarted unpaired.
     // m_vmStartNotified tracks the VM lifecycle, not whether OnVmStarted is installed, so a hooks user
     // that sets only OnVmStopping still gets paired stop notifications.
-    std::function<void()> hook;
+    auto lock = std::lock_guard(m_notifyLock);
+
+    if (m_terminating->load())
     {
-        auto lock = std::lock_guard(m_notifyLock);
-
-        if (m_terminating->load())
-        {
-            return;
-        }
-
-        m_vmStartNotified.store(true);
-        hook = m_hooks.OnVmStarted;
+        return;
     }
 
-    if (hook)
+    m_vmStartNotified.store(true);
+    if (m_hooks.OnVmStarted)
     {
-        hook();
+        m_hooks.OnVmStarted();
     }
 }
 
 void WSLCSessionRuntime::NotifyVmStopping()
 {
-    // Decide the pairing under m_notifyLock (paired once with a prior OnVmStarted, skipped if bring-up
-    // never completed), then fire the hook after releasing the lock. The handler may reentrantly restart
-    // the VM and call NotifyVmStarted; invoking it under this non-recursive mutex would self-deadlock.
-    std::function<void()> hook;
-    {
-        auto lock = std::lock_guard(m_notifyLock);
+    // See NotifyVmStarted: hold m_notifyLock across both the pairing decision (paired once with a prior
+    // OnVmStarted, skipped if bring-up never completed) and the hook invocation, so the two notifications
+    // cannot interleave across threads. Recursive because the handler may reentrantly restart the VM and
+    // call NotifyVmStarted on this same thread.
+    auto lock = std::lock_guard(m_notifyLock);
 
-        if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
-        {
-            hook = m_hooks.OnVmStopping;
-        }
-    }
-
-    if (hook)
+    if (m_vmStartNotified.exchange(false) && m_hooks.OnVmStopping)
     {
-        hook();
+        m_hooks.OnVmStopping();
     }
 }
 
@@ -612,6 +602,15 @@ try
 
     if (m_idleState->ActivityCount() != 0)
     {
+        // Release the expected-stop claim before dropping the lock again for NotifyVmStarted(): that
+        // call runs with m_lock dropped, and a VM crash in that window must be claimable by
+        // OnVmExited() as a normal spontaneous exit. Leaving the claim held here would make
+        // OnVmExited() silently decline the crash (disposition mismatch) while m_vmState stays
+        // Running, wedging the session until an explicit Terminate/Shutdown. dispositionCleanup's
+        // CAS on return is then a harmless no-op.
+        auto stopRequested = VmExitDisposition::StopRequested;
+        m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+
         lock.reset();
         NotifyVmStarted();
         return;
