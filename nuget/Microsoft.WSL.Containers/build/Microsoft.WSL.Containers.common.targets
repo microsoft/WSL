@@ -158,8 +158,7 @@
         <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
 
         <PropertyGroup>
-            <_WslcBuildOptions></_WslcBuildOptions>
-            <_WslcBuildOptions>$(_WslcBuildOptions) -t &quot;$(_WslcFullRef)&quot;</_WslcBuildOptions>
+            <_WslcBuildOptions>-t &quot;$(_WslcFullRef)&quot;</_WslcBuildOptions>
             <_WslcBuildOptions Condition="'$(_WslcNoCache)' == 'true'">$(_WslcBuildOptions) --no-cache</_WslcBuildOptions>
             <_WslcBuildOptions Condition="'$(_WslcPull)' == 'true'">$(_WslcBuildOptions) --pull</_WslcBuildOptions>
             <_WslcBuildOptions Condition="'@(_WslcBuildArgItems)' != ''">$(_WslcBuildOptions) @(_WslcBuildArgItems->'--build-arg &quot;%(Identity)&quot;', ' ')</_WslcBuildOptions>
@@ -170,7 +169,7 @@
         <Message Importance="high"
                  Text="WSLC: Building image '$(_WslcFullRef)'..." />
 
-        <Exec Command="&quot;$(WslcCliPath)&quot; image build$(_WslcBuildOptions) &quot;$(_WslcContext)&quot;"
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build $(_WslcBuildOptions) &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
         <Message Importance="high"
