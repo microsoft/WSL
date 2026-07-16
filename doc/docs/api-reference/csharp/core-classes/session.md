@@ -181,7 +181,7 @@ Authenticates to a registry and returns an identity token string.
 string token = session.Authenticate(
     new Uri("https://registry.example.com"),
     "user1",
-    Environment.GetEnvironmentVariable("REGISTRY_PASSWORD")!);
+    "password");
 ```
 
 ## Session.GetImages()
