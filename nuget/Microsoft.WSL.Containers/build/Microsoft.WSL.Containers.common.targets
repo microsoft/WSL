@@ -92,12 +92,6 @@
         .dockerignore and other Docker build inputs still invalidate the marker.
     -->
     <Target Name="_WslcCollectSources">
-        <PropertyGroup>
-            <_WslcBuildSignaturePath>$(_WslcIntDir)wslc.$(_WslcName).options</_WslcBuildSignaturePath>
-        </PropertyGroup>
-
-        <MakeDir Directories="$(_WslcIntDir)" />
-
         <ItemGroup>
             <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
@@ -105,6 +99,18 @@
             <_WslcSourceFiles Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
             <_WslcBuildArgItems Include="$([MSBuild]::Unescape('$(_WslcBuildArgs)').Split(';'))" Condition="'$(_WslcBuildArgs)' != ''" />
             <_WslcLabelItems Include="$([MSBuild]::Unescape('$(_WslcLabels)').Split(';'))" Condition="'$(_WslcLabels)' != ''" />
+        </ItemGroup>
+    </Target>
+
+    <Target Name="_WslcWriteBuildSignature"
+            DependsOnTargets="_WslcResolveImageRef;_WslcCollectSources">
+        <PropertyGroup>
+            <_WslcBuildSignaturePath>$(_WslcIntDir)wslc.$(_WslcName).options</_WslcBuildSignaturePath>
+        </PropertyGroup>
+
+        <MakeDir Directories="$(_WslcIntDir)" />
+
+        <ItemGroup>
             <_WslcBuildSignature Include="Image=$(_WslcFullRef)" />
             <_WslcBuildSignature Include="Dockerfile=$(_WslcDockerfile)" />
             <_WslcBuildSignature Include="Context=$(_WslcContext)" />
@@ -151,7 +157,7 @@
     <!-- Build + save one image atomically (per-image, so a mid-list failure
          leaves a coherent state). Save writes <tar>.tmp and Moves on success. -->
     <Target Name="_WslcBuildAndSaveSingleImage"
-            DependsOnTargets="_WslcResolveImageRef;_WslcCollectSources;_WslcResolveSavePath"
+            DependsOnTargets="_WslcWriteBuildSignature;_WslcResolveSavePath"
             Inputs="@(_WslcSourceFiles)"
             Outputs="$(_WslcTarPath)">
 
