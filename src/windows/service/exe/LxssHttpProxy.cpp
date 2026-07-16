@@ -502,8 +502,7 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
 
         executionStep = "WinHttpGetProxySettingsEx";
         // Query the proxy settings
-        const DWORD dwError =
-            s_WinHttpGetProxySettingsEx.value()(resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, context);
+        const DWORD dwError = s_WinHttpGetProxySettingsEx.value()(resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, context);
 
         if (dwError != ERROR_IO_PENDING && dwError != ERROR_SUCCESS)
         {
