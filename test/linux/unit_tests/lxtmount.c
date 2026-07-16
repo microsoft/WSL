@@ -649,14 +649,26 @@ Return Value:
     struct libmnt_table* Table;
 
     //
-    // Find the mount ID of the  directory. This is done by device because
-    // it may not be a mount point.
+    // Prefer an exact mount-point match when the path is itself a mount point,
+    // returning the topmost mount there (which is exactly the parent a new mount
+    // placed at this path will get).
+    //
+    // Aggregate virtio-fs collapses every Windows share onto a single device, so
+    // all shares report the same device number. A device-based lookup is
+    // therefore ambiguous and can return an arbitrary share's mount, which makes
+    // callers such as the drvfs parent-id checks nondeterministic. Fall back to
+    // the device search only for paths that are not mount points (e.g. a
+    // directory whose mount was just removed).
     //
 
     FileSystem = NULL;
     Table = NULL;
     LxtCheckErrnoZeroSuccess(stat(Path, &Stat));
-    LxtCheckResult(MountFindMount(MOUNT_PROC_MOUNTINFO, NULL, Stat.st_dev, &Table, &FileSystem, MNT_ITER_BACKWARD));
+    LxtCheckResult(MountFindMount(MOUNT_PROC_MOUNTINFO, Path, 0, &Table, &FileSystem, MNT_ITER_BACKWARD));
+    if (FileSystem == NULL)
+    {
+        LxtCheckResult(MountFindMount(MOUNT_PROC_MOUNTINFO, NULL, Stat.st_dev, &Table, &FileSystem, MNT_ITER_BACKWARD));
+    }
 
     LxtCheckNotEqual(FileSystem, NULL, "%p");
     Result = mnt_fs_get_id(FileSystem);
