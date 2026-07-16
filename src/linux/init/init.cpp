@@ -344,6 +344,11 @@ int GenerateSystemdUnits(int Argc, char** Argv)
             File.reset();
         }
 
+        if (automountRoot.empty() || automountRoot.back() != '/')
+        {
+            automountRoot += '/';
+        }
+
         // Mask systemd-networkd-wait-online.service since WSL always ensures that networking is configured during boot.
         // That unit can cause systemd boot timeouts since WSL's network interface is unmanaged by systemd.
         THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/systemd-networkd-wait-online.service", installPath).c_str()) < 0);
@@ -354,11 +359,6 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         // Mask console-getty.service since /dev/tty devices are shared at the VM level across all distros.
         // When multiple distros are running, the second distro's getty fails because the tty is already held.
         THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/console-getty.service", installPath).c_str()) < 0);
-
-        if (automountRoot.empty() || automountRoot.back() != '/')
-        {
-            automountRoot += '/';
-        }
 
         const auto sharedMountPath = automountRoot + "wsl";
         const auto mountGuardUnitContent = std::format(
