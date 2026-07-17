@@ -1000,7 +1000,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
         {
             const auto diskHandle = wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-            wsl::windows::common::disk::SetOnline(diskHandle.get(), false, m_vmConfig.MountDeviceTimeout);
+            wsl::windows::common::disk::SetOnline(diskHandle.get(), true, m_vmConfig.MountDeviceTimeout);
         }
     });
 
