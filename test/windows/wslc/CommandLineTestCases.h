@@ -95,7 +95,8 @@ COMMAND_LINE_TEST_CASE(L"container run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --cidfile C:\\temp\\cidfile ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --rm -it --name foo ubuntu", L"run", true)
-COMMAND_LINE_TEST_CASE(L"stop", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"stop", L"stop", false)           // Missing required container-id positional
+COMMAND_LINE_TEST_CASE(L"container stop", L"stop", false) // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal SIGALRM", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal sigkill", L"stop", true)
