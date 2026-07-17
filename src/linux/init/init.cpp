@@ -2572,23 +2572,33 @@ Return Value:
                 continue;
             }
 
-            int Status{};
-            auto Pid = waitpid(-1, &Status, WNOHANG);
-            if (Pid == 0)
+            bool distroInitExited = false;
+            for (;;)
             {
-                continue;
-            }
-            else if (Pid > 0)
-            {
-                if (Pid == distroInitPid.value())
+                int Status{};
+                auto Pid = waitpid(-1, &Status, WNOHANG);
+                if (Pid == 0)
                 {
-                    LOG_ERROR("Init has exited. Terminating distribution");
                     break;
                 }
+                else if (Pid > 0)
+                {
+                    distroInitExited |= (Pid == distroInitPid.value());
+                }
+                else if (errno == ECHILD)
+                {
+                    break;
+                }
+                else
+                {
+                    FATAL_ERROR("waitpid failed {}", errno);
+                }
             }
-            else if (errno != ECHILD)
+
+            if (distroInitExited)
             {
-                FATAL_ERROR("waitpid failed {}", errno);
+                LOG_ERROR("Init has exited. Terminating distribution");
+                break;
             }
         }
     }
