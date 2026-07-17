@@ -4,8 +4,8 @@
 #include "GuestDeviceManager.h"
 #include "DeviceHostProxy.h"
 
-GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId) :
-    m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId))
+GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId, bool EnableTelemetry) :
+    m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId, EnableTelemetry))
 {
 }
 
@@ -19,47 +19,18 @@ GuestDeviceManager::~GuestDeviceManager()
 }
 
 _Requires_lock_not_held_(m_lock)
-GUID GuestDeviceManager::AddGuestDevice(
-    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
+GUID GuestDeviceManager::AddVirtiofsDevice(_In_ PCWSTR Label, _In_opt_ PCWSTR MountOptions, _In_ PCWSTR RootPath, _In_ HANDLE UserToken, VirtioFsShareOptions Options)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
-    return AddHdvShareWithOptions(DeviceId, ImplementationClsid, AccessName, Options, Path, Flags, UserToken);
+    return m_deviceHostSupport->AddVirtiofsDevice(
+        UserToken, Label, RootPath, Options.Kind, Options.SharedMemorySizeMb, MountOptions ? MountOptions : L"");
 }
 
-_Requires_lock_held_(m_lock)
-GUID GuestDeviceManager::AddHdvShareWithOptions(
-    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
+_Requires_lock_not_held_(m_lock)
+GUID GuestDeviceManager::AddVirtioPmemDevice(_In_ PCWSTR Path, bool ReadOnly, _In_ HANDLE UserToken)
 {
-    wil::com_ptr<IPlan9FileSystem> server;
-
-    // Options are appended to the name with a semi-colon separator.
-    //  "name;key1=value1;key2=value2"
-    // The AddSharePath implementation is responsible for separating them out and interpreting them.
-    // N.B. A ";vm_id=<guid>" option is always appended so the device host can identify the owning VM.
-    std::wstring nameWithOptions{AccessName};
-    if (ARGUMENT_PRESENT(Options) && Options[0] != L'\0')
-    {
-        nameWithOptions += L";";
-        nameWithOptions += Options;
-    }
-
-    nameWithOptions += std::format(L";vm_id={}", m_machineId);
-
-    {
-        auto revert = wil::impersonate_token(UserToken);
-
-        server = GetRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag);
-        if (!server)
-        {
-            server = wil::CoCreateInstance<IPlan9FileSystem>(ImplementationClsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
-            m_deviceHostSupport->AddRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag.c_str(), server);
-        }
-
-        THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), Path, Flags));
-    }
-
-    // This requires more privileges than the user may have, so impersonation is disabled.
-    return m_deviceHostSupport->AddNewDevice(DeviceId, server, AccessName);
+    auto guestDeviceLock = m_lock.lock_exclusive();
+    return m_deviceHostSupport->AddVirtioPmemDevice(UserToken, Path, !ReadOnly);
 }
 
 _Requires_lock_not_held_(m_lock)
@@ -69,22 +40,35 @@ GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil:
     return m_deviceHostSupport->AddNewDevice(deviceId, server, tag);
 }
 
+GUID GuestDeviceManager::AddVirtioNetDevice(_In_ PCWSTR Tag, const WslVirtioNetConfig& Config, const std::vector<IpAddress>& Nameservers, _In_ HANDLE UserToken)
+{
+    auto guestDeviceLock = m_lock.lock_exclusive();
+    THROW_HR_IF(E_INVALIDARG, m_virtioNetDevices.contains(Tag));
+    const auto instanceId = m_deviceHostSupport->AddVirtioNetDevice(UserToken, Config, Nameservers);
+    m_virtioNetDevices.emplace(Tag, instanceId);
+    return instanceId;
+}
+
+wil::com_ptr<IWslVirtioNetDevice> GuestDeviceManager::GetVirtioNetDevice(_In_ PCWSTR Tag)
+{
+    auto guestDeviceLock = m_lock.lock_shared();
+    const auto device = m_virtioNetDevices.find(Tag);
+    THROW_HR_IF(E_NOT_SET, device == m_virtioNetDevices.end());
+    return m_deviceHostSupport->GetVirtioNetDevice(device->second);
+}
+
 void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server)
 {
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);
 }
 
-void GuestDeviceManager::AddSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
+void GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
 
-    // For virtiofs hdv, the flags parameter has been overloaded. Flags are placed in the lower
-    // 16 bits, while the shared memory size in megabytes are placed in the upper 16 bits.
-    static constexpr auto VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT = 16;
-    UINT32 flags = (SizeMb << VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT);
-    WI_SetFlag(flags, VIRTIO_FS_FLAGS_TYPE_SECTIONS);
-    (void)AddHdvShareWithOptions(VIRTIO_FS_DEVICE_ID, ImplementationClsid, Tag, {}, objectLifetime.Path.c_str(), flags, UserToken);
+    (void)m_deviceHostSupport->AddVirtiofsDevice(
+        UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
     m_objectDirectories.emplace_back(std::move(objectLifetime));
 }
 
@@ -149,9 +133,23 @@ wil::com_ptr<IPlan9FileSystem> GuestDeviceManager::GetRemoteFileSystem(_In_ REFC
     return m_deviceHostSupport->GetRemoteFileSystem(clsid, tag);
 }
 
+void GuestDeviceManager::SetSwiotlb(UINT64 GpaBase, UINT64 SizeBytes)
+{
+    m_deviceHostSupport->SetSwiotlb(GpaBase, SizeBytes);
+}
+
 _Requires_lock_not_held_(m_lock)
-void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& DeviceId, _In_ const GUID& InstanceId)
+void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& InstanceId)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
-    m_deviceHostSupport->RemoveDevice(DeviceId, InstanceId);
+    for (auto it = m_virtioNetDevices.begin(); it != m_virtioNetDevices.end(); ++it)
+    {
+        if (IsEqualGUID(it->second, InstanceId))
+        {
+            m_virtioNetDevices.erase(it);
+            break;
+        }
+    }
+
+    m_deviceHostSupport->RemoveDevice(InstanceId);
 }
