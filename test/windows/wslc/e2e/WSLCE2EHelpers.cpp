@@ -403,6 +403,9 @@ void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
     {
         if (image.Repository && image.Tag && image.Repository->starts_with(prefix))
         {
+            // No container cleanup here: the images this prunes are only ever built and inspected, never used to
+            // create containers, so image delete --force is sufficient. If a future test containerizes a built
+            // image, remove its container in that test's cleanup rather than broadening this prefix-based safety net.
             const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", *image.Repository, *image.Tag));
             RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
         }

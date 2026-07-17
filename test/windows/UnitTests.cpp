@@ -2526,8 +2526,18 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Keys that are only created by the MSI.
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
-            L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}",
+            L"SOFTWARE\\Classes\\CLSID\\{2C3E9A41-7B5D-4F18-93D6-A8C2E4F7B1D9}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{E3146082-A0DA-43A7-813B-A89EEE8C7628}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{4F9C8B23-D6E1-4A85-BF2A-E7C5D8F931A6}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{9C9C7131-D756-48FA-BD49-734E75AF37C0}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}\\InProcServer32",
+            L"SOFTWARE\\Classes\\Interface\\{27394DCF-6383-4E4E-BB0A-C13D4E5F6071}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{D2F47B8A-1E3C-4D9F-A6B5-7C8E9F0A1B2C}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32"};
 
         for (const auto* keyName : serviceKeys)
         {

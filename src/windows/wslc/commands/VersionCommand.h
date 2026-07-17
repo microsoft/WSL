@@ -22,6 +22,7 @@ struct VersionCommand final : public Command
     {
     }
     static void PrintVersion();
+    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

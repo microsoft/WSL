@@ -4,27 +4,13 @@
 
 #include "DeviceHostProxy.h"
 
-// Flags for virtiofs vdev device creation.
-#define VIRTIO_FS_FLAGS_TYPE_FILES 0x8000
-#define VIRTIO_FS_FLAGS_TYPE_SECTIONS 0x4000
-
 inline const std::wstring c_defaultDeviceTag = L"default";
 
-// Use vcpus=1 so the device exposes a single virtio queue, bounding concurrent
-// guest-memory apertures to avoid hitting the host VID's 512-aperture quota.
-// TODO: revisit when the devicehost supports multiple shares per device.
-inline const std::wstring c_vcpusOption = L"vcpus=1";
-
-// These device types and class IDs are implemented by the external wsldevicehost vdev.
-DEFINE_GUID(VIRTIO_FS_DEVICE_ID, 0x872270E1, 0xA899, 0x4AF6, 0xB4, 0x54, 0x71, 0x93, 0x63, 0x44, 0x35, 0xAD); // {872270E1-A899-4AF6-B454-7193634435AD}
-DEFINE_GUID(VIRTIO_FS_ADMIN_CLASS_ID, 0x7E6AD219, 0xD1B3, 0x42D5, 0xB8, 0xEE, 0xD9, 0x63, 0x24, 0xE6, 0x4F, 0xF6); // {7E6AD219-D1B3-42D5-B8EE-D96324E64FF6}
-DEFINE_GUID(VIRTIO_FS_CLASS_ID, 0x60285AE6, 0xAAF3, 0x4456, 0xB4, 0x44, 0xA6, 0xC2, 0xD0, 0xDE, 0xDA, 0x38); // {60285AE6-AAF3-4456-B444-A6C2D0DEDA38}
-
-DEFINE_GUID(VIRTIO_NET_DEVICE_ID, 0xF07010D0, 0x0EA9, 0x447F, 0x88, 0xEF, 0xBD, 0x95, 0x2A, 0x4D, 0x2F, 0x14); // {F07010D0-0EA9-447F-88EF-BD952A4D2F14}
-DEFINE_GUID(VIRTIO_NET_CLASS_ID, 0x9E0D1898, 0xCA63, 0x424E, 0x8D, 0x49, 0x9D, 0x60, 0x67, 0xA3, 0x6B, 0xCE); // {9E0D1898-CA63-424E-8D49-9D6067A36BCE}
-
-DEFINE_GUID(VIRTIO_PMEM_DEVICE_ID, 0xEDBB24BB, 0x5E19, 0x40F4, 0x8A, 0x0F, 0x82, 0x24, 0x31, 0x30, 0x64, 0xFD); // {EDBB24BB-5E19-40F4-8A0F-8224313064FD}
-DEFINE_GUID(VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 0x78, 0x7A, 0xBC, 0xF6, 0xC2); // {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
+struct VirtioFsShareOptions
+{
+    VirtiofsShareKind Kind = VirtiofsShareKind_FileBacked;
+    UINT32 SharedMemorySizeMb = 0;
+};
 
 //
 // Provides synchronized access to guest device operations.
@@ -32,42 +18,35 @@ DEFINE_GUID(VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 
 class GuestDeviceManager
 {
 public:
-    GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId);
+    GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId, bool EnableTelemetry = true);
     ~GuestDeviceManager();
 
     _Requires_lock_not_held_(m_lock)
-    GUID AddGuestDevice(
-        _In_ const GUID& DeviceId,
-        _In_ const GUID& ImplementationClsid,
-        _In_ PCWSTR AccessName,
-        _In_opt_ PCWSTR Options,
-        _In_ PCWSTR Path,
-        _In_ UINT32 Flags,
-        _In_ HANDLE UserToken);
+    GUID AddVirtiofsDevice(_In_ PCWSTR Label, _In_opt_ PCWSTR MountOptions, _In_ PCWSTR RootPath, _In_ HANDLE UserToken, VirtioFsShareOptions Options = {});
+
+    _Requires_lock_not_held_(m_lock)
+    GUID AddVirtioPmemDevice(_In_ PCWSTR Path, bool ReadOnly, _In_ HANDLE UserToken);
 
     _Requires_lock_not_held_(m_lock)
     GUID AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag);
 
+    _Requires_lock_not_held_(m_lock)
+    GUID AddVirtioNetDevice(_In_ PCWSTR Tag, const WslVirtioNetConfig& Config, const std::vector<IpAddress>& Nameservers, _In_ HANDLE UserToken);
+
+    wil::com_ptr<IWslVirtioNetDevice> GetVirtioNetDevice(_In_ PCWSTR Tag);
+
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
 
-    void AddSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
+    void AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag);
 
+    void SetSwiotlb(UINT64 GpaBase, UINT64 SizeBytes);
+
     _Requires_lock_not_held_(m_lock)
-    void RemoveGuestDevice(_In_ const GUID& DeviceId, _In_ const GUID& InstanceId);
+    void RemoveGuestDevice(_In_ const GUID& InstanceId);
 
 private:
-    _Requires_lock_held_(m_lock)
-    GUID AddHdvShareWithOptions(
-        _In_ const GUID& DeviceId,
-        _In_ const GUID& ImplementationClsid,
-        _In_ PCWSTR AccessName,
-        _In_opt_ PCWSTR Options,
-        _In_ PCWSTR Path,
-        _In_ UINT32 Flags,
-        _In_ HANDLE UserToken);
-
     struct DirectoryObjectLifetime
     {
         std::wstring Path;
@@ -82,4 +61,5 @@ private:
     std::wstring m_machineId;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
+    _Guarded_by_(m_lock) std::map<std::wstring, GUID> m_virtioNetDevices;
 };
