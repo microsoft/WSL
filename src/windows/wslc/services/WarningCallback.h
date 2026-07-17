@@ -20,15 +20,19 @@ public:
 
     HRESULT OnWarning(LPCWSTR Message) override
     {
-        WI_ASSERT(Message);
-        if (Message != nullptr)
+        try
         {
-            // Message already carries the "wsl: " prefix and trailing newline from EmitUserWarning;
-            // Warn writes it verbatim, adding color only on a VT console.
-            m_reporter.Warn(L"{}", Message);
-        }
+            WI_ASSERT(Message);
+            if (Message != nullptr)
+            {
+                // Message already carries the "wsl: " prefix and trailing newline from EmitUserWarning;
+                // Warn writes it verbatim, adding color only on a VT console.
+                m_reporter.Warn(L"{}", Message);
+            }
 
-        return S_OK;
+            return S_OK;
+        }
+        CATCH_RETURN();
     }
 
 private:
