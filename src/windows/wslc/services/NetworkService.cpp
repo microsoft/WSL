@@ -22,8 +22,9 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void NetworkService::Create(models::Session& session, const models::CreateNetworkOptions& createOptions)
+void NetworkService::Create(Reporter& reporter, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
+    WarningCallback warningCallback(reporter);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())
@@ -61,8 +62,7 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
         options.Gateway = createOptions.Gateway->c_str();
     }
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)

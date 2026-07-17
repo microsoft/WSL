@@ -16,6 +16,7 @@ Abstract:
 #include "ContainerModel.h"
 #include "Reporter.h"
 #include <docker_schema.h>
+#include <wslc.h>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {

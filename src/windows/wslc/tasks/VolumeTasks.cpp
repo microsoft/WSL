@@ -213,7 +213,7 @@ void PruneVolumes(CLIExecutionContext& context)
         filters.push_back(validation::ParseFilter(value));
     }
 
-    auto result = VolumeService::Prune(session, all, filters);
+    auto result = VolumeService::Prune(context.Reporter, session, all, filters);
 
     for (const auto& volumeName : result.PrunedVolumes)
     {

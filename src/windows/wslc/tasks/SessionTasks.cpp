@@ -46,7 +46,7 @@ void OpenOrCreateDefaultSession(CLIExecutionContext& context)
 {
     if (!context.Data.Contains(Data::Session))
     {
-        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession());
+        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession(context.Reporter));
     }
 }
 
