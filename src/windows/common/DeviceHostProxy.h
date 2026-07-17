@@ -156,6 +156,7 @@ private:
         wil::com_ptr<IVmFiovGuestMmioMappings> MemoryMapping;
         wil::com_ptr<IUnknown> Device;
         size_t DoorbellCount = 0;
+        bool ShuttingDown = false;
     };
 
     wil::com_ptr<IVmVirtualDeviceAccess> m_deviceAccess;

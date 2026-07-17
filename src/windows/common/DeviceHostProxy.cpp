@@ -230,6 +230,7 @@ void DeviceHostProxy::RemoveDevice(const GUID& InstanceId)
         const auto entry = m_devices.find(InstanceId);
         THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
         THROW_HR_IF(E_INVALIDARG, entry == m_devices.end());
+        entry->second.ShuttingDown = true;
         device = entry->second.Device;
         type = entry->second.Type;
     }
@@ -297,7 +298,7 @@ wil::com_ptr<IWslVirtioNetDevice> DeviceHostProxy::GetVirtioNetDevice(const GUID
     THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
 
     const auto device = m_devices.find(InstanceId);
-    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || !device->second.Device);
+    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
     return device->second.Device.query<IWslVirtioNetDevice>();
 }
 
@@ -341,9 +342,14 @@ void DeviceHostProxy::Shutdown()
     std::vector<wil::com_ptr<IUnknown>> devices;
     {
         auto lock = m_devicesLock.lock_exclusive();
+
+        // Block device retrieval and new registrations while retaining the entries needed by
+        // Teardown() callbacks to unregister doorbells and destroy mapped ranges.
+        m_devicesShutdown = true;
         devices.reserve(m_devices.size());
         for (auto& device : m_devices)
         {
+            device.second.ShuttingDown = true;
             devices.emplace_back(device.second.Device);
         }
     }
@@ -356,7 +362,6 @@ void DeviceHostProxy::Shutdown()
     {
         auto lock = m_devicesLock.lock_exclusive();
         m_devices.clear();
-        m_devicesShutdown = true;
     }
 }
 
@@ -503,7 +508,7 @@ try
     // N.B. For security it is enforced that each device can only register a small number of doorbells.
     //      Currently virtio-9p only uses one and the external virtio device uses two.
     const auto knownDevice = m_devices.find(InstanceId);
-    RETURN_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.DoorbellCount == DEVICE_HOST_PROXY_DOORBELL_LIMIT);
+    RETURN_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.ShuttingDown || knownDevice->second.DoorbellCount == DEVICE_HOST_PROXY_DOORBELL_LIMIT);
 
     if (!knownDevice->second.MemoryNotification)
     {
@@ -553,7 +558,6 @@ HRESULT DeviceHostProxy::UnregisterDoorbellImpl(const GUID& InstanceId, UINT8 Ba
 try
 {
     auto lock = m_devicesLock.lock_exclusive();
-    RETURN_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
 
     // Check if the device is a known device and has registered a doorbell.
     // N.B. If the device is being removed, the device can't be retrieved from the worker process
@@ -594,7 +598,7 @@ try
 
     // Check if the device is one of the known devices.
     const auto knownDevice = m_devices.find(InstanceId);
-    THROW_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end());
+    THROW_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.ShuttingDown);
 
     if (!knownDevice->second.MemoryMapping)
     {
@@ -637,7 +641,6 @@ HRESULT DeviceHostProxy::DestroySectionBackedMmioRangeImpl(const GUID& InstanceI
 try
 {
     auto lock = m_devicesLock.lock_exclusive();
-    RETURN_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
     const auto device = m_devices.find(InstanceId);
     RETURN_HR_IF(E_ACCESSDENIED, device == m_devices.end() || !device->second.MemoryMapping);
     RETURN_IF_FAILED(device->second.MemoryMapping->DestroySectionBackedMmioRange(static_cast<FIOV_BAR_SELECTOR>(BarIndex), BarOffsetInPages));
