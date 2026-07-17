@@ -3505,6 +3505,66 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
 #define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
 
+namespace {
+
+class CpuIdleTracker
+{
+public:
+    struct State
+    {
+        bool IntervalIdle;
+        bool WindowIdle;
+    };
+
+    State AddSample(unsigned long long Busy, unsigned long long Total)
+    {
+        m_windowBusy -= m_busyWindow[m_windowIndex];
+        m_windowTotal -= m_totalWindow[m_windowIndex];
+        m_busyWindow[m_windowIndex] = Busy;
+        m_totalWindow[m_windowIndex] = Total;
+        m_windowBusy += Busy;
+        m_windowTotal += Total;
+        m_windowIndex = (m_windowIndex + 1) % c_windowIntervals;
+        if (m_windowSamples < c_windowIntervals)
+        {
+            m_windowSamples += 1;
+        }
+
+        return {
+            .IntervalIdle = IsIdle(Busy, Total),
+            .WindowIdle = m_windowSamples == c_windowIntervals && IsIdle(m_windowBusy, m_windowTotal),
+        };
+    }
+
+    void Reset()
+    {
+        m_busyWindow.fill(0);
+        m_totalWindow.fill(0);
+        m_windowBusy = 0;
+        m_windowTotal = 0;
+        m_windowIndex = 0;
+        m_windowSamples = 0;
+    }
+
+private:
+    static bool IsIdle(unsigned long long Busy, unsigned long long Total)
+    {
+        return Total == 0 || Busy * 1000 <= Total * c_busyThresholdPerMille;
+    }
+
+    static constexpr size_t c_windowIntervals = 12;                  // 2 minutes
+    static constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
+
+    std::array<unsigned long long, c_windowIntervals> m_busyWindow{};
+    std::array<unsigned long long, c_windowIntervals> m_totalWindow{};
+    unsigned long long m_windowBusy = 0;
+    unsigned long long m_windowTotal = 0;
+    size_t m_windowIndex = 0;
+    size_t m_windowSamples = 0;
+};
+
+} // namespace
+
 static bool ReadCpuBusyIdle(unsigned long long& Busy, unsigned long long& Idle)
 
 /*++
@@ -3686,7 +3746,8 @@ Return Value:
     }
 
     const std::string request = std::to_string(Bytes) + " swappiness=0";
-    if (UtilWriteStringView(fd.get(), request) == static_cast<ssize_t>(request.size()) || errno == EAGAIN)
+    const ssize_t result = UtilWriteStringView(fd.get(), request);
+    if (result == static_cast<ssize_t>(request.size()) || (result < 0 && errno == EAGAIN))
     {
         return true;
     }
@@ -3704,11 +3765,10 @@ Routine Description:
     This routine starts a background thread that reclaims cold page cache and compacts free pages while
     the VM is idle, so the maximum number of pages can be discarded back to the host.
 
-    Reclaim is gated on CPU idle (measured over each interval using all non-idle CPU time, not just user
-    time) so it never competes with real work. Gradual mode reclaims cold file-backed page cache above a
-    small floor via the cgroup memory.reclaim knob, falling back to drop_caches when the knob is
-    unavailable. DropCache mode uses drop_caches directly. Freed pages are compacted so free-page
-    reporting can hand back large blocks.
+    Reclaim is gated on CPU idle using a rolling window of all non-idle CPU time, not just user time.
+    Gradual mode reclaims cold file-backed page cache above a small floor via the cgroup memory.reclaim
+    knob, falling back to drop_caches when the knob is unavailable. DropCache mode uses drop_caches
+    directly. Freed pages are compacted so free-page reporting can hand back large blocks.
 
 Arguments:
 
@@ -3752,14 +3812,8 @@ try
 
             constexpr auto c_pollInterval = std::chrono::seconds(10);
 
-            // An interval is idle when busy CPU is at most this fraction (per-mille) of total CPU time.
-            constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
-
             // Reclaimable cache below this floor is always retained to protect a minimal working set.
             constexpr long long c_floorBytes = 128ll * 1024 * 1024;
-
-            // Compact immediately on idle, but preserve the cache during normal pauses between commands.
-            constexpr int c_reclaimIdleIntervals = 12; // 2 minutes
 
             // Scale reclaim requests with the VM size while keeping individual operations bounded.
             constexpr long long c_minReclaimBytes = 256ll * 1024 * 1024;
@@ -3781,7 +3835,8 @@ try
             unsigned long long previousBusy = 0;
             unsigned long long previousIdle = 0;
             bool havePreviousSample = false;
-            int idleIntervals = 0;
+
+            CpuIdleTracker idleTracker;
 
             bool droppedThisIdlePeriod = false;
             bool compactedThisIdlePeriod = false;
@@ -3813,6 +3868,9 @@ try
                 {
                     previousBusy = busy;
                     previousIdle = idle;
+                    idleTracker.Reset();
+                    droppedThisIdlePeriod = false;
+                    compactedThisIdlePeriod = false;
                     continue;
                 }
 
@@ -3821,23 +3879,29 @@ try
                 previousBusy = busy;
                 previousIdle = idle;
 
-                const bool intervalIdle = (totalDelta == 0) || (busyDelta * 1000 <= totalDelta * c_busyThresholdPerMille);
-                if (!intervalIdle)
+                const auto idleState = idleTracker.AddSample(busyDelta, totalDelta);
+                if (!idleState.WindowIdle)
                 {
-                    idleIntervals = 0;
                     droppedThisIdlePeriod = false;
                     compactedThisIdlePeriod = false;
                     continue;
                 }
 
-                idleIntervals += 1;
+                //
+                // A short burst blocks this tick but does not discard the preceding idle history.
+                //
+
+                if (!idleState.IntervalIdle)
+                {
+                    continue;
+                }
 
                 //
                 // The VM is idle: reclaim cold cache and compact.
                 //
 
                 bool reclaimed = false;
-                if (idleIntervals >= c_reclaimIdleIntervals && useReclaim)
+                if (useReclaim)
                 {
                     const long long cache = GetReclaimableCacheBytes();
                     if (cache > c_floorBytes)
@@ -3851,7 +3915,7 @@ try
                         reclaimed = RequestReclaim(bytes);
                     }
                 }
-                else if (idleIntervals >= c_reclaimIdleIntervals && !useReclaim && !droppedThisIdlePeriod)
+                else if (!droppedThisIdlePeriod)
                 {
                     if (WriteToFile("/proc/sys/vm/drop_caches", "1\n") == 0)
                     {
