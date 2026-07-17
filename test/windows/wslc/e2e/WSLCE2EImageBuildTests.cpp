@@ -347,6 +347,31 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_BareIdUnsetVar_Fails)
+    {
+        // Docker parity: '--secret id=NAME' with no env=/src= reads the host env var named NAME, and
+        // errors when that variable is unset (unlike an explicit 'env=', which yields an empty value).
+        constexpr auto envName = L"WSLC_E2E_SECRET_BARE_ID_UNSET";
+        SetEnvironmentVariableW(envName, nullptr); // Ensure it's not set even if a prior run leaked.
+
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-bare-id-unset";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=WSLC_E2E_SECRET_BARE_ID_UNSET", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_FALSE(buildResult.Stderr->empty());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_MissingEnvVar_EmptyValue_Success)
     {
         // Docker parity: an unset environment variable yields an empty secret value, not an error.

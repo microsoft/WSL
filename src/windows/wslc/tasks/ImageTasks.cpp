@@ -161,8 +161,15 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     if (envName.empty() && srcPath.empty())
     {
         // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
-        // environment variable whose name matches the id.
+        // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
+        // must be set - Docker errors when the id-named variable is undefined.
         envName = id;
+        if (GetEnvironmentVariableW(envName.c_str(), nullptr, 0) == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+        {
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG,
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
+        }
     }
 
     if (!srcPath.empty())
