@@ -345,6 +345,8 @@ class MountTests
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
+        FormatDisk({L"ext4"}, true);
+
         for (const auto* name : {L"\"\"", L".", L"..", L"foo/bar"})
         {
             const auto mountCommand = std::format(L"--mount {} --vhd --name {} --partition 1", VhdDevice, name);
