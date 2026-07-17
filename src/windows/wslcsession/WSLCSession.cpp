@@ -921,8 +921,8 @@ try
         GUID id{};
         THROW_IF_FAILED(CoCreateGuid(&id));
         auto vmPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(id));
-        THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
         mountedPaths.push_back(vmPath);
+        THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
         return vmPath;
     };
 
@@ -1002,6 +1002,7 @@ try
     {
         const auto& secret = Options->Secrets.Values[i];
         RETURN_HR_IF_NULL(E_INVALIDARG, secret.Id);
+        RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '\0');
         RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '-');
         // Id is interpolated into docker's comma/'='-delimited --secret spec below, so reject any ','
         // or '=' a malicious caller could use to inject extra options.
