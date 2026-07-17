@@ -32,6 +32,7 @@
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
+                <File Id="wsldevicehostproxystub.dll" Name="wsldevicehostproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehostproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
                 <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${CMAKE_SOURCE_DIR}/NOTICE.txt" />
@@ -189,9 +190,55 @@
                     <RegistryValue Name="LaunchPermission" Value="${DCOM_PERMISSION}" Type="binary" />
                 </RegistryKey>
 
-                <!-- WslDeviceHost_VirtioPmem -->
-                <RegistryKey Root="HKCR" Key="CLSID\{ABB755FC-1B86-4255-83E2-E5787ABCF6C2}">
-                    <RegistryValue Value="WslDeviceHost_VirtioPmem" Type="string" />
+                <!-- WslDeviceHostProxyStub -->
+                <RegistryKey Root="HKCR" Key="Interface\{27394DCF-6383-4E4E-BB0A-C13D4E5F6071}">
+                    <RegistryValue Value="IWslDeviceHost" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{D2F47B8A-1E3C-4D9F-A6B5-7C8E9F0A1B2C}">
+                    <RegistryValue Value="IWslDeviceHostCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}">
+                    <RegistryValue Value="IWslVirtioNetDevice" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}">
+                    <RegistryValue Value="IWslVirtiofsDevice" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}">
+                    <RegistryValue Value="IWslVirtioPmemDevice" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}">
+                    <RegistryValue Value="IWslVm" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <RegistryKey Root="HKCR" Key="CLSID\{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}">
+                    <RegistryValue Value="WslDeviceHostProxyStub" Type="string" />
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehostproxystub.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost -->
+                <RegistryKey Root="HKCR" Key="CLSID\{2C3E9A41-7B5D-4F18-93D6-A8C2E4F7B1D9}">
+                    <RegistryValue Value="WslDeviceHost" Type="string" />
                     <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string"/>
 
                     <RegistryKey Key="InProcServer32">
@@ -200,9 +247,20 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- WslDeviceHost_VirtioFs (admin) -->
-                <RegistryKey Root="HKCR" Key="CLSID\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}">
-                    <RegistryValue Value="WslDeviceHost_VirtioFs_Admin" Type="string"/>
+                <!-- WslDeviceHost for elevated activation -->
+                <RegistryKey Root="HKCR" Key="CLSID\{E3146082-A0DA-43A7-813B-A89EEE8C7628}">
+                    <RegistryValue Value="WslDeviceHost_Admin" Type="string" />
+                    <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string"/>
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost without telemetry -->
+                <RegistryKey Root="HKCR" Key="CLSID\{4F9C8B23-D6E1-4A85-BF2A-E7C5D8F931A6}">
+                    <RegistryValue Value="WslDeviceHost_NoTelemetry" Type="string"/>
                     <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string"/>
 
                     <RegistryKey Key="InProcServer32">
@@ -211,25 +269,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- WslDeviceHost_VirtioFs -->
-                <RegistryKey Root="HKCR" Key="CLSID\{60285AE6-AAF3-4456-B444-A6C2D0DEDA38}">
-                    <RegistryValue Value="WslDeviceHost_VirtioFs" Type="string" />
-                    <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string" />
+                <!-- WslDeviceHost without telemetry for elevated activation -->
+                <RegistryKey Root="HKCR" Key="CLSID\{9C9C7131-D756-48FA-BD49-734E75AF37C0}">
+                    <RegistryValue Value="WslDeviceHost_NoTelemetry_Admin" Type="string"/>
+                    <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string"/>
 
                     <RegistryKey Key="InProcServer32">
-                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
-                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
-                    </RegistryKey>
-                </RegistryKey>
-
-                <!-- WslDeviceHost_VirtioNet -->
-                <RegistryKey Root="HKCR" Key="CLSID\{9E0D1898-CA63-424E-8D49-9D6067A36BCE}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
-                    <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string" />
-
-                    <RegistryKey Key="InProcServer32">
-                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
-                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string"/>
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string"/>
                     </RegistryKey>
                 </RegistryKey>
 
@@ -803,4 +850,3 @@
         <?endif?>
     </Package>
 </Wix>
-

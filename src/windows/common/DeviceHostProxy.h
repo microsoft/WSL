@@ -3,22 +3,35 @@
 #pragma once
 
 #include <windowsdefs.h>
+#include <WslDeviceHost.h>
 #include "hcs.hpp"
 
 namespace wrl = Microsoft::WRL;
 
-class DeviceHostProxy : public wrl::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost>
+class DeviceHostProxy
+    : public wrl::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost, IWslDeviceHostCallback>
 {
 public:
-    DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId);
+    DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId, bool EnableTelemetry = true);
 
     GUID AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag);
 
-    void RemoveDevice(const GUID& Type, const GUID& InstanceId);
+    GUID AddVirtioNetDevice(_In_ HANDLE UserToken, const WslVirtioNetConfig& Config, const std::vector<IpAddress>& Nameservers);
+
+    GUID AddVirtiofsDevice(
+        _In_ HANDLE UserToken, const std::wstring& Label, const std::wstring& RootPath, VirtiofsShareKind Kind, UINT32 ShmemSizeMb, const std::wstring& MountOptions);
+
+    GUID AddVirtioPmemDevice(_In_ HANDLE UserToken, const std::wstring& Path, bool Writable);
+
+    void RemoveDevice(const GUID& InstanceId);
 
     void AddRemoteFileSystem(const GUID& ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs);
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag);
+
+    wil::com_ptr<IWslVirtioNetDevice> GetVirtioNetDevice(const GUID& InstanceId);
+
+    void SetSwiotlb(UINT64 GpaBase, UINT64 SizeBytes);
 
     void Shutdown();
 
@@ -40,6 +53,18 @@ public:
         const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, UINT64 MappingFlags, HANDLE SectionHandle, UINT64 SectionOffsetInPages) override;
 
     IFACEMETHOD(DestroySectionBackedMmioRange)(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages) override;
+
+    //
+    // IWslDeviceHostCallback
+    //
+    IFACEMETHOD(RegisterDoorbell)(GUID InstanceId, BYTE BarIndex, UINT64 Offset, UINT64 TriggerValue, UINT64 Flags, HANDLE Event) override;
+
+    IFACEMETHOD(UnregisterDoorbell)(GUID InstanceId, BYTE BarIndex, UINT64 Offset, UINT64 TriggerValue, UINT64 Flags) override;
+
+    IFACEMETHOD(CreateSectionBackedMmioRange)(
+        GUID InstanceId, BYTE BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, UINT64 MappingFlags, HANDLE SectionHandle, UINT64 SectionOffsetInPages) override;
+
+    IFACEMETHOD(DestroySectionBackedMmioRange)(GUID InstanceId, BYTE BarIndex, UINT64 BarOffsetInPages) override;
 
 private:
     struct RemoteFileSystemInfo
@@ -95,21 +120,47 @@ private:
 
     wil::com_ptr<IGlobalInterfaceTable> m_git;
 
+    struct DeviceHostProxyEntry;
+
+    wil::com_ptr<IWslVm> GetWslVm(_In_ HANDLE UserToken);
+    wil::com_ptr<IWslDeviceHostCallback> GetCallback();
+    void AddFlexibleIoDevice(const GUID& Type, const GUID& InstanceId);
+    _Requires_lock_held_(m_lock)
+    void ConfigureSwiotlb(const wil::com_ptr<IWslVm>& Vm, bool& Configured);
+    void TeardownDevice(const wil::com_ptr<IUnknown>& Device) noexcept;
+
+    HRESULT RegisterDoorbellImpl(const GUID& InstanceId, UINT8 BarIndex, UINT64 Offset, UINT64 TriggerValue, UINT64 Flags, HANDLE Event) noexcept;
+    HRESULT UnregisterDoorbellImpl(const GUID& InstanceId, UINT8 BarIndex, UINT64 Offset, UINT64 TriggerValue, UINT64 Flags) noexcept;
+    HRESULT CreateSectionBackedMmioRangeImpl(
+        const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, UINT64 MappingFlags, HANDLE SectionHandle, UINT64 SectionOffsetInPages) noexcept;
+    HRESULT DestroySectionBackedMmioRangeImpl(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages) noexcept;
+
     std::wstring m_systemId;
     GUID m_runtimeId;
+    bool m_enableTelemetry;
     wsl::windows::common::hcs::unique_hcs_system m_system;
     wil::srwlock m_lock;
     std::vector<RemoteFileSystemInfo> m_fileSystems;
     bool m_shutdown;
+    wil::com_ptr<IWslVm> m_wslVm;
+    wil::com_ptr<IWslVm> m_adminWslVm;
+    SwiotlbConfig m_swiotlbConfig{};
+    bool m_swiotlbConfigured = false;
+    bool m_wslVmSwiotlbConfigured = false;
+    bool m_adminWslVmSwiotlbConfigured = false;
 
     struct DeviceHostProxyEntry
     {
+        GUID Type{};
         wil::com_ptr<IVmFiovGuestMemoryFastNotification> MemoryNotification;
         wil::com_ptr<IVmFiovGuestMmioMappings> MemoryMapping;
+        wil::com_ptr<IUnknown> Device;
         size_t DoorbellCount = 0;
+        bool ShuttingDown = false;
     };
 
     wil::com_ptr<IVmVirtualDeviceAccess> m_deviceAccess;
+    std::mutex m_deviceLifecycleLock;
     wil::srwlock m_devicesLock;
     std::map<GUID, DeviceHostProxyEntry, wsl::windows::common::helpers::GuidLess> m_devices;
     bool m_devicesShutdown;
