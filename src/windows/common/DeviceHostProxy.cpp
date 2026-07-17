@@ -151,6 +151,8 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
             .rootPath = rootPath.get(),
             .kind = Kind,
             .shmemSizeMb = ShmemSizeMb,
+            // To workaround memory aperture limitations, limit virtiofs devices to one queue.
+            .queueCount = 1,
             .mountOptions = mountOptions.get()};
         THROW_IF_FAILED(GetWslVm(UserToken)->CreateVirtiofsDevice(&instanceIdForCall, GetCallback().get(), &config, virtiofsDevice.put()));
     }
