@@ -83,6 +83,7 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
 InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
+void ValidateSecretSpec(const std::vector<std::wstring>& values);
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
 

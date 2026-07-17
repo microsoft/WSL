@@ -23,6 +23,7 @@ Abstract:
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <format>
 #include <sstream>
 #include <unordered_map>
@@ -102,6 +103,10 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::Time:
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
+        break;
+
+    case ArgType::Secret:
+        validation::ValidateSecretSpec(execArgs.GetAll<ArgType::Secret>());
         break;
 
     case ArgType::Since:
@@ -198,6 +203,127 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
+    }
+}
+
+void ValidateSecretSpec(const std::vector<std::wstring>& values)
+{
+    for (const auto& spec : values)
+    {
+        std::wstring id;
+        std::wstring type;
+        std::wstring envName;
+        std::wstring srcPath;
+
+        for (const auto& part : Split(spec, L','))
+        {
+            auto eq = part.find(L'=');
+            if (eq == std::wstring::npos || eq == 0)
+            {
+                throw ArgumentException(
+                    Localization::MessageWslcSecretInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+            }
+            auto key = part.substr(0, eq);
+            auto value = part.substr(eq + 1);
+
+            if (key == L"id")
+            {
+                id = value;
+            }
+            else if (key == L"type")
+            {
+                type = value;
+            }
+            else if (key == L"env")
+            {
+                envName = value;
+            }
+            else if (key == L"src" || key == L"source")
+            {
+                srcPath = value;
+            }
+            else
+            {
+                throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported key '{}'", key)));
+            }
+        }
+
+        if (id.empty())
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
+        }
+
+        // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
+        if (id[0] == L'-')
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
+        }
+
+        // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
+        // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
+        for (auto ch : id)
+        {
+            const bool allowed = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
+                                 ch == L'_' || ch == L'-' || ch == L'.';
+            if (!allowed)
+            {
+                throw ArgumentException(
+                    Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may only contain letters, digits, '_', '-' or '.'"));
+            }
+        }
+
+        if (!type.empty() && type != L"file" && type != L"env")
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
+        }
+
+        // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
+        // otherwise fall through to reading an environment variable, silently contradicting the type.
+        if (type == L"file" && srcPath.empty())
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'type=file' requires 'src='"));
+        }
+
+        // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
+        // than a file path), unless an explicit 'env=' was also given.
+        if (type == L"env" && envName.empty() && !srcPath.empty())
+        {
+            envName = std::move(srcPath);
+            srcPath.clear();
+        }
+
+        if (!envName.empty() && !srcPath.empty())
+        {
+            // Docker parity: 'env=' and 'src=' are not mutually exclusive; when both are given the
+            // environment variable wins and the file path is ignored.
+            srcPath.clear();
+        }
+        if (envName.empty() && srcPath.empty())
+        {
+            // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
+            // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
+            // must be set - Docker errors when the id-named variable is undefined.
+            envName = id;
+            if (GetEnvironmentVariableW(envName.c_str(), nullptr, 0) == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+            {
+                throw ArgumentException(
+                    Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
+            }
+        }
+
+        if (!srcPath.empty())
+        {
+            std::error_code ec;
+            // Resolve symlinks (and normalize '..') so we validate the file that actually holds the
+            // secret's bytes rather than the link node itself.
+            auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
+            if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
+            {
+                throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
+                    spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
+            }
+        }
     }
 }
 

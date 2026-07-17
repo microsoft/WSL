@@ -74,6 +74,8 @@ namespace {
 
 static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
 {
+    // The spec was already validated by validation::ValidateSecretSpec during argument processing, so
+    // this only parses the (known-valid) spec and resolves the secret's bytes.
     std::wstring id;
     std::wstring type;
     std::wstring envName;
@@ -84,8 +86,7 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         auto eq = part.find(L'=');
         if (eq == std::wstring::npos || eq == 0)
         {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+            continue;
         }
         auto key = part.substr(0, eq);
         auto value = part.substr(eq + 1);
@@ -106,48 +107,6 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         {
             srcPath = value;
         }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported key '{}'", key)));
-        }
-    }
-
-    if (id.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
-    }
-
-    // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
-    if (id[0] == L'-')
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
-    }
-
-    // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
-    // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
-    for (auto ch : id)
-    {
-        const bool allowed = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
-                             ch == L'_' || ch == L'-' || ch == L'.';
-        if (!allowed)
-        {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may only contain letters, digits, '_', '-' or '.'"));
-        }
-    }
-
-    if (!type.empty() && type != L"file" && type != L"env")
-    {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
-    }
-
-    // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
-    // otherwise fall through to reading an environment variable, silently contradicting the type.
-    if (type == L"file" && srcPath.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"'type=file' requires 'src='"));
     }
 
     // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
@@ -167,15 +126,8 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     if (envName.empty() && srcPath.empty())
     {
         // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
-        // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
-        // must be set - Docker errors when the id-named variable is undefined.
+        // environment variable whose name matches the id.
         envName = id;
-        if (GetEnvironmentVariableW(envName.c_str(), nullptr, 0) == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
-        {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
-        }
     }
 
     if (!srcPath.empty())
@@ -184,13 +136,6 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // Resolve symlinks (and normalize '..') so we read the file that actually holds the secret's
         // bytes rather than the link node itself.
         auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
-        if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
-        {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                Localization::MessageWslcSecretInvalidSpec(
-                    spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
-        }
 
         // Read the file's raw bytes and forward them verbatim. The server materializes them into a
         // root-only tmpfs file inside the VM, so file secrets are byte-exact (binary, embedded NULs,
