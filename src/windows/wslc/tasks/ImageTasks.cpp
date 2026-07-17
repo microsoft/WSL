@@ -117,6 +117,12 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
     }
 
+    // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
+    if (id[0] == L'-')
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
+    }
+
     // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
     // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
     for (auto ch : id)
