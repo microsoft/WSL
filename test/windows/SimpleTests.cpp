@@ -259,6 +259,41 @@ class SimpleTests
         auto upperCaseGuidStringWide = wideGuidStringNoBraces;
         std::transform(upperCaseGuidStringWide.begin(), upperCaseGuidStringWide.end(), upperCaseGuidStringWide.begin(), toupper);
         VERIFY_ARE_EQUAL(upperCaseGuidStringWide, wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::Uppercase));
+
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::string{" \tvalue\r\n"}), std::string{"value"});
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::string{" \t\r\n"}), std::string{});
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::wstring{L" \tvalue\r\n"}), std::wstring{L"value"});
+
+        const std::vector<std::pair<std::string, std::string>> shellStrings{
+            {"", ""},
+            {"plain", "plain"},
+            {"\"\"", ""},
+            {"''", ""},
+            {"\"double quoted\"", "double quoted"},
+            {"'single quoted'", "single quoted"},
+            {"one' two'\" three\"", "one two three"},
+            {"escaped\\ value", "escaped value"},
+            {"escaped\\q", "escapedq"},
+            {"escaped\\'quote", "escaped'quote"},
+            {"abc\\\nedf", "abcedf"},
+            {"\"abc\\\nedf\"", "abcedf"},
+            {"'abc\\\nedf'", "abc\\\nedf"},
+            {"\"escaped \\\"quote\\\" and \\\\ slash\"", "escaped \"quote\" and \\ slash"},
+            {"\"escaped \\$dollar and \\`backtick\"", "escaped $dollar and `backtick"},
+            {"\"literal \\q\"", "literal \\q"},
+            {"'literal \\ value'", "literal \\ value"},
+            {"unterminated'", "unterminated'"},
+            {"\"unterminated", "\"unterminated"},
+            {"trailing\\", "trailing\\"},
+            {"\"trailing\\", "\"trailing\\"}};
+
+        for (const auto& [input, expected] : shellStrings)
+        {
+            VERIFY_ARE_EQUAL(wsl::shared::string::UnescapeShell(input), expected);
+            VERIFY_ARE_EQUAL(
+                wsl::shared::string::UnescapeShell(wsl::shared::string::MultiByteToWide(input)),
+                wsl::shared::string::MultiByteToWide(expected));
+        }
     }
 
     TEST_METHOD(WindowsPathWithSpaces)
