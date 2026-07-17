@@ -104,7 +104,7 @@ class WSLCE2EImageInspectTests
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltExposeImage.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltExposeImage.NameAndTag());
         VERIFY_IS_TRUE(inspectData.Config.has_value());

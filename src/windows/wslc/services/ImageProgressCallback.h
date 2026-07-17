@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #pragma once
+#include "Reporter.h"
 #include "SessionService.h"
 #include "VTSupport.h"
 #include <map>
@@ -24,17 +25,24 @@ class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallbac
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
+    // level selects the target stream: Output (stdout) for standalone pull/push, Info (stderr) for
+    // the implicit pull during run/create, matching Docker.
+    ImageProgressCallback(Reporter& reporter, Reporter::Level level) : m_reporter(reporter), m_level(level)
+    {
+    }
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
 private:
     auto MoveToLine(int line);
-    static CONSOLE_SCREEN_BUFFER_INFO Info();
-    void WriteTerminal(std::wstring_view content) const;
-    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
+    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth);
+    Reporter& m_reporter;
+    // Declared before m_vtEnabled, whose initializer reads it.
+    const Reporter::Level m_level;
     std::map<std::string, int> m_statuses;
+    // Last status text per id; used only when redirected to dedupe repeated byte-progress callbacks.
+    std::map<std::string, std::string> m_lastStatusById;
     int m_currentLine = 0;
-    HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
-    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{m_console};
-    wsl::windows::common::vt::ChangeTerminalMode m_terminalMode{m_console, false};
+    // The progress display only renders on a VT console.
+    bool m_vtEnabled = m_reporter.IsVTEnabled(m_level);
 };
 } // namespace wsl::windows::wslc::services

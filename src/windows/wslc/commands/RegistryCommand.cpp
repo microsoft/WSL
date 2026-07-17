@@ -25,29 +25,39 @@ using namespace wsl::shared;
 
 namespace {
 
-auto MaskInput()
-{
-    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode = 0;
-
-    if ((input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode))
-    {
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT));
-        return wil::scope_exit(std::function<void()>([input, mode] {
-            SetConsoleMode(input, mode);
-            std::wcerr << L'\n';
-        }));
-    }
-
-    return wil::scope_exit(std::function<void()>([] {}));
-}
-
-std::wstring Prompt(const std::wstring& label, bool maskInput)
+std::wstring Prompt(wsl::windows::wslc::Reporter& reporter, const std::wstring& label, bool maskInput)
 {
     // Write without a trailing newline so the cursor stays inline (matching Docker's behavior).
-    std::wcerr << label;
+    reporter.Info(L"{}", label);
 
-    auto restoreConsole = maskInput ? MaskInput() : wil::scope_exit(std::function<void()>([] {}));
+    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD previousMode = 0;
+    const bool canMask = maskInput && (input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &previousMode);
+
+    // Armed before echo is disabled and built from a direct lambda (no allocation, can't throw) so a
+    // failure while masking still restores the console. Only acts once echo was actually disabled.
+    bool echoDisabled = false;
+    auto restoreConsole = wil::scope_exit([input, previousMode, &echoDisabled, &reporter]() {
+        if (!echoDisabled)
+        {
+            return;
+        }
+
+        SetConsoleMode(input, previousMode);
+        // Runs from a noexcept scope_exit destructor, possibly during unwinding, so swallow any
+        // output failure to avoid std::terminate.
+        try
+        {
+            reporter.Info(L"\n");
+        }
+        CATCH_LOG()
+    });
+
+    if (canMask)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, previousMode & ~ENABLE_ECHO_INPUT));
+        echoDisabled = true;
+    }
 
     std::wstring value;
     std::getline(std::wcin, value);
@@ -127,7 +137,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     // Prompt for username if not provided.
     if (!context.Args.Contains(ArgType::Username))
     {
-        context.Args.Add(ArgType::Username, Prompt(Localization::WSLCCLI_LoginUsernamePrompt(), false));
+        context.Args.Add(ArgType::Username, Prompt(context.Reporter, Localization::WSLCCLI_LoginUsernamePrompt(), false));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
@@ -146,7 +156,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
         }
         else
         {
-            context.Args.Add(ArgType::Password, Prompt(Localization::WSLCCLI_LoginPasswordPrompt(), true));
+            context.Args.Add(ArgType::Password, Prompt(context.Reporter, Localization::WSLCCLI_LoginPasswordPrompt(), true));
         }
     }
 
