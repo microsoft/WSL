@@ -26,6 +26,9 @@ std::vector<std::unique_ptr<Command>> NetworkCommand::GetCommands() const
     commands.push_back(std::make_unique<NetworkRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<NetworkInspectCommand>(FullName()));
     commands.push_back(std::make_unique<NetworkListCommand>(FullName()));
+    commands.push_back(std::make_unique<NetworkPruneCommand>(FullName()));
+    commands.push_back(std::make_unique<NetworkConnectCommand>(FullName()));
+    commands.push_back(std::make_unique<NetworkDisconnectCommand>(FullName()));
     return commands;
 }
 
@@ -46,6 +49,6 @@ std::wstring NetworkCommand::LongDescription() const
 
 void NetworkCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

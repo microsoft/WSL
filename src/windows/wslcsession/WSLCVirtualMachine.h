@@ -92,6 +92,7 @@ struct VMPortMapping
     void Attach(WSLCVirtualMachine& Vm);
     void Detach();
     uint16_t HostPort() const;
+    void SetHostPort(uint16_t port);
 
     static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
     static VMPortMapping FromWSLCPortMapping(const ::WSLCPortMapping& Mapping);
@@ -121,7 +122,13 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent);
+    // Invoked when a Linux process crash dump has been written to disk. The arguments mirror
+    // ICrashDumpCallback::OnCrashDump. The VM owns producing crash events; the session owns
+    // fanning them out to any registered COM callbacks.
+    using TOnCrashDump =
+        std::function<void(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)>;
+
+    WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump);
     ~WSLCVirtualMachine();
 
     void Initialize();
@@ -144,6 +151,8 @@ public:
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -151,6 +160,8 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    void RemoveDirectory(_In_ const std::string& Path);
+    std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
@@ -162,6 +173,12 @@ public:
         return m_vmTerminatingEvent.get();
     }
 
+    // Retrieves the cached termination reason and details from the underlying VM.
+    HRESULT GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) const
+    {
+        return m_vm->GetTerminationReason(Reason, Details);
+    }
+
     GUID VmId() const
     {
         return m_vmId;
@@ -169,15 +186,19 @@ public:
 
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
+    WSLCNetworkingMode NetworkingMode() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
+
+    bool UseWslRelayPortForwarding() const;
 
     // Initial setup during Connect()
     void ConfigureNetworking();
 
     // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
-    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
-    // can include the swiotlb token. Called after the root filesystem is mounted.
+    // reserved at boot) and forwards them to the service before virtio devices are created.
+    // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
@@ -187,6 +208,8 @@ private:
         _In_ LPCSTR Executable,
         _In_ const WSLCProcessOptions& Options,
         _In_ const std::vector<WSLCProcessFd>& Fds = {},
+        _In_ ULONG TtyRows = 0,
+        _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -218,6 +241,10 @@ private:
     ULONG m_bootTimeoutMs{};
 
     std::string m_rootVhdType;
+
+    // Invoked by the crash dump collection thread after a crash dump is fully written.
+    // Supplied by the session, which fans out to any registered ICrashDumpCallback subscribers.
+    TOnCrashDump m_onCrashDump;
 
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;

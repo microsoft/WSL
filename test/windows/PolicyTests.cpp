@@ -261,7 +261,7 @@ class PolicyTest
 
     WSL2_TEST_METHOD(CustomNetworkingMode)
     {
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         {
             auto revert = SetPolicy(c_allowCustomNetworkingModeUserSetting, 1);
@@ -284,8 +284,8 @@ class PolicyTest
             ValidateWarnings(L"");
 
             // Validate that no warnings are shown if the default networking mode is set to the same value as .wslconfig.
-            auto revertDefault = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::VirtioProxy));
-            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+            auto revertDefault = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::Consomme));
+            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
             ValidateWarnings(L"");
         }
     }
@@ -414,10 +414,10 @@ class PolicyTest
         }
 
         {
-            auto revert = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::VirtioProxy));
+            auto revert = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::Consomme));
             WslShutdown();
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'virtioproxy'"), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'consomme'"), 0u);
         }
     }
 

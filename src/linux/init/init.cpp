@@ -410,7 +410,7 @@ try
     message.WriteString(Argv[2]);
     message->Timestamp = std::strtoull(Argv[1], nullptr, 10);
     message->Signal = std::strtoul(Argv[4], nullptr, 10);
-    message->Pid = std::strtoull(Argv[3], nullptr, 10);
+    message->Pid = std::strtoul(Argv[3], nullptr, 10);
 
     auto result = channel.Transaction<LX_PROCESS_CRASH>(message.Span()).Result;
     if (result != 0)
@@ -1179,14 +1179,17 @@ try
         }
 
         SessionLeader = UtilCreateChildProcess(
-            "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
+            "SessionLeader",
+            [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
                 umask(Config.Umask);
                 Channel.Close();
 
                 THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
                 SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
-            });
+            },
+            {},
+            Config.CgroupPath);
     }
     else
     {
@@ -1228,7 +1231,8 @@ try
         // of other session leaders. See https://github.com/microsoft/WSL/issues/9114.
 
         SessionLeader = UtilCreateChildProcess(
-            "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
+            "SessionLeader",
+            [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
                 umask(Mask);
                 Channel.Close();
 
@@ -1243,7 +1247,9 @@ try
                 }
 
                 SessionLeaderEntryUtilityVm(channel, Config);
-            });
+            },
+            {},
+            Config.CgroupPath);
     }
 
     if (SessionLeader < 0)
@@ -1840,6 +1846,11 @@ Return Value:
                         break;
                     }
                 }
+                else if (BytesWritten < BytesRead)
+                {
+                    assert(PendingStdin.empty());
+                    PendingStdin.assign(Buffer.begin() + BytesWritten, Buffer.begin() + BytesRead);
+                }
             }
         }
 
@@ -2299,6 +2310,24 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_INIT_PID);
     }
 
+    //
+    // Get the per-distro cgroup path.
+    //
+
+    const auto DistroCgroupPath = getenv(LX_WSL2_DISTRO_CGROUP_PATH);
+    if (DistroCgroupPath != nullptr)
+    {
+        if (access(DistroCgroupPath, F_OK) == 0)
+        {
+            Config.CgroupPath = DistroCgroupPath;
+        }
+        else
+        {
+            LOG_ERROR("Cgroup path {} does not exist", DistroCgroupPath);
+        }
+        unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
+    }
+
     std::vector<gsl::byte> Buffer;
     if (Config.BootInit)
     {
@@ -2370,6 +2399,11 @@ Return Value:
             }
 
             CreateWslSystemdUnits(Config);
+
+            if (Config.CgroupPath.has_value())
+            {
+                UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), true, "systemd");
+            }
 
             const char* Argv[] = {INIT_PATH, nullptr};
             std::vector<const char*> Env;
@@ -2515,7 +2549,7 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span);
+                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath);
                 break;
 
             default:
@@ -2753,11 +2787,14 @@ try
     {
         THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
-        if (UtilExecCommandLine("systemctl poweroff", nullptr) == 0)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
-            LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
-        }
+        //
+        // systemctl poweroff is normally async but can block in rare cases.
+        // Run it in a thread so a stuck invocation can't prevent the fallback timeout below.
+        //
+        std::thread([]() { UtilExecCommandLine("systemctl poweroff", nullptr); }).detach();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
+        LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
     }
 
     reboot(RB_POWER_OFF);

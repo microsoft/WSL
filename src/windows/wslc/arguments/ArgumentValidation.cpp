@@ -19,8 +19,12 @@ Abstract:
 #include "ContainerModel.h"
 #include "Exceptions.h"
 #include "Localization.h"
+#include <algorithm>
 #include <charconv>
+#include <chrono>
+#include <cmath>
 #include <format>
+#include <sstream>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -46,8 +50,37 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
         break;
 
+    case ArgType::StopTimeout:
+        validation::ValidateIntegerFromString<long>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        break;
+
     case ArgType::ShmSize:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
+        break;
+
+    case ArgType::HealthInterval:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthInterval>(), m_name);
+        break;
+
+    case ArgType::HealthTimeout:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthTimeout>(), m_name);
+        break;
+
+    case ArgType::HealthStartPeriod:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthStartPeriod>(), m_name);
+        break;
+
+    case ArgType::HealthRetries:
+        validation::ValidateIntegerFromString<int>(
+            execArgs.GetAll<ArgType::HealthRetries>(), m_name, [](int value) { return value >= 0; });
+        break;
+
+    case ArgType::NoHealthcheck:
+        if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
+            execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+        }
         break;
 
     case ArgType::Memory:
@@ -72,11 +105,11 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Since:
-        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Since>(), m_name);
+        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Since>(), m_name);
         break;
 
     case ArgType::Until:
-        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Until>(), m_name);
+        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Until>(), m_name);
         break;
 
     case ArgType::Last:
@@ -119,6 +152,19 @@ void Argument::Validate(const ArgMap& execArgs) const
             if (IsEqual(value, L"host", true))
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
+            }
+        }
+        break;
+    }
+
+    case ArgType::NetworkAlias:
+    {
+        for (const auto& value : execArgs.GetAll<ArgType::NetworkAlias>())
+        {
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(m_name));
             }
         }
         break;
@@ -169,10 +215,7 @@ void ValidateFilter(const std::vector<std::wstring>& values)
 {
     for (const auto& value : values)
     {
-        if (value.find(L'=') == std::wstring::npos)
-        {
-            throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
-        }
+        std::ignore = ParseFilter(value);
     }
 }
 
@@ -221,6 +264,104 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
     }
 
     return static_cast<WSLCSignal>(signalValue);
+}
+
+// Parses an RFC3339 timestamp (e.g. "2024-01-15T10:30:00Z" or "2024-01-15T10:30:00+05:30")
+// into a ULONGLONG Unix epoch seconds value using std::chrono::parse.
+// Note: +HHMM (no colon) offsets are not supported; use +HH:MM format.
+static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
+{
+    std::string normalized = input;
+
+    // Normalize trailing 'Z'/'z' to '+00:00' so %Ez can parse it uniformly.
+    if (!normalized.empty() && (normalized.back() == 'Z' || normalized.back() == 'z'))
+    {
+        normalized.pop_back();
+        normalized += "+00:00";
+    }
+
+    // Reject bare dot with no fractional digits (e.g. "10:30:00.+00:00") since
+    // std::chrono::parse is lenient about this.
+    auto dotPos = normalized.find('.');
+    if (dotPos != std::string::npos && (dotPos + 1 >= normalized.size() || !std::isdigit(normalized[dotPos + 1])))
+    {
+        return std::nullopt;
+    }
+
+    // Pre-validate day-of-month since std::chrono::parse silently wraps invalid dates (e.g. Feb 31 → Mar 2).
+    if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
+    {
+        int year = 0, month = 0, day = 0;
+        auto yResult = std::from_chars(normalized.data(), normalized.data() + 4, year);
+        auto mResult = std::from_chars(normalized.data() + 5, normalized.data() + 7, month);
+        auto dResult = std::from_chars(normalized.data() + 8, normalized.data() + 10, day);
+
+        if (yResult.ec == std::errc() && mResult.ec == std::errc() && dResult.ec == std::errc())
+        {
+            auto ymd = std::chrono::year{year} / std::chrono::month{static_cast<unsigned>(month)} /
+                       std::chrono::day{static_cast<unsigned>(day)};
+            if (!ymd.ok())
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    // Parse into nanosecond precision so fractional seconds (e.g. ".123456789") are consumed
+    // by std::chrono::parse rather than requiring manual stripping.
+    std::chrono::sys_time<std::chrono::nanoseconds> utcTime;
+    std::istringstream stream(normalized);
+    stream >> std::chrono::parse("%FT%T%Ez", utcTime);
+    if (stream.fail())
+    {
+        return std::nullopt;
+    }
+
+    // Reject if there are trailing characters after the parsed timestamp
+    if (stream.peek() != std::istringstream::traits_type::eof())
+    {
+        return std::nullopt;
+    }
+
+    auto epochSeconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch()).count();
+    if (epochSeconds < 0)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<ULONGLONG>(epochSeconds);
+}
+
+void ValidateTimestamp(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetTimestampFromString(value, argName);
+    }
+}
+
+ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName)
+{
+    std::string narrowValue = wsl::windows::common::string::WideToMultiByte(value);
+
+    // Try integer (Unix epoch seconds) first
+    ULONGLONG intValue{};
+    const char* begin = narrowValue.c_str();
+    const char* end = begin + narrowValue.size();
+    auto result = std::from_chars(begin, end, intValue);
+    if (result.ec == std::errc() && result.ptr == end)
+    {
+        return intValue;
+    }
+
+    // Try RFC3339 timestamp
+    auto rfc3339Value = TryParseRfc3339(narrowValue);
+    if (rfc3339Value.has_value())
+    {
+        return rfc3339Value.value();
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidTimestampArgumentError(argName, value));
 }
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
@@ -301,6 +442,144 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
     }
 
     return static_cast<int64_t>(parsed.value());
+}
+
+// Parses duration string into nanoseconds.
+static std::optional<int64_t> TryParseDuration(const std::string& input)
+{
+    if (input.empty())
+    {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    bool negative = false;
+    if (input[pos] == '+' || input[pos] == '-')
+    {
+        negative = input[pos] == '-';
+        pos++;
+    }
+
+    // Special case: a bare "0" (with optional sign) is a valid zero duration.
+    if (input.substr(pos) == "0")
+    {
+        return 0;
+    }
+
+    // Accumulate in a long double so fractional units (e.g. "1.5h") are handled, then round.
+    long double totalNanos = 0.0L;
+    bool sawValue = false;
+
+    while (pos < input.size())
+    {
+        // Parse the numeric part (integer and/or fraction).
+        const size_t numberStart = pos;
+        while (pos < input.size() && (std::isdigit(static_cast<unsigned char>(input[pos])) || input[pos] == '.'))
+        {
+            pos++;
+        }
+
+        const std::string numberStr = input.substr(numberStart, pos - numberStart);
+        if (numberStr.empty() || numberStr == "." || std::count(numberStr.begin(), numberStr.end(), '.') > 1)
+        {
+            return std::nullopt;
+        }
+
+        // Parse the unit (everything up to the next digit or '.').
+        const size_t unitStart = pos;
+        while (pos < input.size() && !std::isdigit(static_cast<unsigned char>(input[pos])) && input[pos] != '.')
+        {
+            pos++;
+        }
+
+        const std::string unit = input.substr(unitStart, pos - unitStart);
+
+        long double multiplier{};
+        if (unit == "ns")
+        {
+            multiplier = 1.0L;
+        }
+        else if (unit == "us" || unit == "\xC2\xB5s" /* µs (U+00B5) */ || unit == "\xCE\xBCs" /* μs (U+03BC) */)
+        {
+            multiplier = 1000L;
+        }
+        else if (unit == "ms")
+        {
+            multiplier = 1000000L;
+        }
+        else if (unit == "s")
+        {
+            multiplier = 1000000000L;
+        }
+        else if (unit == "m")
+        {
+            multiplier = 60000000000L;
+        }
+        else if (unit == "h")
+        {
+            multiplier = 3600000000000L;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        long double value{};
+        try
+        {
+            auto [ptr, ec] = std::from_chars(numberStr.data(), numberStr.data() + numberStr.size(), value, std::chars_format::fixed);
+            if (ptr != numberStr.data() + numberStr.size() || ec != std::errc())
+            {
+                return std::nullopt;
+            }
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+
+        totalNanos += value * multiplier;
+        sawValue = true;
+    }
+
+    if (!sawValue)
+    {
+        return std::nullopt;
+    }
+
+    if (negative)
+    {
+        totalNanos = -totalNanos;
+    }
+
+    if (totalNanos > static_cast<long double>(std::numeric_limits<int64_t>::max()) ||
+        totalNanos < static_cast<long double>(std::numeric_limits<int64_t>::min()))
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<int64_t>(std::llroundl(totalNanos));
+}
+
+void ValidateDuration(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetDurationNanosFromString(value, argName);
+    }
+}
+
+int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring& argName)
+{
+    const std::string narrow = WideToMultiByte(input);
+    const auto parsed = TryParseDuration(narrow);
+
+    if (!parsed.has_value() || parsed.value() < 0)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidDurationError(argName, input));
+    }
+
+    return parsed.value();
 }
 
 void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName)
@@ -404,6 +683,17 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
     if (pos == std::wstring::npos)
     {
         return {WideToMultiByte(value), std::string{}};
+    }
+
+    return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};
+}
+
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+{
+    auto pos = value.find(L'=');
+    if (pos == std::wstring::npos)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
     }
 
     return {WideToMultiByte(value.substr(0, pos)), WideToMultiByte(value.substr(pos + 1))};

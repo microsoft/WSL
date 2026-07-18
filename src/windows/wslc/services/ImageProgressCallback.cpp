@@ -19,18 +19,26 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::windows::common::vt;
 
-auto ImageProgressCallback::MoveToLine(SHORT line)
+// Fallback width for the in-place progress display when the console width can't be queried. This
+// value already includes the autowrap guard (visible width minus one) so a wrapped line can't
+// corrupt the cursor-based rendering.
+constexpr int c_fallbackConsoleWidth = 79;
+
+auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        wprintf(L"\033[%iA", line);
+        m_reporter.Write(m_level, L"{}", Cursor::Up(line));
     }
 
-    return wil::scope_exit([line = line]() {
+    // scope_exit is noexcept and may fire during unwinding; scope_exit_log swallows output
+    // failures so a throw here can't call std::terminate.
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [line = line, this]() {
         if (line > 1)
         {
-            wprintf(L"\033[%iB", line - 1);
+            m_reporter.Write(m_level, L"{}", Cursor::Down(line - 1));
         }
     });
 }
@@ -39,32 +47,57 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
-        if (!m_terminalMode.IsConsole())
+        // status is [unique] in the IDL, so it may be null; normalize before either path uses it.
+        status = (status != nullptr) ? status : "";
+
+        // The in-place progress display needs cursor movement, so when output is redirected fall
+        // back to a log stream: one line per new status, deduping the repeated byte-progress
+        // callbacks that share a status text.
+        if (!m_vtEnabled)
         {
+            if (id == nullptr || *id == '\0')
+            {
+                m_reporter.Write(m_level, L"{}\n", status);
+            }
+            else
+            {
+                auto [it, inserted] = m_lastStatusById.try_emplace(id, status);
+                if (inserted || it->second != status)
+                {
+                    it->second = status;
+                    m_reporter.Write(m_level, L"{}: {}\n", id, status);
+                }
+            }
+
             return S_OK;
         }
 
+        // Hide the cursor while rendering so it doesn't bounce through the movements; scope_exit_log
+        // restores it on every exit path and can't call std::terminate during unwinding.
+        m_reporter.Write(m_level, L"{}", Cursor::Hide);
+        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_reporter.Write(m_level, L"{}", Cursor::Show); });
+
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            wprintf(L"%hs\n", status);
+            m_reporter.Write(m_level, L"{}\n", status);
             m_currentLine++;
             return S_OK;
         }
 
-        auto info = Info();
+        const int visibleWidth = m_reporter.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
         }
 
         return S_OK;
@@ -72,15 +105,12 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
     CATCH_RETURN();
 }
 
-CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth)
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    return info;
-}
+    // status/id are [unique] in the IDL and may be null; treat null as empty before formatting.
+    const char* const safeStatus = (status != nullptr) ? status : "";
+    const char* const safeId = (id != nullptr) ? id : "";
 
-std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
-{
     std::wstring line;
     if (total != 0)
     {
@@ -114,21 +144,19 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
             progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
         }
 
-        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
+        line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
+        line = std::format(L"{}: {} {}", safeId, safeStatus, wsl::shared::string::FormatBytes(current));
     }
     else
     {
-        line = std::format(L"{}: {}", id, status);
+        line = std::format(L"{}: {}", safeId, safeStatus);
     }
 
-    // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left + 1);
-
-    // Truncate to console width to prevent wrapping that would break cursor repositioning.
+    // Truncate to the console width to prevent wrapping that breaks cursor repositioning, then pad
+    // to erase any previously written characters on the line.
     if (line.size() > static_cast<size_t>(visibleWidth))
     {
         line.resize(visibleWidth);
@@ -141,7 +169,6 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         }
     }
 
-    // Erase any previously written char on that line.
     line.resize(visibleWidth, L' ');
 
     return line;

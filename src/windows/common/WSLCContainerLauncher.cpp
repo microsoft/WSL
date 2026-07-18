@@ -129,9 +129,44 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
+void WSLCContainerLauncher::SetStopTimeout(LONG Timeout)
+{
+    m_stopTimeout = Timeout;
+}
+
 void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
 {
     m_shmSize = ShmSize;
+}
+
+void WSLCContainerLauncher::SetHealthCmd(std::string&& HealthCmd)
+{
+    m_healthCmd = std::move(HealthCmd);
+}
+
+void WSLCContainerLauncher::SetHealthInterval(int64_t Nanoseconds)
+{
+    m_healthInterval = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthTimeout(int64_t Nanoseconds)
+{
+    m_healthTimeout = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthStartPeriod(int64_t Nanoseconds)
+{
+    m_healthStartPeriod = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthRetries(LONG Retries)
+{
+    m_healthRetries = Retries;
+}
+
+void WSLCContainerLauncher::SetNoHealthcheck()
+{
+    WI_SetFlag(m_containerFlags, WSLCContainerFlagsNoHealthCheck);
 }
 
 void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
@@ -250,6 +285,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std
     m_additionalNetworks.push_back(Name);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
+{
+    m_primaryNetworkAliases.push_back(Alias);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
     IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
 {
@@ -259,7 +299,11 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
     }
 
-    result = container.value().Get().Start(Flags, nullptr, WarningCallback);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+
+    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }
@@ -287,7 +331,28 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.Flags = m_containerFlags;
+    if (m_stopTimeout.has_value())
+    {
+        options.StopTimeout = m_stopTimeout.value();
+        WI_SetFlag(options.Flags, WSLCContainerFlagsStopTimeout);
+    }
+
     options.ShmSize = m_shmSize;
+
+    if (m_healthCmd.has_value() || m_healthInterval.has_value() || m_healthTimeout.has_value() ||
+        m_healthStartPeriod.has_value() || m_healthRetries.has_value())
+    {
+        if (m_healthCmd.has_value())
+        {
+            options.HealthCmd = m_healthCmd->c_str();
+        }
+
+        options.HealthIntervalNs = m_healthInterval.value_or(0);
+        options.HealthTimeoutNs = m_healthTimeout.value_or(0);
+        options.HealthStartPeriodNs = m_healthStartPeriod.value_or(0);
+        options.HealthRetries = m_healthRetries.value_or(0);
+        WI_SetFlag(options.Flags, WSLCContainerFlagsHealthCheck);
+    }
 
     if (!entrypointStorage.empty())
     {
@@ -366,6 +431,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
+
+    // Aliases for the primary endpoint.
+    std::vector<KeyValuePair> aliasKvps;
+    aliasKvps.reserve(m_primaryNetworkAliases.size());
+    for (const auto& alias : m_primaryNetworkAliases)
+    {
+        aliasKvps.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    options.ContainerNetwork.Settings = aliasKvps.empty() ? nullptr : aliasKvps.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(aliasKvps.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

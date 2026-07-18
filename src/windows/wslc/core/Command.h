@@ -18,6 +18,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
+#include "Reporter.h"
 
 #include <memory>
 #include <optional>
@@ -30,7 +31,8 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
 
-constexpr std::wstring_view s_ExecutableName = L"wslc";
+// The executable name shown in usage/help output, set from argv[0] at startup.
+extern std::wstring s_ExecutableName;
 
 struct Command
 {
@@ -79,20 +81,63 @@ struct Command
         return args;
     }
 
+    // Options accepted before any subcommand on the command line.
+    virtual std::vector<Argument> GetGlobalArguments() const
+    {
+        return {};
+    }
+
+    // Args eligible for environment binding.
+    virtual std::vector<Argument> GetEnvArguments() const
+    {
+        return {};
+    }
+
+    // Union of GetGlobalArguments() and GetEnvArguments(), deduped by ArgType
+    // (globals win on conflict). Use this anywhere the two sets are combined
+    // so duplicates are not parsed/validated twice.
+    std::vector<Argument> GetGlobalsAndEnvArguments() const;
+
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
-    void OutputIntroHeader() const;
-    void OutputHelp(const CommandException* exception = nullptr) const;
+    void OutputHelp(Reporter& reporter, const CommandException* exception = nullptr) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
-    void ParseArguments(Invocation& inv, ArgMap& execArgs) const;
-    void ValidateArguments(ArgMap& execArgs) const;
+
+    // optionsOnly:          stop (without consuming) at the first positional token.
+    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    //                       token instead of throwing. Note: applies per-token; a
+    //                       bundled short chain (e.g. "-Dv") whose leading alias
+    //                       is recognized is treated as claimed, and an unknown
+    //                       alias later in the chain still throws.
+    // overridableDefaults:  args whose preloaded entries in target are treated
+    //                       as defaults (e.g. env-applied) and may be replaced
+    //                       by the first CLI occurrence.
+    void ParseArguments(
+        Invocation& inv,
+        ArgMap& target,
+        std::vector<Argument> definedArgs,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        const std::vector<Argument>& overridableDefaults = {}) const;
+
+    void ParseArguments(Invocation& inv, ArgMap& target) const
+    {
+        ParseArguments(inv, target, GetAllArguments());
+    }
+
+    void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+
+    void ValidateArguments(const ArgMap& source) const
+    {
+        ValidateArguments(source, GetAllArguments(), true);
+    }
 
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ValidateArgumentsInternal(const ArgMap& execArgs) const;
+    virtual void ValidateArgumentsInternal(const ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:

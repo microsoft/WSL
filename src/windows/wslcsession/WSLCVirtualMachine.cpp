@@ -157,7 +157,7 @@ void VMPortMapping::Release()
 
 bool VMPortMapping::IsLocalhost() const
 {
-    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    if (BindAddress.si_family == AF_INET6)
     {
         return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
     }
@@ -182,6 +182,19 @@ uint16_t VMPortMapping::HostPort() const
     {
         WI_ASSERT(BindAddress.si_family == AF_INET);
         return ntohs(BindAddress.Ipv4.sin_port);
+    }
+}
+
+void VMPortMapping::SetHostPort(uint16_t port)
+{
+    if (BindAddress.si_family == AF_INET6)
+    {
+        BindAddress.Ipv6.sin6_port = htons(port);
+    }
+    else
+    {
+        WI_ASSERT(BindAddress.si_family == AF_INET);
+        BindAddress.Ipv4.sin_port = htons(port);
     }
 }
 
@@ -248,12 +261,14 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
     return *this;
 }
 
-WSLCVirtualMachine::WSLCVirtualMachine(_In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent) :
+WSLCVirtualMachine::WSLCVirtualMachine(
+    _In_ IWSLCVirtualMachine* Vm, _In_ const WSLCSessionInitSettings* Settings, _In_ HANDLE SessionTerminatingEvent, _In_ TOnCrashDump&& OnCrashDump) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLCFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4"),
+    m_onCrashDump(std::move(OnCrashDump)),
     m_sessionTerminatingEvent(SessionTerminatingEvent)
 {
     // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
@@ -299,8 +314,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
-    // to the service so virtio device-options (virtiofs shares, VirtioProxy networking) can include
-    // the swiotlb token.
+    // to the service before virtiofs shares or Consomme networking devices are created.
     ReadGuestCapabilities();
 
     // Configure GPU mounts if enabled
@@ -352,8 +366,8 @@ void WSLCVirtualMachine::ConfigureNetworking()
     std::vector<WSLCProcessFd> fds;
     fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
 
-    // Virtio proxy forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
-    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeVirtioProxy;
+    // Consomme forwards DNS via the host proxy, so the DNS channel and /gns args are only needed for NAT mode.
+    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeConsomme;
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});
@@ -386,7 +400,7 @@ void WSLCVirtualMachine::ConfigureNetworking()
         options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
     };
 
-    auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
+    auto process = CreateLinuxProcessImpl("/init", options, fds, 0, 0, nullptr, prepareCommandLine);
 
     // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
@@ -418,9 +432,8 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
 
-    // Forward the values to the service so AddShare and ConfigureNetworking can include the
-    // swiotlb device-options token. Passing zero for both means the guest kernel does not
-    // support hv_pci swiotlb; the service then omits the token.
+    // Forward the values to the service so AddShare and ConfigureNetworking can configure
+    // wsldevicehost. Passing zero for both means the guest kernel does not support hv_pci swiotlb.
     WSLCGuestCapabilities capabilities{};
     capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
     capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
@@ -430,6 +443,17 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
+}
+
+WSLCNetworkingMode WSLCVirtualMachine::NetworkingMode() const
+{
+    return m_networkingMode;
+}
+
+bool WSLCVirtualMachine::UseWslRelayPortForwarding() const
+{
+    return m_networkingMode == WSLCNetworkingModeNAT ||
+           (m_networkingMode == WSLCNetworkingModeConsomme && FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
 }
 
 void WSLCVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -532,6 +556,33 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+void WSLCVirtualMachine::RemoveDirectory(const std::string& Path)
+{
+    // rmdir only removes an empty directory, so callers can rely on it to leave
+    // a non-empty directory untouched.
+    constexpr auto rmdirPath = "/bin/rmdir";
+
+    std::vector<std::string> args = {rmdirPath, Path};
+
+    ServiceProcessLauncher launcher(rmdirPath, args);
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Path)
+{
+    wsl::shared::MessageWriter<WSLC_LISTDIR> message;
+    message.WriteString(Path);
+
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
+
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
+
+    return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
@@ -639,7 +690,7 @@ std::string WSLCVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     std::vector<WSLCProcessFd> fds;
@@ -659,11 +710,11 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
         fds.emplace_back(WSLCProcessFd{.Fd = WSLCFDStderr, .Type = WSLCFdType::WSLCFdTypeDefault});
     }
 
-    return CreateLinuxProcessImpl(Executable, Options, fds, Errno, PrepareCommandLine);
+    return CreateLinuxProcessImpl(Executable, Options, fds, TtyRows, TtyColumns, Errno, PrepareCommandLine);
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
-    LPCSTR Executable, const WSLCProcessOptions& Options, const std::vector<WSLCProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    LPCSTR Executable, const WSLCProcessOptions& Options, const std::vector<WSLCProcessFd>& Fds, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
@@ -729,7 +780,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     // If this is an interactive tty, we need a relay process
     if (tty != nullptr)
     {
-        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLC_FORK::Pty, Options.TtyRows, Options.TtyColumns);
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLC_FORK::Pty, TtyRows, TtyColumns);
         WSLC_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.Socket = tty->Fd;
@@ -939,28 +990,43 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for NAT mode: %hs, protocol: %i",
+            "Unsupported port mapping for the wslrelay port relay: %hs, protocol: %i",
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
-    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
-        // TODO: Switch to using the native virtionet relay.
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for virtionet mode: %hs, protocol: %i",
-            Mapping.BindingAddressString().c_str(),
-            Mapping.Protocol);
+        USHORT allocatedHostPort = 0;
+        auto result = m_vm->MapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str(), &allocatedHostPort);
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+        if (FAILED(result))
+        {
+            auto portString = std::format(
+                "{}:{}/{}",
+                Mapping.IsIPv6() ? std::format("[{}]", Mapping.BindingAddressString()) : Mapping.BindingAddressString(),
+                Mapping.HostPort(),
+                Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
+
+            THROW_HR_WITH_USER_ERROR(result, shared::Localization::MessageFailedToMapPort(portString, common::wslutil::GetErrorString(result)));
+        }
+
+        // For anonymous binds, write back the allocated host port.
+        if (Mapping.HostPort() == WSLC_EPHEMERAL_PORT)
+        {
+            WSL_LOG(
+                "AllocatedHostPort",
+                TraceLoggingValue(allocatedHostPort, "HostPort"),
+                TraceLoggingValue(Mapping.VmPort->Port(), "GuestPort"));
+            Mapping.SetHostPort(allocatedHostPort);
+        }
     }
     else
     {
@@ -978,14 +1044,14 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
     }
-    else if (m_networkingMode == WSLCNetworkingModeNAT)
+    else if (UseWslRelayPortForwarding())
     {
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
-    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
-        // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+        THROW_IF_FAILED(m_vm->UnmapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str()));
     }
     else
     {
@@ -1030,6 +1096,13 @@ try
             {
                 shareGuid = shareIt->second;
                 reusingShare = true;
+            }
+            else
+            {
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_OUTOFMEMORY,
+                    shared::Localization::MessageWslcTooManyVirtioFsShares(shared::c_maxVirtioFsShares),
+                    m_virtioFsShares.size() >= shared::c_maxVirtioFsShares);
             }
         }
 
@@ -1152,19 +1225,26 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
 
 #endif
 
-    auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
-    THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
-
-    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
-    std::string options = "lowerdir=" + packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
-        options += ":" + inboxLibMountPoint.value();
+        // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
+        auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
+
+        Mount(
+            m_initChannel,
+            "none",
+            LibrariesMountPoint,
+            "overlay",
+            std::format("lowerdir={}:{}", packagedLibMountPoint, inboxLibMountPoint.value()).c_str(),
+            0);
     }
-
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
+    else
+    {
+        // If the inbox libraries are not present, mount the packaged libraries directly at final location (no overlay needed).
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), LibrariesMountPoint, WSLCMountFlagsReadOnly));
+    }
 }
-
 void WSLCVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_trackedProcessesLock};
@@ -1208,12 +1288,13 @@ std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, i
 {
     std::lock_guard lock{m_lock};
 
-    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
+    for (uint32_t i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
-        if (!m_allocatedPorts.contains(i))
+        uint16_t port = static_cast<uint16_t>(i);
+        if (!m_allocatedPorts.contains(port))
         {
-            WI_VERIFY(m_allocatedPorts.insert(i).second);
-            return std::make_shared<VmPortAllocation>(i, Family, Protocol, *this);
+            WI_VERIFY(m_allocatedPorts.insert(port).second);
+            return std::make_shared<VmPortAllocation>(port, Family, Protocol, *this);
         }
     }
 
@@ -1249,13 +1330,15 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
 
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
     const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-crashes";
 
     while (!m_vmTerminatingEvent.is_signaled())
     {
         try
         {
-            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
             if (!socket)
             {
                 // VM is exiting.
@@ -1275,10 +1358,14 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
             const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
+            const auto crashPid = message.Pid;
+            const auto crashSignal = message.Signal;
+            const auto crashTimestamp = message.Timestamp;
+
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
-            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, crashTimestamp, crashPid, process, crashSignal, dumpExtension);
 
             std::replace_if(
                 filename.begin(),
@@ -1291,8 +1378,8 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             WSL_LOG(
                 "WSLCLinuxCrash",
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
-                TraceLoggingValue(message.Pid, "Pid"),
-                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(crashPid, "Pid"),
+                TraceLoggingValue(crashSignal, "Signal"),
                 TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
@@ -1316,6 +1403,15 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            file.reset();
+
+            // Notify the session that a crash dump has been fully written. The session fans out
+            // to any registered ICrashDumpCallback subscribers. Failures are caller-handled.
+            if (m_onCrashDump)
+            {
+                m_onCrashDump(fullPath.wstring(), process, crashPid, crashSignal, crashTimestamp);
+            }
         }
         CATCH_LOG()
     }

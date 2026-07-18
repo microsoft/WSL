@@ -301,6 +301,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
+                    LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
                     return;
                 }
 
@@ -444,7 +445,7 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
-    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy)
+    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme)
     {
         std::cerr << "Invalid networking mode (" << NetworkingMode << ")\n";
         return 1;

@@ -53,6 +53,7 @@ Abstract:
 #define HOSTS_FILE_PATH ETC_FOLDER "hosts"
 #define LANG_ENV "LANG"
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
+#define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
@@ -844,16 +845,16 @@ try
     }
 
     //
-    // Run the Plan 9 server. This requires a DrvFs mount for the socket file,
-    // so either fstab or automount must be enabled to have a chance for the
-    // mount to be available.
+    // Run the Plan 9 server. On WSL1 this requires a DrvFs mount for the socket
+    // file, so either fstab or automount must be enabled to have a chance for
+    // the mount to be available. WSL2 serves over an hvsocket and has no such
+    // dependency.
     //
     // N.B. Failure to start the server is non-fatal.
     //
-
     unsigned int Plan9Port = LX_INIT_UTILITY_VM_INVALID_PORT;
     if ((WI_IsFlagClear(Config.FeatureFlags.value(), LxInitFeatureDisable9pServer)) && (Config.Plan9Enabled) &&
-        (Config.AutoMount || Config.MountFsTab))
+        (UtilIsUtilityVm() || Config.AutoMount || Config.MountFsTab))
     {
         std::tie(Plan9Port, Config.Plan9ControlChannel) = StartPlan9Server(Plan9SocketPath, Config);
     }
@@ -991,17 +992,21 @@ try
 
     if (Config.BootCommand.has_value())
     {
-        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
-            //
-            // Restore default signal dispositions for the child process.
-            //
+        UtilCreateChildProcess(
+            "BootCommand",
+            [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
+                //
+                // Restore default signal dispositions for the child process.
+                //
 
-            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
-            THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+                THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
+                THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-            execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
-            LOG_ERROR("execl() failed, {}", errno);
-        });
+                execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
+                LOG_ERROR("execl() failed, {}", errno);
+            },
+            {},
+            Config.CgroupPath);
     }
 
     return 0;
@@ -2514,8 +2519,13 @@ void ConfigUpdateLanguage(EnvironmentBlock& Environment)
 
 Routine Description:
 
-    This routine queries the contents of the /etc/default/locale text file and
+    This routine queries the contents of the locale configuration file and
     if present updates the $LANG environment variable in the environment block.
+
+    Different distributions store this file in different locations:
+        - /etc/default/locale
+        - /etc/locale.conf
+    Both share the same "LANG=" line format, so the first file that exists is used.
 
 Arguments:
 
@@ -2530,22 +2540,33 @@ Return Value:
 try
 {
     //
-    // Attempt to open the /etc/default/locale file. If the file does not exist
-    // then the $LANG environment variable will not be updated.
+    // Attempt to open the locale configuration file, trying each known path in turn.
+    // If none of the files exist then the $LANG environment variable will not be updated.
     //
-    // N.B. This file is being opened by root. The only user-visible content
+    // N.B. These files are being opened by root. The only user-visible content
     //      will be the contents of the last line of the file that contains
     //      "LANG=".
     //
 
-    wil::unique_file LocaleFile{fopen(LOCALE_FILE_PATH, "r")};
-    if (!LocaleFile)
+    constexpr const char* LocaleFilePaths[] = {LOCALE_FILE_PATH, LOCALE_CONF_FILE_PATH};
+
+    wil::unique_file LocaleFile;
+    for (const auto* Path : LocaleFilePaths)
     {
-        if (errno != ENOENT)
+        LocaleFile.reset(fopen(Path, "r"));
+        if (LocaleFile)
         {
-            LOG_ERROR("fopen({}) failed {}", LOCALE_FILE_PATH, errno);
+            break;
         }
 
+        if (errno != ENOENT)
+        {
+            LOG_ERROR("fopen({}) failed {}", Path, errno);
+        }
+    }
+
+    if (!LocaleFile)
+    {
         return;
     }
 

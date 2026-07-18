@@ -18,10 +18,11 @@ Abstract:
 
 namespace wsl::windows::common::wslc_schema {
 
+using wsl::shared::EmptyObject;
+
 struct InspectPortBinding
 {
-    // WSLC always binds to localhost. Included for Docker API compatibility.
-    std::string HostIp = "127.0.0.1";
+    std::string HostIp;
     std::string HostPort;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectPortBinding, HostIp, HostPort);
@@ -38,6 +39,25 @@ struct InspectMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, ReadWrite);
 };
 
+struct HealthcheckResult
+{
+    std::string Start;
+    std::string End;
+    int ExitCode{};
+    std::string Output;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthcheckResult, Start, End, ExitCode, Output);
+};
+
+struct Health
+{
+    std::string Status;
+    int FailingStreak{};
+    std::vector<HealthcheckResult> Log;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Health, Status, FailingStreak, Log);
+};
+
 struct ContainerInspectState
 {
     std::string Status;
@@ -45,8 +65,9 @@ struct ContainerInspectState
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
+    std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -68,6 +89,17 @@ struct InspectHostConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
 };
 
+struct HealthConfig
+{
+    std::optional<std::vector<std::string>> Test;
+    std::optional<std::int64_t> Interval;
+    std::optional<std::int64_t> Timeout;
+    std::optional<std::int64_t> StartPeriod;
+    std::optional<int> Retries;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthConfig, Test, Interval, Timeout, StartPeriod, Retries);
+};
+
 struct ContainerConfig
 {
     std::optional<std::vector<std::string>> Env;
@@ -75,8 +107,10 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Entrypoint;
     std::string User;
     std::string WorkingDir;
+    std::optional<int> StopTimeout;
+    std::optional<HealthConfig> Healthcheck;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck);
 };
 
 struct InspectEndpointSettings
@@ -85,8 +119,9 @@ struct InspectEndpointSettings
     std::string Gateway;
     std::string MacAddress;
     int IPPrefixLen{};
+    std::vector<std::string> Aliases;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
 };
 
 struct InspectNetworkSettings
@@ -118,11 +153,22 @@ struct ImageConfig
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
     std::optional<std::vector<std::string>> Env;
+    std::optional<std::map<std::string, EmptyObject>> ExposedPorts;
     std::optional<std::map<std::string, std::string>> Labels;
+    std::string StopSignal;
     std::string User;
+    std::optional<std::map<std::string, EmptyObject>> Volumes;
     std::string WorkingDir;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, Labels, User, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, ExposedPorts, Labels, StopSignal, User, Volumes, WorkingDir);
+};
+
+struct ImageRootFS
+{
+    std::string Type;
+    std::optional<std::vector<std::string>> Layers;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageRootFS, Type, Layers);
 };
 
 struct InspectImage
@@ -139,9 +185,10 @@ struct InspectImage
     int64_t Size{};
     std::optional<std::map<std::string, std::string>> Metadata;
     std::optional<ImageConfig> Config;
+    std::optional<ImageRootFS> RootFS;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config, RootFS);
 };
 
 struct InspectVolume
@@ -180,9 +227,10 @@ struct Network
     std::string Scope;
     bool Internal{};
     IPAM IPAM;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
 };
 
 } // namespace wsl::windows::common::wslc_schema

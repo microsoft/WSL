@@ -230,8 +230,18 @@ if (DEFINED PIPELINE_BUILD_ID)
 endif()
 
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
+
+# Link the third-party binaries we ship (and their PDBs) into bin so packaging
+# and the pipeline's symbol publishing step find them. Without the PDBs here,
+# Watson can't resolve function names in their crash frames.
+string(REPLACE ".dll" ".pdb" WSLG_TS_PLUGIN_PDB ${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_PDB} ${BIN}/${WSLG_TS_PLUGIN_PDB})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
+file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
+# wsldevicehost.dll is packaged directly from its NuGet package, so only its PDB
+# needs linking into bin for symbol publishing.
+file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
@@ -500,6 +510,7 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wsldevicehoststub/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
@@ -524,8 +535,10 @@ add_subdirectory(nuget)
 add_subdirectory(msixgluepackage)
 add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
+add_subdirectory(src/windows/wsldevicehoststub/inc)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
+add_subdirectory(src/windows/wsldevicehoststub)
 add_subdirectory(src/windows/wslcsession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)

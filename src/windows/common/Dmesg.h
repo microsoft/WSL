@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "relay.hpp"
+#include "HandleIO.h"
 #include "RingBuffer.h"
 
 class DmesgCollector
@@ -35,7 +36,7 @@ public:
 
     static std::shared_ptr<DmesgCollector> Create(
         GUID VmId,
-        const wil::unique_event& ExitEvent,
+        HANDLE ExitEvent,
         bool EnableTelemetry,
         bool EnableDebugConsole,
         const std::wstring& Com1PipeName,
@@ -49,38 +50,35 @@ private:
         DmesgCollectorConsole
     };
 
-    DmesgCollector(
-        GUID VmId,
-        const wil::unique_event& ExitEvent,
-        bool EnableTelemetry,
-        bool EnableDebugConsole,
-        const std::wstring& Com1PipeName,
-        wil::unique_handle&& OutputHandle = {});
+    DmesgCollector(GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle = {});
 
-    HRESULT Start(bool EnableEarlyBootConsole);
-    std::pair<std::wstring, std::thread> StartDmesgThread(InputSource Source);
+    void Start(bool EnableEarlyBootConsole);
+
+    void Run();
+
+    static std::pair<std::wstring, wil::unique_hfile> CreateConsolePipe();
+
     void ProcessInput(InputSource Source, const gsl::span<char>& Input);
-    void WriteToCom1(const gsl::span<char>& Input);
 
-    wil::srwlock m_lock;
     std::wstring m_com1PipeName;
     std::wstring m_earlyConsoleName;
     std::wstring m_virtioConsoleName;
-    wil::unique_event m_exitEvent;
-    wil::unique_event m_threadExit;
-    std::vector<HANDLE> m_exitEvents;
+    HANDLE m_vmExitEvent;
+    wil::unique_event m_threadExitEvent{wil::EventOptions::ManualReset};
     wil::unique_hfile m_com1Pipe;
+    wil::unique_handle m_outputHandle;
+    wil::unique_hfile m_earlyConsolePipe;
+    wil::unique_hfile m_virtioConsolePipe;
     GUID m_runtimeId{};
-    wil::unique_event m_overlappedEvent;
-    _Guarded_by_(m_lock) OVERLAPPED m_overlapped {};
     RingBuffer m_dmesgBuffer{LX_RELAY_BUFFER_SIZE};
     RingBuffer m_dmesgEarlyBuffer{LX_RELAY_BUFFER_SIZE};
     bool m_debugConsole;
     bool m_telemetry;
-    std::atomic<bool> m_earlyConsoleTransition = false;
-    bool m_pipeServer;
-    bool m_waitForConnection;
-    std::thread m_earlyConsoleWorker;
-    std::thread m_virtioWorker;
-    wil::unique_handle m_outputHandle = nullptr;
+    bool m_earlyConsoleTransition = false;
+    bool m_pipeServer = false;
+
+    std::thread m_thread;
+
+    wsl::windows::common::io::WriteHandle* m_outputWrite = nullptr;
+    wsl::windows::common::io::WriteNamedPipe* m_com1Write = nullptr;
 };

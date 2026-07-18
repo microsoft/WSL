@@ -28,7 +28,6 @@ std::vector<Argument> NetworkInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::NetworkName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -44,7 +43,7 @@ std::wstring NetworkInspectCommand::LongDescription() const
 
 void NetworkInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << InspectNetworks;
 }
 } // namespace wsl::windows::wslc

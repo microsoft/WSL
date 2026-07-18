@@ -4,6 +4,7 @@
 #include "HandleIO.h"
 #pragma hdrstop
 
+using wsl::windows::common::io::AcceptHandle;
 using wsl::windows::common::io::BufferWrapper;
 using wsl::windows::common::io::DockerIORelayHandle;
 using wsl::windows::common::io::EventHandle;
@@ -14,9 +15,10 @@ using wsl::windows::common::io::LineBasedReadHandle;
 using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
+using wsl::windows::common::io::ReadNamedPipe;
 using wsl::windows::common::io::ReadSocketMessageHandle;
-using wsl::windows::common::io::SingleAcceptHandle;
 using wsl::windows::common::io::WriteHandle;
+using wsl::windows::common::io::WriteNamedPipe;
 
 namespace {
 
@@ -70,6 +72,69 @@ inline void UnregisterWait(HANDLE waitHandle) noexcept
 }
 
 using unique_registered_wait = wil::unique_any_handle_null<decltype(&UnregisterWait), &UnregisterWait>;
+
+#define TTY_ALT_NUMPAD_VK_MENU (0x12)
+#define TTY_ESCAPE_CHARACTER (L'\x1b')
+#define TTY_INPUT_EVENT_BUFFER_SIZE (16)
+#define TTY_UTF8_TRANSLATION_BUFFER_SIZE (4 * TTY_INPUT_EVENT_BUFFER_SIZE)
+
+BOOL IsActionableKey(_In_ PKEY_EVENT_RECORD KeyEvent)
+{
+    //
+    // This is a bit complicated to discern.
+    //
+    // 1. Our first check is that we only want structures that
+    //    represent at least one key press. If we have 0, then we don't
+    //    need to bother. If we have >1, we'll send the key through
+    //    that many times into the pipe.
+    // 2. Our second check is where it gets confusing.
+    //    a. Characters that are non-null get an automatic pass. Copy
+    //       them through to the pipe.
+    //    b. Null characters need further scrutiny. We generally do not
+    //       pass nulls through EXCEPT if they're sourced from the
+    //       virtual terminal engine (or another application living
+    //       above our layer). If they're sourced by a non-keyboard
+    //       source, they'll have no scan code (since they didn't come
+    //       from a keyboard). But that rule has an exception too:
+    //       "Enhanced keys" from above the standard range of scan
+    //       codes will return 0 also with a special flag set that says
+    //       they're an enhanced key. That means the desired behavior
+    //       is:
+    //           Scan Code = 0, ENHANCED_KEY = 0
+    //               -> This came from the VT engine or another app
+    //                  above our layer.
+    //           Scan Code = 0, ENHANCED_KEY = 1
+    //               -> This came from the keyboard, but is a special
+    //                  key like 'Volume Up' that wasn't generally a
+    //                  part of historic (pre-1990s) keyboards.
+    //           Scan Code = <anything else>
+    //               -> This came from a keyboard directly.
+    //
+
+    if ((KeyEvent->wRepeatCount == 0) || ((KeyEvent->uChar.UnicodeChar == UNICODE_NULL) &&
+                                          ((KeyEvent->wVirtualScanCode != 0) || (WI_IsFlagSet(KeyEvent->dwControlKeyState, ENHANCED_KEY)))))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter)
+{
+    BOOL IsNextCharacterValid = FALSE;
+    if (InputRecord->EventType == KEY_EVENT)
+    {
+        const auto KeyEvent = &InputRecord->Event.KeyEvent;
+        if ((IsActionableKey(KeyEvent) != FALSE) && ((KeyEvent->bKeyDown != FALSE) || (KeyEvent->wVirtualKeyCode == TTY_ALT_NUMPAD_VK_MENU)))
+        {
+            *NextCharacter = KeyEvent->uChar.UnicodeChar;
+            IsNextCharacterValid = TRUE;
+        }
+    }
+
+    return IsNextCharacterValid;
+}
 
 } // namespace
 
@@ -304,41 +369,131 @@ HANDLE ReadHandle::GetHandle() const
     return Event.get();
 }
 
-// SingleAcceptHandle
+// ReadNamedPipe
 
-SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted) :
-    ListenSocket(std::move(ListenSocket)), AcceptedSocket(std::move(AcceptedSocket)), OnAccepted(std::move(OnAccepted))
+ReadNamedPipe::ReadNamedPipe(HandleWrapper&& Pipe, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+    ReadHandle(std::move(Pipe), std::move(OnRead))
 {
-    Overlapped.hEvent = Event.get();
 }
 
-SingleAcceptHandle::~SingleAcceptHandle()
+void ReadNamedPipe::Schedule()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        if (!ConnectNamedPipe(Handle.Get(), &Overlapped))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                State = IOHandleStatus::Pending;
+                return;
+            }
+
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+    }
+
+    ReadHandle::Schedule();
+}
+
+void ReadNamedPipe::Collect()
+{
+    if (!m_connected)
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        DWORD bytes{};
+        if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytes, FALSE))
+        {
+            const auto error = GetLastError();
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Handle.Get());
+        }
+
+        m_connected = true;
+
+        // Transition back to standby so the IO loop schedules the first read.
+        State = IOHandleStatus::Standby;
+        return;
+    }
+
+    ReadHandle::Collect();
+}
+
+// AcceptHandle
+
+AcceptHandle::AcceptHandle(HandleWrapper&& ListenSocket, bool AcceptOnce, std::function<void(wil::unique_socket&&)>&& OnAccepted) :
+    ListenSocket(std::move(ListenSocket)), AcceptOnce(AcceptOnce), OnAccepted(std::move(OnAccepted))
+{
+    Overlapped.hEvent = Event.get();
+
+    // Query the listen socket so accepted sockets can be created with a matching address family, type, and protocol.
+    WSAPROTOCOL_INFOW protocolInfo{};
+    int length = sizeof(protocolInfo);
+    THROW_LAST_ERROR_IF(
+        getsockopt(reinterpret_cast<SOCKET>(this->ListenSocket.Get()), SOL_SOCKET, SO_PROTOCOL_INFOW, reinterpret_cast<char*>(&protocolInfo), &length) ==
+        SOCKET_ERROR);
+
+    AddressFamily = protocolInfo.iAddressFamily;
+    SocketType = protocolInfo.iSocketType;
+    Protocol = protocolInfo.iProtocol;
+}
+
+AcceptHandle::~AcceptHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
-
-        DWORD bytesProcessed{};
-        DWORD flagsReturned{};
-        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
-        {
-            auto error = GetLastError();
-            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-        }
+        CancelPendingIo(reinterpret_cast<SOCKET>(ListenSocket.Get()), Overlapped);
     }
 }
 
-void SingleAcceptHandle::Schedule()
+void AcceptHandle::CreateAcceptSocket()
+{
+    AcceptedSocket.reset(WSASocketW(AddressFamily, SocketType, Protocol, nullptr, 0, WSA_FLAG_OVERLAPPED));
+    THROW_LAST_ERROR_IF(!AcceptedSocket);
+
+    if (AddressFamily == AF_HYPERV)
+    {
+        ULONG enable = 1;
+        THROW_LAST_ERROR_IF(
+            setsockopt(AcceptedSocket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECTED_SUSPEND, reinterpret_cast<char*>(&enable), sizeof(enable)) ==
+            SOCKET_ERROR);
+    }
+}
+
+void AcceptHandle::OnComplete()
+{
+    wsl::windows::common::socket::SetAcceptContext(AcceptedSocket.get(), reinterpret_cast<SOCKET>(ListenSocket.Get()));
+
+    OnAccepted(std::move(AcceptedSocket));
+
+    if (AcceptOnce)
+    {
+        State = IOHandleStatus::Completed;
+    }
+    else
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+void AcceptHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
 
+    CreateAcceptSocket();
+
+    Event.ResetEvent();
+
     // Schedule the accept.
     DWORD bytesReturned{};
-    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
+    if (AcceptEx((SOCKET)ListenSocket.Get(), AcceptedSocket.get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
     {
         // Accept completed immediately.
-        State = IOHandleStatus::Completed;
-        OnAccepted();
+        OnComplete();
     }
     else
     {
@@ -349,7 +504,7 @@ void SingleAcceptHandle::Schedule()
     }
 }
 
-void SingleAcceptHandle::Collect()
+void AcceptHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
 
@@ -358,11 +513,10 @@ void SingleAcceptHandle::Collect()
 
     THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesReceived, false, &flagsReturned));
 
-    State = IOHandleStatus::Completed;
-    OnAccepted();
+    OnComplete();
 }
 
-HANDLE SingleAcceptHandle::GetHandle() const
+HANDLE AcceptHandle::GetHandle() const
 {
     return Event.get();
 }
@@ -717,13 +871,336 @@ HANDLE ReadSocketMessageHandle::GetHandle() const
     return Event.get();
 }
 
+// ReadConsoleHandle
+
+wsl::windows::common::io::ReadConsoleHandle::ReadConsoleHandle(
+    HandleWrapper&& Console,
+    std::function<void(const gsl::span<char>& Buffer)>&& OnRead,
+    std::function<void()>&& UpdateTerminalSize,
+    std::vector<char> DetachSequence,
+    std::function<void()>&& OnDetach) :
+    Console(std::move(Console)),
+    OnRead(std::move(OnRead)),
+    UpdateTerminalSize(std::move(UpdateTerminalSize)),
+    DetachSequence(std::move(DetachSequence)),
+    OnDetach(std::move(OnDetach))
+{
+}
+
+void wsl::windows::common::io::ReadConsoleHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    //
+    // Use the console handle as the signal event.
+    // N.B. This behavior is documented here: https://learn.microsoft.com/en-us/windows/console/readconsoleinput
+    //
+
+    State = IOHandleStatus::Pending;
+}
+
+HANDLE wsl::windows::common::io::ReadConsoleHandle::GetHandle() const
+{
+    return Console.Get();
+}
+
+void wsl::windows::common::io::ReadConsoleHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    //
+    // Re-arm by default; a detected detach sequence overrides this to Completed below.
+    //
+
+    State = IOHandleStatus::Standby;
+
+    //
+    // N.B. ReadConsoleInputEx has no associated import library.
+    //
+
+    static LxssDynamicFunction<decltype(ReadConsoleInputExW)> readConsoleInput(L"Kernel32.dll", "ReadConsoleInputExW");
+
+    INPUT_RECORD InputRecordBuffer[TTY_INPUT_EVENT_BUFFER_SIZE];
+    INPUT_RECORD* InputRecordPeek = &(InputRecordBuffer[1]);
+    KEY_EVENT_RECORD* KeyEvent;
+    DWORD RecordsRead;
+
+    //
+    // The console handle stays signaled while input is available, so drain all currently available
+    // input here and return to Standby once none remains (the handle is waited on again by the IO loop).
+    //
+
+    for (;;)
+    {
+        // Detach if the escape sequence was detected.
+        // N.B. This needs to be done at the beginning of the loop so the escape sequence is also delivered.
+        if (!CurrentSequence.empty() && std::ranges::equal(CurrentSequence, DetachSequence))
+        {
+            OnDetach();
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        //
+        // Because some input events generated by the console are encoded with
+        // more than one input event, we have to be smart about reading the
+        // events.
+        //
+        // First, we peek at the next input event.
+        // If it's an escape (wch == L'\x1b') event, then the characters that
+        //      follow are part of an input sequence. We can't know for sure
+        //      how long that sequence is, but we can assume it's all sent to
+        //      the input queue at once, and it's less that 16 events.
+        //      Furthermore, we can assume that if there's an Escape in those
+        //      16 events, that the escape marks the start of a new sequence.
+        //      So, we'll peek at another 15 events looking for escapes.
+        //      If we see an escape, then we'll read one less than that,
+        //      such that the escape remains the next event in the input.
+        //      From those read events, we'll aggregate chars into a single
+        //      string to send to the subsystem.
+        // If it's not an escape, send the event through one at a time.
+        //
+
+        //
+        // Read one input event without blocking. If none is available, all input has been drained.
+        //
+
+        THROW_IF_WIN32_BOOL_FALSE(readConsoleInput(Console.Get(), InputRecordBuffer, 1, &RecordsRead, CONSOLE_READ_NOWAIT));
+        if (RecordsRead == 0)
+        {
+            return;
+        }
+
+        //
+        // Don't read additional records if the first entry is a window size
+        // event, or a repeated character. Handle those events on their own.
+        //
+
+        DWORD RecordsPeeked = 0;
+        if ((InputRecordBuffer[0].EventType != WINDOW_BUFFER_SIZE_EVENT) &&
+            ((InputRecordBuffer[0].EventType != KEY_EVENT) || (InputRecordBuffer[0].Event.KeyEvent.wRepeatCount < 2)))
+        {
+            //
+            // Read additional input records into the buffer if available.
+            //
+
+            THROW_IF_WIN32_BOOL_FALSE(PeekConsoleInputW(Console.Get(), InputRecordPeek, (RTL_NUMBER_OF(InputRecordBuffer) - 1), &RecordsPeeked));
+        }
+
+        //
+        // Iterate over peeked records [1, RecordsPeeked].
+        //
+
+        DWORD AdditionalRecordsToRead = 0;
+        WCHAR NextCharacter;
+        for (DWORD RecordIndex = 1; RecordIndex <= RecordsPeeked; RecordIndex++)
+        {
+            if (GetNextCharacter(&InputRecordBuffer[RecordIndex], &NextCharacter) != FALSE)
+            {
+                KeyEvent = &InputRecordBuffer[RecordIndex].Event.KeyEvent;
+                if (NextCharacter == TTY_ESCAPE_CHARACTER)
+                {
+                    //
+                    // CurrentRecord is an escape event. We will start here
+                    // on the next input loop.
+                    //
+
+                    break;
+                }
+                else if (KeyEvent->wRepeatCount > 1)
+                {
+                    //
+                    // Repeated keys are handled on their own. Start with this
+                    // key on the next input loop.
+                    //
+
+                    break;
+                }
+                else if (IS_HIGH_SURROGATE(NextCharacter) && (RecordIndex >= (RecordsPeeked - 1)))
+                {
+                    //
+                    // If there is not enough room for the second character of
+                    // a surrogate pair, start with this character on the next
+                    // input loop.
+                    //
+                    // N.B. The test is for at least two remaining records
+                    //      because typically a surrogate pair will be entered
+                    //      via copy/paste, which will appear as an input
+                    //      record with alt-down, alt-up and character. So to
+                    //      include the next character of the surrogate pair it
+                    //      is likely that the alt-up record will need to be
+                    //      read first.
+                    //
+
+                    break;
+                }
+            }
+            else if (InputRecordBuffer[RecordIndex].EventType == WINDOW_BUFFER_SIZE_EVENT)
+            {
+                //
+                // A window size event is handled on its own.
+                //
+
+                break;
+            }
+
+            //
+            // Process the additional input record.
+            //
+
+            AdditionalRecordsToRead += 1;
+        }
+
+        if (AdditionalRecordsToRead > 0)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(readConsoleInput(Console.Get(), InputRecordPeek, AdditionalRecordsToRead, &RecordsRead, CONSOLE_READ_NOWAIT));
+
+            if (RecordsRead == 0)
+            {
+                //
+                // This would be an unexpected case. We've already peeked to see
+                // that there are AdditionalRecordsToRead # of records in the
+                // input that need reading, yet we didn't get them when we read.
+                // In this case, stop draining and wait to be signaled again.
+                //
+
+                return;
+            }
+
+            //
+            // We already had one input record in the buffer before reading
+            // additional, So account for that one too
+            //
+
+            RecordsRead += 1;
+        }
+
+        //
+        // Process each input event. Keydowns will get aggregated into
+        // Utf8String before getting injected into the subsystem.
+        //
+
+        WCHAR Utf16String[TTY_INPUT_EVENT_BUFFER_SIZE];
+        ULONG Utf16StringSize = 0;
+        for (DWORD RecordIndex = 0; RecordIndex < RecordsRead; RecordIndex++)
+        {
+            INPUT_RECORD* CurrentInputRecord = &(InputRecordBuffer[RecordIndex]);
+            switch (CurrentInputRecord->EventType)
+            {
+            case KEY_EVENT:
+
+                KeyEvent = &CurrentInputRecord->Event.KeyEvent;
+
+                if (KeyEvent->bKeyDown && IsActionableKey(KeyEvent) && !DetachSequence.empty())
+                {
+                    if (CurrentSequence.size() >= DetachSequence.size())
+                    {
+                        CurrentSequence.pop_front();
+                    }
+
+                    CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.AsciiChar);
+                }
+
+                //
+                // Filter out key up events unless they are from an <Alt> key.
+                // Key up with an <Alt> key could contain a Unicode character
+                // pasted from the clipboard and converted to an <Alt>+<Numpad> sequence.
+                //
+
+                if ((KeyEvent->bKeyDown == FALSE) && (KeyEvent->wVirtualKeyCode != TTY_ALT_NUMPAD_VK_MENU))
+                {
+                    break;
+                }
+
+                //
+                // Filter out key presses that are not actionable, such as just
+                // pressing <Ctrl>, <Alt>, <Shift> etc. These key presses return
+                // the character of null but will have a valid scan code off the
+                // keyboard. Certain other key sequences such as Ctrl+A,
+                // Ctrl+<space>, and Ctrl+@ will also return the character null
+                // but have no scan code.
+                // <Alt> + <NumPad> sequences will show an <Alt> but will have
+                // a scancode and character specified, so they should be actionable.
+                //
+
+                if (IsActionableKey(KeyEvent) == FALSE)
+                {
+                    break;
+                }
+
+                Utf16String[Utf16StringSize] = KeyEvent->uChar.UnicodeChar;
+                Utf16StringSize += 1;
+                break;
+
+            case WINDOW_BUFFER_SIZE_EVENT:
+
+                //
+                // Query the window size and send an update message via the
+                // control channel.
+                //
+
+                UpdateTerminalSize();
+                break;
+            }
+        }
+
+        CHAR Utf8String[TTY_UTF8_TRANSLATION_BUFFER_SIZE];
+        DWORD Utf8StringSize = 0;
+        if (Utf16StringSize > 0)
+        {
+            //
+            // Windows uses UTF-16LE encoding, Linux uses UTF-8 by default.
+            // Convert each UTF-16LE character into the proper UTF-8 byte
+            // sequence equivalent.
+            //
+
+            THROW_LAST_ERROR_IF(
+                (Utf8StringSize = WideCharToMultiByte(
+                     CP_UTF8, 0, Utf16String, Utf16StringSize, Utf8String, sizeof(Utf8String), nullptr, nullptr)) == 0);
+        }
+
+        //
+        // Deliver the translated input bytes.
+        //
+
+        const auto Utf8Span = gsl::make_span(Utf8String, static_cast<size_t>(Utf8StringSize));
+        if ((RecordsRead == 1) && (InputRecordBuffer[0].EventType == KEY_EVENT) && (InputRecordBuffer[0].Event.KeyEvent.wRepeatCount > 1))
+        {
+            WI_ASSERT(Utf16StringSize == 1);
+
+            //
+            // Handle repeated characters. They aren't part of an input
+            // sequence, so there's only one event that's generating characters.
+            //
+
+            for (WORD RepeatIndex = 0; RepeatIndex < InputRecordBuffer[0].Event.KeyEvent.wRepeatCount; RepeatIndex += 1)
+            {
+                OnRead(Utf8Span);
+            }
+        }
+        else if (Utf8StringSize > 0)
+        {
+            OnRead(Utf8Span);
+        }
+    }
+}
+
 // WriteHandle
 
-WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source) :
-    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source, bool CompleteOnDrained) :
+    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get())), CompleteOnDrained(CompleteOnDrained)
 {
-    std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    if (!Source.empty())
+    {
+        std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    }
+
     Overlapped.hEvent = Event.get();
+
+    if (!CompleteOnDrained && Buffer.Size() == 0)
+    {
+        State = IOHandleStatus::Idle;
+    }
 }
 
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, gsl::span<gsl::byte> Source) :
@@ -740,9 +1217,36 @@ WriteHandle::~WriteHandle()
     }
 }
 
+void WriteHandle::SetCompleteOnDrained(bool Value)
+{
+    CompleteOnDrained = Value;
+}
+
+IOHandleStatus WriteHandle::DrainedState() const
+{
+    if (CompleteOnDrained)
+    {
+        return IOHandleStatus::Completed;
+    }
+
+    return Pending.empty() ? IOHandleStatus::Idle : IOHandleStatus::Standby;
+}
+
 void WriteHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+
+    if (!Pending.empty())
+    {
+        Buffer.Append(gsl::make_span(Pending));
+        Pending.clear();
+    }
+
+    if (Buffer.Size() == 0)
+    {
+        State = DrainedState();
+        return;
+    }
 
     Event.ResetEvent();
 
@@ -759,13 +1263,13 @@ void WriteHandle::Schedule()
         Buffer.Consume(bytesWritten);
         if (Buffer.Size() == 0)
         {
-            State = IOHandleStatus::Completed;
+            State = DrainedState();
         }
     }
     else
     {
         auto error = GetLastError();
-        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.Get());
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p, size: %zu", (void*)Handle.Get(), buffer.size());
 
         // The write is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
@@ -787,20 +1291,26 @@ void WriteHandle::Collect()
     Buffer.Consume(bytesWritten);
     if (Buffer.Size() == 0)
     {
-        State = IOHandleStatus::Completed;
+        State = DrainedState();
     }
 }
 
 void WriteHandle::Push(const gsl::span<char>& Content)
 {
-    // Don't write if a WriteFile() is pending, since that could cause the buffer to reallocate.
-    WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
     WI_ASSERT(!Content.empty());
 
-    // Resize() throws E_UNEXPECTED if Buffer does not own its storage.
-    Buffer.Append(Content);
+    // Put any pending output to a different buffer, since the active buffer could be in the middle of a write.
+    Pending.insert(Pending.end(), Content.begin(), Content.end());
 
-    State = IOHandleStatus::Standby;
+    if (State == IOHandleStatus::Idle)
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+size_t WriteHandle::PendingBytes() const
+{
+    return Pending.size() + Buffer.Size();
 }
 
 HANDLE WriteHandle::GetHandle() const
@@ -808,10 +1318,138 @@ HANDLE WriteHandle::GetHandle() const
     return Event.get();
 }
 
+WriteNamedPipe::WriteNamedPipe(HandleWrapper&& MovedPipe, bool Reconnect, bool Connected) :
+    Pipe(std::move(MovedPipe)), ReconnectOnFailure(Reconnect), NeedConnect(!Connected)
+{
+    ConnectOverlapped.hEvent = ConnectEvent.get();
+
+    Write.emplace(HandleWrapper{Pipe.Get()}, std::vector<char>{}, false);
+
+    State = IOHandleStatus::Idle;
+}
+
+WriteNamedPipe::~WriteNamedPipe()
+{
+    if (Connecting)
+    {
+        CancelPendingIo(Pipe.Get(), ConnectOverlapped);
+    }
+}
+
+void WriteNamedPipe::Reconnect()
+{
+    // Drop the disconnected client so a new one can connect, and retry the buffered data once reconnected.
+    LOG_IF_WIN32_BOOL_FALSE(DisconnectNamedPipe(Pipe.Get()));
+
+    NeedConnect = true;
+    State = IOHandleStatus::Standby;
+}
+
+void WriteNamedPipe::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    if (NeedConnect)
+    {
+        ConnectEvent.ResetEvent();
+        ConnectOverlapped.Offset = 0;
+        ConnectOverlapped.OffsetHigh = 0;
+
+        if (!ConnectNamedPipe(Pipe.Get(), &ConnectOverlapped))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                Connecting = true;
+                State = IOHandleStatus::Pending;
+                return;
+            }
+
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Pipe.Get());
+        }
+
+        NeedConnect = false;
+    }
+
+    try
+    {
+        Write->Schedule();
+        State = Write->GetState();
+    }
+    catch (...)
+    {
+        if (!ReconnectOnFailure)
+        {
+            throw;
+        }
+
+        LOG_CAUGHT_EXCEPTION();
+        Reconnect();
+    }
+}
+
+void WriteNamedPipe::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Complete a pending connection, then let the loop schedule the first write.
+    if (Connecting)
+    {
+        Connecting = false;
+
+        DWORD bytes{};
+        if (!GetOverlappedResult(Pipe.Get(), &ConnectOverlapped, &bytes, FALSE))
+        {
+            const auto error = GetLastError();
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_PIPE_CONNECTED, "Handle: 0x%p", (void*)Pipe.Get());
+        }
+
+        NeedConnect = false;
+        State = IOHandleStatus::Standby;
+        return;
+    }
+
+    try
+    {
+        Write->Collect();
+        State = Write->GetState();
+    }
+    catch (...)
+    {
+        if (!ReconnectOnFailure)
+        {
+            throw;
+        }
+
+        LOG_CAUGHT_EXCEPTION();
+        Reconnect();
+    }
+}
+
+HANDLE WriteNamedPipe::GetHandle() const
+{
+    return Connecting ? ConnectEvent.get() : Write->GetHandle();
+}
+
+void WriteNamedPipe::Push(const gsl::span<char>& Content)
+{
+    Write->Push(Content);
+
+    if (State == IOHandleStatus::Idle)
+    {
+        State = IOHandleStatus::Standby;
+    }
+}
+
+size_t WriteNamedPipe::PendingBytes() const
+{
+    return Write ? Write->PendingBytes() : 0;
+}
+
 // DockerIORelayHandle
 
 DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :
-    WriteStdout(std::move(Stdout)), WriteStderr(std::move(Stderr))
+    WriteStdout(std::move(Stdout), {}, false), WriteStderr(std::move(Stderr), {}, false)
 {
     if (ReadFormat == Format::HttpChunked)
     {
@@ -850,7 +1488,7 @@ void DockerIORelayHandle::Schedule()
         {
             State = IOHandleStatus::Pending;
         }
-        else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        else if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
         {
             if (RemainingBytes == 0)
             {
@@ -893,9 +1531,11 @@ void DockerIORelayHandle::Collect()
         // If the write is completed, switch back to reading.
         if (RemainingBytes == 0)
         {
-            if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+            if (ActiveHandle->GetState() == IOHandleStatus::Completed || ActiveHandle->GetState() == IOHandleStatus::Idle)
             {
                 ActiveHandle = nullptr;
+
+                ProcessNextHeader();
             }
         }
 
@@ -992,7 +1632,7 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
 
         for (auto& entry : m_handles)
         {
-            entry->self = this;
+            entry->Self = this;
         }
 
         // N.B. moving a MultiHandleWait() while running is not supported
@@ -1002,12 +1642,21 @@ MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
     return *this;
 }
 
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags, OnError&& onError)
 {
     auto entry = std::make_unique<Entry>();
     entry->HandleFlags = flags;
     entry->Handle = std::move(handle);
-    entry->self = this;
+    entry->Self = this;
+
+    if (WI_IsFlagSet(flags, Flags::IgnoreErrors))
+    {
+        entry->ErrorCallback = []() {};
+    }
+    else
+    {
+        entry->ErrorCallback = std::move(onError);
+    }
     m_handles.emplace_back(std::move(entry));
 }
 
@@ -1020,8 +1669,8 @@ void NTAPI MultiHandleWait::WaitCallback(PVOID Context, BOOLEAN /*TimerOrWaitFir
 {
     auto* entry = static_cast<Entry*>(Context);
 
-    entry->self->m_signaledHandles.push(entry);
-    entry->self->m_handleSignaledEvent.SetEvent();
+    entry->Self->m_signaledHandles.push(entry);
+    entry->Self->m_handleSignaledEvent.SetEvent();
 }
 
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
@@ -1050,13 +1699,9 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
             catch (...)
             {
-                if (WI_IsFlagSet(signaledEntry->HandleFlags, Flags::IgnoreErrors))
-                {
-                    signaledEntry->Handle.reset();
-                    continue;
-                }
-
-                throw;
+                signaledEntry->ErrorCallback(); // Might throw and cancel the IO.
+                signaledEntry->Handle.reset();
+                continue;
             }
         }
 
@@ -1075,13 +1720,9 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 }
                 catch (...)
                 {
-                    if (WI_IsFlagSet(entry.HandleFlags, Flags::IgnoreErrors))
-                    {
-                        entry.Handle.reset();
-                        break;
-                    }
-
-                    throw;
+                    entry.ErrorCallback(); // Might throw and cancel the IO.
+                    entry.Handle.reset();
+                    break;
                 }
             }
 
@@ -1093,6 +1734,13 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 }
 
                 it = m_handles.erase(it);
+                continue;
+            }
+
+            // N.B. An Idle handle cannot be waited for since it's not doing any IO.
+            if (entry.Handle->GetState() == IOHandleStatus::Idle)
+            {
+                ++it;
                 continue;
             }
 

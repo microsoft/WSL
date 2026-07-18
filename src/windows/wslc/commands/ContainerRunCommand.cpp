@@ -43,22 +43,29 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         Argument::Create(ArgType::Gpus),
+        Argument::Create(ArgType::HealthCmd),
+        Argument::Create(ArgType::HealthInterval),
+        Argument::Create(ArgType::HealthRetries),
+        Argument::Create(ArgType::HealthStartPeriod),
+        Argument::Create(ArgType::HealthTimeout),
         Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Label, false, NO_LIMIT),
         Argument::Create(ArgType::Memory),
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::Network, false, NO_LIMIT),
+        Argument::Create(ArgType::NetworkAlias, false, NO_LIMIT),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::NoHealthcheck),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::PublishAll),
         // Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
         // Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
+        Argument::Create(ArgType::StopTimeout),
         Argument::Create(ArgType::TMPFS, false, NO_LIMIT),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::Ulimit, false, NO_LIMIT),
@@ -84,7 +91,7 @@ std::wstring ContainerRunCommand::LongDescription() const
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << RunContainer;
 }

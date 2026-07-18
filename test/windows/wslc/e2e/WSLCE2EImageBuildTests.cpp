@@ -15,7 +15,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include <fstream>
 
 namespace WSLCE2ETests {
 
@@ -25,32 +24,40 @@ class WSLCE2EImageBuildTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsLoaded(DebianTestImage());
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
-    TEST_METHOD_SETUP(MethodSetup)
-    {
-        DeleteAllBuiltImages();
-        return true;
-    }
+    // Each test owns and cleans up exactly the image(s) it builds via DeleteImageOnExit, so there is
+    // no per-method sweep. DeleteImagesWithRepositoryPrefix in the class setup/cleanup above is only a
+    // safety net for images left behind by a crashed run.
+    static constexpr auto c_builtImagePrefix = L"wslc-e2e-build-";
 
-    TEST_METHOD_CLEANUP(MethodCleanup)
+    // Returns an RAII guard that best-effort deletes the given image when it goes out of scope. It is
+    // deliberately non-throwing (no VERIFY) because it may run while the stack unwinds after a test
+    // failure; the class-level prune is the authoritative cleanup.
+    static auto DeleteImageOnExit(const TestImage& image)
     {
-        DeleteAllBuiltImages();
-        return true;
+        return wil::scope_exit([image]() {
+            try
+            {
+                RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
+            }
+            CATCH_LOG()
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_EmptyContextDirectory_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImage);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-empty-context";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -60,11 +67,11 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
 
         auto buildResult = RunWslc(
             std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImage.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImage.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -74,6 +81,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_BuildArgsFileAndMultipleTags_Success)
     {
+        auto imageCleanup1 = DeleteImageOnExit(BuiltImageTag1);
+        auto imageCleanup2 = DeleteImageOnExit(BuiltImageTag2);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-args-tags";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -84,10 +93,10 @@ class WSLCE2EImageBuildTests
 
         // Create a simple file in the context directory
         auto filePath = contextDir / L"hello.txt";
-        WriteTestFile(filePath, "hello from wslc build\n");
+        WriteTestFileContent(filePath, "hello from wslc build\n");
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath,
             "FROM debian:latest\n"
             "ARG TEST_LABEL=default_value\n"
@@ -101,7 +110,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageTag1.NameAndTag(),
             BuiltImageTag2.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         // Verify both tags are present by inspecting each one
         auto inspectData1 = InspectImage(BuiltImageTag1.NameAndTag());
@@ -125,6 +134,7 @@ class WSLCE2EImageBuildTests
     {
         SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
 
+        auto imageCleanup = DeleteImageOnExit(BuiltImagePull);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -134,21 +144,22 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
 
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
-        // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
+        // "FROM docker.io/library/debian:latest@sha256:..."). Build progress goes to stderr.
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(buildResult.Stdout.has_value());
-        VERIFY_IS_TRUE(buildResult.Stdout->find(L"@sha256:") != std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"@sha256:") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageTarget);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-target";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -158,7 +169,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(
+        WriteTestFileContent(
             dockerfilePath,
             "FROM debian:latest AS build-stage\n"
             "RUN echo build > /stage.txt\n"
@@ -169,7 +180,7 @@ class WSLCE2EImageBuildTests
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -183,13 +194,82 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(!inspectData.Config.value().Cmd.has_value() || inspectData.Config.value().Cmd.value() != finalStageCmd);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Label_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabel);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
+
+        // Use both the short alias (-l) and long form (--label) to confirm both parse paths.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabel.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+
+        auto firstIt = labels.find("first");
+        VERIFY_IS_TRUE(firstIt != labels.end());
+        VERIFY_ARE_EQUAL(std::string("one"), firstIt->second);
+
+        auto secondIt = labels.find("second");
+        VERIFY_IS_TRUE(secondIt != labels.end());
+        VERIFY_ARE_EQUAL(std::string("two"), secondIt->second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_LabelOverridesDockerfile_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabelOverride);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label-override";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath, "FROM debian:latest\nLABEL conflict=from-dockerfile\nCMD [\"echo\", \"label-override-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabelOverride.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+        auto it = labels.find("conflict");
+        VERIFY_IS_TRUE(it != labels.end());
+        VERIFY_ARE_EQUAL(std::string("from-cli"), it->second);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
         BuildFromContextFile(L"Dockerfile", BuiltImageDockerfile);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_ContainerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageContainerfile);
         BuildFromContextFile(L"Containerfile", BuiltImageContainerfile);
     }
 
@@ -198,8 +278,8 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-both-files";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        WriteTestFile(testRoot / L"Dockerfile", "FROM debian:latest\n");
-        WriteTestFile(testRoot / L"Containerfile", "FROM debian:latest\n");
+        WriteTestFileContent(testRoot / L"Dockerfile", "FROM debian:latest\n");
+        WriteTestFileContent(testRoot / L"Containerfile", "FROM debian:latest\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
         buildResult.Verify(
@@ -226,7 +306,7 @@ class WSLCE2EImageBuildTests
         auto cleanup = SetupTestDirectory(testRoot);
 
         auto containerfilePath = testRoot / L"Containerfile";
-        WriteTestFile(containerfilePath, "FROM debian:latest\n");
+        WriteTestFileContent(containerfilePath, "FROM debian:latest\n");
 
         // Deny read access so wslc cannot open the file.
         SetPathAccess(containerfilePath, GENERIC_READ, DENY_ACCESS);
@@ -241,6 +321,47 @@ class WSLCE2EImageBuildTests
              .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_NoCache_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageNoCache);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-no-cache";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        // `RUN date +%N` produces a different output each invocation, so without caching the
+        // resulting layer (and therefore the image id) changes every build.
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "FROM debian:latest\n"
+            "RUN date +%N > /timestamp.txt\n");
+
+        const auto buildCmd =
+            std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageNoCache.NameAndTag());
+
+        // Seed the cache.
+        auto firstBuild = RunWslc(buildCmd);
+        firstBuild.Verify({.Stdout = L"", .ExitCode = 0});
+        const auto firstId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_NOT_EQUAL(std::string{}, firstId);
+
+        // A repeated build without --no-cache should hit the cache and produce the same id.
+        auto cachedBuild = RunWslc(buildCmd);
+        cachedBuild.Verify({.Stdout = L"", .ExitCode = 0});
+        const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
+
+        // --no-cache must re-run the non-deterministic step, producing a new id.
+        auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
+        noCacheBuild.Verify({.Stdout = L"", .ExitCode = 0});
+        const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
+        VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -249,56 +370,24 @@ private:
     const TestImage BuiltImageTarget{L"wslc-e2e-build-target", L"latest", L""};
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
+    const TestImage BuiltImageNoCache{L"wslc-e2e-build-no-cache", L"latest", L""};
+    const TestImage BuiltImageLabel{L"wslc-e2e-build-label", L"latest", L""};
+    const TestImage BuiltImageLabelOverride{L"wslc-e2e-build-label-override", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
         auto testRoot = std::filesystem::current_path() / image.Name;
         auto cleanup = SetupTestDirectory(testRoot);
 
-        WriteTestFile(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
+        WriteTestFileContent(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\" -t {}", testRoot.wstring(), image.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(image.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
         VERIFY_ARE_EQUAL(image.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
-    }
-
-    void DeleteAllBuiltImages()
-    {
-        EnsureImageIsDeleted(BuiltImage);
-        EnsureImageIsDeleted(BuiltImageTag1);
-        EnsureImageIsDeleted(BuiltImageTag2);
-        EnsureImageIsDeleted(BuiltImagePull);
-        EnsureImageIsDeleted(BuiltImageTarget);
-        EnsureImageIsDeleted(BuiltImageDockerfile);
-        EnsureImageIsDeleted(BuiltImageContainerfile);
-    }
-
-    static auto SetupTestDirectory(const std::filesystem::path& testRoot)
-    {
-        std::error_code ec;
-        std::filesystem::remove_all(testRoot, ec);
-        THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 && std::filesystem::exists(testRoot), "%hs", ec.message().c_str());
-
-        std::filesystem::create_directories(testRoot, ec);
-        THROW_HR_IF_MSG(E_FAIL, ec.value() != 0 || !std::filesystem::exists(testRoot), "%hs", ec.message().c_str());
-
-        return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [testRoot]() {
-            std::error_code removeError;
-            std::filesystem::remove_all(testRoot, removeError);
-        });
-    }
-
-    static void WriteTestFile(const std::filesystem::path& path, const std::string& content)
-    {
-        std::ofstream file(path);
-        THROW_HR_IF(E_FAIL, !file.is_open());
-        file << content;
-        THROW_HR_IF(E_FAIL, !file.good());
-        file.close();
     }
 };
 } // namespace WSLCE2ETests

@@ -18,15 +18,10 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::string::MultiByteToWide;
+using namespace wsl::windows::common::vt;
 
-namespace {
-    constexpr std::wstring_view c_escapeMoveCursorUpAndClear = L"\033[{}A\033[J";
-    constexpr std::wstring_view c_escapeBrightGreen = L"\033[92m";
-    constexpr std::wstring_view c_escapeResetAttributes = L"\033[0m";
-    constexpr std::wstring_view c_escapeHideCursorDim = L"\033[?25l\033[2m";
-    constexpr std::wstring_view c_escapeClearLineAndNewline = L"\033[K\n";
-    constexpr std::wstring_view c_escapeUndimShowCursor = L"\033[22m\033[?25h";
-} // namespace
+// Fallback width used when the console width can't be queried.
+constexpr int c_fallbackConsoleWidth = 79;
 
 BuildImageCallback::~BuildImageCallback()
 try
@@ -46,17 +41,11 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            WriteTerminal(MultiByteToWide(line));
+            m_reporter.Info(L"{}", line);
         }
     }
 }
 CATCH_LOG()
-
-void BuildImageCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
 
 bool BuildImageCallback::IsCancelled() const
 {
@@ -67,7 +56,8 @@ void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(c_escapeMoveCursorUpAndClear, m_displayedLines));
+        // Move cursor up to the start of the display area, then erase to end of screen.
+        m_reporter.Info(L"{}{}", Cursor::Up(m_displayedLines), Erase::ScreenForward);
         m_displayedLines = 0;
     }
 
@@ -110,7 +100,7 @@ try
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            wprintf(L"%hs", status);
+            m_reporter.Info(L"{}", status);
         }
         return S_OK;
     }
@@ -184,59 +174,60 @@ try
     const auto newlines = wide.substr(bodyLength);
     wide.resize(bodyLength);
 
-    WriteTerminal(std::format(L"{}{}{}{}", c_escapeBrightGreen, wide, c_escapeResetAttributes, newlines));
+    // Pass the color sequences as arguments (not baked into the string) so Reporter strips
+    // them when --no-color is set. The trailing newlines are emitted after the reset.
+    m_reporter.Info(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines);
     return S_OK;
 }
 CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    // Use the visible window width (not buffer width), minus one column to avoid the
-    // deferred-wrap edge case when a line is exactly the window width. Clamp to at
-    // least zero so the value never goes negative (which would underflow when passed
-    // to std::wstring::resize).
-    const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
+    const int consoleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info).value_or(c_fallbackConsoleWidth);
 
-    // Determine how many completed lines to show, leaving room for the pending line and pull progress.
     const bool showPending = !m_pendingLine.empty();
-    const SHORT pullCount = static_cast<SHORT>(m_pullLines.size());
-    SHORT completedCount = static_cast<SHORT>(m_lines.size());
-    const SHORT reservedLines = (showPending ? 1 : 0) + pullCount;
+    const int pullCount = static_cast<int>(m_pullLines.size());
+    int completedCount = static_cast<int>(m_lines.size());
+    const int reservedLines = (showPending ? 1 : 0) + pullCount;
     if (completedCount + reservedLines > c_maxDisplayLines)
     {
-        completedCount = std::max<SHORT>(0, c_maxDisplayLines - reservedLines);
+        completedCount = std::max(0, c_maxDisplayLines - reservedLines);
     }
-    const SHORT displayCount = completedCount + reservedLines;
+    const int displayCount = completedCount + reservedLines;
 
-    // Build the entire frame in one buffer to minimize console writes. Hide the cursor
-    // during the redraw so the user doesn't see it bouncing through the cursor movement,
-    // then show it again at the final position. The dim attribute (\033[2m) renders the
-    // scrolling lines de-emphasized regardless of the user's theme.
-    std::wstring buffer{c_escapeHideCursorDim};
+    // Build the frame body in one buffer to minimize console writes. The cursor moves,
+    // erases, and text lines it holds are non-color VT that only runs when a VT console is
+    // attached. The cursor hide/show wrapper and the dim intensity attribute are passed as
+    // Sequence arguments to Reporter (below) so it strips the color ones (Dim/Normal) when
+    // --no-color is set, while leaving the non-color cursor moves intact.
+    //
+    // m_frameBuffer is a member so its backing allocation is reused across frames -
+    // it grows to the high-water mark and is never freed between redraws.
+    m_frameBuffer.clear();
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
     // previous one (e.g. when \r clears the pending line without a replacement).
     if (m_displayedLines > 0)
     {
-        buffer += std::format(c_escapeMoveCursorUpAndClear, m_displayedLines);
+        m_frameBuffer += Cursor::Up(m_displayedLines);
+        m_frameBuffer += Erase::ScreenForward;
     }
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (static_cast<SHORT>(wline.size()) > consoleWidth)
+        if (wline.size() > static_cast<size_t>(consoleWidth))
         {
-            wline.resize(consoleWidth);
+            wline.resize(static_cast<size_t>(consoleWidth));
         }
-        buffer += wline;
-        buffer += c_escapeClearLineAndNewline;
+        m_frameBuffer += std::move(wline);
+        m_frameBuffer += Erase::LineForward;
+        m_frameBuffer += L'\n';
     };
 
     // Print completed lines (skip older ones if we need room for the pending line).
     auto it = m_lines.begin();
-    if (completedCount < static_cast<SHORT>(m_lines.size()))
+    if (completedCount < static_cast<int>(m_lines.size()))
     {
         std::advance(it, m_lines.size() - completedCount);
     }
@@ -257,9 +248,10 @@ void BuildImageCallback::Redraw()
         appendLine(line);
     }
 
-    buffer += c_escapeUndimShowCursor;
-
-    WriteTerminal(buffer);
+    // Emit the frame as a single atomic write. Cursor Hide/Show are non-color and always
+    // rendered here (VT is on); Format::Dim/Normal are color sequences that Reporter strips
+    // under --no-color. The buffered body carries the cursor moves, erases, and text lines.
+    m_reporter.Info(L"{}{}{}{}{}", Cursor::Hide, Format::Dim, std::wstring_view{m_frameBuffer}, Format::Normal, Cursor::Show);
     m_displayedLines = displayCount;
 }
 

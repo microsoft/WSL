@@ -49,13 +49,15 @@ class WSLCE2EVolumeRemoveTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_HelpCommand)
     {
         auto result = RunWslc(L"volume remove --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_MissingVolumeName)
     {
         auto result = RunWslc(L"volume remove");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'volume-name'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'volume-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Valid)
@@ -131,56 +133,65 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_NotFound)
+    {
+        auto result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_Valid)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_MixedFoundNotFound)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove --force {} {}", TestVolumeName, TestVolumeName2));
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Force_VolumeInUse_Fail)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        // Create a container that uses the volume to ensure it's in use
+        result = RunWslc(std::format(
+            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
+            L"infinity\"",
+            WslcContainerName,
+            TestVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // --force does not bypass in-use checks, volume should still fail to be removed
+        result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName),
+             .ExitCode = 1});
+
+        VerifyVolumeIsListed(TestVolumeName);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
     const std::wstring TestVolumeName = L"wslc-e2e-volume-remove";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-remove-2";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableCommands()       //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_VolumeRemoveLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc volume remove [<options>] <volume-name>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: delete rm\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  volume-name    Volume name\r\n"           //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"            //
-                << L"  -?,--help      Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

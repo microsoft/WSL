@@ -65,7 +65,15 @@ class WSLCE2EAliasTests
         const auto containerResult = RunContainerExe(L"--help");
         containerResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_ARE_EQUAL(wslcResult.Stdout.value(), containerResult.Stdout.value());
+        // Help output should be identical except the executable name in the usage line.
+        auto wslcOutput = wslcResult.Stdout.value();
+        const std::wstring usageNeedle = L"Usage: wslc";
+        const std::wstring usageReplacement = L"Usage: container";
+        auto pos = wslcOutput.find(usageNeedle);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, pos);
+        wslcOutput.replace(pos, usageNeedle.size(), usageReplacement);
+
+        VERIFY_ARE_EQUAL(wslcOutput, containerResult.Stdout.value());
     }
 };
 

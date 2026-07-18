@@ -17,7 +17,7 @@ set(OUTPUT_PACKAGE ${BIN}/wsl.msi)
 set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/package.wix.in)
 set(PACKAGE_WIX ${BIN}/package.wix)
 set(CAB_CACHE ${BIN}/cab)
-set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll;wslc.exe;wslcsession.exe)
+set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wsldevicehostproxystub.dll;wslinstall.dll;wslc.exe;wslcsession.exe)
 if (WSL_BUILD_WSL_SETTINGS)
     list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
 endif()
@@ -52,12 +52,12 @@ add_custom_command(
     COMMAND ${WIX_SOURCE_DIR}/wix.exe build ${PACKAGE_WIX} -o ${OUTPUT_PACKAGE} -arch ${TARGET_PLATFORM} -dcl ${COMPRESSION} -cc ${CAB_CACHE} -pdbtype none
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/msipackage"
     VERBATIM
-    DEPENDS ${PACKAGE_WIX} ${BINARIES_DEPENDENCIES} # Make sure the package is rebuilt if any of the binaries or resources change
+    DEPENDS ${PACKAGE_WIX} ${BINARIES_DEPENDENCIES} ${CMAKE_SOURCE_DIR}/NOTICE.txt # Make sure the package is rebuilt if any of the binaries or resources change
 )
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage wslc wslcsession)
+add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub wsldevicehostproxystub init initramfs wslinstall msixgluepackage wslc wslcsession)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)

@@ -29,7 +29,6 @@ std::vector<Argument> ImageSaveCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ImageId, true, NO_LIMIT),
         Argument::Create(ArgType::Output),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -45,8 +44,8 @@ std::wstring ImageSaveCommand::LongDescription() const
 
 void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << SaveImage;
 }
 } // namespace wsl::windows::wslc

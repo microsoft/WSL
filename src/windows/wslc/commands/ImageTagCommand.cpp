@@ -29,7 +29,6 @@ std::vector<Argument> ImageTagCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Source, true),
         Argument::Create(ArgType::Target, true),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -45,8 +44,8 @@ std::wstring ImageTagCommand::LongDescription() const
 
 void ImageTagCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << TagImage;
 }
 } // namespace wsl::windows::wslc
