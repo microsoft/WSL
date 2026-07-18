@@ -107,7 +107,7 @@ void CreateNetwork(CLIExecutionContext& context)
         options.Gateway = WideToMultiByte(context.Args.Get<ArgType::Gateway>());
     }
 
-    NetworkService::Create(context.Data.Get<Data::Session>(), options);
+    NetworkService::Create(context.Reporter, context.Data.Get<Data::Session>(), options);
     context.Reporter.Output(L"{}\n", MultiByteToWide(options.Name));
 }
 

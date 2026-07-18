@@ -35,7 +35,7 @@ struct SessionService
     // Opens the default session. Throws WSLC_E_SESSION_NOT_FOUND if no default session exists.
     static wsl::windows::wslc::models::Session OpenDefaultSession();
     // Opens or creates the default session.
-    static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession();
+    static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Reporter& reporter);
     // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
     static int Run(Reporter& reporter, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
     static int TerminateSession(Reporter& reporter, const wsl::windows::wslc::models::Session& session);

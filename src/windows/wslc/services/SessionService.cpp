@@ -52,14 +52,14 @@ Session SessionService::OpenDefaultSession()
     return OpenSessionByName(CreateSessionManager(), nullptr);
 }
 
-Session SessionService::OpenOrCreateDefaultSession()
+Session SessionService::OpenOrCreateDefaultSession(Reporter& reporter)
 {
+    WarningCallback warningCallback(reporter);
     auto manager = CreateSessionManager();
 
     // Null Settings = default session with server-determined name and settings.
     wil::com_ptr<IWSLCSession> session;
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -123,11 +123,11 @@ int SessionService::Enter(Reporter& reporter, const std::wstring& storagePath, c
     THROW_HR_IF(E_INVALIDARG, storagePath.empty());
     THROW_HR_IF(E_INVALIDARG, displayName.empty());
 
+    WarningCallback warningCallback(reporter);
     auto sessionManager = CreateSessionManager();
 
     wil::com_ptr<IWSLCSession> session;
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), warningCallback.Get(), &session));
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     reporter.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
 

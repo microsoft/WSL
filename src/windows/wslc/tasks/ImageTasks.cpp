@@ -226,7 +226,7 @@ void PullImage(CLIExecutionContext& context)
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
     ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
-    services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Pull(context.Reporter, session, WideToMultiByte(imageId), &callback);
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -237,7 +237,7 @@ void PushImage(CLIExecutionContext& context)
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
     ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
-    services::ImageService::Push(session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Push(context.Reporter, session, WideToMultiByte(imageId), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)
@@ -262,7 +262,7 @@ void LoadImage(CLIExecutionContext& context)
     {
         auto& input = context.Args.Get<ArgType::Input>();
         auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
-        services::ImageService::Load(session, input, callback.Get());
+        services::ImageService::Load(context.Reporter, session, input, callback.Get());
         return;
     }
 
@@ -283,7 +283,7 @@ void ImportImage(CLIExecutionContext& context)
     }
 
     auto& input = context.Args.Get<ArgType::ImportFile>();
-    auto imageId = services::ImageService::Import(session, input, imageName);
+    auto imageId = services::ImageService::Import(context.Reporter, session, input, imageName);
     if (!imageId.empty())
     {
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
