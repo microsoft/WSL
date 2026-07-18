@@ -2216,6 +2216,21 @@ Uso:
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Para obter mais detalhes sobre um comando específico, passe o argumento de ajuda.</value>
   </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Comandos:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Opções:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Opções Globais:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliases:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumentos:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>O nome do argumento não foi reconhecido para o comando atual: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
