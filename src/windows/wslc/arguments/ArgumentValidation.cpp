@@ -274,8 +274,7 @@ void ValidateSecretSpec(const std::vector<std::wstring>& values)
 
         if (!type.empty() && type != L"file" && type != L"env")
         {
-            throw ArgumentException(
-                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
         }
 
         // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
