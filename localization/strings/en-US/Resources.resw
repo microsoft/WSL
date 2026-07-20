@@ -2379,10 +2379,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Invalid stop timeout value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
     <value>The primary network mode '{}' does not support connecting or disconnecting additional networks.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
