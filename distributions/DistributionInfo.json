@@ -249,7 +249,7 @@
                 }
             }
         ],
-         "AzureLinux": [
+        "AzureLinux": [
             {
                 "Name": "AzureLinux-4.0-BETA",
                 "FriendlyName": "Azure Linux 4.0 (BETA)",
