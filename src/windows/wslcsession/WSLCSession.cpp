@@ -993,7 +993,26 @@ try
             auto& process = std::get<2>(cleanupResult);
             if (process)
             {
-                process->WaitAndCaptureOutput(60000UL);
+                // Best-effort wipe: we cannot recover from within the scope_exit, but a failed
+                // removal leaves the secret bytes readable in the VM tmpfs for the session lifetime,
+                // so surface it for diagnosis/security auditing. The rm output carries only error
+                // text about the directory path, never secret contents, so it is safe to log.
+                const auto result = process->WaitAndCaptureOutput(60000UL);
+                if (result.Code != 0)
+                {
+                    WSL_LOG(
+                        "BuildSecretCleanupFailed",
+                        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                        TraceLoggingValue(result.Code, "ExitCode"),
+                        TraceLoggingValue(cleanup.FormatResult(result).c_str(), "Output"));
+                }
+            }
+            else
+            {
+                WSL_LOG(
+                    "BuildSecretCleanupLaunchFailed",
+                    TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                    TraceLoggingValue(std::get<0>(cleanupResult), "Result"));
             }
         }
     });
