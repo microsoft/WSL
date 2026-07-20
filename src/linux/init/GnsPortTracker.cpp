@@ -458,9 +458,10 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
     // listen() can trigger an implicit autobind (assigning an ephemeral port) on a socket that
     // was never explicitly bind()'d. There's no sockaddr to inspect here (listen() only takes a
     // socket fd and a backlog), and we can't tell in advance whether the socket is already bound,
-    // so always duplicate the fd and defer resolution to ResolvePortZeroBind(), the same as a
-    // bind(port=0) call. If the socket already had an explicit bind(), this just re-resolves and
-    // re-tracks the same port, which is harmless (TrackPort() refreshes the existing entry).
+    // so duplicate the fd and check getsockname() immediately: if it's already bound (the common
+    // bind()+listen() case), resolve the port synchronously here. Otherwise defer resolution to
+    // ResolvePortZeroBind(), the same as a bind(port=0) call, since the port isn't assigned until
+    // the listen() syscall (which performs the implicit autobind) actually completes in-kernel.
     auto ParseListen = [&](int Socket) -> std::optional<BindCall> {
         auto networkNamespace = std::filesystem::read_symlink(std::format("/proc/{}/ns/net", Pid)).string();
         if (networkNamespace != m_networkNamespace)
