@@ -13,6 +13,7 @@
 #include "NetlinkTransactionError.h"
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
+#include "seccomp_defs.h"
 
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
@@ -453,19 +454,104 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
 
         return {{{PortAllocation(port, address.sa_family, protocol, storedAddress)}, {}, CallId}};
     };
+
+    // listen() can trigger an implicit autobind (assigning an ephemeral port) on a socket that
+    // was never explicitly bind()'d. There's no sockaddr to inspect here (listen() only takes a
+    // socket fd and a backlog), and we can't tell in advance whether the socket is already bound,
+    // so always duplicate the fd and defer resolution to ResolvePortZeroBind(), the same as a
+    // bind(port=0) call. If the socket already had an explicit bind(), this just re-resolves and
+    // re-tracks the same port, which is harmless (TrackPort() refreshes the existing entry).
+    auto ParseListen = [&](int Socket) -> std::optional<BindCall> {
+        auto networkNamespace = std::filesystem::read_symlink(std::format("/proc/{}/ns/net", Pid)).string();
+        if (networkNamespace != m_networkNamespace)
+        {
+            GNS_LOG_INFO("Skipping listen() call for pid {} in network namespace {}", Pid, networkNamespace.c_str());
+            return {{{}, {}, CallId}}; // Different network namespace. Let it go through.
+        }
+
+        try
+        {
+            const int protocol = GetSocketProtocol(Pid, Socket);
+            auto dupFd = DuplicateSocketFd(Pid, Socket);
+            if (!dupFd)
+            {
+                return {{{}, {}, CallId}};
+            }
+            if (!m_seccompDispatcher->ValidateCookie(CallId))
+            {
+                return {{{}, {}, CallId}};
+            }
+
+            // If the socket was already explicitly bind()'d - the common case of a normal
+            // bind() followed by listen() - its port is already known right now, before the
+            // listen() syscall even runs, so resolve it immediately instead of deferring
+            // through the post-completion polling path. That path is reserved for the case
+            // where listen() itself is what triggers the kernel's implicit autobind (i.e. no
+            // prior bind() call), which can only be observed after listen() has completed.
+            sockaddr_storage storage{};
+            socklen_t addressLength = sizeof(storage);
+            if (getsockname(dupFd.get(), reinterpret_cast<sockaddr*>(&storage), &addressLength) == 0)
+            {
+                in_port_t port = 0;
+                in6_addr address = {};
+                if (storage.ss_family == AF_INET)
+                {
+                    const auto* sin = reinterpret_cast<const sockaddr_in*>(&storage);
+                    port = ntohs(sin->sin_port);
+                    address.s6_addr32[0] = sin->sin_addr.s_addr;
+                }
+                else if (storage.ss_family == AF_INET6)
+                {
+                    const auto* sin6 = reinterpret_cast<const sockaddr_in6*>(&storage);
+                    port = ntohs(sin6->sin6_port);
+                    memcpy(address.s6_addr32, sin6->sin6_addr.s6_addr32, sizeof(address.s6_addr32));
+                }
+
+                if (port != 0)
+                {
+                    return {{{PortAllocation(port, static_cast<int>(storage.ss_family), protocol, address)}, {}, CallId}};
+                }
+            }
+
+            return {{{}, DeferredPortLookup{Pid, std::move(dupFd), protocol}, CallId}};
+        }
+        catch (const std::exception&)
+        {
+            return {{{}, {}, CallId}}; // Not an IP socket (or can't determine its protocol), just let it through
+        }
+    };
+
 #ifdef __x86_64__
     if (Arch & __AUDIT_ARCH_64BIT)
     {
+        if (SysCallNumber == __NR_listen)
+        {
+            return ParseListen(Arguments[0]);
+        }
+
         return ParseSocket(Arguments[0], Arguments[1], Arguments[2]);
     }
     // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND to make bind system call and the second argument is
-    // a pointer to a block of memory containing the original arguments.
+    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls and the
+    // second argument is a pointer to a block of memory containing the original arguments.
     else
     {
+        if (Arguments[0] == SYS_LISTEN)
+        {
+            // Grab the first parameter (the socket fd).
+            auto processMemory = m_seccompDispatcher->ReadProcessMemory(CallId, Pid, Arguments[1], sizeof(uint32_t));
+            if (!processMemory.has_value())
+            {
+                throw RuntimeErrorWithSourceLocation("Failed to read process memory");
+            }
+
+            const uint32_t* CopiedArguments = reinterpret_cast<uint32_t*>(processMemory->data());
+            return ParseListen(CopiedArguments[0]);
+        }
+
         if (Arguments[0] != SYS_BIND)
         {
-            return {{{}, {}, CallId}}; // Not a bind call, just let the call go through
+            return {{{}, {}, CallId}}; // Not a bind or listen call, just let the call go through
         }
         // Grab the first 3 parameters
         auto processMemory = m_seccompDispatcher->ReadProcessMemory(CallId, Pid, Arguments[1], sizeof(uint32_t) * 3);
@@ -478,6 +564,14 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
         return ParseSocket(CopiedArguments[0], CopiedArguments[1], CopiedArguments[2]);
     }
 #else
+    // Both native 64-bit listen() (trapped via __NR_listen, e.g. on aarch64) and 32-bit ARM
+    // compat listen() (trapped via the hardcoded ARMV7_NR_listen syscall number) land here, so
+    // both syscall numbers must be checked.
+    if (SysCallNumber == __NR_listen || SysCallNumber == ARMV7_NR_listen)
+    {
+        return ParseListen(Arguments[0]);
+    }
+
     return ParseSocket(Arguments[0], Arguments[1], Arguments[2]);
 #endif
 }
@@ -558,6 +652,10 @@ catch (const std::exception& e)
 
 std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
 {
+    // This resolves the port for both an explicit bind(port=0) and an implicit
+    // autobind triggered by listen(), since neither can be known until after the
+    // syscall has actually completed in-kernel.
+    //
     // The socket fd was already duplicated (via pidfd_getfd) while the target process
     // was stopped by seccomp, so it remains valid even if the process has closed or
     // reused the original fd number.

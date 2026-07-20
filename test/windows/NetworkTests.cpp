@@ -2120,6 +2120,124 @@ class NetworkTests
         return {std::move(process), assignedPort};
     }
 
+    // Create a TCP listening socket in the guest via listen() WITHOUT ever calling bind() first
+    // (implicit autobind to an ephemeral port on the wildcard address, e.g. INADDR_ANY:0).
+    // This exercises the seccomp listen() trap added for the implicit-autobind port tracking fix,
+    // as opposed to BindGuestPortZero() which exercises the pre-existing explicit bind(0) path.
+    static std::tuple<unique_kill_process, uint16_t> BindGuestPortViaListenOnly()
+    {
+        auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
+
+        // Perl one-liner: socket() + listen() with no bind(), print the kernel-assigned
+        // port via getsockname(), then accept() (blocking) to keep the socket alive.
+        const std::wstring wslCmd = L"perl -MSocket -e '"
+                                     L"$|=1;"
+                                     L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+                                     L"listen(S,5) or die;"
+                                     L"my $port=(sockaddr_in(getsockname(S)))[0];"
+                                     L"print \"PORT=$port\\n\";"
+                                     L"accept(C,S);"
+                                     L"'";
+        auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
+
+        auto process = LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get(), nullptr);
+        stdOutWrite.reset();
+
+        std::string output(256, '\0');
+        DWORD writeOffset = 0;
+        uint16_t assignedPort = 0;
+        bool found = false;
+
+        while (!found)
+        {
+            if (writeOffset == output.size())
+            {
+                output.resize(output.size() * 2);
+            }
+
+            DWORD bytesRead = 0;
+            if (!ReadFile(stdOutRead.get(), output.data() + writeOffset, static_cast<DWORD>(output.size() - writeOffset), &bytesRead, nullptr) ||
+                bytesRead == 0)
+            {
+                break;
+            }
+
+            writeOffset += bytesRead;
+            LogInfo("output %hs", output.c_str());
+            std::string_view outputView(output.data(), writeOffset);
+            auto pos = outputView.find("PORT=");
+            if (pos != std::string_view::npos)
+            {
+                auto portStr = outputView.substr(pos + 5);
+                auto end = portStr.find_first_not_of("0123456789");
+                if (end != std::string_view::npos)
+                {
+                    portStr = portStr.substr(0, end);
+                }
+
+                if (!portStr.empty())
+                {
+                    assignedPort = static_cast<uint16_t>(std::stoi(std::string(portStr)));
+                    found = true;
+                }
+            }
+        }
+
+        VERIFY_IS_TRUE(found);
+        VERIFY_IS_TRUE(assignedPort > 0);
+        LogInfo("listen()-only autobind resolved to port %u", assignedPort);
+
+        return {std::move(process), assignedPort};
+    }
+
+    // Verifies that a listen() call with no preceding bind() (implicit autobind) is tracked
+    // by the host port tracker, mirroring VerifyPortZeroBindIsTracked's coverage of the
+    // pre-existing explicit bind(0) path.
+    static void VerifyListenWithoutBindIsTracked(bool verifyRelease = true)
+    {
+        WslKeepAlive keepAlive;
+
+        auto [guestProcess, assignedPort] = BindGuestPortViaListenOnly();
+
+        // Port resolution is asynchronous (deferred to a background thread) for the case where
+        // the socket wasn't already bound. Retry until the host port tracker registers the port,
+        // blocking the host bind.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&assignedPort]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(assignedPort);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+
+        if (!verifyRelease)
+        {
+            return;
+        }
+
+        // Kill the guest process so the port tracker releases the port.
+        guestProcess.reset();
+
+        // Retry until the host can bind the port again, confirming it was released.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&assignedPort]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(assignedPort);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2)));
+    }
+
     static void VerifyPortZeroBindIsTracked(bool verifyRelease = true)
     {
         // Make sure the VM doesn't time out while we wait for async port resolution
@@ -4171,6 +4289,17 @@ class MirroredTests
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
+    WSL2_TEST_METHOD(ListenWithoutBindIsTracked)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        // See PortZeroBindIsTracked above for why release verification is skipped in mirrored mode.
+        NetworkTests::VerifyListenWithoutBindIsTracked(false);
+    }
+
     WSL2_TEST_METHOD(AcceptedConnectionPortTracking)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -5126,6 +5255,15 @@ class ConsommeTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+    }
+
+    WSL2_TEST_METHOD(ListenWithoutBindIsTracked)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        NetworkTests::VerifyListenWithoutBindIsTracked();
     }
 
     WSL2_TEST_METHOD(PortZeroRebindSucceeds)

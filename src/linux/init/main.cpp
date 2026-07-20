@@ -3336,7 +3336,11 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind() & ioctl(*, TUNSETIFF, *) calls.
+    Register a seccomp notification for bind(), listen() & ioctl(*, TUNSETIFF, *) calls.
+
+    listen() is intercepted in addition to bind() because it can perform an implicit
+    autobind (assigning an ephemeral port) on a socket that was never explicitly bind()'d;
+    that autobind would otherwise be invisible to the port tracker.
 
 Arguments:
 
@@ -3360,11 +3364,13 @@ Return Value:
         // If syscall_arch & __AUDIT_ARCH_64BIT then continue else goto :32bit
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arch),
         // For now, notify on all non-native arch
-        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 7),
+        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 8),
         // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 3, 0),
-        // if (syscall_nr == __NR_bind) then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 4, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else continue
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_listen, 3, 0),
+        // if (syscall_nr == __NR_ioctl) then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_ioctl, 0, 3),
         // if (syscall arg1 == SIOCSIFFLAGS) goto user_notify else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(1)),
@@ -3377,15 +3383,17 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
     // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND to make bind system call.
+    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls.
 #ifdef __x86_64__
         // 32bit:
         // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
-        // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 4),
+        // if syscall arg0 == SYS_BIND then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 1, 0),
+        // if syscall arg0 == SYS_LISTEN then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_LISTEN, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
@@ -3394,9 +3402,11 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 #else
         // 32bit:
-        // If syscall_nr == __NR_bind then goto user_notify: else goto allow:
+        // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 1, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_listen, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
