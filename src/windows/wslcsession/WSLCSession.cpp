@@ -921,9 +921,9 @@ try
         GUID id{};
         THROW_IF_FAILED(CoCreateGuid(&id));
         auto vmPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(id));
-        mountedPaths.push_back(vmPath);
         THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
-        return vmPath;
+        mountedPaths.push_back(std::move(vmPath));
+        return mountedPaths.back();
     };
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
