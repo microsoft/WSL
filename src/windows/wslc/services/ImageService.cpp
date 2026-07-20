@@ -185,7 +185,7 @@ void ImageService::Build(
         secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
         secretEntries.push_back(WSLCBuildSecret{
             .Id = secretIdStrings.back().c_str(),
-            .Value = secret.Value.data(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
             .ValueSize = static_cast<ULONG>(secret.Value.size()),
         });
     }
