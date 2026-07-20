@@ -700,9 +700,7 @@ class WSLCE2EImageBuildTests
             RunWslc(std::format(L"build \"{}\" -f \"{}\" --secret id=x,type=bogus", contextDir.wstring(), dockerfilePath.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(
-            buildResult.Stderr->find(L"Invalid --secret value 'id=x,type=bogus': unsupported secret type 'bogus'") !=
-            std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --secret value 'id=x,type=bogus': unsupported secret type 'bogus'") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
