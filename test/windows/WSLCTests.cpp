@@ -8778,19 +8778,40 @@ class WSLCTests
             VERIFY_IS_TRUE(inspectData.Ports.contains("8080/tcp"));
             VERIFY_IS_TRUE(inspectData.Ports.contains("9090/tcp"));
 
-            // Verify we can connect to the 8080 exposed port from the host.
-            auto portBindings8080 = inspectData.Ports["8080/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings8080.size());
-            auto hostPort8080 = std::stoi(portBindings8080[0].HostPort);
-            VERIFY_IS_TRUE(hostPort8080 > 0);
+            // Each exposed port is published dual-stack: one IPv4 (127.0.0.1) and one IPv6 (::1)
+            // loopback binding. Verify both are present and return the IPv4 host port.
+            auto getDualStackIpv4HostPort = [](const auto& bindings) -> int {
+                VERIFY_ARE_EQUAL(2u, bindings.size());
 
+                int ipv4HostPort = 0;
+                bool foundIpv4 = false;
+                bool foundIpv6 = false;
+                for (const auto& binding : bindings)
+                {
+                    auto hostPort = std::stoi(binding.HostPort);
+                    VERIFY_IS_TRUE(hostPort > 0);
+                    if (binding.HostIp == "127.0.0.1")
+                    {
+                        ipv4HostPort = hostPort;
+                        foundIpv4 = true;
+                    }
+                    else if (binding.HostIp == "::1")
+                    {
+                        foundIpv6 = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundIpv4);
+                VERIFY_IS_TRUE(foundIpv6);
+                return ipv4HostPort;
+            };
+
+            // Verify we can connect to the 8080 exposed port from the host.
+            auto hostPort8080 = getDualStackIpv4HostPort(inspectData.Ports["8080/tcp"]);
             ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort8080).c_str(), 200);
 
             // Verify the second exposed port got a mapping too.
-            auto portBindings9090 = inspectData.Ports["9090/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings9090.size());
-            auto hostPort9090 = std::stoi(portBindings9090[0].HostPort);
-            VERIFY_IS_TRUE(hostPort9090 > 0);
+            auto hostPort9090 = getDualStackIpv4HostPort(inspectData.Ports["9090/tcp"]);
 
             // The two host ports must be different.
             VERIFY_ARE_NOT_EQUAL(hostPort8080, hostPort9090);
