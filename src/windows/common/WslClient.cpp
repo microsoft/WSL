@@ -20,6 +20,7 @@ Abstract:
 #include "CommandLine.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
+#include "wslinstallerservice.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -618,15 +619,33 @@ int Install(_In_ std::wstring_view commandLine)
 
 bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
 {
-    const auto [rebootRequired, missingComponents] = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
+    const auto token = wil::open_current_access_token();
+    const bool elevated = wsl::windows::common::security::IsTokenElevated(token.get());
+
+    WslInstall::OptionalComponentRequirements requirements;
+    if (elevated)
+    {
+        requirements = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
+    }
+    else
+    {
+        const auto installer = wil::CoCreateInstance<IWslInstaller>(__uuidof(WslInstaller), CLSCTX_LOCAL_SERVER);
+        requirements = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent, [&](std::wstring_view featureName) {
+            const std::wstring nullTerminatedName{featureName};
+            UINT state{};
+            THROW_IF_FAILED(installer->GetOptionalFeatureState(nullTerminatedName.c_str(), &state));
+            THROW_HR_IF(E_UNEXPECTED, state > static_cast<UINT>(wsl::windows::common::optionalfeature::State::EnablePending));
+            return static_cast<wsl::windows::common::optionalfeature::State>(state);
+        });
+    }
+
+    const auto& [rebootRequired, missingComponents] = requirements;
     if (missingComponents.empty())
     {
         return rebootRequired;
     }
 
-    // Install any optional components that have not yet been installed.
-    const auto token = wil::open_current_access_token();
-    if (!wsl::windows::common::security::IsTokenElevated(token.get()))
+    if (!elevated)
     {
         const auto elevatedCommand = std::format(
             L"{} {} {}", WSL_INSTALL_ARG, WSL_INSTALL_ARG_NO_DISTRIBUTION_OPTION, installWslOptionalComponent ? WSL_INSTALL_ARG_ENABLE_WSL1_LONG : L"");

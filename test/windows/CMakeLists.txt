@@ -3,6 +3,7 @@ set(SOURCES
     UnitTests.cpp
     MountTests.cpp
     NetworkTests.cpp
+    OptionalFeatureTests.cpp
     Plan9Tests.cpp
     DrvFsTests.cpp
     Common.cpp

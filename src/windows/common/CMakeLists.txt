@@ -28,6 +28,7 @@ set(SOURCES
     LxssServerPort.cpp
     NatNetworking.cpp
     notifications.cpp
+    OptionalFeature.cpp
     Redirector.cpp
     registry.cpp
     relay.cpp
@@ -113,6 +114,7 @@ set(HEADERS
     LxssServerPort.h
     NatNetworking.h
     notifications.h
+    OptionalFeature.h
     precomp.h
     Redirector.h
     registry.hpp

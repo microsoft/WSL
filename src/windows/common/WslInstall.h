@@ -13,8 +13,11 @@ Abstract:
 --*/
 
 #pragma once
+#include <functional>
 #include <string_view>
+
 #include "Distribution.h"
+#include "OptionalFeature.h"
 
 class WslInstall
 {
@@ -43,7 +46,20 @@ public:
         _In_ const std::optional<std::wstring>& location,
         _In_ const std::optional<uint64_t>& vhdSize);
 
-    static std::pair<bool, std::vector<std::wstring>> CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
+    struct OptionalComponentRequirements
+    {
+        bool RebootRequired{};
+        std::vector<std::wstring> ComponentsToEnable;
+    };
+
+    using OptionalFeatureStateQuery = std::function<wsl::windows::common::optionalfeature::State(std::wstring_view featureName)>;
+
+    static OptionalComponentRequirements CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
+
+    static OptionalComponentRequirements CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent, const OptionalFeatureStateQuery& queryFeatureState);
+
+    static OptionalComponentRequirements EvaluateOptionalComponentRequirements(
+        _In_ bool requireWslOptionalComponent, const OptionalFeatureStateQuery& queryFeatureState);
 
     static void InstallOptionalComponents(const std::vector<std::wstring>& components);
 
