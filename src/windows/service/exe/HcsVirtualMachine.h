@@ -82,13 +82,10 @@ private:
     ULONG m_bootTimeoutMs{};
 
     wil::shared_handle m_userToken;
-    GUID m_virtioFsClassId{};
-
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
 
-    // Swiotlb device-options token sized to fit inside the VM's RAM (empty when too small).
-    std::wstring m_swiotlbOption;
+    bool m_swiotlbConfigured = false;
 
     wil::unique_socket m_listenSocket;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};

@@ -1221,7 +1221,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>El ajuste Subsistema de Windows para Linux permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación basada en GUI.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Recuperación automática de memoria</value>
@@ -1301,13 +1301,15 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>Distribución del sistema personalizada</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Examinar distribuciones</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1315,10 +1317,11 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Distribución del sistema personalizada</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Especifica una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Habilitar consola de depuración</value>
@@ -1353,6 +1356,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>Desarrollador</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentación</value>
@@ -1852,6 +1856,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>Desarrollador</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Administración de distribuciones</value>
@@ -2260,6 +2265,10 @@ Uso:
      <value>El argumento de marca no puede contener el valor adyacente: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Valor booleano no válido para el argumento de marca: '{}'. Se esperaba true, false, 1 o 0.</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Se encontró un argumento posicional cuando no se esperaba ninguno: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2346,8 +2355,8 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
-    <value>La opción de controlador de red 'Gateway' requiere que también se especifique la 'Subnet'.</value>
-    <comment>{Locked="Gateway"}{Locked="Subnet"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>La opción '--gateway' requiere que también se especifique '--subnet'.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>La red “{}” tiene puntos de conexión activos.</value>
@@ -2359,6 +2368,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Modo de red no admitido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>Valor de tiempo de espera de detención no válido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
@@ -2423,6 +2436,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>No se puede usar '{}' como almacenamiento de sesión porque no es un directorio</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>Creando almacenamiento de sesión en "{}" según la configuración de session.storagePath. Si más adelante cambias o quitas esta configuración, los datos almacenados aquí ya no se usarán en la sesión predeterminada y se podrán eliminar para recuperar espacio.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
+  </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>Formato de etiqueta de imagen no válido: "{}". El formato esperado es 'name:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2475,6 +2492,58 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Escribe en un archivo, en lugar de STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Copia archivos entre un contenedor y el sistema de archivos local.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Copiar archivos entre un contenedor y el sistema de archivos local.
+Uso: wslc container cp [OPCIONES] ORIGEN DESTINO
+ Local a contenedor: wslc container cp LOCAL_PATH CONTAINER:PATH
+ Contenedor a local: wslc container cp CONTAINER:PATH LOCAL_PATH
+ Entrada estándar a contenedor: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Origen: ruta de acceso local, CONTAINER:PATH o "-" para stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Destino: ruta local o CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Formato de destino no válido. Se esperaba CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Formato de origen no válido. Se esperaba CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>No se encontró la ruta de acceso de origen: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe no encontrado. Se requiere tar de Windows para la copia de archivos locales.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Dirección de copia no válida. Use CONTAINER:PATH como origen o destino.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>No se pueden leer datos tar desde el terminal. Redirigir un archivo tar a stdin.
+Ejemplo: tar -cf - archivos | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>No se extrajo ningún archivo del archivo contenedor</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>No se puede copiar un directorio en una ruta de acceso de archivo. Use un destino de directorio (con separador final) en su lugar.</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspecciona un contenedor.</value>
@@ -2776,6 +2845,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Mostrar todo independientemente del estado.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Modo de archivo (aceptado por compatibilidad con la CLI de Docker)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Establecer variables en tiempo de compilación (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2842,6 +2915,24 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Valor {} no válido: '{}'. Solo se admite "all".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Comando para ejecutar para verificar la salud del contenedor</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Tiempo transcurrido entre la ejecución de la comprobación de estado (por ejemplo, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Errores consecutivos necesarios para notificar el contenedor como incorrecto</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Período de inicio para que el contenedor se inicialice antes de la cuenta atrás de comprobación de estado (por ejemplo, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Tiempo máximo para permitir que se ejecute una comprobación de estado (por ejemplo, 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Eliminar imágenes incluso si se están usando</value>
   </data>
@@ -2899,6 +2990,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>No usar caché al compilar la imagen</value>
   </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Deshabilitar cualquier comprobación de estado especificada por el contenedor</value>
+  </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>No eliminar elementos primarios sin etiquetar</value>
   </data>
@@ -2925,6 +3019,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Señal para detener el contenedor</value>
+  </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>Tiempo de espera (en segundos) para detener el contenedor antes de terminarlo (-1 para que no se agote el tiempo de espera)</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>Tamaño de /dev/shm (por ejemplo, 64 M, 1G)</value>
@@ -3076,6 +3173,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Valor de argumento {} no válido: '{}'. Se esperaba un tamaño de memoria (por ejemplo, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Valor de argumento {} no válido "{}". Se esperaba una duración (por ejemplo, 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>La opción --no-healthcheck no se puede combinar con otras opciones de comprobación de estado.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>El archivo CID "{}" ya existe</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3093,6 +3198,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Carga solicitada, pero no se proporcionó ninguna entrada.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>Imagen cargada: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>Id. de imagen cargada: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Administrar redes.</value>
@@ -3113,6 +3226,17 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>Configuración de metadatos de red</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>Restricción del acceso externo a la red</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>Subred en formato CIDR que representa un segmento de red</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>Puerta de enlace IPv4 o IPv6 para la subred</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Quita una o varias redes.</value>
@@ -3147,6 +3271,18 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Eliminado: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Conectar un contenedor a una red</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Conecta un contenedor a una red existente.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Desconecta un contenedor de una red.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Desconecta un contenedor de una red existente.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Administra volúmenes.</value>
@@ -3357,6 +3493,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>No se pudo desmontar el volumen '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>El volumen '{}' tiene un directorio de 'lost+found' no vacío. Se dejó en su lugar y es posible que el volumen no se inicialice con el contenido de la imagen.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>No se pudo detener el contenedor '{}' tras el rechazo del complemento</value>

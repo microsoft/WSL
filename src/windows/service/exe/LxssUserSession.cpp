@@ -3014,8 +3014,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(
-                DeleteFileW(Configuration.ShortcutPath->c_str()), "Failed to delete %ls", Configuration.ShortcutPath->c_str());
+            // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
+            try
+            {
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(10),
+                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+            }
+            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }
 
         // Remove the terminal profile, if any.
@@ -4102,6 +4110,14 @@ try
         // We only add uppercase as there is no standard environment variable for PAC proxies.
         // This at least makes the PAC url available to the user in case they wish to use it.
         environment.emplace_back(std::format("{}={}", c_pacProxy, proxySettings.PacUrl));
+
+        // When PAC is used, the reply only populates the proxy field.
+        // Set both envs to this value as best effort since PAC is not functional in headless Linux.
+        if (proxySettings.SecureProxy.empty() && !proxySettings.Proxy.empty())
+        {
+            environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.Proxy));
+            environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.Proxy));
+        }
     }
 }
 CATCH_LOG()

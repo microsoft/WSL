@@ -39,6 +39,25 @@ struct InspectMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, ReadWrite);
 };
 
+struct HealthcheckResult
+{
+    std::string Start;
+    std::string End;
+    int ExitCode{};
+    std::string Output;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthcheckResult, Start, End, ExitCode, Output);
+};
+
+struct Health
+{
+    std::string Status;
+    int FailingStreak{};
+    std::vector<HealthcheckResult> Log;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Health, Status, FailingStreak, Log);
+};
+
 struct ContainerInspectState
 {
     std::string Status;
@@ -46,8 +65,9 @@ struct ContainerInspectState
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
+    std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -69,6 +89,17 @@ struct InspectHostConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
 };
 
+struct HealthConfig
+{
+    std::optional<std::vector<std::string>> Test;
+    std::optional<std::int64_t> Interval;
+    std::optional<std::int64_t> Timeout;
+    std::optional<std::int64_t> StartPeriod;
+    std::optional<int> Retries;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthConfig, Test, Interval, Timeout, StartPeriod, Retries);
+};
+
 struct ContainerConfig
 {
     std::optional<std::vector<std::string>> Env;
@@ -77,8 +108,9 @@ struct ContainerConfig
     std::string User;
     std::string WorkingDir;
     std::optional<int> StopTimeout;
+    std::optional<HealthConfig> Healthcheck;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck);
 };
 
 struct InspectEndpointSettings
@@ -195,9 +227,10 @@ struct Network
     std::string Scope;
     bool Internal{};
     IPAM IPAM;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
 };
 
 } // namespace wsl::windows::common::wslc_schema

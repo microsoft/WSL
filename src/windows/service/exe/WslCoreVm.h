@@ -308,7 +308,6 @@ private:
     bool m_seccompAvailable;
     uint64_t m_hvPciSwiotlbBase = 0;
     uint64_t m_hvPciSwiotlbSize = 0;
-    std::wstring m_swiotlbOption;
     std::wstring m_sharedMemoryRoot;
     std::filesystem::path m_installPath;
     std::wstring m_userProfile;

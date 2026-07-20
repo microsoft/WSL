@@ -984,6 +984,19 @@ extern "C" UINT __stdcall EnableWslService(MSIHANDLE install)
     return NOERROR;
 }
 
+#ifndef WSL_OFFICIAL_BUILD
+extern "C" __declspec(dllexport) UINT __stdcall WslTestForceInstallFailure(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("WslTestForceInstallFailure", TraceLoggingValue("Forcing install failure for rollback testing", "Reason"));
+    }
+    CATCH_LOG();
+
+    return ERROR_INSTALL_FAILURE;
+}
+#endif
+
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
     wil::DLLMain(Instance, Reason, Reserved);

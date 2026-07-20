@@ -524,6 +524,7 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: nat\n"
             "  hostFileShareMode: virtiofs\n"
             "  dnsTunneling: true\n"
+            "  storagePath: C:\\wslc-data\n"
             "experimental:\n"
             "  portRelay: wslrelay\n"
             "credentialStore: wincred\n");
@@ -628,6 +629,71 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(
             Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
             s.GetWarnings().front().Message);
+    }
+
+    // -----------------------------------------------------------------------
+    // session.storagePath
+    // -----------------------------------------------------------------------
+
+    // When unset, the storage path falls back to the empty built-in default (caller uses %LOCALAPPDATA%).
+    TEST_METHOD(Validation_StoragePath_Absent_UsesEmptyDefault)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 4\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A valid absolute path loads without warnings.
+    TEST_METHOD(Validation_StoragePath_AbsoluteValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: D:\\wslc\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("D:\\wslc"), s.Get<Setting::SessionStoragePath>());
+    }
+
+    // "default" magic string uses the built-in (empty) default with no warning.
+    TEST_METHOD(Validation_StoragePath_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A relative path is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_StoragePath_RelativeValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: wslc\\data\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.storagePath", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.storagePath"), s.GetWarnings().front().SettingPath);
     }
 };
 

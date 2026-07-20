@@ -78,6 +78,12 @@ public:
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetStopTimeout(LONG Timeout);
     void SetShmSize(int64_t ShmSize);
+    void SetHealthCmd(std::string&& HealthCmd);
+    void SetHealthInterval(int64_t Nanoseconds);
+    void SetHealthTimeout(int64_t Nanoseconds);
+    void SetHealthStartPeriod(int64_t Nanoseconds);
+    void SetHealthRetries(LONG Retries);
+    void SetNoHealthcheck();
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
@@ -113,6 +119,11 @@ private:
     WSLCSignal m_stopSignal = WSLCSignalNone;
     std::optional<LONG> m_stopTimeout;
     int64_t m_shmSize = 0;
+    std::optional<std::string> m_healthCmd;
+    std::optional<int64_t> m_healthInterval;
+    std::optional<int64_t> m_healthTimeout;
+    std::optional<int64_t> m_healthStartPeriod;
+    std::optional<LONG> m_healthRetries;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;

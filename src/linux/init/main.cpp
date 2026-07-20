@@ -102,6 +102,9 @@ Abstract:
 #define syscall_arch (offsetof(struct seccomp_data, arch))
 
 constexpr auto c_trueString = "1";
+constexpr size_t c_systemReservedMemory = 32 * 1024 * 1024; // 32MiB reserved for WSL system processes
+constexpr long c_cpuPeriodMicros = 100000;
+constexpr long c_systemReservedCpuMicros = 1000; // 0.01 Logical core reserved for WSL system processes
 
 struct VmConfiguration
 {
@@ -159,7 +162,8 @@ void LaunchInit(
     const char* SharedMemoryRoot = nullptr,
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
-    std::optional<pid_t> DistroInitPid = {});
+    std::optional<pid_t> DistroInitPid = {},
+    const char* DistroCgroupPath = nullptr);
 
 void LaunchSystemDistro(
     int SocketFd,
@@ -170,7 +174,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid);
+    pid_t DistroInitPid,
+    const char* DistroCgroupPath);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -211,6 +216,8 @@ void StartTimeSyncAgent(void);
 void WaitForBlockDevice(const char* Path);
 
 int WaitForChild(pid_t Pid, const char* Name);
+
+void SetupWslUserCgroup();
 
 int Chroot(const char* Target)
 
@@ -1419,7 +1426,8 @@ void LaunchInit(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    std::optional<pid_t> DistroInitPid)
+    std::optional<pid_t> DistroInitPid,
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1457,6 +1465,8 @@ Arguments:
         environment variable.
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
+
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
 
 Return Value:
 
@@ -1564,6 +1574,7 @@ try
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
+    AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
 
     if (DistroInitPid.has_value())
     {
@@ -1665,7 +1676,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid)
+    pid_t DistroInitPid,
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1702,6 +1714,8 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
+
 Return Value:
 
     None. This method does not return.
@@ -1720,7 +1734,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath);
     _exit(1);
 }
 catch (...)
@@ -2227,6 +2241,52 @@ void ProcessLaunchInitMessage(
 
         THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
+        auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
+        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
+
+        bool bootInit = false;
+        bool enableGuiApps = Config.EnableGuiApps;
+        {
+            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+            if (File)
+            {
+                std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
+                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            }
+        }
+
+        //
+        // Set up the per-distro cgroup before potentially forking into two inits.
+        //
+
+        std::string DistroCgroupPath{};
+        if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
+        {
+            DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
+
+            auto cleanup = wil::scope_exit([&]() {
+                rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir(DistroCgroupPath.c_str());
+                DistroCgroupPath.clear();
+            });
+
+            try
+            {
+                THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0);
+
+                if (bootInit)
+                {
+                    THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
+                }
+
+                cleanup.release();
+            }
+            CATCH_LOG();
+        }
+
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
@@ -2234,17 +2294,9 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
-        bool enableGuiApps = Config.EnableGuiApps;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-                File.reset();
-            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -2301,7 +2353,8 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->SharedMemoryRootOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
-                        ChildPid);
+                        ChildPid,
+                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
                 }
             }
 
@@ -2322,7 +2375,9 @@ void ProcessLaunchInitMessage(
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
-            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset));
+            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
+            std::nullopt,
+            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
     }
     catch (...)
     {
@@ -3007,6 +3062,11 @@ try
             Config.EnableSafeMode = true;
         }
 
+        if (EarlyConfig->IsolateDistroCgroup && access(CGROUP_MOUNTPOINT "/cgroup.controllers", F_OK) == 0)
+        {
+            SetupWslUserCgroup();
+        }
+
         //
         // Establish the connection for the guest network service.
         //
@@ -3227,7 +3287,14 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Transaction, Buffer);
+        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+        }
+        else
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
+        }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3657,6 +3724,102 @@ void EnableDebugMode(const std::string& Mode)
     }
 }
 
+void SetupWslUserCgroup()
+
+/*++
+
+Routine Description:
+
+    This routine creates a memory-limited cgroup for user processes. All user workloads
+    (systemd, session leaders, boot commands) are placed into this cgroup so that they
+    cannot exhaust all VM memory. This reserves a fixed amount of memory for critical
+    WSL system processes (mini_init, GNS, Plan9, WSL init) that remain in the root cgroup.
+
+    The memory.max limit is set to totalram - c_systemReservedMemory, which provides a
+    hard cap. When this limit is reached, the cgroup-local OOM killer activates and only
+    kills processes within wsl-user, leaving system processes unaffected.
+
+    The cpu.max limit is set to (nproc * c_cpuPeriodMicros - c_systemReservedCpuMicros) per
+    c_cpuPeriodMicros period, reserving a small portion of the CPU for WSL system processes so they remain
+    schedulable even when user workloads saturate every CPU.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    None.
+
+--*/
+
+{
+    struct sysinfo info = {};
+    if (sysinfo(&info) < 0)
+    {
+        LOG_ERROR("sysinfo failed {}", errno);
+        return;
+    }
+
+    uint64_t totalRam = static_cast<uint64_t>(info.totalram) * info.mem_unit;
+
+    if (totalRam <= c_systemReservedMemory)
+    {
+        LOG_WARNING("Total RAM ({}) is too small to reserve {} for system processes", totalRam, c_systemReservedMemory);
+        return;
+    }
+
+    if (UtilEnableAllCgroupControllers(CGROUP_MOUNTPOINT) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for root {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
+        return;
+    }
+
+    if (UtilEnableAllCgroupControllers(WSL_USER_CGROUP_PATH) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for wsl-user {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
+        return;
+    }
+
+    auto userMemoryMax = std::to_string(totalRam - c_systemReservedMemory);
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/memory.max", userMemoryMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set memory.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, totalRam, c_systemReservedMemory);
+
+    const long nproc = get_nprocs();
+    if (nproc <= 0)
+    {
+        LOG_WARNING("get_nprocs returned {}, skipping cpu.max", nproc);
+        return;
+    }
+
+    const long cpuQuota = (nproc * c_cpuPeriodMicros) - c_systemReservedCpuMicros;
+    auto userCpuMax = std::format("{} {}", cpuQuota, c_cpuPeriodMicros);
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/cpu.max", userCpuMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set cpu.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -3864,7 +4027,12 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
+    {
+        Result = -1;
+        LOG_ERROR("Failed to mount cgroup2: {}", errno);
+        goto ErrorExit;
+    }
 
     UtilSetThreadName("mini_init");
 
@@ -3970,6 +4138,47 @@ int main(int Argc, char* Argv[])
                     //
 
                     sync();
+
+                    //
+                    // Clear the distro cgroup
+                    //
+
+                    auto CgroupDir = UtilGetDistroCgroupPath(Result);
+                    if (access(CgroupDir.c_str(), F_OK) == 0)
+                    {
+                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
+
+                        //
+                        // Recursively rmdir the cgroup subtree.
+                        //
+
+                        try
+                        {
+                            std::vector<std::string> dirs;
+                            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                                     CgroupDir, std::filesystem::directory_options::skip_permission_denied))
+                            {
+                                if (entry.is_directory())
+                                {
+                                    dirs.emplace_back(entry.path().string());
+                                }
+                            }
+
+                            for (auto it = dirs.rbegin(); it != dirs.rend(); ++it)
+                            {
+                                if (rmdir(it->c_str()) < 0 && errno != ENOENT)
+                                {
+                                    LOG_ERROR("rmdir({}) failed {}", *it, errno);
+                                }
+                            }
+
+                            if (rmdir(CgroupDir.c_str()) < 0 && errno != ENOENT)
+                            {
+                                LOG_ERROR("rmdir({}) failed {}", CgroupDir, errno);
+                            }
+                        }
+                        CATCH_LOG();
+                    }
 
                     //
                     // Send a message with the child's pid to the service.
