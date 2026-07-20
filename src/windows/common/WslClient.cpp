@@ -1525,7 +1525,14 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::install::CallMsiPackage();
+        const bool launchedViaAppActivation = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs() != nullptr;
+        const auto exitCode = wsl::windows::common::install::CallMsiPackage();
+        if (launchedViaAppActivation && exitCode == -1)
+        {
+            g_promptBeforeExit = true;
+        }
+
+        return exitCode;
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux
