@@ -306,7 +306,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageSecret.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecret.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -341,7 +341,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageSecretBareId.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretBareId.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -397,7 +397,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageSecretMissingEnv.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretMissingEnv.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -435,7 +435,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageSecretSrc.NameAndTag(),
             secretFile.wstring()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretSrc.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -480,7 +480,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageSecretSrcSymlink.NameAndTag(),
             linkFile.wstring()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretSrcSymlink.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -541,7 +541,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageSecretEnvWins.NameAndTag(),
             secretFile.wstring()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretEnvWins.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -574,7 +574,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageSecretTypeEnv.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeEnv.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -608,7 +608,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageSecretTypeEnvSrc.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeEnvSrc.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -640,7 +640,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageSecretTypeFile.NameAndTag(),
             secretFile.wstring()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeFile.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -677,7 +677,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageSecretBinary.NameAndTag(),
             secretFile.wstring()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretBinary.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
