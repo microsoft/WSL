@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "install.h"
 #include "WslInstaller.h"
-#include "OptionalFeature.h"
 
 extern wil::unique_event g_stopEvent;
 
@@ -215,16 +214,5 @@ try
     *Errors = wil::make_unique_string<wil::unique_cotaskmem_string>(context->Errors.c_str()).release();
 
     return context->Result;
-}
-CATCH_RETURN()
-
-HRESULT WslInstaller::GetOptionalFeatureState(LPCWSTR FeatureName, UINT* State)
-try
-{
-    THROW_HR_IF(E_INVALIDARG, FeatureName == nullptr || State == nullptr);
-
-    wsl::windows::common::optionalfeature::Query query;
-    *State = static_cast<UINT>(query.GetState(FeatureName));
-    return S_OK;
 }
 CATCH_RETURN()
