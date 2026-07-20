@@ -141,14 +141,37 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // root-only tmpfs file inside the VM, so file secrets are byte-exact (binary, embedded NULs,
         // and arbitrary size all round-trip) - matching Docker's type=file semantics - without ever
         // mounting a host directory into the VM.
-        std::ifstream file(absPath, std::ios::binary);
+        std::ifstream file(absPath, std::ios::binary | std::ios::ate);
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to open source file: {}", absPath.wstring())),
             !file);
+
+        // Read a known number of bytes rather than draining via istreambuf_iterator: that iterator
+        // cannot distinguish EOF from a mid-stream read error, so a transient I/O failure would
+        // silently truncate the secret. Size the buffer from the stream, read exactly that many
+        // bytes, then verify the full contents were delivered so a short read is surfaced as an
+        // error instead of forwarding a partial secret to the build.
+        const std::streamoff size = file.tellg();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
+            size < 0);
+
+        std::vector<BYTE> value(static_cast<size_t>(size));
+        if (size > 0)
+        {
+            file.seekg(0);
+            file.read(reinterpret_cast<char*>(value.data()), size);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_UNEXPECTED,
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"failed to read source file: {}", absPath.wstring())),
+                file.bad() || file.gcount() != size);
+        }
+
         return services::BuildSecret{
             .Id = std::move(id),
-            .Value = std::vector<BYTE>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()),
+            .Value = std::move(value),
         };
     }
 
