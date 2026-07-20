@@ -316,9 +316,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
             auto value = entry.substr(separator + 1);
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), isBlank(key));
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::MessageWslcDriverOptDuplicate(key),
-                !driverOpts.try_emplace(std::move(key), std::move(value)).second);
+                E_INVALIDARG, Localization::MessageWslcDriverOptDuplicate(key), !driverOpts.try_emplace(key, std::move(value)).second);
         }
         config.DriverOpts = std::move(driverOpts);
     }
