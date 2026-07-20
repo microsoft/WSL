@@ -1433,6 +1433,21 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     return {repo.str(), std::move(tagOrDigest)};
 }
 
+std::string wsl::windows::common::wslutil::GetCanonicalImageReference(const std::string& input)
+{
+    // Mirror the Docker CLI's client-side reference normalization so the final line matches `docker pull` exactly.
+    // See github.com/distribution/reference (normalize.go, reference.go) and github.com/docker/cli
+    // (cli/command/image/pull.go). A digest takes precedence over a tag here, consistent with ParseImage.
+    EnumReferenceFormat format = EnumReferenceFormatNone;
+    auto [repo, tagOrDigest] = ParseImage(input, &format);
+    auto [domain, path] = NormalizeRepo(repo);
+
+    // A digest is joined with '@', a tag with ':'; a name-only reference defaults to the ":latest" tag.
+    const std::string_view separator = (format == EnumReferenceFormatDigest) ? "@" : ":";
+    const std::string_view reference = (format == EnumReferenceFormatNone) ? "latest" : std::string_view{tagOrDigest.value()};
+    return std::format("{}/{}{}{}", domain, path, separator, reference);
+}
+
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
 {
     fwprintf(stream, L"%ls\n", GetSystemErrorString(result).c_str());
