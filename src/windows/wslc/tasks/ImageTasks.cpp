@@ -176,7 +176,7 @@ static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     };
 }
 
-static bool TryInspectImage(Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
+static bool TryInspectImage(Reporter& reporter, Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
 {
     try
     {
@@ -237,7 +237,7 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.Contains(ArgType::BuildPull));
 
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(cancelEvent, context.Args.Contains(ArgType::Verbose));
+    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.Contains(ArgType::Verbose));
     services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
