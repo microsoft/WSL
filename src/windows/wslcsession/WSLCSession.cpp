@@ -1019,7 +1019,11 @@ try
         ServiceProcessLauncher writer("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
         auto writerProcess = writer.Launch(*m_virtualMachine);
 
-        std::vector<char> bytes(reinterpret_cast<const char*>(secret.Value), reinterpret_cast<const char*>(secret.Value) + secret.ValueSize);
+        std::vector<char> bytes;
+        if (secret.ValueSize > 0)
+        {
+            bytes.assign(reinterpret_cast<const char*>(secret.Value), reinterpret_cast<const char*>(secret.Value) + secret.ValueSize);
+        }
         std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
         extraHandles.emplace_back(std::make_unique<WriteHandle>(writerProcess.GetStdHandle(WSLCFDStdin), std::move(bytes)));
         const auto result = writerProcess.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
