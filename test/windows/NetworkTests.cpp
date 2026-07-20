@@ -2130,14 +2130,15 @@ class NetworkTests
 
         // Perl one-liner: socket() + listen() with no bind(), print the kernel-assigned
         // port via getsockname(), then accept() (blocking) to keep the socket alive.
-        const std::wstring wslCmd = L"perl -MSocket -e '"
-                                     L"$|=1;"
-                                     L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
-                                     L"listen(S,5) or die;"
-                                     L"my $port=(sockaddr_in(getsockname(S)))[0];"
-                                     L"print \"PORT=$port\\n\";"
-                                     L"accept(C,S);"
-                                     L"'";
+        const std::wstring wslCmd =
+            L"perl -MSocket -e '"
+            L"$|=1;"
+            L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+            L"listen(S,5) or die;"
+            L"my $port=(sockaddr_in(getsockname(S)))[0];"
+            L"print \"PORT=$port\\n\";"
+            L"accept(C,S);"
+            L"'";
         auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
 
         auto process = LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get(), nullptr);
