@@ -1379,6 +1379,73 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL("127.0.0.1", bindings[0].HostIp);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_PublishAll_DualStack)
+    {
+        // Remove the container and built image on exit. Both helpers are idempotent, so this is safe
+        // to arm before either resource exists.
+        auto cleanup = wil::scope_exit([&] {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            EnsureImageIsDeleted(PublishAllImage);
+        });
+
+        // Build an image that exposes both a TCP and a UDP port so publish-all has something to map.
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-publish-all";
+        auto cleanupDir = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            std::format(
+                "FROM {}\n"
+                "EXPOSE 8080/tcp\n"
+                "EXPOSE 9090/udp\n",
+                string::WideToMultiByte(DebianImage.NameAndTag())));
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), PublishAllImage.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        // Port bindings only show up in inspect after start, so create then start before inspecting.
+        auto result = RunWslc(std::format(L"container create --name {} -P {} sleep 5", WslcContainerName, PublishAllImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Each exposed port (tcp and udp) must be published dual-stack: one IPv4 loopback and one IPv6
+        // loopback binding, each on an ephemeral host port.
+        const auto inspect = InspectContainer(WslcContainerName);
+        for (const auto& portKey : {std::string{"8080/tcp"}, std::string{"9090/udp"}})
+        {
+            VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
+
+            const auto& bindings = inspect.Ports.at(portKey);
+            VERIFY_ARE_EQUAL(2u, bindings.size());
+
+            bool foundIpv4 = false;
+            bool foundIpv6 = false;
+            for (const auto& binding : bindings)
+            {
+                VERIFY_IS_TRUE(std::stoi(binding.HostPort) > 0);
+                if (binding.HostIp == "127.0.0.1")
+                {
+                    foundIpv4 = true;
+                }
+                else if (binding.HostIp == "::1")
+                {
+                    foundIpv6 = true;
+                }
+            }
+            VERIFY_IS_TRUE(foundIpv4);
+            VERIFY_IS_TRUE(foundIpv6);
+        }
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -1401,6 +1468,9 @@ private:
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+
+    // Image built at test time with exposed TCP and UDP ports for publish-all coverage.
+    const TestImage PublishAllImage{L"wslc-e2e-publish-all", L"latest", L""};
 
     // Test ports
     const uint16_t ContainerTestPort = 8080;

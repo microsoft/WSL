@@ -1824,18 +1824,18 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             {
                 auto [port, protocol] = ParseExposedPortKey(portKey);
 
-                // Only TCP localhost mappings are currently supported by the relay path.
-                if (protocol != IPPROTO_TCP)
+                // Exposed ports carry only a port and protocol (tcp/udp), never an address family.
+                // Mirror Docker's dual-stack default by publishing each exposed port on both the IPv4
+                // and IPv6 loopback, while keeping wslc's loopback-only default binding convention.
+                for (const auto& [family, address] : {std::pair{AF_INET, "127.0.0.1"}, std::pair{AF_INET6, "::1"}})
                 {
-                    continue;
+                    auto& createdPort = ports.emplace_back();
+                    createdPort.HostPort = WSLC_EPHEMERAL_PORT;
+                    createdPort.Family = family;
+                    createdPort.ContainerPort = port;
+                    createdPort.Protocol = protocol;
+                    strcpy_s(createdPort.BindingAddress, address);
                 }
-
-                auto& createdPort = ports.emplace_back();
-                createdPort.HostPort = WSLC_EPHEMERAL_PORT;
-                createdPort.Family = AF_INET;
-                createdPort.ContainerPort = port;
-                createdPort.Protocol = protocol;
-                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
             }
         }
     }
