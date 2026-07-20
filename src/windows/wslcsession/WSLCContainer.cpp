@@ -1820,9 +1820,26 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
         if (imageInfo.Config.has_value() && imageInfo.Config->ExposedPorts.has_value())
         {
+            // The userspace wslrelay port relay only forwards TCP. When it's active, adding a UDP
+            // mapping would fail the whole container (MapPort throws ERROR_NOT_SUPPORTED), so skip
+            // UDP exposed ports and warn once. UDP is published normally on the virtioNet path.
+            const bool relayForwarding = virtualMachine.UseWslRelayPortForwarding();
+            bool warnedUdpSkipped = false;
+
             for (const auto& [portKey, _] : imageInfo.Config->ExposedPorts.value())
             {
                 auto [port, protocol] = ParseExposedPortKey(portKey);
+
+                if (relayForwarding && protocol == IPPROTO_UDP)
+                {
+                    if (!warnedUdpSkipped)
+                    {
+                        EMIT_USER_WARNING(Localization::MessageWslcPublishAllUdpNotSupported());
+                        warnedUdpSkipped = true;
+                    }
+
+                    continue;
+                }
 
                 // Exposed ports carry only a port and protocol (tcp/udp), never an address family.
                 // Mirror Docker's dual-stack default by publishing each exposed port on both the IPv4

@@ -188,10 +188,12 @@ public:
 
     WSLCNetworkingMode NetworkingMode() const;
 
+    // True when port forwarding goes through the userspace wslrelay path (NAT mode, or Consomme with
+    // the wslrelay feature flag). That relay only supports TCP localhost mappings.
+    bool UseWslRelayPortForwarding() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
-
-    bool UseWslRelayPortForwarding() const;
 
     // Initial setup during Connect()
     void ConfigureNetworking();
