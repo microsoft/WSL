@@ -11599,10 +11599,10 @@ class WSLCTests
             "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "docker.io/library/ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
-        // A digest takes precedence over a tag, consistent with ParseImage.
+        // A tag and digest are both preserved when both are present, matching Docker's canonical reference.
         Validate(
             "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
-            "docker.io/library/ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+            "docker.io/library/ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
     }
 
     WSLC_TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)

@@ -1437,15 +1437,23 @@ std::string wsl::windows::common::wslutil::GetCanonicalImageReference(const std:
 {
     // Mirror the Docker CLI's client-side reference normalization so the final line matches `docker pull` exactly.
     // See github.com/distribution/reference (normalize.go, reference.go) and github.com/docker/cli
-    // (cli/command/image/pull.go). A digest takes precedence over a tag here, consistent with ParseImage.
-    EnumReferenceFormat format = EnumReferenceFormatNone;
-    auto [repo, tagOrDigest] = ParseImage(input, &format);
-    auto [domain, path] = NormalizeRepo(repo);
+    // (cli/command/image/pull.go). Unlike ParseImage -- which collapses to a single tag-or-digest field with digest
+    // precedence -- Docker's canonical string keeps both a tag and a digest when both are present, so compose the
+    // reference directly from the parsed name, tag and digest groups.
+    static const auto regex = BuildImageReferenceRegex();
+    std::smatch match;
+    if (!std::regex_match(input, match, regex))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+    }
 
-    // A digest is joined with '@', a tag with ':'; a name-only reference defaults to the ":latest" tag.
-    const std::string_view separator = (format == EnumReferenceFormatDigest) ? "@" : ":";
-    const std::string_view reference = (format == EnumReferenceFormatNone) ? "latest" : std::string_view{tagOrDigest.value()};
-    return std::format("{}/{}{}{}", domain, path, separator, reference);
+    auto [domain, path] = NormalizeRepo(match[1].str());
+
+    // A tag joins with ':' and a digest with '@'. A name-only reference (no tag and no digest) defaults to ":latest";
+    // a digest-only reference is not name-only, so it keeps no tag (matching Docker's TagNameOnly).
+    const std::string tag = match[2].matched ? std::format(":{}", match[2].str()) : (match[3].matched ? "" : ":latest");
+    const std::string digest = match[3].matched ? std::format("@{}", match[3].str()) : "";
+    return std::format("{}/{}{}{}", domain, path, tag, digest);
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
