@@ -3681,8 +3681,12 @@ Return Value:
     }
 
     // /proc/meminfo values are in kB.
-    long long totalKb = 0;
-    bool foundCounter = false;
+    long long activeFileKb = 0;
+    long long inactiveFileKb = 0;
+    long long reclaimableSlabKb = 0;
+    bool foundActiveFile = false;
+    bool foundInactiveFile = false;
+    bool foundReclaimableSlab = false;
     std::string line;
     while (std::getline(memInfo, line))
     {
@@ -3694,10 +3698,20 @@ Return Value:
             continue;
         }
 
-        if (name == "Active(file):" || name == "Inactive(file):" || name == "SReclaimable:")
+        if (name == "Active(file):")
         {
-            foundCounter = true;
-            totalKb += value;
+            activeFileKb = value;
+            foundActiveFile = true;
+        }
+        else if (name == "Inactive(file):")
+        {
+            inactiveFileKb = value;
+            foundInactiveFile = true;
+        }
+        else if (name == "SReclaimable:")
+        {
+            reclaimableSlabKb = value;
+            foundReclaimableSlab = true;
         }
     }
 
@@ -3707,13 +3721,13 @@ Return Value:
         return -1;
     }
 
-    if (!foundCounter)
+    if (!foundActiveFile || !foundInactiveFile || !foundReclaimableSlab)
     {
         LOG_ERROR("failed to find reclaimable cache counters in /proc/meminfo");
         return -1;
     }
 
-    return totalKb * 1024;
+    return (activeFileKb + inactiveFileKb + reclaimableSlabKb) * 1024;
 }
 
 static bool RequestReclaim(long long Bytes)
@@ -3945,7 +3959,13 @@ try
 
                 if (memoryOperation)
                 {
-                    ReadCpuBusyIdle(previousBusy, previousIdle);
+                    if (!ReadCpuBusyIdle(previousBusy, previousIdle))
+                    {
+                        havePreviousSample = false;
+                        idleTracker.Reset();
+                        droppedThisIdlePeriod = false;
+                        compactedThisIdlePeriod = false;
+                    }
                 }
             }
         }
