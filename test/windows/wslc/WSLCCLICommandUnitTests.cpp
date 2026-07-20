@@ -162,13 +162,21 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(0u, cmd.GetCommands().size());
     }
 
-    // Test: Verify VersionCommand has no arguments (only the auto-added --help)
-    TEST_METHOD(VersionCommand_HasNoArguments)
+    // Test: Verify VersionCommand exposes the --format argument (plus the auto-added --help)
+    TEST_METHOD(VersionCommand_HasFormatArgument)
     {
         auto cmd = VersionCommand(L"wslc");
-        VERIFY_ARE_EQUAL(0u, cmd.GetArguments().size());
-        // Test out that auto added help command is the only one
-        VERIFY_ARE_EQUAL(1u, cmd.GetAllArguments().size());
+
+        auto args = cmd.GetArguments();
+        VERIFY_ARE_EQUAL(1u, args.size());
+
+        const auto& format = args[0];
+        VERIFY_ARE_EQUAL(ArgType::Format, format.Type());
+        VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
+        VERIFY_IS_FALSE(format.Required());
+
+        // GetAllArguments also includes the auto-added --help.
+        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
     }
 
     // Test: Verify RootCommand contains VersionCommand as a subcommand

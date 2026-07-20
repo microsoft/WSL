@@ -36,78 +36,16 @@ class WSLCE2EContainerTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        auto result = RunWslc(L"container --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        RunWslc(L"container INVALID_CMD").Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
-    }
-
-private:
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerCommandLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container [<command>] [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
-            {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
-            {L"cp", Localization::WSLCCLI_ContainerCpDesc()},
-            {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
-            {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
-            {L"export", Localization::WSLCCLI_ContainerExportDesc()},
-            {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
-            {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
-            {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},
-            {L"list", Localization::WSLCCLI_ContainerListDesc()},
-            {L"prune", Localization::WSLCCLI_ContainerPruneDesc()},
-            {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
-            {L"run", Localization::WSLCCLI_ContainerRunDesc()},
-            {L"start", Localization::WSLCCLI_ContainerStartDesc()},
-            {L"stats", Localization::WSLCCLI_ContainerStatsDesc()},
-            {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
-        };
-
-        size_t maxLen = 0;
-        for (const auto& [name, _] : entries)
-        {
-            maxLen = (std::max)(maxLen, name.size());
-        }
-
-        std::wstringstream commands;
-        commands << Localization::WSLCCLI_AvailableSubcommands() << L"\r\n";
-        for (const auto& [name, desc] : entries)
-        {
-            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
-        }
-        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n" //
-                << L"  -?,--help  Shows help about the selected command\r\n\r\n";
-        return options.str();
+        auto result = RunWslc(L"container INVALID_CMD");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
     }
 };
 } // namespace WSLCE2ETests

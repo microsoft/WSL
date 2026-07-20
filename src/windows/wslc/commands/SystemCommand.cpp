@@ -43,6 +43,6 @@ std::wstring SystemCommand::LongDescription() const
 
 void SystemCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

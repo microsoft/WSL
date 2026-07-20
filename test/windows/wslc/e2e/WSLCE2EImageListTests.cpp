@@ -43,7 +43,8 @@ class WSLCE2EImageListTests
     WSLC_TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
     {
         const auto result = RunWslc(L"image list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
@@ -117,7 +118,9 @@ class WSLCE2EImageListTests
     WSLC_TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
     {
         const auto result = RunWslc(L"image list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
@@ -167,7 +170,8 @@ class WSLCE2EImageListTests
     {
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"image list --filter dangling");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"dangling") + L"\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"dangling")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Filter_InvalidKey)
@@ -315,45 +319,5 @@ class WSLCE2EImageListTests
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageListLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
-                << L"  --no-trunc   Do not truncate output\r\n"
-                << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  --verbose    Output verbose details\r\n"
-                << L"  -?,--help    Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

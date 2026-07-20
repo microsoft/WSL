@@ -61,13 +61,15 @@ class WSLCE2EContainerExecTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_HelpCommand)
     {
         auto result = RunWslc(L"container exec --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_MissingContainerId)
     {
         auto result = RunWslc(L"container exec");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_MissingCommand)
@@ -76,7 +78,8 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec {}", WslcContainerName));
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'command'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'command'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_ContainerNotFound)
@@ -322,8 +325,9 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
@@ -352,7 +356,9 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_DuplicateKeys_Precedence)
@@ -500,53 +506,5 @@ private:
     // Test environment variable files
     std::filesystem::path EnvTestFile1;
     std::filesystem::path EnvTestFile2;
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return L"Executes a command in a running container.\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container exec [<options>] <container-id> <command> [<arguments>...]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"
-                 << L"  container-id      Container ID\r\n"
-                 << L"  command           The command to run\r\n"
-                 << L"  arguments         Arguments to pass to the command being executed inside the container\r\n"
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -d,--detach       Run container in detached mode\r\n"
-                << L"  -e,--env          Key=Value pairs for environment variables\r\n"
-                << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
-                << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -?,--help         Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

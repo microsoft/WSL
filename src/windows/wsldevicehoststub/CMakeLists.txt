@@ -13,7 +13,7 @@ add_dependencies(wsldevicehostproxystub wsldevicehostidl)
 # The generated dlldata.c uses ENTRY_PREFIX/REGISTER_PROXY_DLL only when those
 # macros are pre-defined. midl-generated proxy code resolves IIDs via the _i.c
 # definitions and links against rpcrt4/ole32 like classic-COM proxies.
-target_link_libraries(wsldevicehostproxystub ${COMMON_LINK_LIBRARIES} rpcrt4.lib)
+target_link_libraries(wsldevicehostproxystub ${COMMON_LINK_LIBRARIES})
 
 # The proxy/stub file uses `#define REGISTER_PROXY_DLL` so DllRegisterServer is
 # emitted. This lets `regsvr32` work for developer/ad-hoc registration; the

@@ -238,6 +238,7 @@ void DeviceHostProxy::RemoveDevice(const GUID& InstanceId)
         const auto entry = m_devices.find(InstanceId);
         THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
         THROW_HR_IF(E_INVALIDARG, entry == m_devices.end());
+        entry->second.ShuttingDown = true;
         device = entry->second.Device;
         type = entry->second.Type;
     }
@@ -305,7 +306,7 @@ wil::com_ptr<IWslVirtioNetDevice> DeviceHostProxy::GetVirtioNetDevice(const GUID
     THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
 
     const auto device = m_devices.find(InstanceId);
-    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || !device->second.Device);
+    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
     return device->second.Device.query<IWslVirtioNetDevice>();
 }
 
@@ -315,7 +316,7 @@ wil::com_ptr<IWslVirtiofsDevice> DeviceHostProxy::GetVirtiofsDevice(const GUID& 
     THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
 
     const auto device = m_devices.find(InstanceId);
-    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || !device->second.Device);
+    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
     return device->second.Device.query<IWslVirtiofsDevice>();
 }
 
@@ -359,9 +360,14 @@ void DeviceHostProxy::Shutdown()
     std::vector<wil::com_ptr<IUnknown>> devices;
     {
         auto lock = m_devicesLock.lock_exclusive();
+
+        // Block device retrieval and new registrations while retaining the entries needed by
+        // Teardown() callbacks to unregister doorbells and destroy mapped ranges.
+        m_devicesShutdown = true;
         devices.reserve(m_devices.size());
         for (auto& device : m_devices)
         {
+            device.second.ShuttingDown = true;
             devices.emplace_back(device.second.Device);
         }
     }
@@ -374,7 +380,69 @@ void DeviceHostProxy::Shutdown()
     {
         auto lock = m_devicesLock.lock_exclusive();
         m_devices.clear();
-        m_devicesShutdown = true;
+    }
+}
+
+wil::com_ptr<IWslVm> DeviceHostProxy::GetWslVm(_In_ HANDLE UserToken)
+{
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(E_CHANGED_STATE, m_shutdown);
+
+    const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
+    auto& cachedVm = elevated ? m_adminWslVm : m_wslVm;
+    auto& swiotlbConfigured = elevated ? m_adminWslVmSwiotlbConfigured : m_wslVmSwiotlbConfigured;
+    if (!cachedVm)
+    {
+        auto revert = wil::impersonate_token(UserToken);
+        const auto& clsid = m_enableTelemetry
+                                ? (elevated ? CLSID_WSL_DEVICE_HOST_ADMIN : CLSID_WSL_DEVICE_HOST)
+                                : (elevated ? CLSID_WSL_DEVICE_HOST_NO_TELEMETRY_ADMIN : CLSID_WSL_DEVICE_HOST_NO_TELEMETRY);
+        const auto host = wil::CoCreateInstance<IWslDeviceHost>(clsid, CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        auto vmId = m_runtimeId;
+        wil::com_ptr<IWslVm> vm;
+        THROW_IF_FAILED(host->OpenVm(&vmId, vm.put()));
+        cachedVm = std::move(vm);
+    }
+
+    ConfigureSwiotlb(cachedVm, swiotlbConfigured);
+    return cachedVm;
+}
+
+_Requires_lock_held_(m_lock)
+void DeviceHostProxy::ConfigureSwiotlb(const wil::com_ptr<IWslVm>& Vm, bool& Configured)
+{
+    if (Vm && m_swiotlbConfigured && !Configured)
+    {
+        THROW_IF_FAILED(Vm->SetSwiotlb(&m_swiotlbConfig));
+        Configured = true;
+    }
+}
+
+wil::com_ptr<IWslDeviceHostCallback> DeviceHostProxy::GetCallback()
+{
+    wil::com_ptr<IWslDeviceHostCallback> callback;
+    THROW_IF_FAILED(CastToUnknown()->QueryInterface(IID_PPV_ARGS(callback.put())));
+    return callback;
+}
+
+void DeviceHostProxy::TeardownDevice(const wil::com_ptr<IUnknown>& Device) noexcept
+{
+    if (!Device)
+    {
+        return;
+    }
+
+    if (const auto netDevice = Device.try_query<IWslVirtioNetDevice>())
+    {
+        LOG_IF_FAILED(netDevice->Teardown());
+    }
+    else if (const auto virtiofsDevice = Device.try_query<IWslVirtiofsDevice>())
+    {
+        LOG_IF_FAILED(virtiofsDevice->Teardown());
+    }
+    else if (const auto pmemDevice = Device.try_query<IWslVirtioPmemDevice>())
+    {
+        LOG_IF_FAILED(pmemDevice->Teardown());
     }
 }
 
@@ -521,7 +589,7 @@ try
     // N.B. For security it is enforced that each device can only register a small number of doorbells.
     //      Currently virtio-9p only uses one and the external virtio device uses two.
     const auto knownDevice = m_devices.find(InstanceId);
-    RETURN_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.DoorbellCount == DEVICE_HOST_PROXY_DOORBELL_LIMIT);
+    RETURN_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.ShuttingDown || knownDevice->second.DoorbellCount == DEVICE_HOST_PROXY_DOORBELL_LIMIT);
 
     if (!knownDevice->second.MemoryNotification)
     {
@@ -571,7 +639,6 @@ HRESULT DeviceHostProxy::UnregisterDoorbellImpl(const GUID& InstanceId, UINT8 Ba
 try
 {
     auto lock = m_devicesLock.lock_exclusive();
-    RETURN_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
 
     // Check if the device is a known device and has registered a doorbell.
     // N.B. If the device is being removed, the device can't be retrieved from the worker process
@@ -612,7 +679,7 @@ try
 
     // Check if the device is one of the known devices.
     const auto knownDevice = m_devices.find(InstanceId);
-    THROW_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end());
+    THROW_HR_IF(E_ACCESSDENIED, knownDevice == m_devices.end() || knownDevice->second.ShuttingDown);
 
     if (!knownDevice->second.MemoryMapping)
     {
@@ -655,7 +722,6 @@ HRESULT DeviceHostProxy::DestroySectionBackedMmioRangeImpl(const GUID& InstanceI
 try
 {
     auto lock = m_devicesLock.lock_exclusive();
-    RETURN_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
     const auto device = m_devices.find(InstanceId);
     RETURN_HR_IF(E_ACCESSDENIED, device == m_devices.end() || !device->second.MemoryMapping);
     RETURN_IF_FAILED(device->second.MemoryMapping->DestroySectionBackedMmioRange(static_cast<FIOV_BAR_SELECTOR>(BarIndex), BarOffsetInPages));

@@ -147,6 +147,12 @@ bool WSLCExecutionResult::StdoutContainsSubstring(const std::wstring& substring)
     return Stdout.value().find(substring) != std::wstring::npos;
 }
 
+bool WSLCExecutionResult::StderrContainsSubstring(const std::wstring& substring) const
+{
+    VERIFY_IS_TRUE(Stderr.has_value());
+    return Stderr.value().find(substring) != std::wstring::npos;
+}
+
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType, HANDLE stdinHandle)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
@@ -276,15 +282,6 @@ void WaitForContainerOutput(const std::wstring& containerName, std::string_view 
     });
 
     WaitForOutput(wil::unique_handle{parentStdoutRead.release()}, expected, timeout);
-}
-
-std::wstring GetWslcHeader()
-{
-    std::wstringstream header;
-    header << L"Copyright (c) Microsoft Corporation. All rights reserved.\r\n"
-           << L"For privacy information about this product please visit https://aka.ms/privacy.\r\n"
-           << L"\r\n";
-    return header.str();
 }
 
 WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole)
