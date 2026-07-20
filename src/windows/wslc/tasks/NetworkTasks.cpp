@@ -231,12 +231,37 @@ void PruneNetworks(CLIExecutionContext& context)
 void ConnectNetwork(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Data.Contains(Data::NetworkEndpointOptions));
     WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
 
+    const auto& endpoint = context.Data.Get<Data::NetworkEndpointOptions>();
     models::ConnectNetworkOptions options{};
     options.NetworkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
     options.ContainerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    options.Aliases = endpoint.Aliases;
+    options.IpAddress = endpoint.IpAddress;
+    options.Links = endpoint.Links;
+    options.LinkLocalIps = endpoint.LinkLocalIps;
+    options.DriverOpts = endpoint.DriverOpts;
+
+    NetworkService::Connect(context.Data.Get<Data::Session>(), options);
+}
+
+void DisconnectNetwork(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
+    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
+
+    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
+    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkName, containerId);
+}
+
+void SetNetworkEndpointOptionsFromArgs(CLIExecutionContext& context)
+{
+    models::NetworkEndpointOptions options{};
 
     for (const auto& alias : context.Args.GetAll<ArgType::NetworkAlias>())
     {
@@ -263,17 +288,6 @@ void ConnectNetwork(CLIExecutionContext& context)
         options.DriverOpts.emplace_back(WideToMultiByte(driverOpt));
     }
 
-    NetworkService::Connect(context.Data.Get<Data::Session>(), options);
-}
-
-void DisconnectNetwork(CLIExecutionContext& context)
-{
-    WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
-    WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-
-    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
-    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkName, containerId);
+    context.Data.Add<Data::NetworkEndpointOptions>(std::move(options));
 }
 } // namespace wsl::windows::wslc::task
