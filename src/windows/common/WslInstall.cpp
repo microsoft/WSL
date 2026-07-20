@@ -14,15 +14,12 @@ Abstract:
 
 #include "precomp.h"
 #include "WslInstall.h"
-#include "registry.hpp"
 #include "wslutil.h"
 #include "Distribution.h"
 #include "HandleConsoleProgressBar.h"
 #include "svccomm.hpp"
 
 extern HINSTANCE g_dllInstance;
-
-constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;
@@ -66,20 +63,6 @@ void AddOptionalComponentRequirement(
     default:
         THROW_HR(E_UNEXPECTED);
     }
-}
-
-std::vector<std::wstring> GetPreflightInstalledOptionalComponents()
-{
-    const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-    auto [key, error] = wsl::windows::common::registry::OpenKeyNoThrow(lxssKey.get(), c_optionalFeatureInstallStatus, KEY_READ);
-    std::vector<std::wstring> installedComponents;
-    if (key)
-    {
-        const auto components = wsl::windows::common::registry::ReadString(key.get(), nullptr, nullptr, L"");
-        installedComponents = wsl::shared::string::Split(components, L',');
-    }
-
-    return installedComponents;
 }
 
 }; // namespace
@@ -204,30 +187,6 @@ try
 }
 CATCH_RETURN()
 
-WslInstall::OptionalComponentRequirements WslInstall::CheckForMissingOptionalComponentsPreflight(_In_ bool requireWslOptionalComponent)
-{
-    OptionalComponentRequirements requirements;
-    requireWslOptionalComponent |= !wsl::windows::common::helpers::IsWindows11OrAbove();
-    if (requireWslOptionalComponent && !wsl::windows::common::helpers::IsServicePresent(L"lxssmanager"))
-    {
-        requirements.ComponentsToEnable.emplace_back(c_optionalFeatureNameWsl);
-    }
-
-    if (!wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
-    {
-        requirements.ComponentsToEnable.emplace_back(c_optionalFeatureNameVmp);
-    }
-
-    requirements.RebootRequired = !requirements.ComponentsToEnable.empty();
-    const auto installedComponents = GetPreflightInstalledOptionalComponents();
-    for (const auto& component : installedComponents)
-    {
-        std::erase(requirements.ComponentsToEnable, component);
-    }
-
-    return requirements;
-}
-
 WslInstall::OptionalComponentRequirements WslInstall::CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent)
 {
     wsl::windows::common::optionalfeature::Query query;
@@ -287,13 +246,6 @@ void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& comp
             THROW_HR_WITH_USER_ERROR(WSL_E_INSTALL_COMPONENT_FAILED, Localization::MessageOptionalComponentInstallFailed(component, exitCode));
         }
     }
-
-    auto installedComponents = GetPreflightInstalledOptionalComponents();
-    installedComponents.insert(installedComponents.end(), components.begin(), components.end());
-    const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-    const auto key =
-        wsl::windows::common::registry::CreateKey(lxssKey.get(), c_optionalFeatureInstallStatus, KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
-    wsl::windows::common::registry::WriteString(key.get(), nullptr, nullptr, wsl::shared::string::Join(installedComponents, L',').c_str());
 }
 
 std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(

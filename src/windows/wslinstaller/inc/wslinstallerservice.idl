@@ -29,4 +29,5 @@ cpp_quote("#endif")
 interface IWslInstaller : IUnknown
 {
     HRESULT Install([out] UINT* ExitCode, [out] LPWSTR* ErrorMessage);
+    HRESULT GetOptionalFeatureState([in, unique, string] LPCWSTR FeatureName, [out] UINT* State);
 };

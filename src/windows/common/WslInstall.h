@@ -54,8 +54,6 @@ public:
 
     using OptionalFeatureStateQuery = std::function<wsl::windows::common::optionalfeature::State(std::wstring_view featureName)>;
 
-    static OptionalComponentRequirements CheckForMissingOptionalComponentsPreflight(_In_ bool requireWslOptionalComponent);
-
     static OptionalComponentRequirements CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
 
     static OptionalComponentRequirements CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent, const OptionalFeatureStateQuery& queryFeatureState);
