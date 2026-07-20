@@ -70,15 +70,19 @@ class WSLCE2EPushPullTests
 
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
-            // Push should succeed.
+            // Standalone push/pull send progress to stdout (Docker parity), leaving stderr empty.
             auto result = RunWslc(std::format(L"push {}", registryImage));
-            result.Verify({.ExitCode = 0});
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_IS_TRUE(result.Stdout.has_value());
+            VERIFY_IS_FALSE(result.Stdout->empty());
 
             // Delete the local copy and pull it back.
             RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
 
             result = RunWslc(std::format(L"pull {}", registryImage));
             result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_IS_TRUE(result.Stdout.has_value());
+            VERIFY_IS_FALSE(result.Stdout->empty());
 
             // Verify the image is now present.
             auto registryRepo = registryImage.substr(0, registryImage.rfind(L':'));
@@ -93,7 +97,7 @@ class WSLCE2EPushPullTests
     {
         auto result = RunWslc(L"push does-not-exist:latest");
         auto errorMessage = L"An image does not exist locally with the tag: does-not-exist\r\nError code: E_FAIL\r\n";
-        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        result.Verify({.Stderr = errorMessage, .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_NonExistentImage)

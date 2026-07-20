@@ -11,8 +11,10 @@ Abstract:
     Implementation of the version command.
 
 --*/
+
 #include "VersionCommand.h"
 #include "ArgumentValidation.h"
+#include "CLIExecutionContext.h"
 #include "JsonUtils.h"
 
 using namespace wsl::shared;
@@ -38,9 +40,9 @@ std::wstring VersionCommand::LongDescription() const
     return Localization::WSLCCLI_VersionLongDesc();
 }
 
-void VersionCommand::PrintVersion()
+void VersionCommand::PrintVersion(Reporter& reporter)
 {
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
+    reporter.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -57,11 +59,11 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         nlohmann::json root;
         root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
-        wsl::windows::common::wslutil::PrintMessage(MultiByteToWide(root.dump(c_jsonPrettyPrintIndent)));
+        context.Reporter.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonPrettyPrintIndent)));
         break;
     }
     case FormatType::Table:
-        PrintVersion();
+        PrintVersion(context.Reporter);
         break;
     default:
         THROW_HR(E_UNEXPECTED);
