@@ -2393,7 +2393,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
     <value>Invalid driver option '{}'; expected 'key=value'.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked="key=value"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
     <value>Unknown endpoint setting '{}' for network '{}'.</value>
@@ -3009,17 +3009,19 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
     <value>Set endpoint driver options (--driver-opt key=value)</value>
-    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--driver-opt "}{Locked="key=value"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
     <value>Assign the container an IPv4 address on the network</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
     <value>Add link to another container (--link name:alias)</value>
-    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--link "}{Locked="name:alias"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
     <value>Add a link-local IPv4 address for the container</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Invalid {} value: network alias cannot be empty or whitespace</value>
