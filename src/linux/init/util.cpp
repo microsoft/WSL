@@ -26,6 +26,7 @@ Abstract:
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <regex>
 #include <thread>
 #include <chrono>
@@ -3751,18 +3752,42 @@ std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
 
 int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
 {
-    // Only cpu and memory are required for wsl's resource limit.
-    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory") < 0)
+    // Only cpu and memory are required for wsl's resource limit; every other controller cgroup.controllers
+    // reports is enabled on a best-effort basis.
+    constexpr std::string_view RequiredControllers[] = {"cpu", "memory"};
+    std::string RequiredEntries;
+    for (const auto Controller : RequiredControllers)
+    {
+        RequiredEntries += std::format("+{} ", Controller);
+    }
+
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), RequiredEntries.c_str()) < 0)
     {
         LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
         return -1;
     }
-    const char* const OptionalControllers[] = {"+pids", "+io", "+cpuset", "+hugetlb", "+rdma", "+misc"};
-    for (const auto Controller : OptionalControllers)
+
+    std::string AvailableControllers;
+    try
     {
-        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Controller) < 0)
+        AvailableControllers = UtilReadFileContent(CgroupPath + "/cgroup.controllers");
+    }
+    CATCH_LOG();
+
+    std::string_view Remaining{AvailableControllers};
+    while (!Remaining.empty())
+    {
+        auto Controller = UtilStringNextToken(Remaining, " \n");
+        if (Controller.empty() ||
+            std::find(std::begin(RequiredControllers), std::end(RequiredControllers), Controller) != std::end(RequiredControllers))
         {
-            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Controller, CgroupPath, errno);
+            continue;
+        }
+
+        auto Entry = std::format("+{}", Controller);
+        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Entry.c_str()) < 0)
+        {
+            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Entry, CgroupPath, errno);
         }
     }
     return 0;
