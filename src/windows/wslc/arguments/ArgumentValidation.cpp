@@ -18,6 +18,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "Exceptions.h"
+#include "ImageService.h"
 #include "Localization.h"
 #include <algorithm>
 #include <charconv>
@@ -25,6 +26,7 @@ Abstract:
 #include <cmath>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <sstream>
 #include <unordered_map>
 #include <wslc.h>
@@ -106,8 +108,13 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Secret:
-        validation::ValidateSecretSpec(execArgs.GetAll<ArgType::Secret>());
+    {
+        for (const auto& spec : execArgs.GetAll<ArgType::Secret>())
+        {
+            std::ignore = validation::ParseSecretSpec(spec);
+        }
         break;
+    }
 
     case ArgType::Since:
         validation::ValidateTimestamp(execArgs.GetAll<ArgType::Since>(), m_name);
@@ -206,124 +213,181 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     }
 }
 
-void ValidateSecretSpec(const std::vector<std::wstring>& values)
+services::BuildSecret ParseSecretSpec(const std::wstring& spec)
 {
-    for (const auto& spec : values)
+    std::wstring id;
+    std::wstring type;
+    std::wstring envName;
+    std::wstring srcPath;
+
+    for (const auto& part : Split(spec, L','))
     {
-        std::wstring id;
-        std::wstring type;
-        std::wstring envName;
-        std::wstring srcPath;
-
-        for (const auto& part : Split(spec, L','))
+        auto eq = part.find(L'=');
+        if (eq == std::wstring::npos || eq == 0)
         {
-            auto eq = part.find(L'=');
-            if (eq == std::wstring::npos || eq == 0)
-            {
-                throw ArgumentException(
-                    Localization::MessageWslcSecretInvalidSpec(spec, L"expected key=value pairs separated by ','"));
-            }
-            auto key = part.substr(0, eq);
-            auto value = part.substr(eq + 1);
-
-            if (key == L"id")
-            {
-                id = value;
-            }
-            else if (key == L"type")
-            {
-                type = value;
-            }
-            else if (key == L"env")
-            {
-                envName = value;
-            }
-            else if (key == L"src" || key == L"source")
-            {
-                srcPath = value;
-            }
-            else
-            {
-                throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported key '{}'", key)));
-            }
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, L"expected key=value pairs separated by ','"));
         }
+        auto key = part.substr(0, eq);
+        auto value = part.substr(eq + 1);
 
-        if (id.empty())
+        if (key == L"id")
         {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
+            id = value;
         }
-
-        // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
-        if (id[0] == L'-')
+        else if (key == L"type")
         {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
+            type = value;
         }
-
-        // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
-        // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
-        for (auto ch : id)
+        else if (key == L"env")
         {
-            const bool allowed = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
-                                 ch == L'_' || ch == L'-' || ch == L'.';
-            if (!allowed)
-            {
-                throw ArgumentException(
-                    Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may only contain letters, digits, '_', '-' or '.'"));
-            }
+            envName = value;
         }
-
-        if (!type.empty() && type != L"file" && type != L"env")
+        else if (key == L"src" || key == L"source")
         {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
+            srcPath = value;
         }
-
-        // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
-        // otherwise fall through to reading an environment variable, silently contradicting the type.
-        if (type == L"file" && srcPath.empty())
+        else
         {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'type=file' requires 'src='"));
-        }
-
-        // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
-        // than a file path), unless an explicit 'env=' was also given.
-        if (type == L"env" && envName.empty() && !srcPath.empty())
-        {
-            envName = std::move(srcPath);
-            srcPath.clear();
-        }
-
-        if (!envName.empty() && !srcPath.empty())
-        {
-            // Docker parity: 'env=' and 'src=' are not mutually exclusive; when both are given the
-            // environment variable wins and the file path is ignored.
-            srcPath.clear();
-        }
-        if (envName.empty() && srcPath.empty())
-        {
-            // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
-            // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
-            // must be set - Docker errors when the id-named variable is undefined.
-            envName = id;
-            if (GetEnvironmentVariableW(envName.c_str(), nullptr, 0) == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
-            {
-                throw ArgumentException(
-                    Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
-            }
-        }
-
-        if (!srcPath.empty())
-        {
-            std::error_code ec;
-            // Resolve symlinks (and normalize '..') so we validate the file that actually holds the
-            // secret's bytes rather than the link node itself.
-            auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
-            if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
-            {
-                throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
-                    spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
-            }
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported key '{}'", key)));
         }
     }
+
+    if (id.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
+    }
+
+    // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
+    if (id[0] == L'-')
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
+    }
+
+    // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
+    // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
+    for (auto ch : id)
+    {
+        const bool allowed = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
+                             ch == L'_' || ch == L'-' || ch == L'.';
+        if (!allowed)
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may only contain letters, digits, '_', '-' or '.'"));
+        }
+    }
+
+    if (!type.empty() && type != L"file" && type != L"env")
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
+    }
+
+    // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
+    // otherwise fall through to reading an environment variable, silently contradicting the type.
+    if (type == L"file" && srcPath.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'type=file' requires 'src='"));
+    }
+
+    // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
+    // than a file path), unless an explicit 'env=' was also given.
+    if (type == L"env" && envName.empty() && !srcPath.empty())
+    {
+        envName = std::move(srcPath);
+        srcPath.clear();
+    }
+
+    if (!envName.empty() && !srcPath.empty())
+    {
+        // Docker parity: 'env=' and 'src=' are not mutually exclusive; when both are given the
+        // environment variable wins and the file path is ignored.
+        srcPath.clear();
+    }
+    if (envName.empty() && srcPath.empty())
+    {
+        // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
+        // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
+        // must be set - Docker errors when the id-named variable is undefined.
+        envName = id;
+        if (GetEnvironmentVariableW(envName.c_str(), nullptr, 0) == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
+        }
+    }
+
+    if (!srcPath.empty())
+    {
+        std::error_code ec;
+        // Resolve symlinks (and normalize '..') so we read the file that actually holds the secret's
+        // bytes rather than the link node itself.
+        auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
+        if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
+                spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
+        }
+
+        // Read the file's raw bytes and forward them verbatim. The server materializes them into a
+        // root-only tmpfs file inside the VM, so file secrets are byte-exact (binary, embedded NULs,
+        // and arbitrary size all round-trip) - matching Docker's type=file semantics - without ever
+        // mounting a host directory into the VM.
+        std::ifstream file(absPath, std::ios::binary | std::ios::ate);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to open source file: {}", absPath.wstring())),
+            !file);
+
+        // Read a known number of bytes rather than draining via istreambuf_iterator: that iterator
+        // cannot distinguish EOF from a mid-stream read error, so a transient I/O failure would
+        // silently truncate the secret. Size the buffer from the stream, read exactly that many
+        // bytes, then verify the full contents were delivered so a short read is surfaced as an
+        // error instead of forwarding a partial secret to the build.
+        const std::streamoff size = file.tellg();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
+            size < 0);
+
+        std::vector<BYTE> value(static_cast<size_t>(size));
+        if (size > 0)
+        {
+            file.seekg(0);
+            file.read(reinterpret_cast<char*>(value.data()), size);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_UNEXPECTED,
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"failed to read source file: {}", absPath.wstring())),
+                file.bad() || file.gcount() != size);
+        }
+
+        return services::BuildSecret{
+            .Id = std::move(id),
+            .Value = std::move(value),
+        };
+    }
+
+    // Docker parity: a referenced environment variable that is unset (or set but empty) yields an
+    // empty secret value rather than an error. GetEnvironmentVariableW returns 0 for an undefined
+    // variable; for a defined one it returns the buffer size needed including the null terminator.
+    std::wstring value;
+    DWORD size = GetEnvironmentVariableW(envName.c_str(), nullptr, 0);
+    if (size > 0)
+    {
+        value.resize(size);
+        DWORD written = GetEnvironmentVariableW(envName.c_str(), value.data(), size);
+        // If the variable grew between the size query above and this read, GetEnvironmentVariableW
+        // returns the newly-required size (>= our buffer) without filling it; treat that as an error
+        // rather than forwarding a truncated/garbage secret value to the build.
+        THROW_HR_IF(E_UNEXPECTED, written >= size);
+        value.resize(written);
+    }
+
+    // The env value is delivered as UTF-8 bytes, matching how the guest exposes it at /run/secrets/<id>.
+    auto valueBytes = wsl::windows::common::string::WideToMultiByte(value);
+    return services::BuildSecret{
+        .Id = std::move(id),
+        .Value = std::vector<BYTE>(valueBytes.begin(), valueBytes.end()),
+    };
 }
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values)

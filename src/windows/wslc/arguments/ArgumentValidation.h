@@ -26,6 +26,10 @@ Abstract:
 
 using namespace wsl::windows::wslc::models;
 
+namespace wsl::windows::wslc::services {
+struct BuildSecret;
+}
+
 namespace wsl::windows::wslc::validation {
 
 template <typename T>
@@ -83,7 +87,9 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
 InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
-void ValidateSecretSpec(const std::vector<std::wstring>& values);
+
+services::BuildSecret ParseSecretSpec(const std::wstring& spec);
+
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
 

@@ -23,7 +23,6 @@ Abstract:
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
-#include <fstream>
 #include <wslutil.h>
 
 using namespace wsl::shared;
@@ -72,133 +71,6 @@ namespace {
 
 } // namespace
 
-static services::BuildSecret ParseSecretSpec(const std::wstring& spec)
-{
-    // The spec was already validated by validation::ValidateSecretSpec during argument processing, so
-    // this only parses the (known-valid) spec and resolves the secret's bytes.
-    std::wstring id;
-    std::wstring type;
-    std::wstring envName;
-    std::wstring srcPath;
-
-    for (const auto& part : wsl::shared::string::Split(spec, L','))
-    {
-        auto eq = part.find(L'=');
-        if (eq == std::wstring::npos || eq == 0)
-        {
-            continue;
-        }
-        auto key = part.substr(0, eq);
-        auto value = part.substr(eq + 1);
-
-        if (key == L"id")
-        {
-            id = value;
-        }
-        else if (key == L"type")
-        {
-            type = value;
-        }
-        else if (key == L"env")
-        {
-            envName = value;
-        }
-        else if (key == L"src" || key == L"source")
-        {
-            srcPath = value;
-        }
-    }
-
-    // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
-    // than a file path), unless an explicit 'env=' was also given.
-    if (type == L"env" && envName.empty() && !srcPath.empty())
-    {
-        envName = std::move(srcPath);
-        srcPath.clear();
-    }
-
-    if (!envName.empty() && !srcPath.empty())
-    {
-        // Docker parity: 'env=' and 'src=' are not mutually exclusive; when both are given the
-        // environment variable wins and the file path is ignored.
-        srcPath.clear();
-    }
-    if (envName.empty() && srcPath.empty())
-    {
-        // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
-        // environment variable whose name matches the id.
-        envName = id;
-    }
-
-    if (!srcPath.empty())
-    {
-        std::error_code ec;
-        // Resolve symlinks (and normalize '..') so we read the file that actually holds the secret's
-        // bytes rather than the link node itself.
-        auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
-
-        // Read the file's raw bytes and forward them verbatim. The server materializes them into a
-        // root-only tmpfs file inside the VM, so file secrets are byte-exact (binary, embedded NULs,
-        // and arbitrary size all round-trip) - matching Docker's type=file semantics - without ever
-        // mounting a host directory into the VM.
-        std::ifstream file(absPath, std::ios::binary | std::ios::ate);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to open source file: {}", absPath.wstring())),
-            !file);
-
-        // Read a known number of bytes rather than draining via istreambuf_iterator: that iterator
-        // cannot distinguish EOF from a mid-stream read error, so a transient I/O failure would
-        // silently truncate the secret. Size the buffer from the stream, read exactly that many
-        // bytes, then verify the full contents were delivered so a short read is surfaced as an
-        // error instead of forwarding a partial secret to the build.
-        const std::streamoff size = file.tellg();
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
-            size < 0);
-
-        std::vector<BYTE> value(static_cast<size_t>(size));
-        if (size > 0)
-        {
-            file.seekg(0);
-            file.read(reinterpret_cast<char*>(value.data()), size);
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_UNEXPECTED,
-                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"failed to read source file: {}", absPath.wstring())),
-                file.bad() || file.gcount() != size);
-        }
-
-        return services::BuildSecret{
-            .Id = std::move(id),
-            .Value = std::move(value),
-        };
-    }
-
-    // Docker parity: a referenced environment variable that is unset (or set but empty) yields an
-    // empty secret value rather than an error. GetEnvironmentVariableW returns 0 for an undefined
-    // variable; for a defined one it returns the buffer size needed including the null terminator.
-    std::wstring value;
-    DWORD size = GetEnvironmentVariableW(envName.c_str(), nullptr, 0);
-    if (size > 0)
-    {
-        value.resize(size);
-        DWORD written = GetEnvironmentVariableW(envName.c_str(), value.data(), size);
-        // If the variable grew between the size query above and this read, GetEnvironmentVariableW
-        // returns the newly-required size (>= our buffer) without filling it; treat that as an error
-        // rather than forwarding a truncated/garbage secret value to the build.
-        THROW_HR_IF(E_UNEXPECTED, written >= size);
-        value.resize(written);
-    }
-
-    // The env value is delivered as UTF-8 bytes, matching how the guest exposes it at /run/secrets/<id>.
-    auto valueBytes = wsl::windows::common::string::WideToMultiByte(value);
-    return services::BuildSecret{
-        .Id = std::move(id),
-        .Value = std::vector<BYTE>(valueBytes.begin(), valueBytes.end()),
-    };
-}
-
 static bool TryInspectImage(Reporter& reporter, Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
 {
     try
@@ -238,7 +110,7 @@ void BuildImage(CLIExecutionContext& context)
     {
         for (const auto& spec : context.Args.GetAll<ArgType::Secret>())
         {
-            secrets.push_back(ParseSecretSpec(spec));
+            secrets.push_back(validation::ParseSecretSpec(spec));
         }
     }
 
