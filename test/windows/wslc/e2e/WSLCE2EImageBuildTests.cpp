@@ -67,7 +67,7 @@ class WSLCE2EImageBuildTests
         auto dir = std::filesystem::current_path() / L"wslc-e2e-build-secret-context";
         std::error_code ec;
         std::filesystem::create_directories(dir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(dir));
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::is_directory(dir));
         return dir;
     }
 
