@@ -2162,6 +2162,25 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
     }
 }
 
+static bool IsFatBackedPath(_In_ PCWSTR Path)
+{
+    wchar_t volumeRoot[MAX_PATH];
+    if (!GetVolumePathNameW(Path, volumeRoot, ARRAYSIZE(volumeRoot)))
+    {
+        LOG_LAST_ERROR_MSG("GetVolumePathNameW failed for %ls", Path);
+        return false;
+    }
+
+    wchar_t fileSystemName[MAX_PATH];
+    if (!GetVolumeInformationW(volumeRoot, nullptr, 0, nullptr, nullptr, nullptr, fileSystemName, ARRAYSIZE(fileSystemName)))
+    {
+        LOG_LAST_ERROR_MSG("GetVolumeInformationW failed for %ls", volumeRoot);
+        return false;
+    }
+
+    return (_wcsnicmp(fileSystemName, L"FAT", 3) == 0) || (_wcsicmp(fileSystemName, L"exFAT") == 0);
+}
+
 _Requires_lock_held_(m_guestDeviceLock)
 std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
@@ -2183,6 +2202,14 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     }
 
     sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
+
+    // FAT-family volumes (FAT/FAT32/exFAT) cannot be fully backed by virtiofs, so
+    // fail the share add and let the guest fall back to Plan9.
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        IsFatBackedPath(sharePath.c_str()),
+        "virtiofs is not supported on FAT volume %ls; falling back to Plan9",
+        sharePath.c_str());
 
     std::wstring effectiveOptions(Options);
 

@@ -803,7 +803,21 @@ try
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0);
+
+    if (MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0)
+    {
+        const auto childError = errno;
+        LOG_WARNING("Mounting virtiofs child for {} failed {}, falling back to Plan9", Source, childError);
+
+        // Clear any mount-failure exit code so the Plan9 attempt isn't
+        // pre-judged as a failure.
+        if (ExitCode != nullptr)
+        {
+            *ExitCode = 0;
+        }
+
+        return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
+    }
 
     //
     // Save the tag mapping.

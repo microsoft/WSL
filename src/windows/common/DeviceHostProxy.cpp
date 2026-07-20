@@ -446,69 +446,6 @@ void DeviceHostProxy::TeardownDevice(const wil::com_ptr<IUnknown>& Device) noexc
     }
 }
 
-wil::com_ptr<IWslVm> DeviceHostProxy::GetWslVm(_In_ HANDLE UserToken)
-{
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(E_CHANGED_STATE, m_shutdown);
-
-    const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
-    auto& cachedVm = elevated ? m_adminWslVm : m_wslVm;
-    auto& swiotlbConfigured = elevated ? m_adminWslVmSwiotlbConfigured : m_wslVmSwiotlbConfigured;
-    if (!cachedVm)
-    {
-        auto revert = wil::impersonate_token(UserToken);
-        const auto& clsid = m_enableTelemetry
-                                ? (elevated ? CLSID_WSL_DEVICE_HOST_ADMIN : CLSID_WSL_DEVICE_HOST)
-                                : (elevated ? CLSID_WSL_DEVICE_HOST_NO_TELEMETRY_ADMIN : CLSID_WSL_DEVICE_HOST_NO_TELEMETRY);
-        const auto host = wil::CoCreateInstance<IWslDeviceHost>(clsid, CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
-        auto vmId = m_runtimeId;
-        wil::com_ptr<IWslVm> vm;
-        THROW_IF_FAILED(host->OpenVm(&vmId, vm.put()));
-        cachedVm = std::move(vm);
-    }
-
-    ConfigureSwiotlb(cachedVm, swiotlbConfigured);
-    return cachedVm;
-}
-
-_Requires_lock_held_(m_lock)
-void DeviceHostProxy::ConfigureSwiotlb(const wil::com_ptr<IWslVm>& Vm, bool& Configured)
-{
-    if (Vm && m_swiotlbConfigured && !Configured)
-    {
-        THROW_IF_FAILED(Vm->SetSwiotlb(&m_swiotlbConfig));
-        Configured = true;
-    }
-}
-
-wil::com_ptr<IWslDeviceHostCallback> DeviceHostProxy::GetCallback()
-{
-    wil::com_ptr<IWslDeviceHostCallback> callback;
-    THROW_IF_FAILED(CastToUnknown()->QueryInterface(IID_PPV_ARGS(callback.put())));
-    return callback;
-}
-
-void DeviceHostProxy::TeardownDevice(const wil::com_ptr<IUnknown>& Device) noexcept
-{
-    if (!Device)
-    {
-        return;
-    }
-
-    if (const auto netDevice = Device.try_query<IWslVirtioNetDevice>())
-    {
-        LOG_IF_FAILED(netDevice->Teardown());
-    }
-    else if (const auto virtiofsDevice = Device.try_query<IWslVirtiofsDevice>())
-    {
-        LOG_IF_FAILED(virtiofsDevice->Teardown());
-    }
-    else if (const auto pmemDevice = Device.try_query<IWslVirtioPmemDevice>())
-    {
-        LOG_IF_FAILED(pmemDevice->Teardown());
-    }
-}
-
 HRESULT
 DeviceHostProxy::RegisterDeviceHost(_In_ IVmDeviceHost* DeviceHost, _In_ DWORD ProcessId, _Out_ UINT64* IpcSectionHandle)
 try
