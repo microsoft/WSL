@@ -3784,11 +3784,8 @@ int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
             continue;
         }
 
-        auto Entry = std::format("+{}", Controller);
-        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Entry.c_str()) < 0)
-        {
-            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Entry, CgroupPath, errno);
-        }
+        // WriteToFile() already logs a failure; these controllers are best-effort so no extra handling is needed.
+        WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), std::format("+{}", Controller).c_str());
     }
     return 0;
 }
