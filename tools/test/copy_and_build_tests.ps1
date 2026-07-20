@@ -45,11 +45,6 @@ $DistroPath = "$env:LocalAppData\lxss"
 $copyScriptCommand = $PSScriptRoot + "\copy_tests.ps1 -WslTestDirPath $WslTestDirPath -DistroName $DistroName"
 
 $cleanTestCommand = "rm -rf /data/test"
-# Capture the build output to the log and propagate the real exit code from
-# build_tests.sh. Previously this piped to `less` as the last command, which
-# (a) always failed because build_tests.sh never writes that log file, and
-# (b) masked the actual make exit code, so genuine build failures looked like
-# successes (and successes looked like failures).
 $buildTestCommand = "cd /data/test; ./build_tests.sh 2>&1 | tee /data/test/log/build_output; exit `${PIPESTATUS[0]}"
 
 # clean test directory on linux side

@@ -649,16 +649,10 @@ Return Value:
     struct libmnt_table* Table;
 
     //
-    // Prefer an exact mount-point match when the path is itself a mount point,
-    // returning the topmost mount there (which is exactly the parent a new mount
-    // placed at this path will get).
-    //
     // Aggregate virtio-fs collapses every Windows share onto a single device, so
     // all shares report the same device number. A device-based lookup is
     // therefore ambiguous and can return an arbitrary share's mount, which makes
-    // callers such as the drvfs parent-id checks nondeterministic. Fall back to
-    // the device search only for paths that are not mount points (e.g. a
-    // directory whose mount was just removed).
+    // callers such as the drvfs parent-id checks nondeterministic. 
     //
 
     FileSystem = NULL;
