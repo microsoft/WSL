@@ -11594,6 +11594,9 @@ class WSLCTests
         Validate("myregistry.io:5000/myimage", "myregistry.io:5000/myimage:latest");
         Validate("localhost:5000/myimage:latest", "localhost:5000/myimage:latest");
 
+        // A mixed-case registry domain is preserved verbatim, matching Docker (which never lowercases the domain).
+        Validate("Example.COM/owner/repo", "Example.COM/owner/repo:latest");
+
         // Digest references are preserved.
         Validate(
             "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
