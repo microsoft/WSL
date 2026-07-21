@@ -698,6 +698,89 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --secret value 'id=x,type=bogus': unsupported secret type 'bogus'") != std::wstring::npos);
     }
 
+    // Tier 1: an invalid --output spec is rejected client-side before any build runs. This exercises the
+    // full parser through the real binary and asserts the localized "Invalid --output value" wrapper.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_UnsupportedType_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-type-bad";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=bogus", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=bogus': unsupported output type 'bogus'") != std::wstring::npos);
+    }
+
+    // Tier 2: the docker exporter loads the built image into the engine's image store, so the result is
+    // host-observable via inspect. The -t flag supplies the tag; the default docker builder does not
+    // honor the exporter 'name=' attribute for tagging (that requires the docker-container driver), so
+    // these tests deliberately tag with -t rather than name=.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeDockerWithTagFlag_LoadsIntoStore_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageOutputDockerTag);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-docker-tag";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-tag-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=docker",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputDockerTag.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageOutputDockerTag.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
+        VERIFY_ARE_EQUAL(BuiltImageOutputDockerTag.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+    }
+
+    // Tier 2: the docker exporter produces a complete, correct image (not just a tag). Build with a
+    // distinctive CMD and verify it round-trips through inspect, proving --output built a real image.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeDocker_ProducesImageWithConfig_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageOutputDockerConfig);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-docker-config";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-config-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=docker",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputDockerConfig.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageOutputDockerConfig.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Cmd.has_value());
+        const std::vector<std::string> expectedCmd{"echo", "output-docker-config-ok"};
+        VERIFY_ARE_EQUAL(expectedCmd, inspectData.Config.value().Cmd.value());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
@@ -820,6 +903,8 @@ private:
     const TestImage BuiltImageSecretSrc{L"wslc-e2e-build-secret-src", L"latest", L""};
     const TestImage BuiltImageSecretSrcSymlink{L"wslc-e2e-build-secret-src-symlink", L"latest", L""};
     const TestImage BuiltImageSecretBinary{L"wslc-e2e-build-secret-binary", L"latest", L""};
+    const TestImage BuiltImageOutputDockerTag{L"wslc-e2e-build-output-docker-tag", L"latest", L""};
+    const TestImage BuiltImageOutputDockerConfig{L"wslc-e2e-build-output-docker-config", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
