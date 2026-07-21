@@ -8817,8 +8817,9 @@ class WSLCTests
             // Verify the second exposed port got a dual-stack mapping too.
             auto ports9090 = getDualStackHostPorts(inspectData.Ports["9090/tcp"]);
 
-            // The two exposed ports must map to different host ports.
+            // Each exposed port must map to distinct host ports on both loopback families.
             VERIFY_ARE_NOT_EQUAL(ports8080.ipv4, ports9090.ipv4);
+            VERIFY_ARE_NOT_EQUAL(ports8080.ipv6, ports9090.ipv6);
         }
     }
 

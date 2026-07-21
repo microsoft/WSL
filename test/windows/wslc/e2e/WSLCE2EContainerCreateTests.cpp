@@ -1469,15 +1469,15 @@ while True:
             uint16_t ipv6Port = 0;
             for (const auto& binding : bindings)
             {
-                const auto hostPort = static_cast<uint16_t>(std::stoi(binding.HostPort));
-                VERIFY_IS_TRUE(hostPort > 0);
+                const int hostPort = std::stoi(binding.HostPort);
+                VERIFY_IS_TRUE(hostPort > 0 && hostPort <= 65535);
                 if (binding.HostIp == "127.0.0.1")
                 {
-                    ipv4Port = hostPort;
+                    ipv4Port = static_cast<uint16_t>(hostPort);
                 }
                 else if (binding.HostIp == "::1")
                 {
-                    ipv6Port = hostPort;
+                    ipv6Port = static_cast<uint16_t>(hostPort);
                 }
             }
 
