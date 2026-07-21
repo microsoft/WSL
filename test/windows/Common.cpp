@@ -1645,6 +1645,13 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.virtioFsAggregateShares.has_value())
+    {
+        newConfig += L"\n[experimental]\n";
+        newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
+        newConfig += L"[wsl2]\n";
+    }
+
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
 

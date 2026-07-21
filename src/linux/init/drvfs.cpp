@@ -774,8 +774,12 @@ try
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-
-    if (MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0)
+    const char* MappingName = Tag;
+    if (*ChildName == '\0')
+    {
+        THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
+    }
+    else if (MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0)
     {
         const auto childError = errno;
         LOG_WARNING("Mounting virtiofs child for {} failed {}, falling back to Plan9", Source, childError);
@@ -789,6 +793,10 @@ try
 
         return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
     }
+    else
+    {
+        MappingName = ChildName;
+    }
 
     //
     // Save the tag mapping.
@@ -796,7 +804,7 @@ try
     // N.B. Use the source path from the response since the service canonicalizes it.
     //
 
-    SaveVirtiofsTagMapping(ChildName, ResponseSource);
+    SaveVirtiofsTagMapping(MappingName, ResponseSource);
 
     return 0;
 }
@@ -856,9 +864,18 @@ try
     auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountVirtioFsChild(NewTag, ChildName, Target, Options, nullptr, SubPath) < 0);
+    const char* MappingName = NewTag;
+    if (*ChildName == '\0')
+    {
+        THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(MountVirtioFsChild(NewTag, ChildName, Target, Options, nullptr, SubPath) < 0);
+        MappingName = ChildName;
+    }
 
-    SaveVirtiofsTagMapping(ChildName, Source);
+    SaveVirtiofsTagMapping(MappingName, Source);
 
     return 0;
 }

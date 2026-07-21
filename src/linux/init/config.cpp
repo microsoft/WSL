@@ -1714,7 +1714,8 @@ Return Value:
         // Do not consider bind mounts.
         //
 
-        if (strcmp(MountEnum.Current().Root, "/") != 0 && strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) != 0)
+        if (strcmp(MountEnum.Current().Root, "/") != 0 &&
+            !ParseAggregateVirtioFsMountRoot(MountEnum.Current().Source, MountEnum.Current().Root))
         {
             continue;
         }
@@ -2335,7 +2336,7 @@ try
         // TODO_LX: Support bind mounts.
         //
 
-        if (strcmp(MountEntry.Root, "/") != 0 && strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) != 0)
+        if (strcmp(MountEntry.Root, "/") != 0 && !ParseAggregateVirtioFsMountRoot(MountEntry.Source, MountEntry.Root))
         {
             continue;
         }

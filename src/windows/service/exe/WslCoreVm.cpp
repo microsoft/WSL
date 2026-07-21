@@ -2188,7 +2188,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
 
     // Check if a matching share already exists.
     bool created = false;
-    std::wstring childName;
+    std::wstring shareName;
     VirtioFsShare key(sharePath.c_str(), effectiveOptions.c_str(), Admin);
     if (!m_virtioFsShares.contains(key))
     {
@@ -2198,27 +2198,38 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         GUID tagGuid{};
         THROW_IF_FAILED(CoCreateGuid(&tagGuid));
 
-        childName = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
-        WI_ASSERT(!FindVirtioFsShare(childName.c_str(), Admin));
+        shareName = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
+        WI_ASSERT(!FindVirtioFsShare(shareName.c_str(), Admin));
 
-        auto& device = Admin ? m_adminVirtioFsDevice : m_virtioFsDevice;
-        const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-        if (!device.has_value())
+        if (m_vmConfig.EnableVirtioFsAggregateShares)
         {
-            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
-            device = m_guestDeviceManager->AddVirtiofsDevice(deviceTag, L"", L"", UserToken, aggregateOptions);
-        }
-        m_guestDeviceManager->AddVirtiofsChild(device.value(), childName.c_str(), key.OptionsString().c_str(), sharePath.c_str());
+            auto& device = Admin ? m_adminVirtioFsDevice : m_virtioFsDevice;
+            const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+            if (!device.has_value())
+            {
+                VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
+                device = m_guestDeviceManager->AddVirtiofsDevice(deviceTag, L"", L"", UserToken, aggregateOptions);
+            }
 
-        m_virtioFsShares.emplace(std::move(key), childName);
+            m_guestDeviceManager->AddVirtiofsChild(device.value(), shareName.c_str(), key.OptionsString().c_str(), sharePath.c_str());
+        }
+        else
+        {
+            (void)m_guestDeviceManager->AddVirtiofsDevice(shareName.c_str(), key.OptionsString().c_str(), sharePath.c_str(), UserToken);
+        }
+
+        m_virtioFsShares.emplace(std::move(key), shareName);
         created = true;
     }
     else
     {
-        childName = m_virtioFsShares[key];
+        shareName = m_virtioFsShares[key];
     }
 
-    const std::wstring deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+    const std::wstring deviceTag = m_vmConfig.EnableVirtioFsAggregateShares
+                                       ? (Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG))
+                                       : shareName;
+    const std::wstring childName = m_vmConfig.EnableVirtioFsAggregateShares ? shareName : L"";
 
     WSL_LOG(
         "WslCoreVmAddVirtioFsShare",
@@ -2227,6 +2238,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         TraceLoggingValue(effectiveOptions.c_str(), "options"),
         TraceLoggingValue(deviceTag.c_str(), "tag"),
         TraceLoggingValue(childName.c_str(), "childName"),
+        TraceLoggingValue(m_vmConfig.EnableVirtioFsAggregateShares, "aggregate"),
         TraceLoggingValue(created, "created"),
         TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
 
