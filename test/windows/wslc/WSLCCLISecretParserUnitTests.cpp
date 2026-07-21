@@ -27,28 +27,6 @@ using namespace wsl::windows::wslc;
 
 namespace WSLCCLISecretParserUnitTests {
 
-// RAII helper: sets an environment variable for the duration of a test and removes it afterwards so
-// tests never leak state into one another.
-class ScopedEnvVar
-{
-public:
-    ScopedEnvVar(const wchar_t* name, const wchar_t* value) : m_name(name)
-    {
-        SetEnvironmentVariableW(name, value);
-    }
-
-    ~ScopedEnvVar()
-    {
-        SetEnvironmentVariableW(m_name.c_str(), nullptr);
-    }
-
-    ScopedEnvVar(const ScopedEnvVar&) = delete;
-    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
-
-private:
-    std::wstring m_name;
-};
-
 // RAII helper: writes the given bytes to a uniquely named temp file and deletes it on destruction.
 class ScopedTempFile
 {
@@ -123,25 +101,25 @@ class WSLCCLISecretParserUnitTests
 
     TEST_METHOD(Secret_Env_BareIdReadsIdNamedVariable)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_BARE", L"bare-value");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_BARE", L"bare-value");
         VerifyValid(L"id=WSLC_UT_SECRET_BARE", L"WSLC_UT_SECRET_BARE", ToBytes("bare-value"));
     }
 
     TEST_METHOD(Secret_Env_ExplicitEnvName)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_ENV", L"explicit-env");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_ENV", L"explicit-env");
         VerifyValid(L"id=my.secret,env=WSLC_UT_SECRET_ENV", L"my.secret", ToBytes("explicit-env"));
     }
 
     TEST_METHOD(Secret_Env_TypeEnvBareSrcIsVariableName)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_TYPEENV", L"type-env-src");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_TYPEENV", L"type-env-src");
         VerifyValid(L"id=s,type=env,src=WSLC_UT_SECRET_TYPEENV", L"s", ToBytes("type-env-src"));
     }
 
     TEST_METHOD(Secret_Env_WinsOverSrcWhenBothPresent)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_ENVWINS", L"env-wins");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_ENVWINS", L"env-wins");
         // A non-existent src path is provided but must be ignored because env= takes precedence.
         VerifyValid(L"id=s,env=WSLC_UT_SECRET_ENVWINS,src=C:\\wslc-ut\\does-not-exist.txt", L"s", ToBytes("env-wins"));
     }
@@ -149,26 +127,26 @@ class WSLCCLISecretParserUnitTests
     TEST_METHOD(Secret_Env_ExplicitEnvUnsetYieldsEmptyValue)
     {
         // Ensure the variable is not set.
-        SetEnvironmentVariableW(L"WSLC_UT_SECRET_EXPLICIT_UNSET", nullptr);
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_EXPLICIT_UNSET");
         VerifyValid(L"id=s,env=WSLC_UT_SECRET_EXPLICIT_UNSET", L"s", {});
     }
 
     TEST_METHOD(Secret_Env_EmptyVariableYieldsEmptyValue)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_EMPTY", L"");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_EMPTY", L"");
         VerifyValid(L"id=WSLC_UT_SECRET_EMPTY", L"WSLC_UT_SECRET_EMPTY", {});
     }
 
     TEST_METHOD(Secret_Env_ValueEncodedAsUtf8)
     {
         // 'é' (U+00E9) encodes to the two UTF-8 bytes 0xC3 0xA9.
-        ScopedEnvVar env(L"WSLC_UT_SECRET_UTF8", L"h\u00e9llo");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_UTF8", L"h\u00e9llo");
         VerifyValid(L"id=WSLC_UT_SECRET_UTF8", L"WSLC_UT_SECRET_UTF8", {0x68, 0xC3, 0xA9, 0x6C, 0x6C, 0x6F});
     }
 
     TEST_METHOD(Secret_Env_IdAllowedCharacters)
     {
-        ScopedEnvVar env(L"WSLC_UT_SECRET_IDCHARS", L"ok");
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_IDCHARS", L"ok");
         VerifyValid(L"id=Ab.9_-x,env=WSLC_UT_SECRET_IDCHARS", L"Ab.9_-x", ToBytes("ok"));
     }
 
@@ -271,7 +249,7 @@ class WSLCCLISecretParserUnitTests
     TEST_METHOD(Secret_Invalid_BareIdVariableNotSet)
     {
         // A bare id whose matching environment variable is undefined must be rejected (Docker parity).
-        SetEnvironmentVariableW(L"WSLC_UT_SECRET_BARE_UNSET", nullptr);
+        ScopedEnvVariable env(L"WSLC_UT_SECRET_BARE_UNSET");
         VerifyInvalid(L"id=WSLC_UT_SECRET_BARE_UNSET", L"environment variable 'WSLC_UT_SECRET_BARE_UNSET' is not set");
     }
 };

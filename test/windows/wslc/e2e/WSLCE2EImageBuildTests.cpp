@@ -282,8 +282,7 @@ class WSLCE2EImageBuildTests
         // Set the env var the --secret will reference; ensure cleanup so we don't leak into other tests.
         constexpr auto envName = L"WSLC_E2E_SECRET_VALUE";
         constexpr auto envValue = L"expected-secret-content-12345";
-        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
-        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+        ScopedEnvVariable envVar(envName, envValue);
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecret);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-env";
@@ -317,8 +316,7 @@ class WSLCE2EImageBuildTests
         // Docker parity: '--secret id=NAME' with no env=/src= reads the host env var named NAME.
         constexpr auto envName = L"WSLC_E2E_BARE_SECRET";
         constexpr auto envValue = L"bare-id-secret-content-67890";
-        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
-        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+        ScopedEnvVariable envVar(envName, envValue);
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretBareId);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-bare-id";
@@ -352,7 +350,7 @@ class WSLCE2EImageBuildTests
         // Docker parity: '--secret id=NAME' with no env=/src= reads the host env var named NAME, and
         // errors when that variable is unset (unlike an explicit 'env=', which yields an empty value).
         constexpr auto envName = L"WSLC_E2E_SECRET_BARE_ID_UNSET";
-        SetEnvironmentVariableW(envName, nullptr); // Ensure it's not set even if a prior run leaked.
+        ScopedEnvVariable envVar(envName); // Clears it (restoring any prior value on exit) so a leaked value can't taint the test.
 
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-bare-id-unset";
         auto cleanup = SetupTestDirectory(testRoot);
@@ -376,7 +374,7 @@ class WSLCE2EImageBuildTests
     {
         // Docker parity: an unset environment variable yields an empty secret value, not an error.
         constexpr auto envName = L"WSLC_E2E_SECRET_UNSET_VAR";
-        SetEnvironmentVariableW(envName, nullptr); // Ensure it's not set even if a prior run leaked.
+        ScopedEnvVariable envVar(envName); // Clears it (restoring any prior value on exit) so a leaked value can't taint the test.
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretMissingEnv);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-missing";
@@ -513,8 +511,7 @@ class WSLCE2EImageBuildTests
         // the file path is ignored (no error).
         constexpr auto envName = L"WSLC_E2E_ENV_WINS_VALUE";
         constexpr auto envValue = L"env-wins-content-55555";
-        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
-        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+        ScopedEnvVariable envVar(envName, envValue);
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretEnvWins);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-both";
@@ -551,8 +548,7 @@ class WSLCE2EImageBuildTests
     {
         constexpr auto envName = L"WSLC_E2E_TYPE_ENV_VALUE";
         constexpr auto envValue = L"type-env-content-11111";
-        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
-        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+        ScopedEnvVariable envVar(envName, envValue);
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretTypeEnv);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-env";
@@ -585,8 +581,7 @@ class WSLCE2EImageBuildTests
         // Docker parity: with type=env, a bare src= names the env var to read (not a file path).
         constexpr auto envName = L"WSLC_E2E_TYPE_ENV_SRC_VALUE";
         constexpr auto envValue = L"type-env-src-content-22222";
-        THROW_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(envName, envValue));
-        auto envCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [envName]() { SetEnvironmentVariableW(envName, nullptr); });
+        ScopedEnvVariable envVar(envName, envValue);
 
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretTypeEnvSrc);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-type-env-src";
