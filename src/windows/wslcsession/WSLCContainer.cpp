@@ -310,7 +310,10 @@ std::vector<ContainerPortMapping> BuildPortMappings(std::vector<_WSLCPortMapping
     const bool allocateVmPorts = NetworkModeAllocatesVmPorts(primary);
     for (auto& e : requestedPorts)
     {
-        if (e.HostPort == WSLC_EPHEMERAL_PORT && vm.NetworkingMode() == WSLCNetworkingModeNAT)
+        // Pre-allocate a concrete host port whenever the wslrelay relay path will be used: that path
+        // maps the host port verbatim and has no ephemeral writeback (unlike the virtioNet path), so
+        // an unresolved WSLC_EPHEMERAL_PORT (0) would otherwise be mapped as port 0 and fail.
+        if (e.HostPort == WSLC_EPHEMERAL_PORT && vm.UseWslRelayPortForwarding())
         {
             e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
         }
