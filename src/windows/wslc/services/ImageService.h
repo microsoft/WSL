@@ -16,6 +16,7 @@ Abstract:
 #include "SessionModel.h"
 #include "ImageModel.h"
 #include "Reporter.h"
+#include <map>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
@@ -32,6 +33,15 @@ struct BuildSecret
     std::vector<BYTE> Value;
 };
 
+// Parsed docker-style --output spec (buildx exporter). Type/Dest are the resolved exporter type and
+// destination; any remaining key=value attributes (name, push, compression, ...) are carried verbatim.
+struct BuildOutput
+{
+    std::wstring Type;                               // resolved exporter type (e.g. L"local", L"tar", ...)
+    std::wstring Dest;                               // destination path; L"-" means stdout; empty when not applicable
+    std::map<std::wstring, std::wstring> Attributes; // remaining key=value attributes
+};
+
 class ImageService
 {
 public:
@@ -44,6 +54,7 @@ public:
         const std::vector<BuildSecret>& secrets,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
+        const std::wstring& output,
         WSLCBuildImageFlags flags,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
