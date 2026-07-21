@@ -3336,7 +3336,8 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind(), listen() & ioctl(*, SIOCSIFFLAGS, *) calls.
+    Register a seccomp notification for bind() & listen() calls (both the native and 32-bit
+    compat ABIs), plus ioctl(*, SIOCSIFFLAGS, *) calls on the native 64-bit ABI only.
 
     listen() is intercepted in addition to bind() because it can perform an implicit
     autobind (assigning an ephemeral port) on a socket that was never explicitly bind()'d;
