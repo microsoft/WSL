@@ -947,6 +947,11 @@ try
         buildArgs.push_back("--target");
         buildArgs.push_back(Options->Target);
     }
+    if (Options->Output != nullptr && Options->Output[0] != '\0')
+    {
+        buildArgs.push_back("--output");
+        buildArgs.push_back(Options->Output);
+    }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);

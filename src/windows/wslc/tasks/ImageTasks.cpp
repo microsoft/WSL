@@ -126,6 +126,13 @@ void BuildImage(CLIExecutionContext& context)
         target = context.Args.Get<ArgType::BuildTarget>();
     }
 
+    std::wstring output;
+    if (context.Args.Contains(ArgType::Output))
+    {
+        // Validate and normalize the spec client-side, then forward the canonical form to buildx.
+        output = validation::FormatOutputSpec(validation::ParseOutputSpec(context.Args.Get<ArgType::Output>()));
+    }
+
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
     WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
@@ -133,7 +140,8 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(
+        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

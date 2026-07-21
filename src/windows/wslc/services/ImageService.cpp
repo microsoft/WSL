@@ -123,6 +123,7 @@ void ImageService::Build(
     const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
+    const std::wstring& output,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
@@ -191,6 +192,7 @@ void ImageService::Build(
     }
 
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
+    auto outputStr = wsl::windows::common::string::WideToMultiByte(output);
 
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
@@ -202,6 +204,7 @@ void ImageService::Build(
         .Flags = flags,
         .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
         .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
+        .Output = outputStr.empty() ? nullptr : outputStr.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));

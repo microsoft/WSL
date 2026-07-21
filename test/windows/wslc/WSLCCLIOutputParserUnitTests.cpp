@@ -310,6 +310,73 @@ class WSLCCLIOutputParserUnitTests
     {
         VerifyInvalid(L"type=registry", L"'type=registry' requires 'name='");
     }
+
+    // --- Round-trip: FormatOutputSpec re-serializes a BuildOutput into a canonical buildx spec ---
+
+    // Parses spec, formats the result, and asserts the canonical serialized form.
+    static void VerifyFormat(const std::wstring& spec, const std::wstring& expectedCanonical)
+    {
+        const auto canonical = validation::FormatOutputSpec(validation::ParseOutputSpec(spec));
+        VERIFY_ARE_EQUAL(expectedCanonical, canonical);
+
+        // The canonical form must itself parse back to an equivalent BuildOutput (idempotent round-trip).
+        const auto reparsed = validation::ParseOutputSpec(canonical);
+        const auto original = validation::ParseOutputSpec(spec);
+        VERIFY_ARE_EQUAL(original.Type, reparsed.Type);
+        VERIFY_ARE_EQUAL(original.Dest, reparsed.Dest);
+        VERIFY_ARE_EQUAL(original.Attributes.size(), reparsed.Attributes.size());
+        for (const auto& [key, value] : original.Attributes)
+        {
+            const auto it = reparsed.Attributes.find(key);
+            VERIFY_IS_TRUE(it != reparsed.Attributes.end());
+            if (it != reparsed.Attributes.end())
+            {
+                VERIFY_ARE_EQUAL(value, it->second);
+            }
+        }
+    }
+
+    TEST_METHOD(Format_Shorthand_LocalNormalizedToCanonical)
+    {
+        // Shorthand paths are normalized to their explicit type=local,dest= form for buildx.
+        VerifyFormat(L"./out", L"type=local,dest=./out");
+    }
+
+    TEST_METHOD(Format_Shorthand_DashNormalizedToTarStdout)
+    {
+        VerifyFormat(L"-", L"type=tar,dest=-");
+    }
+
+    TEST_METHOD(Format_TypeOnly_NoDestOrAttributes)
+    {
+        // docker/cacheonly need neither dest nor attributes, so the canonical form is just the type.
+        VerifyFormat(L"type=docker", L"type=docker");
+        VerifyFormat(L"type=cacheonly", L"type=cacheonly");
+    }
+
+    TEST_METHOD(Format_TypeAndDest)
+    {
+        VerifyFormat(L"type=tar,dest=out.tar", L"type=tar,dest=out.tar");
+    }
+
+    TEST_METHOD(Format_CaseInsensitiveKeysNormalizedToLower)
+    {
+        // 'type'/'dest' keys are lowercased; the type value is lowercased too.
+        VerifyFormat(L"TYPE=LOCAL,DEST=./out", L"type=local,dest=./out");
+    }
+
+    TEST_METHOD(Format_AttributesAppendedAfterDest)
+    {
+        // Attributes follow type/dest; std::map orders them, so 'name' precedes 'push'.
+        VerifyFormat(L"type=image,push=true,name=x", L"type=image,name=x,push=true");
+    }
+
+    TEST_METHOD(Format_RegistryWithAttributes)
+    {
+        VerifyFormat(
+            L"type=registry,name=myrepo/app:latest,push-by-digest=true",
+            L"type=registry,name=myrepo/app:latest,push-by-digest=true");
+    }
 };
 
 } // namespace WSLCCLIOutputParserUnitTests

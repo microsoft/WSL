@@ -216,6 +216,139 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     };
 }
 
+services::BuildOutput ParseOutputSpec(const std::wstring& spec)
+{
+    // Mirrors `docker buildx build --output`. A bare token is shorthand for a destination; otherwise
+    // the spec is a comma separated list of key=value pairs where 'type'/'dest' are structural and
+    // every other key is forwarded verbatim to buildx as an exporter attribute.
+    if (spec.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"the value may not be empty"));
+    }
+
+    // Split on ',' preserving empty fields. Unlike the shared Split helper (which drops them), an
+    // empty field such as in "type=local,,dest=x" is a malformed spec that must be rejected.
+    std::vector<std::wstring> fields;
+    for (size_t start = 0;;)
+    {
+        const auto pos = spec.find(L',', start);
+        if (pos == std::wstring::npos)
+        {
+            fields.emplace_back(spec.substr(start));
+            break;
+        }
+        fields.emplace_back(spec.substr(start, pos - start));
+        start = pos + 1;
+    }
+
+    // Keys are ASCII and matched case-insensitively; lowercase them without touching values.
+    const auto toLower = [](std::wstring value) {
+        for (auto& ch : value)
+        {
+            if (ch >= L'A' && ch <= L'Z')
+            {
+                ch = static_cast<wchar_t>(ch - L'A' + L'a');
+            }
+        }
+        return value;
+    };
+
+    // Shorthand: a single token with no '=' names the destination. '-' streams a tarball to stdout;
+    // anything else exports the final stage's filesystem to that local path.
+    if (fields.size() == 1 && fields[0].find(L'=') == std::wstring::npos)
+    {
+        if (fields[0] == L"-")
+        {
+            return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
+        }
+
+        return services::BuildOutput{.Type = L"local", .Dest = fields[0]};
+    }
+
+    services::BuildOutput output;
+    std::wstring rawType;
+    bool hasType = false;
+    bool hasDest = false;
+
+    for (const auto& field : fields)
+    {
+        const auto kv = SplitKeyValue(field);
+        if (!kv.HadSeparator || kv.Key.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+        }
+
+        const auto key = toLower(kv.Key);
+        if (key == L"type")
+        {
+            rawType = kv.Value;
+            output.Type = toLower(kv.Value);
+            hasType = true;
+        }
+        else if (key == L"dest")
+        {
+            output.Dest = kv.Value;
+            hasDest = true;
+        }
+        else
+        {
+            // Remaining attributes (name, push, compression, annotations, ...) are stored verbatim.
+            output.Attributes[kv.Key] = kv.Value;
+        }
+    }
+
+    if (!hasType || output.Type.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"type is required"));
+    }
+
+    const bool supportedType = output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci" ||
+                               output.Type == L"docker" || output.Type == L"image" || output.Type == L"registry" ||
+                               output.Type == L"cacheonly";
+    if (!supportedType)
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"unsupported output type '{}'", rawType)));
+    }
+
+    // Filesystem/tarball exporters write to a caller-provided location, so 'dest=' is mandatory.
+    if ((output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci") && (!hasDest || output.Dest.empty()))
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'dest='", output.Type)));
+    }
+
+    // The registry exporter pushes to a named reference, so 'name=' is mandatory.
+    if (output.Type == L"registry")
+    {
+        const auto it = output.Attributes.find(L"name");
+        if (it == output.Attributes.end() || it->second.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'name='", output.Type)));
+        }
+    }
+
+    return output;
+}
+
+std::wstring FormatOutputSpec(const services::BuildOutput& output)
+{
+    // buildx consumes the same comma separated key=value form we parsed, so we round-trip the parsed
+    // struct back into a canonical spec. This is what actually reaches `docker build --output <spec>`.
+    std::wstring spec = std::format(L"type={}", output.Type);
+    if (!output.Dest.empty())
+    {
+        spec += std::format(L",dest={}", output.Dest);
+    }
+
+    for (const auto& [key, value] : output.Attributes)
+    {
+        spec += std::format(L",{}={}", key, value);
+    }
+
+    return spec;
+}
+
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName)
 {
     // Accepts <name>=<soft>[:<hard>]; if hard is omitted hard = soft. -1 means unlimited.

@@ -23,7 +23,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 struct BuildSecret;
-}
+struct BuildOutput;
+} // namespace wsl::windows::wslc::services
 
 namespace wsl::windows::wslc::validation {
 
@@ -42,6 +43,12 @@ KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator = L'=')
 
 // Parses a docker-style --secret spec ("id=...,type=...,src=...") and resolves its value bytes.
 services::BuildSecret ParseSecretSpec(const std::wstring& spec);
+
+// Parses a docker-style --output spec ("type=...,dest=...,<attr>=...") into a BuildOutput.
+services::BuildOutput ParseOutputSpec(const std::wstring& spec);
+
+// Serializes a BuildOutput back into a canonical buildx --output spec ("type=...,dest=...,<attr>=...").
+std::wstring FormatOutputSpec(const services::BuildOutput& output);
 
 // Parses a --ulimit spec ("<name>=<soft>[:<hard>]") into (name, soft, hard). -1 means unlimited.
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName = {});

@@ -540,6 +540,7 @@ typedef struct _WSLCBuildImageOptions
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
     WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
     WSLCBuildSecretArray Secrets; // --secret entries; the server writes each secret's bytes to a root-only tmpfs file in the VM and emits the corresponding id=...,src=... spec.
+    [unique, string] LPCSTR Output; // Passed verbatim as --output to docker build (buildx exporter spec, e.g. type=local,dest=path).
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
