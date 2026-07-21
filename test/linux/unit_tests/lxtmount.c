@@ -649,21 +649,16 @@ Return Value:
     struct libmnt_table* Table;
 
     //
-    // Aggregate virtio-fs collapses every Windows share onto a single device, so
-    // all shares report the same device number. A device-based lookup is
-    // therefore ambiguous and can return an arbitrary share's mount, which makes
-    // callers such as the drvfs parent-id checks nondeterministic.
+    // Find the nearest mount containing the path without relying on the device
+    // number, which is shared by all aggregate virtio-fs shares.
     //
 
     FileSystem = NULL;
     Table = NULL;
     LxtCheckErrnoZeroSuccess(stat(Path, &Stat));
-    LxtCheckResult(MountFindMount(MOUNT_PROC_MOUNTINFO, Path, 0, &Table, &FileSystem, MNT_ITER_BACKWARD));
-    if (FileSystem == NULL)
-    {
-        LxtCheckResult(MountFindMount(MOUNT_PROC_MOUNTINFO, NULL, Stat.st_dev, &Table, &FileSystem, MNT_ITER_BACKWARD));
-    }
-
+    Table = mnt_new_table_from_file(MOUNT_PROC_MOUNTINFO);
+    LxtCheckNotEqual(Table, NULL, "%p");
+    FileSystem = mnt_table_find_mountpoint(Table, Path, MNT_ITER_BACKWARD);
     LxtCheckNotEqual(FileSystem, NULL, "%p");
     Result = mnt_fs_get_id(FileSystem);
 
