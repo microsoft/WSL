@@ -784,13 +784,6 @@ try
         const auto childError = errno;
         LOG_WARNING("Mounting virtiofs child for {} failed {}, falling back to Plan9", Source, childError);
 
-        // Clear any mount-failure exit code so the Plan9 attempt isn't
-        // pre-judged as a failure.
-        if (ExitCode != nullptr)
-        {
-            *ExitCode = 0;
-        }
-
         return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
     }
     else
@@ -913,7 +906,7 @@ try
     // Validate the tag is a GUID.
     //
 
-    std::string_view mappingName{Tag};
+    std::string mappingName{Tag};
     if (Root != nullptr)
     {
         if (const auto mountRoot = ParseAggregateVirtioFsMountRoot(Tag, Root))
