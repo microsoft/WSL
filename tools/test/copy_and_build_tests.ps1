@@ -45,7 +45,7 @@ $DistroPath = "$env:LocalAppData\lxss"
 $copyScriptCommand = $PSScriptRoot + "\copy_tests.ps1 -WslTestDirPath $WslTestDirPath -DistroName $DistroName"
 
 $cleanTestCommand = "rm -rf /data/test"
-$buildTestCommand = "cd /data/test; ./build_tests.sh 2>&1 | tee /data/test/log/build_output; exit `${PIPESTATUS[0]}"
+$buildTestCommand = "cd /data/test; ./build_tests.sh; less /data/test/log/build_output"
 
 # clean test directory on linux side
 Write-Output "Cleaning unit tests at $DistroPath\rootfs\data\test"
