@@ -453,8 +453,8 @@ public:
 
             // Mount the share.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
-            VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(L"mount -t drvfs {}'{}' '{}'", readOnly ? L"-o ro " : L"", sourceDir.string(), mountPoint)), 0);
+            const auto mountCommand = std::format(L"mount -t drvfs {}'{}' '{}'", readOnly ? L"-o ro " : L"", sourceDir.string(), mountPoint);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand), 0);
 
             // Validate that it can be accessed.
             {

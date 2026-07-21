@@ -652,7 +652,7 @@ Return Value:
     // Aggregate virtio-fs collapses every Windows share onto a single device, so
     // all shares report the same device number. A device-based lookup is
     // therefore ambiguous and can return an arbitrary share's mount, which makes
-    // callers such as the drvfs parent-id checks nondeterministic. 
+    // callers such as the drvfs parent-id checks nondeterministic.
     //
 
     FileSystem = NULL;
