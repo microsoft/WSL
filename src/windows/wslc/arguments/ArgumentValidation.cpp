@@ -367,20 +367,9 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     }
 
     // Docker parity: a referenced environment variable that is unset (or set but empty) yields an
-    // empty secret value rather than an error. GetEnvironmentVariableW returns 0 for an undefined
-    // variable; for a defined one it returns the buffer size needed including the null terminator.
-    std::wstring value;
-    DWORD size = GetEnvironmentVariableW(envName.c_str(), nullptr, 0);
-    if (size > 0)
-    {
-        value.resize(size);
-        DWORD written = GetEnvironmentVariableW(envName.c_str(), value.data(), size);
-        // If the variable grew between the size query above and this read, GetEnvironmentVariableW
-        // returns the newly-required size (>= our buffer) without filling it; treat that as an error
-        // rather than forwarding a truncated/garbage secret value to the build.
-        THROW_HR_IF(E_UNEXPECTED, written >= size);
-        value.resize(written);
-    }
+    // empty secret value rather than an error. ReadEnvironmentVariable returns nullopt for an
+    // undefined variable, which we collapse to an empty value.
+    const std::wstring value = wsl::windows::common::wslutil::ReadEnvironmentVariable(envName.c_str()).value_or(std::wstring{});
 
     // The env value is delivered as UTF-8 bytes, matching how the guest exposes it at /run/secrets/<id>.
     auto valueBytes = wsl::windows::common::string::WideToMultiByte(value);

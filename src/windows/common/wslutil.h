@@ -311,6 +311,10 @@ void PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream =
     PrintMessageImpl(message, stream, std::forward<Args>(args)...);
 }
 
+// Reads an environment variable. Returns nullopt iff the variable is not defined; an engaged
+// (possibly empty) string otherwise.
+std::optional<std::wstring> ReadEnvironmentVariable(_In_ LPCWSTR Name);
+
 void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);
