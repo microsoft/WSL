@@ -2457,7 +2457,15 @@ try
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            RemountVirtioFs(MountEntry.Root + 1, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            if (const auto aggregateRoot = ParseAggregateVirtioFsMountRoot(MountEntry.Source, MountEntry.Root))
+            {
+                const std::string childName{aggregateRoot->ChildName};
+                RemountVirtioFs(childName.c_str(), MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin, aggregateRoot->SubPath);
+            }
+            else
+            {
+                RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            }
         }
         else
         {

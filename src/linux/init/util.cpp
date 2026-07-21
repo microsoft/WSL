@@ -926,7 +926,7 @@ try
         //
 
         std::string MountSource;
-        bool IsAggregateVirtioFs = false;
+        std::string_view MountRoot{MountEnum.Current().Root};
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
@@ -939,6 +939,7 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
+            const auto aggregateRoot = ParseAggregateVirtioFsMountRoot(MountEnum.Current().Source, MountRoot);
             MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, MountEnum.Current().Root);
             if (MountSource.empty())
             {
@@ -946,7 +947,10 @@ try
             }
 
             MountEnum.Current().Source = MountSource.data();
-            IsAggregateVirtioFs = strcmp(MountEnum.Current().Root, "/") != 0;
+            if (aggregateRoot)
+            {
+                MountRoot = aggregateRoot->SubPath;
+            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -978,10 +982,10 @@ try
         //
 
         std::string CombinedMountSource;
-        if (!IsAggregateVirtioFs && strcmp(MountEnum.Current().Root, "/") != 0)
+        if (MountRoot != "/")
         {
             CombinedMountSource += MountEnum.Current().Source;
-            CombinedMountSource += MountEnum.Current().Root;
+            CombinedMountSource += MountRoot;
             UtilCanonicalisePathSeparator(CombinedMountSource, PATH_SEP_NT);
             MountEnum.Current().Source = CombinedMountSource.data();
         }

@@ -151,6 +151,8 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
             .rootPath = rootPath.get(),
             .kind = Kind,
             .shmemSizeMb = ShmemSizeMb,
+            // To workaround memory aperture limitations, limit virtiofs devices to one queue.
+            .queueCount = 1,
             .mountOptions = mountOptions.get()};
         THROW_IF_FAILED(GetWslVm(UserToken)->CreateVirtiofsDevice(&instanceIdForCall, GetCallback().get(), &config, virtiofsDevice.put()));
     }
@@ -170,6 +172,8 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
 
 void DeviceHostProxy::AddVirtiofsChild(const GUID& InstanceId, const std::wstring& Name, const std::wstring& RootPath, const std::wstring& MountOptions)
 {
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+
     const auto name = wil::make_bstr(Name.c_str());
     const auto rootPath = wil::make_bstr(RootPath.c_str());
     const auto mountOptions = wil::make_bstr(MountOptions.c_str());

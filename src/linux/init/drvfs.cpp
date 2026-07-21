@@ -47,59 +47,27 @@ int MountFilesystem(const char* FsType, const char* Source, const char* Target, 
 
 int MountWithRetry(const char* Source, const char* Target, const char* FsType, const char* Options, int* ExitCode = nullptr);
 
+std::optional<VirtioFsMountRoot> ParseAggregateVirtioFsMountRoot(std::string_view Tag, std::string_view Root)
+{
+    if ((Tag != LX_INIT_DRVFS_VIRTIO_TAG && Tag != LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) || Root.size() < 2 || Root.front() != '/')
+    {
+        return {};
+    }
+
+    Root.remove_prefix(1);
+    const auto separator = Root.find('/');
+    const auto childName = Root.substr(0, separator);
+    if (!wsl::shared::string::ToGuid(childName))
+    {
+        return {};
+    }
+
+    const auto subPath = separator == std::string_view::npos ? std::string_view{"/"} : Root.substr(separator);
+    return VirtioFsMountRoot{childName, subPath};
+}
+
 namespace {
 std::mutex g_virtiofsDeviceMutex;
-
-void LogVirtioFsMountState(std::string_view Stage, const std::string& RootTarget, const std::string& ChildSource, const char* Target)
-{
-    struct stat namespaceStat = {};
-    const auto namespaceResult = stat("/proc/self/ns/mnt", &namespaceStat);
-    const auto namespaceError = namespaceResult < 0 ? errno : 0;
-
-    struct stat rootStat = {};
-    const auto rootResult = stat(RootTarget.c_str(), &rootStat);
-    const auto rootError = rootResult < 0 ? errno : 0;
-
-    LOG_INFO(
-        "VirtioFsMountState stage={} namespaceInode={} namespaceError={} rootTarget={} rootDevice={} rootInode={} rootError={} "
-        "childSource={} target={}",
-        Stage,
-        namespaceResult == 0 ? namespaceStat.st_ino : 0,
-        namespaceError,
-        RootTarget,
-        rootResult == 0 ? rootStat.st_dev : 0,
-        rootResult == 0 ? rootStat.st_ino : 0,
-        rootError,
-        ChildSource,
-        Target);
-
-    MOUNT_ENUM mountEnum = {};
-    if (MountEnumCreate(&mountEnum) < 0)
-    {
-        LOG_WARNING("MountEnumCreate failed while tracing virtiofs mounts: {}", errno);
-        return;
-    }
-
-    auto cleanup = wil::scope_exit([&] { MountEnumFree(&mountEnum); });
-    while (MountEnumNext(&mountEnum) == 0)
-    {
-        const auto& mount = mountEnum.Current;
-        if (strcmp(mount.FileSystemType, VIRTIO_FS_TYPE) == 0)
-        {
-            LOG_INFO(
-                "VirtioFsMountInfo stage={} id={} parentId={} device={} root={} mountPoint={} mountOptions={} source={} superOptions={}",
-                Stage,
-                mount.Id,
-                mount.ParentId,
-                mount.Device,
-                mount.Root,
-                mount.MountPoint,
-                mount.MountOptions,
-                mount.Source,
-                mount.SuperOptions);
-        }
-    }
-}
 
 bool IsMountPoint(const std::string& Path)
 {
@@ -120,18 +88,23 @@ bool IsMountPoint(const std::string& Path)
 }
 } // namespace
 
-int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Target, const char* Options, int* ExitCode = nullptr)
+int MountVirtioFsChild(
+    const char* Tag,
+    const char* ChildName,
+    const char* Target,
+    const char* Options,
+    int* ExitCode = nullptr,
+    std::string_view SubPath = "/")
 {
     if ((strcmp(Tag, LX_INIT_DRVFS_VIRTIO_TAG) != 0 && strcmp(Tag, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) != 0) ||
-        !wsl::shared::string::ToGuid(ChildName))
+        !wsl::shared::string::ToGuid(ChildName) || SubPath.empty() || SubPath.front() != '/')
     {
         errno = EINVAL;
         return -1;
     }
 
     const auto rootTarget = std::format("{}/{}", VIRTIOFS_MOUNT_DIR, Tag);
-    const auto childSource = std::format("{}/{}", rootTarget, ChildName);
-    LogVirtioFsMountState("before-root-check", rootTarget, childSource, Target);
+    const auto childSource = std::format("{}/{}{}", rootTarget, ChildName, SubPath == "/" ? std::string_view{} : SubPath);
     {
         std::lock_guard<std::mutex> lock(g_virtiofsDeviceMutex);
         if (!IsMountPoint(rootTarget))
@@ -147,7 +120,6 @@ int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Targe
             }
         }
     }
-    LogVirtioFsMountState("root-ready", rootTarget, childSource, Target);
 
     if (UtilMkdirPath(Target, 0755) < 0)
     {
@@ -175,7 +147,6 @@ int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Targe
 
     if (lastError != 0)
     {
-        LogVirtioFsMountState("bind-failed", rootTarget, childSource, Target);
         errno = lastError;
         if (ExitCode != nullptr)
         {
@@ -184,7 +155,6 @@ int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Targe
 
         return -1;
     }
-    LogVirtioFsMountState("bind-complete", rootTarget, childSource, Target);
 
     const auto parsed = mountutil::MountParseFlags(Options ? Options : "");
     auto bindFlags = parsed.MountFlags;
@@ -196,6 +166,7 @@ int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Targe
     if (mount(nullptr, Target, nullptr, MS_BIND | MS_REMOUNT | bindFlags, parsed.StringOptions.c_str()) < 0)
     {
         const auto savedError = errno;
+        // Remove the successful bind before MountVirtioFs falls back to Plan 9.
         umount2(Target, MNT_DETACH);
         errno = savedError;
         if (ExitCode != nullptr)
@@ -831,7 +802,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int RemountVirtioFs(const char* Tag, const char* Target, const char* Options, bool Admin)
+int RemountVirtioFs(const char* Tag, const char* Target, const char* Options, bool Admin, std::string_view SubPath)
 
 /*++
 
@@ -885,7 +856,7 @@ try
     auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
     auto* ChildName = wsl::shared::string::FromSpan(ResponseSpan, Response.ChildNameOffset);
     auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
-    THROW_LAST_ERROR_IF(MountVirtioFsChild(NewTag, ChildName, Target, Options) < 0);
+    THROW_LAST_ERROR_IF(MountVirtioFsChild(NewTag, ChildName, Target, Options, nullptr, SubPath) < 0);
 
     SaveVirtiofsTagMapping(ChildName, Source);
 
@@ -925,10 +896,13 @@ try
     // Validate the tag is a GUID.
     //
 
-    const char* mappingName = Tag;
-    if (Root != nullptr && Root[0] == '/' && Root[1] != '\0')
+    std::string_view mappingName{Tag};
+    if (Root != nullptr)
     {
-        mappingName = Root + 1;
+        if (const auto mountRoot = ParseAggregateVirtioFsMountRoot(Tag, Root))
+        {
+            mappingName = mountRoot->ChildName;
+        }
     }
 
     const auto Guid = wsl::shared::string::ToGuid(mappingName);
