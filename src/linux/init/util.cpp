@@ -877,6 +877,21 @@ try
     while (MountEnum.Next())
     {
         //
+        // Skip internal virtiofs device mounts. The aggregate virtiofs root and
+        // its per-share child binds live under VIRTIOFS_MOUNT_DIR and carry the
+        // same Windows source as the user-facing /mnt/<drive> bind mounts. If
+        // they were considered, reverse (Windows->Linux) translation could
+        // return an internal plumbing path (for example
+        // /run/wsl/virtiofs-mounts/drvfsa/<guid>) instead of the real mount
+        // point such as /mnt/c.
+        //
+
+        if (UtilIsPathPrefix(MountEnum.Current().MountPoint, VIRTIOFS_MOUNT_DIR, false) > 0)
+        {
+            continue;
+        }
+
+        //
         // If a mount point was previously found, and this mount point is a
         // prefix of the path (or the previously found mount point, for Windows
         // to Linux translation), it means that the path is not actually on
